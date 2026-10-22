@@ -72,5 +72,20 @@
     "evidence": {"tests_added": ["SetupThread exposes stable main stack metadata through ReferThreadStatus (updated expectation)"],
                  "integration_commit": "257c5c5", "build": "MSVC 14.44 Release OK", "regression": "ps2x_tests 454/454"},
     "limitations": "For SetupThread(-1) the runtime still tops the stack at 0x02000000 - size; Play! uses RAM size - 4 KiB. Not changed without more evidence."
+  },
+  {
+    "id": "upstream-06",
+    "source": {"repository": "ran-j/PS2Recomp", "branch": "pull/284", "revision": "591e56e", "files": ["ps2xRuntime/src/lib/ps2_memory.cpp"], "authors": ["Luis Braganca (luisbraganca)"]},
+    "title": "D_ENABLEW is visible at D_ENABLER; both reset to 0x1201 (PR #284, issue #257)",
+    "category": "A", "subsystem": "runtime/DMAC",
+    "problem": "The DMAC enable register's write and read ports were unrelated slots, so suspend/resume polls spun forever (Ridge Racer V froze per #257).",
+    "approach": "A write to D_ENABLEW lands in both slots; both start at 0x1201 (CPND clear).",
+    "scope": "general", "scope_evidence": "Every title that suspends the DMAC through D_ENABLEW and polls D_ENABLER.",
+    "reference": "PCSX2 pcsx2/Dmac.cpp dmacWrite32 DMAC_ENABLEW, pcsx2/Hw.cpp hwReset; ps2tek DMAC registers", "license": "GPL-3.0",
+    "upstream_equivalent": "ran-j/PS2Recomp#284 (open); PR #372 contains an overlapping mirror hunk without the reset value",
+    "risk": "low", "priority": 1, "status": "INTEGRATED",
+    "evidence": {"tests_added": ["DMAC D_ENABLER reads 0x1201 after reset with CPND clear", "DMAC D_ENABLEW writes are visible at D_ENABLER", "DMAC suspend and resume polls through D_ENABLEW and D_ENABLER terminate"],
+                 "integration_commit": "591e56e", "build": "MSVC 14.44 Release OK", "regression": "ps2x_tests 457/457, ps2xIOP ctest 4/4"},
+    "limitations": "Channel kicks still run immediately while CPND is set (no queued-DMA model)."
   }
 ]

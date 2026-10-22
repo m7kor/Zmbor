@@ -1815,6 +1815,65 @@ void register_code_generator_tests()
                      "backward internal branch should still re-enter the in-function label when it keeps the current slice");
         });
 
+        // Ported from LightVelox/PS2Recomp 278818e6.
+        tc.Run("signed branches compare the full 64-bit EE register", [](TestCase &t) {
+            struct BranchCase
+            {
+                uint32_t opcode;
+                uint8_t rt;
+                const char *comparison;
+            };
+            const BranchCase cases[] = {
+                {OPCODE_BLEZ, 0, "<= 0"},
+                {OPCODE_BLEZL, 0, "<= 0"},
+                {OPCODE_BGTZ, 0, "> 0"},
+                {OPCODE_BGTZL, 0, "> 0"},
+                {OPCODE_REGIMM, REGIMM_BLTZ, "< 0"},
+                {OPCODE_REGIMM, REGIMM_BLTZL, "< 0"},
+                {OPCODE_REGIMM, REGIMM_BLTZAL, "< 0"},
+                {OPCODE_REGIMM, REGIMM_BLTZALL, "< 0"},
+                {OPCODE_REGIMM, REGIMM_BGEZ, ">= 0"},
+                {OPCODE_REGIMM, REGIMM_BGEZL, ">= 0"},
+                {OPCODE_REGIMM, REGIMM_BGEZAL, ">= 0"},
+                {OPCODE_REGIMM, REGIMM_BGEZALL, ">= 0"},
+            };
+            for (const BranchCase &branchCase : cases)
+            {
+                Function func{};
+                func.name = "signed_branch";
+                func.start = 0x1200;
+                func.end = 0x1210;
+                func.isRecompiled = true;
+
+                Instruction branch = makeIType(0x1200, branchCase.opcode, 3, branchCase.rt, 1);
+                branch.isBranch = true;
+                branch.hasDelaySlot = true;
+
+                CodeGenerator gen({}, {});
+                const std::string generated = gen.generateFunction(
+                    func, {branch, makeNop(0x1204), makeNop(0x1208)}, false);
+                const std::string expected = std::string("GPR_S64(ctx, 3) ") + branchCase.comparison;
+                t.IsTrue(generated.find(expected) != std::string::npos,
+                         "signed branch must use bit 63, including likely and link variants");
+                t.IsTrue(generated.find("GPR_S32(ctx, 3)") == std::string::npos,
+                         "the low-word sign can differ from the sign of a soft-double mantissa");
+            }
+        });
+
+        tc.Run("SQRT.S reads its operand from ft, not fs", [](TestCase &t) {
+            Instruction sqrt{};
+            sqrt.opcode = OPCODE_COP1;
+            sqrt.rs = COP1_S;
+            sqrt.function = COP1_S_SQRT;
+            sqrt.rt = 5; // ft: the operand
+            sqrt.rd = 0; // fs: unused by SQRT.S
+            sqrt.sa = 2; // fd
+            CodeGenerator gen({}, {});
+            const std::string generated = gen.translateInstruction(sqrt);
+            t.IsTrue(generated.find("ctx->f[2] = FPU_SQRT_S(ctx->f[5]);") != std::string::npos,
+                     "SQRT.S fd, ft must take the square root of ft");
+        });
+
         tc.Run("branch-likely places delay slot only in taken path", [](TestCase &t) {
             Function func;
             func.name = "branch_likely";

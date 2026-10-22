@@ -1,0 +1,141 @@
+{
+  "sotc-01": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "verified_by_lead": "PCSX2 Interpreter.cpp BGEZ/BLEZ/BLTZ/BGTZ use GPR.SD[0]; SET_GPR_U32/S32 sign-extend so 32-bit results are unaffected",
+      "tests_added": [
+        "signed branches compare the full 64-bit EE register (ported unchanged)"
+      ],
+      "integration_commit": "a3c7f21",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462, ps2xIOP 4/4; mutation (fix reverted) fails the test"
+    }
+  },
+  "sotc-02": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "verified_by_lead": "PCSX2 FPU.cpp SQRT_S reads only Ft",
+      "tests_added": [
+        "SQRT.S reads its operand from ft, not fs"
+      ],
+      "integration_commit": "a3c7f21",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "note": "Only the operand fix; the fork's float-semantics revert in the same commit (sotc-03) is rejected."
+  },
+  "sotc-06": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "tests_added": [
+        "every R5900Context starts with VF00 = (0, 0, 0, 1)"
+      ],
+      "integration_commit": "a42c052",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "note": "Initialisation only; suppressing VF0 writes from every emitter (GOW/roadtrip) is a separate candidate."
+  },
+  "sotc-07": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "verified_by_lead": "PCSX2 R5900OpcodeImpl.cpp LQ/SQ use addr & ~0xf; runtime-internal Load128 callers (IPU) use aligned bases",
+      "tests_added": [
+        "quadword loads and stores ignore the low four address bits"
+      ],
+      "integration_commit": "a42c052",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    }
+  },
+  "sotc-10": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "tests_added": [
+        "GIF DMA chain longer than 4096 tags is transferred to its END tag (ported unchanged)"
+      ],
+      "integration_commit": "9ed5b6e",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "note": "Cap raised to 1<<20 with a warning; DQ8's cycle detection (dq8-21) and SRWZ's 64 MiB byte cap remain candidates."
+  },
+  "sotc-31": {
+    "status": "SUPERSEDED",
+    "note": "Same fix integrated from upstream PR #310 (upstream-03)."
+  },
+  "dq8-01": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-01 (a3c7f21); independent confirmation from the DQ8 fork."
+  },
+  "dq8-02": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-02 (a3c7f21); independent confirmation from the DQ8 fork."
+  },
+  "dq8-08": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via upstream-01 (PR #304 + slices)."
+  },
+  "dq8-16": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via upstream-04 (#258)."
+  },
+  "dq8-18": {
+    "status": "SUPERSEDED",
+    "note": "Covered by upstream-04/upstream-05 (#258/#259)."
+  },
+  "DJ-01": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-01 (a3c7f21); independent confirmation from Def Jam Vendetta's engine patch."
+  },
+  "FPU-SQRT": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-02 (a3c7f21); found independently by Killzone, Def Jam and BT3."
+  },
+  "KZ-LQALIGN": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-07 (a42c052) at the memory-macro level instead of in codegen."
+  },
+  "KZ-VCALLMSR": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via upstream-02 (PR #268) in codegen."
+  },
+  "sotc-05": {
+    "note": "Written independently against PCSX2; +-max is 0x7FFFFFFF (PCSX2 clamps to 0x7F7FFFFF).",
+    "status": "INTEGRATED",
+    "evidence": {
+      "verified_by_lead": "PCSX2 VUops.cpp _vuDIV/_vuSQRT/_vuRSQRT and FPU.cpp CVT_W read",
+      "regression": "ps2x_tests 466/466, ps2xIOP 4/4; mutation (each fix reverted) fails its test",
+      "build": "MSVC 14.44 Release OK",
+      "integration_commit": "252de7c",
+      "tests_added": [
+        "CVT.W.S truncates toward zero and saturates by sign",
+        "VU0 macro DIV/SQRT/RSQRT follow the FDIV-unit rules and set I/D",
+        "VU0 macro VRSQRT reads its fs numerator"
+      ]
+    }
+  },
+  "KZ-CVTW": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-05 (252de7c)."
+  },
+  "VU0-SQRT": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-05 (252de7c)."
+  },
+  "dq8-04": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-05 (252de7c); the fork's 0-on-nonpositive choice was not taken."
+  },
+  "roadtrip-08": {
+    "status": "SUPERSEDED",
+    "note": "SQRT.S via sotc-02 (a3c7f21), CVT.W.S via sotc-05 (252de7c)."
+  },
+  "KZ-MMI": {
+    "note": "PEXEH/PEXCH/PEXCW/PREVH/PMULTH/PMFHL.SH not yet verified or ported.",
+    "status": "CANDIDATE",
+    "evidence": {
+      "partial_integration": "PEXEW only, in 252de7c with test 'PEXEW swaps words 0 and 2'"
+    }
+  }
+}

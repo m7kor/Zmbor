@@ -1,0 +1,2238 @@
+[
+  {
+    "id": "dj-01",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "ecd34971 (diff vs upstream 2c5fbb9)",
+      "involved": "DJ",
+      "files": [
+        "patches/ps2recomp-local.diff: ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ]
+    },
+    "title": "BLEZ/BGTZ/BLTZ/BGEZ(+L/AL) compare the full 64-bit GPR",
+    "category": "A",
+    "subsystem": "EE codegen branches",
+    "problem": "Upstream emits GPR_S32(...) <= 0 etc. A 64-bit value whose bit 63 is set but bit 31 clear branches the wrong way (DJ comment: libgcc soft-float add/divide depend on it).",
+    "approach": "Emit GPR_S64 for all these conditions.",
+    "scope": "general",
+    "scope_evidence": "general; checked PCSX2 Interpreter.cpp BLEZ/BLTZ: `cpuRegs.GPR.r[_Rs_].SD[0] <= 0`",
+    "reference": "PCSX2 pcsx2/Interpreter.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "DJ-01",
+      "repo": "DJ",
+      "revision": "ecd34971 (diff vs upstream 2c5fbb9)",
+      "license": "GPL-3.0",
+      "files": [
+        "patches/ps2recomp-local.diff: ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ],
+      "title": "BLEZ/BGTZ/BLTZ/BGEZ(+L/AL) compare the full 64-bit GPR",
+      "category": "A/B",
+      "subsystem": "EE codegen branches",
+      "problem": "Upstream emits GPR_S32(...) <= 0 etc. A 64-bit value whose bit 63 is set but bit 31 clear branches the wrong way (DJ comment: libgcc soft-float add/divide depend on it).",
+      "approach": "Emit GPR_S64 for all these conditions.",
+      "general_or_specific": "general; checked PCSX2 Interpreter.cpp BLEZ/BLTZ: `cpuRegs.GPR.r[_Rs_].SD[0] <= 0`",
+      "reference": "PCSX2 pcsx2/Interpreter.cpp",
+      "upstream_already_has": "no (upstream control_flow_emitter.cpp lines 407-425 still use GPR_S32; BT3 also still S32)",
+      "risk": "low; regen needed",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "DJ-01",
+    "limitations": "Integrated via sotc-01 (a3c7f21); independent confirmation from Def Jam Vendetta's engine patch."
+  },
+  {
+    "id": "vendored-02",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "KZ cc1fc7d8 / DJ ecd34971 / BT3 e22a34be",
+      "involved": "KZ (0010), DJ, BT3",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ]
+    },
+    "title": "SQRT.S takes its source from the ft field",
+    "category": "A",
+    "subsystem": "EE FPU codegen",
+    "problem": "Upstream emits FPU_SQRT_S(ctx->f[fs]). fs is 0 in the sqrt.s encoding, so it computes sqrt(f0) (KZ: about 430 sites; BT3: 90 sites).",
+    "approach": "Use the ft field. Three projects fixed this independently.",
+    "scope": "general",
+    "scope_evidence": "general; PCSX2 FPU.cpp SQRT_S operates on _FtValUl_",
+    "reference": "PCSX2 pcsx2/FPU.cpp SQRT_S",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "FPU-SQRT",
+      "repo": "KZ (0010), DJ, BT3",
+      "revision": "KZ cc1fc7d8 / DJ ecd34971 / BT3 e22a34be",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ],
+      "title": "SQRT.S takes its source from the ft field",
+      "category": "A/B",
+      "subsystem": "EE FPU codegen",
+      "problem": "Upstream emits FPU_SQRT_S(ctx->f[fs]). fs is 0 in the sqrt.s encoding, so it computes sqrt(f0) (KZ: about 430 sites; BT3: 90 sites).",
+      "approach": "Use the ft field. Three projects fixed this independently.",
+      "general_or_specific": "general; PCSX2 FPU.cpp SQRT_S operates on _FtValUl_",
+      "reference": "PCSX2 pcsx2/FPU.cpp SQRT_S",
+      "upstream_already_has": "no (fpu_translator.cpp:61 uses fs; ps2_fsqrt already does |x| since #272)",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "FPU-SQRT",
+    "limitations": "Integrated via sotc-02 (a3c7f21); found independently by Killzone, Def Jam and BT3."
+  },
+  {
+    "id": "vendored-03",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0009)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "CVT.W.S truncates toward zero and saturates",
+    "category": "A",
+    "subsystem": "EE FPU",
+    "problem": "Upstream FPU_CVT_W_S is (int32_t)nearbyintf(a): round-to-nearest with no saturation.",
+    "approach": "Truncate; clamp to 0x7FFFFFFF/0x80000000 by sign when the exponent is above 0x4E8.",
+    "scope": "general",
+    "scope_evidence": "general; PCSX2 FPU.cpp CVT_W: (s32) cast when exponent <= 0x4E800000, otherwise saturate by sign",
+    "reference": "PCSX2 pcsx2/FPU.cpp CVT_W",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-CVTW",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0009)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "CVT.W.S truncates toward zero and saturates",
+      "category": "A",
+      "subsystem": "EE FPU",
+      "problem": "Upstream FPU_CVT_W_S is (int32_t)nearbyintf(a): round-to-nearest with no saturation.",
+      "approach": "Truncate; clamp to 0x7FFFFFFF/0x80000000 by sign when the exponent is above 0x4E8.",
+      "general_or_specific": "general; PCSX2 FPU.cpp CVT_W: (s32) cast when exponent <= 0x4E800000, otherwise saturate by sign",
+      "reference": "PCSX2 pcsx2/FPU.cpp CVT_W",
+      "upstream_already_has": "no (macros.h:856)",
+      "risk": "low (header change, full rebuild)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-CVTW",
+    "limitations": "Integrated via sotc-05 (252de7c)."
+  },
+  {
+    "id": "vendored-04",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRecomp/src/lib/instruction_translator.cpp"
+      ]
+    },
+    "title": "LQ/SQ/LQC2/SQC2 force a 16-byte address",
+    "category": "A",
+    "subsystem": "EE load/store codegen",
+    "problem": "Generated code uses rs+imm unmasked. The EE ignores the low 4 bits. Unaligned lq+qfsrv idioms (371 sites in KZ) read the wrong data, which broke culling and 3D rendering.",
+    "approach": "AND the address with ~0xF before READ128/WRITE128.",
+    "scope": "general",
+    "scope_evidence": "general; PCSX2 R5900OpcodeImpl.cpp LQ: `memRead128(addr & ~0xf, ...)`",
+    "reference": "PCSX2 pcsx2/R5900OpcodeImpl.cpp LQ",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-LQALIGN",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/instruction_translator.cpp"
+      ],
+      "title": "LQ/SQ/LQC2/SQC2 force a 16-byte address",
+      "category": "A/B",
+      "subsystem": "EE load/store codegen",
+      "problem": "Generated code uses rs+imm unmasked. The EE ignores the low 4 bits. Unaligned lq+qfsrv idioms (371 sites in KZ) read the wrong data, which broke culling and 3D rendering.",
+      "approach": "AND the address with ~0xF before READ128/WRITE128.",
+      "general_or_specific": "general; PCSX2 R5900OpcodeImpl.cpp LQ: `memRead128(addr & ~0xf, ...)`",
+      "reference": "PCSX2 pcsx2/R5900OpcodeImpl.cpp LQ",
+      "upstream_already_has": "no (instruction_translator.cpp:199-201 passes ADD32(rs,imm); READ128 does not mask)",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-LQALIGN",
+    "limitations": "Integrated via sotc-07 (a42c052) at the memory-macro level instead of in codegen."
+  },
+  {
+    "id": "vendored-05",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "MMI lane fixes: PEXEW/PEXEH/PEXCH/PEXCW/PREVH, PMULTH 128-bit LO/HI, PMFHL.SH",
+    "category": "A",
+    "subsystem": "EE MMI",
+    "problem": "PEXEW swapped adjacent words instead of words 0 and 2, and the other ops had lane errors (per the KZ README).",
+    "approach": "Rewrite them to PCSX2 semantics.",
+    "scope": "general",
+    "scope_evidence": "general; I verified PEXEW only: PCSX2 MMI.cpp gives rd = {rt2, rt1, rt0, rt3}, while upstream PS2_PEXEW is _mm_shuffle_epi32(rs,_MM_SHUFFLE(2,3,0,1)) = {rt1, rt0, rt3, rt2}. The other ops were not independently verified.",
+    "reference": "PCSX2 pcsx2/MMI.cpp PEXEW",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "partial_integration": "PEXEW only, in 252de7c with test 'PEXEW swaps words 0 and 2'"
+    },
+    "agent_report": {
+      "id": "KZ-MMI",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "MMI lane fixes: PEXEW/PEXEH/PEXCH/PEXCW/PREVH, PMULTH 128-bit LO/HI, PMFHL.SH",
+      "category": "A",
+      "subsystem": "EE MMI",
+      "problem": "PEXEW swapped adjacent words instead of words 0 and 2, and the other ops had lane errors (per the KZ README).",
+      "approach": "Rewrite them to PCSX2 semantics.",
+      "general_or_specific": "general; I verified PEXEW only: PCSX2 MMI.cpp gives rd = {rt2, rt1, rt0, rt3}, while upstream PS2_PEXEW is _mm_shuffle_epi32(rs,_MM_SHUFFLE(2,3,0,1)) = {rt1, rt0, rt3, rt2}. The other ops were not independently verified.",
+      "reference": "PCSX2 pcsx2/MMI.cpp PEXEW",
+      "upstream_already_has": "no for PEXEW (macros.h:959); others not determined",
+      "risk": "low-medium",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-MMI",
+    "limitations": "PEXEH/PEXCH/PEXCW/PREVH/PMULTH/PMFHL.SH not yet verified or ported."
+  },
+  {
+    "id": "vendored-06",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "ecd34971 / cc1fc7d8",
+      "involved": "DJ, KZ (0009)",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+      ]
+    },
+    "title": "VU0 macro VSQRT = sqrt(|ft|); VRSQRT = fs/sqrt(|ft|)",
+    "category": "A",
+    "subsystem": "VU0 macro codegen",
+    "problem": "Upstream VSQRT uses max(0, ft). Upstream VRSQRT computes 1/sqrt(ft) and ignores fs.",
+    "approach": "Use fabs and include fs; DJ also handles a zero divisor.",
+    "scope": "general",
+    "scope_evidence": "general; PCSX2 VUops.cpp _vuSQRT uses sqrt(fabs(ft)), and _vuRSQRT is fs/sqrt(fabs(ft)) with a signed-max result on zero",
+    "reference": "PCSX2 pcsx2/VUops.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "VU0-SQRT",
+      "repo": "DJ, KZ (0009)",
+      "revision": "ecd34971 / cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+      ],
+      "title": "VU0 macro VSQRT = sqrt(|ft|); VRSQRT = fs/sqrt(|ft|)",
+      "category": "A",
+      "subsystem": "VU0 macro codegen",
+      "problem": "Upstream VSQRT uses max(0, ft). Upstream VRSQRT computes 1/sqrt(ft) and ignores fs.",
+      "approach": "Use fabs and include fs; DJ also handles a zero divisor.",
+      "general_or_specific": "general; PCSX2 VUops.cpp _vuSQRT uses sqrt(fabs(ft)), and _vuRSQRT is fs/sqrt(fabs(ft)) with a signed-max result on zero",
+      "reference": "PCSX2 pcsx2/VUops.cpp",
+      "upstream_already_has": "no (vu_translation_helpers.cpp:85,92)",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "VU0-SQRT",
+    "limitations": "Integrated via sotc-05 (252de7c)."
+  },
+  {
+    "id": "vendored-07",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0007)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp (vu0StartMicroProgram)"
+      ]
+    },
+    "title": "VCALLMSR starts at CMSAR0, not vi[27]",
+    "category": "A",
+    "subsystem": "VU0 micro",
+    "problem": "Upstream translateVU_VCALLMSR reads ctx->vi[inst.rd] (rd=27), but R5900Context has only uint16_t vi[16], so the read goes out of bounds into neighbouring fields.",
+    "approach": "KZ (runtime-side): start at (vu0_cmsar0 & 0x1FF)*8. A cleaner upstream fix would change the codegen to read vu0_cmsar0.",
+    "scope": "general",
+    "scope_evidence": "general; confirmed against upstream source (ps2_runtime.h:75 vi[16]; vu_translation_helpers.cpp:165-175)",
+    "reference": "upstream source; PCSX2 not checked",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-VCALLMSR",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0007)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp (vu0StartMicroProgram)"
+      ],
+      "title": "VCALLMSR starts at CMSAR0, not vi[27]",
+      "category": "A/B",
+      "subsystem": "VU0 micro",
+      "problem": "Upstream translateVU_VCALLMSR reads ctx->vi[inst.rd] (rd=27), but R5900Context has only uint16_t vi[16], so the read goes out of bounds into neighbouring fields.",
+      "approach": "KZ (runtime-side): start at (vu0_cmsar0 & 0x1FF)*8. A cleaner upstream fix would change the codegen to read vu0_cmsar0.",
+      "general_or_specific": "general; confirmed against upstream source (ps2_runtime.h:75 vi[16]; vu_translation_helpers.cpp:165-175)",
+      "reference": "upstream source; PCSX2 not checked",
+      "upstream_already_has": "no",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-VCALLMSR",
+    "limitations": "Integrated via upstream-02 (PR #268) in codegen."
+  },
+  {
+    "id": "vendored-08",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0010, vif1UnpackPcsx2)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "VIF UNPACK V4-5 scales channels to 8 bits",
+    "category": "A",
+    "subsystem": "VIF",
+    "problem": "Upstream stores the raw 5/5/5/1 fields without shifting.",
+    "approach": "x<<3, y>>2, z>>7 and w>>8 on the masked fields.",
+    "scope": "general",
+    "scope_evidence": "general; PCSX2 Vif_Unpack.cpp UNPACK_V4_5 verified",
+    "reference": "PCSX2 pcsx2/Vif_Unpack.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-V45",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0010, vif1UnpackPcsx2)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "title": "VIF UNPACK V4-5 scales channels to 8 bits",
+      "category": "A/D",
+      "subsystem": "VIF",
+      "problem": "Upstream stores the raw 5/5/5/1 fields without shifting.",
+      "approach": "x<<3, y>>2, z>>7 and w>>8 on the masked fields.",
+      "general_or_specific": "general; PCSX2 Vif_Unpack.cpp UNPACK_V4_5 verified",
+      "reference": "PCSX2 pcsx2/Vif_Unpack.cpp",
+      "upstream_already_has": "no (ps2_vif1_interpreter.cpp:698-706)",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-V45"
+  },
+  {
+    "id": "vendored-09",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "VIF UNPACK semantics: WL=0 means 256, fill-mode source advance, V2 writes xyxy, V3 reads 4 elements, STMOD 3, mask row",
+    "category": "A",
+    "subsystem": "VIF",
+    "problem": "Upstream maps wl==0 to 1 (seen at line 224); the other points are described in the KZ README.",
+    "approach": "A PCSX2-modelled unpack path.",
+    "scope": "general",
+    "scope_evidence": "general per the KZ README; I verified only that upstream maps wl 0 to 1",
+    "reference": "KZ patches/README.md (cites PCSX2); not independently checked beyond V4-5",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-VIFUNPACK",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0010)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "title": "VIF UNPACK semantics: WL=0 means 256, fill-mode source advance, V2 writes xyxy, V3 reads 4 elements, STMOD 3, mask row",
+      "category": "A",
+      "subsystem": "VIF",
+      "problem": "Upstream maps wl==0 to 1 (seen at line 224); the other points are described in the KZ README.",
+      "approach": "A PCSX2-modelled unpack path.",
+      "general_or_specific": "general per the KZ README; I verified only that upstream maps wl 0 to 1",
+      "reference": "KZ patches/README.md (cites PCSX2); not independently checked beyond V4-5",
+      "upstream_already_has": "no / not determined per item",
+      "risk": "medium (hot path)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-VIFUNPACK"
+  },
+  {
+    "id": "vendored-10",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patch 0005)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "A pending PATH2 IMAGE after DIRECT must not swallow VIFcodes",
+    "category": "A",
+    "subsystem": "VIF1/GIF PATH2",
+    "problem": "When a DIRECT ends with an IMAGE GIFtag whose data arrives later, upstream treats the next raw bytes as pixel data (m_vif1PendingPath2ImageQwc branch, lines 307-330). Those bytes are actually MARK/DIRECT VIFcodes, so the upload shifts by 8 bytes (garbled fonts and CLUTs).",
+    "approach": "Always parse VIFcodes; wrap only the next DIRECT's payload in a synthesized IMAGE tag. Raw continuation is kept only for a DIRECT truncated at the end of a DMA buffer.",
+    "scope": "general",
+    "scope_evidence": "general; KZ says it verified byte-for-byte against PCSX2 EE RAM via PINE. The upstream code matches the bug pattern they describe.",
+    "reference": "KZ patches/README.md 0005; upstream code read",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-DIRECTIMG",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patch 0005)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "title": "A pending PATH2 IMAGE after DIRECT must not swallow VIFcodes",
+      "category": "A/D",
+      "subsystem": "VIF1/GIF PATH2",
+      "problem": "When a DIRECT ends with an IMAGE GIFtag whose data arrives later, upstream treats the next raw bytes as pixel data (m_vif1PendingPath2ImageQwc branch, lines 307-330). Those bytes are actually MARK/DIRECT VIFcodes, so the upload shifts by 8 bytes (garbled fonts and CLUTs).",
+      "approach": "Always parse VIFcodes; wrap only the next DIRECT's payload in a synthesized IMAGE tag. Raw continuation is kept only for a DIRECT truncated at the end of a DMA buffer.",
+      "general_or_specific": "general; KZ says it verified byte-for-byte against PCSX2 EE RAM via PINE. The upstream code matches the bug pattern they describe.",
+      "reference": "KZ patches/README.md 0005; upstream code read",
+      "upstream_already_has": "no",
+      "risk": "medium",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-DIRECTIMG"
+  },
+  {
+    "id": "vendored-11",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581 (patches/ps2recomp-vu0-vi0.patch)",
+      "involved": "GOW",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ]
+    },
+    "title": "VMTIR to VI0 is discarded",
+    "category": "A",
+    "subsystem": "VU0 macro",
+    "problem": "Upstream VMTIR writes ctx->vi[rt] even when rt is 0.",
+    "approach": "Emit nothing when rt==0; adds a test.",
+    "scope": "general",
+    "scope_evidence": "general (VI0 is constant zero; upstream tests already require this of VISUB/VIAND/VIOR)",
+    "reference": "upstream ps2xTest code_generator_tests",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-VMTIR",
+      "repo": "GOW",
+      "revision": "92ece581 (patches/ps2recomp-vu0-vi0.patch)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ],
+      "title": "VMTIR to VI0 is discarded",
+      "category": "A",
+      "subsystem": "VU0 macro",
+      "problem": "Upstream VMTIR writes ctx->vi[rt] even when rt is 0.",
+      "approach": "Emit nothing when rt==0; adds a test.",
+      "general_or_specific": "general (VI0 is constant zero; upstream tests already require this of VISUB/VIAND/VIOR)",
+      "reference": "upstream ps2xTest code_generator_tests",
+      "upstream_already_has": "no (vu_translation_helpers.cpp:95-99)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-VMTIR"
+  },
+  {
+    "id": "vendored-12",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581 (ps2recomp-vu0-vf0.patch)",
+      "involved": "GOW",
+      "files": [
+        "ps2xRecomp/src/lib/{instruction_translator,vu_translation_helpers,vu_translator}.cpp",
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2_runtime_macros.h"
+      ]
+    },
+    "title": "VU0 VF0 is constant: writes ignored (PS2_VU0_VF_WRITE) and initialized to (0,0,0,1)",
+    "category": "A",
+    "subsystem": "VU0 macro/COP2",
+    "problem": "Writes from LQC2, QMTC2, arithmetic, VITOF and VMFIR into VF0 were not suppressed.",
+    "approach": "A write macro that skips VF0, plus tests.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "patch tests; PCSX2 not checked",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-VF0",
+      "repo": "GOW",
+      "revision": "92ece581 (ps2recomp-vu0-vf0.patch)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/{instruction_translator,vu_translation_helpers,vu_translator}.cpp",
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2_runtime_macros.h"
+      ],
+      "title": "VU0 VF0 is constant: writes ignored (PS2_VU0_VF_WRITE) and initialized to (0,0,0,1)",
+      "category": "A",
+      "subsystem": "VU0 macro/COP2",
+      "problem": "Writes from LQC2, QMTC2, arithmetic, VITOF and VMFIR into VF0 were not suppressed.",
+      "approach": "A write macro that skips VF0, plus tests.",
+      "general_or_specific": "general",
+      "reference": "patch tests; PCSX2 not checked",
+      "upstream_already_has": "no (no PS2_VU0_VF_WRITE)",
+      "risk": "low-medium (touches many emitters)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-VF0"
+  },
+  {
+    "id": "vendored-13",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581 (ps2recomp-vblank-ntsc.patch)",
+      "involved": "GOW",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xTest/src/ps2_runtime_interrupt_tests.cpp"
+      ]
+    },
+    "title": "Vblank period is the NTSC field (60/1.001 Hz)",
+    "category": "A",
+    "subsystem": "scheduler timing",
+    "problem": "Upstream uses 16667 us (about 60.0 Hz), so FMV drifts 0.1% against audio.",
+    "approach": "16683350 ns, cycles = kEeClockHz*1001/60000; adds a test.",
+    "scope": "general",
+    "scope_evidence": "general for NTSC (PCSX2 Counters.h FRAMERATE_NTSC 29.97). PAL still needs its own value.",
+    "reference": "PCSX2 pcsx2/Counters.h",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-NTSC",
+      "repo": "GOW",
+      "revision": "92ece581 (ps2recomp-vblank-ntsc.patch)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xTest/src/ps2_runtime_interrupt_tests.cpp"
+      ],
+      "title": "Vblank period is the NTSC field (60/1.001 Hz)",
+      "category": "A/C",
+      "subsystem": "scheduler timing",
+      "problem": "Upstream uses 16667 us (about 60.0 Hz), so FMV drifts 0.1% against audio.",
+      "approach": "16683350 ns, cycles = kEeClockHz*1001/60000; adds a test.",
+      "general_or_specific": "general for NTSC (PCSX2 Counters.h FRAMERATE_NTSC 29.97). PAL still needs its own value.",
+      "reference": "PCSX2 pcsx2/Counters.h",
+      "upstream_already_has": "no (EeScheduler.cpp:34)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-NTSC"
+  },
+  {
+    "id": "vendored-14",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581 (ps2recomp-vu-redondeo.patch)",
+      "involved": "GOW",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ]
+    },
+    "title": "VU1 round-toward-zero via MXCSR instead of fesetround",
+    "category": "C",
+    "subsystem": "VU1 interpreter",
+    "problem": "fesetround is called about 1900 times per frame (around 77 ns each).",
+    "approach": "_mm_getcsr/_mm_setcsr on x86-64, with a test.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "patch",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-MXCSR",
+      "repo": "GOW",
+      "revision": "92ece581 (ps2recomp-vu-redondeo.patch)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ],
+      "title": "VU1 round-toward-zero via MXCSR instead of fesetround",
+      "category": "C (perf)",
+      "subsystem": "VU1 interpreter",
+      "problem": "fesetround is called about 1900 times per frame (around 77 ns each).",
+      "approach": "_mm_getcsr/_mm_setcsr on x86-64, with a test.",
+      "general_or_specific": "general",
+      "reference": "patch",
+      "upstream_already_has": "semantics yes (fesetround FE_TOWARDZERO at core.cpp:1633); fast path no",
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-MXCSR"
+  },
+  {
+    "id": "vendored-15",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "ecd34971",
+      "involved": "DJ (and upstream #272)",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "RSQRT.S with ft==0: which operand's sign is used",
+    "category": "A",
+    "subsystem": "EE FPU",
+    "problem": "DJ and upstream's test both use copysign(max, fs) ('sign of fs alone'). PCSX2 FPU.cpp RSQRT_S returns (Ft & 0x80000000) | posFmax, the sign of ft.",
+    "approach": "Investigate and confirm on hardware.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "PCSX2 pcsx2/FPU.cpp RSQRT_S; upstream ps2_float_semantics_tests.cpp:163",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "FPU-RSQRT-ZERO",
+      "repo": "DJ (and upstream #272)",
+      "revision": "ecd34971",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "RSQRT.S with ft==0: which operand's sign is used",
+      "category": "A",
+      "subsystem": "EE FPU",
+      "problem": "DJ and upstream's test both use copysign(max, fs) ('sign of fs alone'). PCSX2 FPU.cpp RSQRT_S returns (Ft & 0x80000000) | posFmax, the sign of ft.",
+      "approach": "Investigate and confirm on hardware.",
+      "general_or_specific": "general",
+      "reference": "PCSX2 pcsx2/FPU.cpp RSQRT_S; upstream ps2_float_semantics_tests.cpp:163",
+      "upstream_already_has": "conflicting behavior",
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "FPU-RSQRT-ZERO"
+  },
+  {
+    "id": "vendored-16",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (patches 0002/0006/0007/0016)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_host_gs.h",
+        "ps2_host_vu.h",
+        "ps2_host_vu0.h",
+        "ps2_host_ipu.h",
+        "ps2_pad_provider.h",
+        "ps2xIOP/include/ps2x/iop/iop_host_spu2.h"
+      ]
+    },
+    "title": "Host-device hook structs (GS, VU1, VU0, IPU, SPU2, pad)",
+    "category": "C",
+    "subsystem": "runtime plugin boundary",
+    "problem": "Replacing a subsystem with an external implementation (PCSX2 GS, microVU, IPU, SPU2) needs a seam.",
+    "approach": "Function-pointer structs registered before PS2Memory::initialize. PS2HostGs{gifPacket(path,data,size), vsync(tick,field), exclusive, vsyncOrdered}. PS2HostVu1{codeMem, dataMem, mscal/mscnt(pc, top, itop, fbrst, codeGeneration, vpuStat), bindWorkerThread}. PS2HostVu0{callms(ctx, pc, codeGeneration)}. IPU register/FIFO/DMA hooks. A codeGeneration counter drives cache invalidation.",
+    "scope": "general",
+    "scope_evidence": "general interface; the implementations are KZ's (Windows/MSVC)",
+    "reference": "read headers",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-HOSTHOOKS",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (patches 0002/0006/0007/0016)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_host_gs.h",
+        "ps2_host_vu.h",
+        "ps2_host_vu0.h",
+        "ps2_host_ipu.h",
+        "ps2_pad_provider.h",
+        "ps2xIOP/include/ps2x/iop/iop_host_spu2.h"
+      ],
+      "title": "Host-device hook structs (GS, VU1, VU0, IPU, SPU2, pad)",
+      "category": "C/D",
+      "subsystem": "runtime plugin boundary",
+      "problem": "Replacing a subsystem with an external implementation (PCSX2 GS, microVU, IPU, SPU2) needs a seam.",
+      "approach": "Function-pointer structs registered before PS2Memory::initialize. PS2HostGs{gifPacket(path,data,size), vsync(tick,field), exclusive, vsyncOrdered}. PS2HostVu1{codeMem, dataMem, mscal/mscnt(pc, top, itop, fbrst, codeGeneration, vpuStat), bindWorkerThread}. PS2HostVu0{callms(ctx, pc, codeGeneration)}. IPU register/FIFO/DMA hooks. A codeGeneration counter drives cache invalidation.",
+      "general_or_specific": "general interface; the implementations are KZ's (Windows/MSVC)",
+      "reference": "read headers",
+      "upstream_already_has": "no (none of these symbols exist upstream)",
+      "risk": "medium (threading contracts)",
+      "priority": 2,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "KZ-HOSTHOOKS"
+  },
+  {
+    "id": "vendored-17",
+    "source": {
+      "repository": "thiagordsfx/urban-reign-recomp",
+      "revision": "2fa53c4d",
+      "involved": "UR",
+      "files": [
+        "runtime/ps2xRuntime/include/runtime/gs/gs_backend.h",
+        "gs_pcsx2_backend.h/.cpp",
+        "gs_threaded_backend.*"
+      ]
+    },
+    "title": "GSRasterBackend raw-GIF extension (WantsRawGif/RawGif/VSync(GSVSyncRegs)/GsReset)",
+    "category": "D",
+    "subsystem": "GS backend interface",
+    "problem": "Upstream's GSRasterBackend only receives decoded primitives, so whole-GS renderers (PCSX2 GS, paraLLEl-GS) cannot be plugged in.",
+    "approach": "Four defaulted virtuals. The front end keeps parsing (SIGNAL/FINISH/LABEL/transfers) but stops sending draws, CLUT loads and image data when WantsRawGif() is true. VSync passes the 15 privileged registers plus CSR/IMR/BUSDIR/SIGLBLID in PCSX2 layout.",
+    "scope": "general",
+    "scope_evidence": "general; minimal and backward-compatible",
+    "reference": "read source; UR docs/GS_PCSX2.md",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "UR-RAWGIF",
+      "repo": "UR",
+      "revision": "2fa53c4d",
+      "license": "GPL-3.0",
+      "files": [
+        "runtime/ps2xRuntime/include/runtime/gs/gs_backend.h",
+        "gs_pcsx2_backend.h/.cpp",
+        "gs_threaded_backend.*"
+      ],
+      "title": "GSRasterBackend raw-GIF extension (WantsRawGif/RawGif/VSync(GSVSyncRegs)/GsReset)",
+      "category": "D",
+      "subsystem": "GS backend interface",
+      "problem": "Upstream's GSRasterBackend only receives decoded primitives, so whole-GS renderers (PCSX2 GS, paraLLEl-GS) cannot be plugged in.",
+      "approach": "Four defaulted virtuals. The front end keeps parsing (SIGNAL/FINISH/LABEL/transfers) but stops sending draws, CLUT loads and image data when WantsRawGif() is true. VSync passes the 15 privileged registers plus CSR/IMR/BUSDIR/SIGLBLID in PCSX2 layout.",
+      "general_or_specific": "general; minimal and backward-compatible",
+      "reference": "read source; UR docs/GS_PCSX2.md",
+      "upstream_already_has": "no",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "UR-RAWGIF"
+  },
+  {
+    "id": "vendored-18",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "ecd34971 (ps2recomp-local.diff)",
+      "involved": "DJ",
+      "files": [
+        "include/runtime/gs/{gs_backend.h,gs_gpu.h,gs_gpu_backend.h,gs_presentation.h,gs_threaded_backend.h}",
+        "src/lib/gs/{gs_gpu_parallel.cpp,gs_gpu_none.cpp,gs_threaded_backend.cpp,gs_vulkan_present.cpp}"
+      ]
+    },
+    "title": "paraLLEl-GS renderer with an ordering contract, mailbox presentation and a threaded CPU backend",
+    "category": "D",
+    "subsystem": "GS",
+    "problem": "Need a GPU GS, an asynchronous renderer and correct readbacks.",
+    "approach": "(a) The GSRasterBackend contract is documented: calls are ordered from a single producer; ReadVram, SnapshotVram, ConsumeLocalToHost and Sync(LocalToHost) observe all earlier calls. New virtuals: PresentToMailbox, ResetPresentation, Kick, WaitFlipBacklog, VerifyPages, Shutdown. (b) GSGpuRenderer is Vulkan-free and takes raw input gif(path,data,bytes), reg(addr,val), present(privRegs[15], vsyncTick, flip), snapshotVram, readTransfer; frames come back through a lock-free triple-buffer mailbox (optionally a shared Vulkan image). (c) GSGpuBackend is a null GSRasterBackend that answers reads from the GPU. (d) Modes VENDETTA_GS=gpu|cpu|both, plus VERIFY, which compares GS memory page CRCs between the two renderers.",
+    "scope": "general",
+    "scope_evidence": "general design; VENDETTA_* env names and settings are project-specific",
+    "reference": "read diff",
+    "license": "GPL-3.0 (+ paraLLEl-GS LGPL-3.0+)",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "DJ-GPUGS",
+      "repo": "DJ",
+      "revision": "ecd34971 (ps2recomp-local.diff)",
+      "license": "GPL-3.0 (+ paraLLEl-GS LGPL-3.0+)",
+      "files": [
+        "include/runtime/gs/{gs_backend.h,gs_gpu.h,gs_gpu_backend.h,gs_presentation.h,gs_threaded_backend.h}",
+        "src/lib/gs/{gs_gpu_parallel.cpp,gs_gpu_none.cpp,gs_threaded_backend.cpp,gs_vulkan_present.cpp}"
+      ],
+      "title": "paraLLEl-GS renderer with an ordering contract, mailbox presentation and a threaded CPU backend",
+      "category": "D",
+      "subsystem": "GS",
+      "problem": "Need a GPU GS, an asynchronous renderer and correct readbacks.",
+      "approach": "(a) The GSRasterBackend contract is documented: calls are ordered from a single producer; ReadVram, SnapshotVram, ConsumeLocalToHost and Sync(LocalToHost) observe all earlier calls. New virtuals: PresentToMailbox, ResetPresentation, Kick, WaitFlipBacklog, VerifyPages, Shutdown. (b) GSGpuRenderer is Vulkan-free and takes raw input gif(path,data,bytes), reg(addr,val), present(privRegs[15], vsyncTick, flip), snapshotVram, readTransfer; frames come back through a lock-free triple-buffer mailbox (optionally a shared Vulkan image). (c) GSGpuBackend is a null GSRasterBackend that answers reads from the GPU. (d) Modes VENDETTA_GS=gpu|cpu|both, plus VERIFY, which compares GS memory page CRCs between the two renderers.",
+      "general_or_specific": "general design; VENDETTA_* env names and settings are project-specific",
+      "reference": "read diff",
+      "upstream_already_has": "no",
+      "risk": "medium-high (large); the ordering contract and mailbox are low-risk to adopt",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "DJ-GPUGS"
+  },
+  {
+    "id": "vendored-19",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "ecd34971 (patches/parallel-gs-local.diff)",
+      "involved": "DJ",
+      "files": [
+        "gs/gs_interface.*",
+        "gs/gs_renderer.*",
+        "gs/shaders/sample_circuit*.frag/.hpp",
+        "triangle_setup*.comp/.hpp"
+      ]
+    },
+    "title": "Local paraLLEl-GS changes (upscaled triangle setup, scaled circuit sampling)",
+    "category": "D",
+    "subsystem": "paraLLEl-GS",
+    "problem": "not determined (content not read beyond file list)",
+    "approach": "not determined",
+    "scope": "unknown",
+    "scope_evidence": "not determined",
+    "reference": "file list only",
+    "license": "LGPL-3.0+",
+    "upstream_equivalent": null,
+    "risk": "unknown",
+    "priority": 4,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "DJ-PGSDIFF",
+      "repo": "DJ",
+      "revision": "ecd34971 (patches/parallel-gs-local.diff)",
+      "license": "LGPL-3.0+",
+      "files": [
+        "gs/gs_interface.*",
+        "gs/gs_renderer.*",
+        "gs/shaders/sample_circuit*.frag/.hpp",
+        "triangle_setup*.comp/.hpp"
+      ],
+      "title": "Local paraLLEl-GS changes (upscaled triangle setup, scaled circuit sampling)",
+      "category": "D",
+      "subsystem": "paraLLEl-GS",
+      "problem": "not determined (content not read beyond file list)",
+      "approach": "not determined",
+      "general_or_specific": "not determined",
+      "reference": "file list only",
+      "upstream_already_has": "n/a",
+      "risk": "unknown",
+      "priority": 4,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "DJ-PGSDIFF"
+  },
+  {
+    "id": "vendored-20",
+    "source": {
+      "repository": "z3xox/BT3-Recomp",
+      "revision": "e22a34be",
+      "involved": "BT3",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_gs_pgs.h",
+        "ps2xRuntime/src/lib/ps2_gs_pgs.cpp",
+        "ps2_gif_arbiter.cpp",
+        "ps2_seamvk.cpp"
+      ]
+    },
+    "title": "paraLLEl-GS backend fed from the GIF arbiter",
+    "category": "D",
+    "subsystem": "GS",
+    "problem": "Hardware GS rendering with SSAA.",
+    "approach": "A headless Granite device. Every arbiter packet goes to GSInterface::gif_transfer(path-1). Privileged registers are shadowed in stream order and copied into get_priv_register_state() at the swap. Swap = flush, vsync(VSyncInfo), then an async fenced readback to RGBA for the GL present thread. Options: dual / exclusive / pack mode, live SSAA re-init that preserves the priv state, map_vram_read for dumps. The file is tangled with BT3-specific post-chain steps (sub_00109848 and others), wshud and seamvk.",
+    "scope": "game-specific",
+    "scope_evidence": "integration pattern general; the code contains title-specific addresses",
+    "reference": "read source",
+    "license": "GPL-3.0 / LGPL-3.0+",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 3,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "BT3-PGS",
+      "repo": "BT3",
+      "revision": "e22a34be",
+      "license": "GPL-3.0 / LGPL-3.0+",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_gs_pgs.h",
+        "ps2xRuntime/src/lib/ps2_gs_pgs.cpp",
+        "ps2_gif_arbiter.cpp",
+        "ps2_seamvk.cpp"
+      ],
+      "title": "paraLLEl-GS backend fed from the GIF arbiter",
+      "category": "D",
+      "subsystem": "GS",
+      "problem": "Hardware GS rendering with SSAA.",
+      "approach": "A headless Granite device. Every arbiter packet goes to GSInterface::gif_transfer(path-1). Privileged registers are shadowed in stream order and copied into get_priv_register_state() at the swap. Swap = flush, vsync(VSyncInfo), then an async fenced readback to RGBA for the GL present thread. Options: dual / exclusive / pack mode, live SSAA re-init that preserves the priv state, map_vram_read for dumps. The file is tangled with BT3-specific post-chain steps (sub_00109848 and others), wshud and seamvk.",
+      "general_or_specific": "integration pattern general; the code contains title-specific addresses",
+      "reference": "read source",
+      "upstream_already_has": "no",
+      "risk": "high to port as-is",
+      "priority": 3,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "BT3-PGS"
+  },
+  {
+    "id": "vendored-21",
+    "source": {
+      "repository": "jcsix694/def-jam-vendetta-recomp",
+      "revision": "DJ ecd34971",
+      "involved": "DJ (also GOW/Waffle, UR, BT3, AC5)",
+      "files": [
+        "DJ: include/runtime/ps2_vu1_compiled.h, tools/vu1_recomp.py",
+        "GOW: vu/ps2_vu1_compiled.inl, ps2_vu1_native.inl, tools/vu1/vu1n_gen.py",
+        "UR: ps2xTest/tools/vu1_recomp.cpp",
+        "BT3: tools/gen_vu1.py, ps2_vu1_native.cpp",
+        "AC5: tools/vurecomp/"
+      ]
+    },
+    "title": "VU1 microprograms recompiled to C++ ahead of time, guarded by a code-byte check",
+    "category": "D",
+    "subsystem": "VU1",
+    "problem": "The VU1 interpreter dominates CPU time (KZ: about 70% of the game thread).",
+    "approach": "DJ: pieces keyed by VU address and exact code bytes, with per-pair Vu1PairShape (stall reads and write latencies) checked against the interpreter's own decode before use. They keep the interpreter's fast-mode timing exactly (Q/clip/XGKICK pipelines). VERIFY mode compares against the interpreter. Five projects do VU1 AOT in some form.",
+    "scope": "general",
+    "scope_evidence": "general mechanism; the program sets are per game",
+    "reference": "read header",
+    "license": "GPL-3.0 (AC5 Apache-2.0)",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "VU1-AOT",
+      "repo": "DJ (also GOW/Waffle, UR, BT3, AC5)",
+      "revision": "DJ ecd34971",
+      "license": "GPL-3.0 (AC5 Apache-2.0)",
+      "files": [
+        "DJ: include/runtime/ps2_vu1_compiled.h, tools/vu1_recomp.py",
+        "GOW: vu/ps2_vu1_compiled.inl, ps2_vu1_native.inl, tools/vu1/vu1n_gen.py",
+        "UR: ps2xTest/tools/vu1_recomp.cpp",
+        "BT3: tools/gen_vu1.py, ps2_vu1_native.cpp",
+        "AC5: tools/vurecomp/"
+      ],
+      "title": "VU1 microprograms recompiled to C++ ahead of time, guarded by a code-byte check",
+      "category": "D",
+      "subsystem": "VU1",
+      "problem": "The VU1 interpreter dominates CPU time (KZ: about 70% of the game thread).",
+      "approach": "DJ: pieces keyed by VU address and exact code bytes, with per-pair Vu1PairShape (stall reads and write latencies) checked against the interpreter's own decode before use. They keep the interpreter's fast-mode timing exactly (Q/clip/XGKICK pipelines). VERIFY mode compares against the interpreter. Five projects do VU1 AOT in some form.",
+      "general_or_specific": "general mechanism; the program sets are per game",
+      "reference": "read header",
+      "upstream_already_has": "no",
+      "risk": "medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "VU1-AOT"
+  },
+  {
+    "id": "vendored-22",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "832c8adb",
+      "involved": "KZ",
+      "files": [
+        "ext/kzvu/*",
+        "ext/kzgs/*",
+        "ext/kzipu/*",
+        "ext/kzspu2/*"
+      ]
+    },
+    "title": "PCSX2 microVU / GS / IPU / SPU2 built as static libraries behind shims",
+    "category": "D",
+    "subsystem": "VU, GS",
+    "problem": "Accuracy and speed.",
+    "approach": "Compile the unmodified PCSX2 sources (646df006a4) with rename/prefix headers and stub shims. Each library ships its own test (kzvu_test compares microVU against the interpreter).",
+    "scope": "general",
+    "scope_evidence": "general but heavy; MSVC/AVX2-only per the README",
+    "reference": "ext/kzvu/README.md, ext/kzgs/README.md",
+    "license": "GPL-3.0 (PCSX2 GPL-3.0+)",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 3,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-KZVU-KZGS",
+      "repo": "KZ",
+      "revision": "832c8adb",
+      "license": "GPL-3.0 (PCSX2 GPL-3.0+)",
+      "files": [
+        "ext/kzvu/*",
+        "ext/kzgs/*",
+        "ext/kzipu/*",
+        "ext/kzspu2/*"
+      ],
+      "title": "PCSX2 microVU / GS / IPU / SPU2 built as static libraries behind shims",
+      "category": "D/C",
+      "subsystem": "VU, GS",
+      "problem": "Accuracy and speed.",
+      "approach": "Compile the unmodified PCSX2 sources (646df006a4) with rename/prefix headers and stub shims. Each library ships its own test (kzvu_test compares microVU against the interpreter).",
+      "general_or_specific": "general but heavy; MSVC/AVX2-only per the README",
+      "reference": "ext/kzvu/README.md, ext/kzgs/README.md",
+      "upstream_already_has": "no",
+      "risk": "high (dependency size, build)",
+      "priority": 3,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "KZ-KZVU-KZGS"
+  },
+  {
+    "id": "vendored-23",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581 (ps2recomp-waffle-runtime.patch)",
+      "involved": "GOW (from Waffle565)",
+      "files": [
+        "ps2xRuntime/src/lib/ee_ref/{eeref.cpp,ee_diff.cpp,R5900OpcodeImpl.cpp,MMI.cpp,FPU.cpp,...}",
+        "src/lib/vu_pcsx2/*"
+      ]
+    },
+    "title": "EE differential tester: re-run recompiled functions on PCSX2's interpreter and diff",
+    "category": "E",
+    "subsystem": "test harness",
+    "problem": "Codegen bugs (like the ones above) are hard to find.",
+    "approach": "PS2X_EE_DIFF=<addr>|all wraps functions. On the first N calls it snapshots the CPU (GPR/FPR/VU0/ACC/Q/P/I/FCR31) and runs PCSX2's interpreter on a copy of RAM and scratchpad, then prints the differing registers and written words. vu_pcsx2 bridges the PCSX2 VU1 interpreter in the same way.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "read source",
+    "license": "GPL-3.0 (PCSX2-derived)",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-EEDIFF",
+      "repo": "GOW (from Waffle565)",
+      "revision": "92ece581 (ps2recomp-waffle-runtime.patch)",
+      "license": "GPL-3.0 (PCSX2-derived)",
+      "files": [
+        "ps2xRuntime/src/lib/ee_ref/{eeref.cpp,ee_diff.cpp,R5900OpcodeImpl.cpp,MMI.cpp,FPU.cpp,...}",
+        "src/lib/vu_pcsx2/*"
+      ],
+      "title": "EE differential tester: re-run recompiled functions on PCSX2's interpreter and diff",
+      "category": "E",
+      "subsystem": "test harness",
+      "problem": "Codegen bugs (like the ones above) are hard to find.",
+      "approach": "PS2X_EE_DIFF=<addr>|all wraps functions. On the first N calls it snapshots the CPU (GPR/FPR/VU0/ACC/Q/P/I/FCR31) and runs PCSX2's interpreter on a copy of RAM and scratchpad, then prints the differing registers and written words. vu_pcsx2 bridges the PCSX2 VU1 interpreter in the same way.",
+      "general_or_specific": "general",
+      "reference": "read source",
+      "upstream_already_has": "no",
+      "risk": "low (opt-in tool)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-EEDIFF"
+  },
+  {
+    "id": "vendored-24",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581",
+      "involved": "GOW",
+      "files": [
+        "patches/*.patch (ps2xTest additions)",
+        "tests/*.cpp|py",
+        "tools/ci/parches.py",
+        ".github/workflows/pruebas.yml"
+      ]
+    },
+    "title": "Each engine patch carries a ps2xTest MiniTest case; CI applies the stack and runs the tests",
+    "category": "E",
+    "subsystem": "testing",
+    "problem": "Regressions while carrying patches.",
+    "approach": "Patches modify ps2xTest/src/*_tests.cpp. CI derives the patch order from compilar.ps1 and fails if a patch is unused. tests/ adds PCSX2 GS module probes.",
+    "scope": "general",
+    "scope_evidence": "general practice",
+    "reference": "read",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-TESTS",
+      "repo": "GOW",
+      "revision": "92ece581",
+      "license": "GPL-3.0",
+      "files": [
+        "patches/*.patch (ps2xTest additions)",
+        "tests/*.cpp|py",
+        "tools/ci/parches.py",
+        ".github/workflows/pruebas.yml"
+      ],
+      "title": "Each engine patch carries a ps2xTest MiniTest case; CI applies the stack and runs the tests",
+      "category": "E",
+      "subsystem": "testing",
+      "problem": "Regressions while carrying patches.",
+      "approach": "Patches modify ps2xTest/src/*_tests.cpp. CI derives the patch order from compilar.ps1 and fails if a patch is unused. tests/ adds PCSX2 GS module probes.",
+      "general_or_specific": "general practice",
+      "reference": "read",
+      "upstream_already_has": "partially (the ps2xTest framework)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "GOW-TESTS"
+  },
+  {
+    "id": "kz-0001",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8",
+      "involved": "KZ",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ]
+    },
+    "title": "Resume points for standalone entry_* blocks",
+    "category": "B",
+    "subsystem": "recompiler",
+    "problem": "see title",
+    "approach": "interval lookup",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "upstream a5d3049 (#271)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "unknown",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-0001",
+      "repo": "KZ",
+      "revision": "cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ],
+      "title": "Resume points for standalone entry_* blocks",
+      "category": "B",
+      "subsystem": "recompiler",
+      "problem": "see title",
+      "approach": "interval lookup",
+      "general_or_specific": "general",
+      "reference": "upstream a5d3049 (#271)",
+      "upstream_already_has": "yes (#271, also by drakolordx7)",
+      "risk": "-",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    },
+    "source_id": "KZ-0001"
+  },
+  {
+    "id": "kz-0014",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8",
+      "involved": "KZ",
+      "files": [
+        "ps2xRecomp/src/lib/function_emitter.cpp / control_flow_*"
+      ]
+    },
+    "title": "An unresolved jalr needs only its return address as a resume point",
+    "category": "B",
+    "subsystem": "recompiler",
+    "problem": "Every instruction of the caller becomes an entry point (about 4000 functions), which is a perf problem.",
+    "approach": "Only the return address becomes a resume label (same as DQ8 fork PR #254).",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-0014",
+      "repo": "KZ",
+      "revision": "cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/function_emitter.cpp / control_flow_*"
+      ],
+      "title": "An unresolved jalr needs only its return address as a resume point",
+      "category": "B",
+      "subsystem": "recompiler",
+      "problem": "Every instruction of the caller becomes an entry point (about 4000 functions), which is a perf problem.",
+      "approach": "Only the return address becomes a resume label (same as DQ8 fork PR #254).",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "not found in upstream git log; not verified in source",
+      "risk": "medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-0014"
+  },
+  {
+    "id": "kz-0008",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "EeScheduler.cpp"
+      ]
+    },
+    "title": "Yield vs return disambiguation (g_ps2GuestUnwinding)",
+    "category": "B",
+    "subsystem": "dispatch",
+    "problem": "A callee that yields at its own entry pc looks like a normal return, which causes random crashes.",
+    "approach": "A global unwinding flag set on every yield or non-return exit.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-0008",
+      "repo": "KZ",
+      "revision": "cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "EeScheduler.cpp"
+      ],
+      "title": "Yield vs return disambiguation (g_ps2GuestUnwinding)",
+      "category": "B/C",
+      "subsystem": "dispatch",
+      "problem": "A callee that yields at its own entry pc looks like a normal return, which causes random crashes.",
+      "approach": "A global unwinding flag set on every yield or non-return exit.",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "not determined",
+      "risk": "medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-0008"
+  },
+  {
+    "id": "vendored-28",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (0017, 0023)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRecomp/src/lib/function_emitter.cpp",
+        "ps2xRuntime/include/ps2_cg.h",
+        "ps2_cg_dsp.h"
+      ]
+    },
+    "title": "Opt-in codegen: GPRs as C++ locals; direct dispatch instead of scheduler unwinds",
+    "category": "B",
+    "subsystem": "codegen perf",
+    "problem": "About 923k scheduler dispatches per second; ctx traffic.",
+    "approach": "PS2X_CODEGEN=locals rewrites the macro text, flushing and reloading around observable points. DSP/FOLD reduces dispatches to about 8k/s. Byte-identical output when disabled.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-CODEGEN",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (0017, 0023)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/function_emitter.cpp",
+        "ps2xRuntime/include/ps2_cg.h",
+        "ps2_cg_dsp.h"
+      ],
+      "title": "Opt-in codegen: GPRs as C++ locals; direct dispatch instead of scheduler unwinds",
+      "category": "B",
+      "subsystem": "codegen perf",
+      "problem": "About 923k scheduler dispatches per second; ctx traffic.",
+      "approach": "PS2X_CODEGEN=locals rewrites the macro text, flushing and reloading around observable points. DSP/FOLD reduces dispatches to about 8k/s. Byte-identical output when disabled.",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "no",
+      "risk": "high",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-CODEGEN"
+  },
+  {
+    "id": "vendored-29",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "KZ cc1fc7d8 (0015, 0016, 0021, 0025) / DJ ps2_chain.h",
+      "involved": "KZ, DJ",
+      "files": [
+        "KZ: ps2_vif1_worker.cpp/.h, iop_subsystem.cpp",
+        "DJ: include/runtime/ps2_chain.h, src/lib/ps2_chain.cpp"
+      ]
+    },
+    "title": "VIF1/VU1/GIF chain and IOP on worker threads with explicit fences",
+    "category": "C",
+    "subsystem": "threading",
+    "problem": "Single-threaded throughput.",
+    "approach": "DJ ChainWorker: the game thread keeps the DMAC and the registers the game reads, and sends ordered records to the worker. Fences are counted by reason (Csr, Siglblid, GifStat, VuMemory, GsCall, DtKick). Per-PC unfenced CSR-read exemptions are title-specific. KZ: IOP thread fed by published EE cycles.",
+    "scope": "general",
+    "scope_evidence": "general design; exemption PCs are game-specific (DJ 0x1A16C0)",
+    "reference": "read headers",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 3,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-THREADS",
+      "repo": "KZ, DJ",
+      "revision": "KZ cc1fc7d8 (0015, 0016, 0021, 0025) / DJ ps2_chain.h",
+      "license": "GPL-3.0",
+      "files": [
+        "KZ: ps2_vif1_worker.cpp/.h, iop_subsystem.cpp",
+        "DJ: include/runtime/ps2_chain.h, src/lib/ps2_chain.cpp"
+      ],
+      "title": "VIF1/VU1/GIF chain and IOP on worker threads with explicit fences",
+      "category": "C",
+      "subsystem": "threading",
+      "problem": "Single-threaded throughput.",
+      "approach": "DJ ChainWorker: the game thread keeps the DMAC and the registers the game reads, and sends ordered records to the worker. Fences are counted by reason (Csr, Siglblid, GifStat, VuMemory, GsCall, DtKick). Per-PC unfenced CSR-read exemptions are title-specific. KZ: IOP thread fed by published EE cycles.",
+      "general_or_specific": "general design; exemption PCs are game-specific (DJ 0x1A16C0)",
+      "reference": "read headers",
+      "upstream_already_has": "no",
+      "risk": "high",
+      "priority": 3,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "KZ-THREADS"
+  },
+  {
+    "id": "kz-0003",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8",
+      "involved": "KZ",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_cdvd.cpp"
+      ]
+    },
+    "title": "IOP sceCdSearchFile walks the disc image's ISO9660; sceCdTrayReq (#14)",
+    "category": "C",
+    "subsystem": "IOP CDVD",
+    "problem": "LSNs come from a host-folder layout, so IOP reads land on the wrong sectors.",
+    "approach": "Search the image directory.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-0003",
+      "repo": "KZ",
+      "revision": "cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_cdvd.cpp"
+      ],
+      "title": "IOP sceCdSearchFile walks the disc image's ISO9660; sceCdTrayReq (#14)",
+      "category": "C",
+      "subsystem": "IOP CDVD",
+      "problem": "LSNs come from a host-folder layout, so IOP reads land on the wrong sectors.",
+      "approach": "Search the image directory.",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "not determined",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-0003"
+  },
+  {
+    "id": "vendored-31",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581",
+      "involved": "GOW",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_cdvd.cpp",
+        "ps2xTest/src/ps2_iop_tests.cpp"
+      ]
+    },
+    "title": "IOP sceCdStop (cdvdman:15) completes immediately",
+    "category": "C",
+    "subsystem": "IOP CDVD",
+    "problem": "Unimplemented, so the waiting IOP thread loops.",
+    "approach": "Return 1 and set the drive idle; adds a test.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "patch",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-CDSTOP",
+      "repo": "GOW",
+      "revision": "92ece581",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_cdvd.cpp",
+        "ps2xTest/src/ps2_iop_tests.cpp"
+      ],
+      "title": "IOP sceCdStop (cdvdman:15) completes immediately",
+      "category": "C",
+      "subsystem": "IOP CDVD",
+      "problem": "Unimplemented, so the waiting IOP thread loops.",
+      "approach": "Return 1 and set the drive idle; adds a test.",
+      "general_or_specific": "general",
+      "reference": "patch",
+      "upstream_already_has": "no (no Stop/case 15 in upstream iop_cdvd.cpp)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-CDSTOP"
+  },
+  {
+    "id": "vendored-32",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581",
+      "involved": "GOW",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp"
+      ]
+    },
+    "title": "DelayThread outside a thread context advances IOP time",
+    "category": "C",
+    "subsystem": "IOP kernel",
+    "problem": "An RPC server polling with DelayThread hangs.",
+    "approach": "Run the IOP for the delay; adds a test.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "patch test",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-IOPDELAY",
+      "repo": "GOW",
+      "revision": "92ece581",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp"
+      ],
+      "title": "DelayThread outside a thread context advances IOP time",
+      "category": "C",
+      "subsystem": "IOP kernel",
+      "problem": "An RPC server polling with DelayThread hangs.",
+      "approach": "Run the IOP for the delay; adds a test.",
+      "general_or_specific": "general",
+      "reference": "patch test",
+      "upstream_already_has": "not determined",
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-IOPDELAY"
+  },
+  {
+    "id": "vendored-33",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (0006)",
+      "involved": "KZ",
+      "files": [
+        "ps2xIOP/src/emulator/*"
+      ]
+    },
+    "title": "sceSifGetOtherData (sifcmd #23) copies EE to IOP RAM; SPU2 host hook",
+    "category": "C",
+    "subsystem": "IOP/SIF/SPU2",
+    "problem": "No-op import.",
+    "approach": "Copy the data; route SPU2 registers and DMA ch4/7 to a host SPU2.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-SIFOTHER",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (0006)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/*"
+      ],
+      "title": "sceSifGetOtherData (sifcmd #23) copies EE to IOP RAM; SPU2 host hook",
+      "category": "C",
+      "subsystem": "IOP/SIF/SPU2",
+      "problem": "No-op import.",
+      "approach": "Copy the data; route SPU2 registers and DMA ch4/7 to a host SPU2.",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "not determined",
+      "risk": "low-medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-SIFOTHER"
+  },
+  {
+    "id": "kz-0004",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ]
+    },
+    "title": "libmpeg HLE: stream-key matching for sceMpegAddStrCallback, sceMpegCbNodata, end flag, SPR interleave DMA",
+    "category": "C",
+    "subsystem": "MPEG HLE",
+    "problem": "Killzone FMV.",
+    "approach": "mixed",
+    "scope": "game-specific",
+    "scope_evidence": "partly general (stream key, nodata callback, D_SQWC interleave); partly title-specific",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-0004",
+      "repo": "KZ",
+      "revision": "cc1fc7d8",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ],
+      "title": "libmpeg HLE: stream-key matching for sceMpegAddStrCallback, sceMpegCbNodata, end flag, SPR interleave DMA",
+      "category": "C/F",
+      "subsystem": "MPEG HLE",
+      "problem": "Killzone FMV.",
+      "approach": "mixed",
+      "general_or_specific": "partly general (stream key, nodata callback, D_SQWC interleave); partly title-specific",
+      "reference": "KZ README",
+      "upstream_already_has": "not determined",
+      "risk": "medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-0004"
+  },
+  {
+    "id": "vendored-35",
+    "source": {
+      "repository": "drakolordx7/KillzoneRecomp",
+      "revision": "cc1fc7d8 (0002)",
+      "involved": "KZ",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "PS2X_HEADLESS with periodic PNG shots and a bounded run time",
+    "category": "E",
+    "subsystem": "testing",
+    "problem": "Automated runs.",
+    "approach": "No window or audio; screenshot every N seconds; heartbeat line.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "KZ README",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "KZ-HEADLESS",
+      "repo": "KZ",
+      "revision": "cc1fc7d8 (0002)",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "title": "PS2X_HEADLESS with periodic PNG shots and a bounded run time",
+      "category": "E",
+      "subsystem": "testing",
+      "problem": "Automated runs.",
+      "approach": "No window or audio; screenshot every N seconds; heartbeat line.",
+      "general_or_specific": "general",
+      "reference": "KZ README",
+      "upstream_already_has": "not determined",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "KZ-HEADLESS"
+  },
+  {
+    "id": "vendored-36",
+    "source": {
+      "repository": "z3xox/BT3-Recomp",
+      "revision": "e22a34be",
+      "involved": "BT3",
+      "files": [
+        "ps2xRuntime/CMakeLists.txt",
+        "docs/BUILD-TIME.md",
+        "games/bt3/gen_overlay.py"
+      ]
+    },
+    "title": "Compile register_functions TUs at -O0 and generated code at -O1; split huge TUs",
+    "category": "E",
+    "subsystem": "build",
+    "problem": "A 92k-assignment constructor took 338 s at -O3.",
+    "approach": "-O0 for registration (338 s down to 4 s); PS2X_RUNNER_OPT=-O1 for generated code (12m26s down to 3m17s wall, no fps loss measured); chunk the overlay into 16 TUs.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "docs/BUILD-TIME.md",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "BT3-BUILD",
+      "repo": "BT3",
+      "revision": "e22a34be",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/CMakeLists.txt",
+        "docs/BUILD-TIME.md",
+        "games/bt3/gen_overlay.py"
+      ],
+      "title": "Compile register_functions TUs at -O0 and generated code at -O1; split huge TUs",
+      "category": "E",
+      "subsystem": "build",
+      "problem": "A 92k-assignment constructor took 338 s at -O3.",
+      "approach": "-O0 for registration (338 s down to 4 s); PS2X_RUNNER_OPT=-O1 for generated code (12m26s down to 3m17s wall, no fps loss measured); chunk the overlay into 16 TUs.",
+      "general_or_specific": "general",
+      "reference": "docs/BUILD-TIME.md",
+      "upstream_already_has": "partially (PCH + unity exist upstream; no -O0/-O1 split)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "BT3-BUILD"
+  },
+  {
+    "id": "vendored-37",
+    "source": {
+      "repository": "KIexster/god-of-war-recomp",
+      "revision": "92ece581",
+      "involved": "GOW",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ]
+    },
+    "title": "Reuse DMA flatten buffers; log the VU1 code range per MPG generation",
+    "category": "C",
+    "subsystem": "DMA/VU1 cache",
+    "problem": "Allocations; whole-cache invalidation about 14 times per frame.",
+    "approach": "Buffer reuse (with a stale-data test); range-based invalidation.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "patch tests",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GOW-DMABUF",
+      "repo": "GOW",
+      "revision": "92ece581",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ],
+      "title": "Reuse DMA flatten buffers; log the VU1 code range per MPG generation",
+      "category": "C (perf)",
+      "subsystem": "DMA/VU1 cache",
+      "problem": "Allocations; whole-cache invalidation about 14 times per frame.",
+      "approach": "Buffer reuse (with a stale-data test); range-based invalidation.",
+      "general_or_specific": "general",
+      "reference": "patch tests",
+      "upstream_already_has": "no",
+      "risk": "low-medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "GOW-DMABUF"
+  },
+  {
+    "id": "vendored-38",
+    "source": {
+      "repository": "thiagordsfx/urban-reign-recomp",
+      "revision": "2fa53c4d",
+      "involved": "UR",
+      "files": [
+        "src/urban/function_hooks.h",
+        "src/urban/hle_bindings.cpp",
+        "sdk_functions.inc",
+        "runtime/.../ps2_pnach.h",
+        "modsdk/include/urban_mod_api.h"
+      ]
+    },
+    "title": "Symbol-less HLE binding by address, function-hook registry with status, PCSX2 pnach engine, C mod DLL API",
+    "category": "E",
+    "subsystem": "game adapter",
+    "problem": "Stripped ELF; mods.",
+    "approach": "An SDK signature finder emits an address table. installHleBindings binds a name list to runtime handlers (URBAN_HLE_SKIP opt-out). FunctionHooks::replace/observeEntry records ReplacementStatus{Recompiled, Observed, Native, Hle, TemporaryStub} and a reason. pnach supports CodeBreaker types and live reload. Mod DLL v2 API: memory r/w, pnach groups, tab UI, on_frame, settings.",
+    "scope": "unknown",
+    "scope_evidence": "mechanism general; tables per game",
+    "reference": "read",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "ADAPTER-UR",
+      "repo": "UR",
+      "revision": "2fa53c4d",
+      "license": "GPL-3.0",
+      "files": [
+        "src/urban/function_hooks.h",
+        "src/urban/hle_bindings.cpp",
+        "sdk_functions.inc",
+        "runtime/.../ps2_pnach.h",
+        "modsdk/include/urban_mod_api.h"
+      ],
+      "title": "Symbol-less HLE binding by address, function-hook registry with status, PCSX2 pnach engine, C mod DLL API",
+      "category": "E/C",
+      "subsystem": "game adapter",
+      "problem": "Stripped ELF; mods.",
+      "approach": "An SDK signature finder emits an address table. installHleBindings binds a name list to runtime handlers (URBAN_HLE_SKIP opt-out). FunctionHooks::replace/observeEntry records ReplacementStatus{Recompiled, Observed, Native, Hle, TemporaryStub} and a reason. pnach supports CodeBreaker types and live reload. Mod DLL v2 API: memory r/w, pnach groups, tab UI, on_frame, settings.",
+      "general_or_specific": "mechanism general; tables per game",
+      "reference": "read",
+      "upstream_already_has": "partially (game_overrides Descriptor + bindAddressHandler)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "ADAPTER-UR"
+  },
+  {
+    "id": "vendored-39",
+    "source": {
+      "repository": "sal063/Ace-Combat-5-Static-recompilation",
+      "revision": "078662b4",
+      "involved": "AC5",
+      "files": [
+        "runtime/include/ps2_hook.h",
+        "ps2_patch.h",
+        "config/hooks.json",
+        "config/overrides.json"
+      ]
+    },
+    "title": "Prioritized hooks (before/replace/after/redirect) and owned byte patches",
+    "category": "E",
+    "subsystem": "game adapter",
+    "problem": "Several mods and fixes competing for the same address.",
+    "approach": "ps2_hook_* take a priority and an owner string, with call_original and a report. ps2_patch_add(addr, bytes, original, len, when=ONCE|ALWAYS|BOTH, priority, owner, origin) loads pnach and verifies original bytes. JSON maps cover overrides (SDK name to HLE) and hooks (address to fn).",
+    "scope": "general",
+    "scope_evidence": "general mechanism (Apache-2.0; can be reimplemented)",
+    "reference": "read headers",
+    "license": "Apache-2.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "ADAPTER-AC5",
+      "repo": "AC5",
+      "revision": "078662b4",
+      "license": "Apache-2.0",
+      "files": [
+        "runtime/include/ps2_hook.h",
+        "ps2_patch.h",
+        "config/hooks.json",
+        "config/overrides.json"
+      ],
+      "title": "Prioritized hooks (before/replace/after/redirect) and owned byte patches",
+      "category": "E",
+      "subsystem": "game adapter",
+      "problem": "Several mods and fixes competing for the same address.",
+      "approach": "ps2_hook_* take a priority and an owner string, with call_original and a report. ps2_patch_add(addr, bytes, original, len, when=ONCE|ALWAYS|BOTH, priority, owner, origin) loads pnach and verifies original bytes. JSON maps cover overrides (SDK name to HLE) and hooks (address to fn).",
+      "general_or_specific": "general mechanism (Apache-2.0; can be reimplemented)",
+      "reference": "read headers",
+      "upstream_already_has": "no (upstream has no priority/owner/original-bytes check)",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "ADAPTER-AC5"
+  },
+  {
+    "id": "vendored-40",
+    "source": {
+      "repository": "z3xox/BT3-Recomp",
+      "revision": "e22a34be",
+      "involved": "BT3",
+      "files": [
+        "games/bt3/apply_patches.py",
+        "apply_overlay_patches.py"
+      ]
+    },
+    "title": "Anchor-based patching of generated C++",
+    "category": "F",
+    "subsystem": "adapter",
+    "problem": "Self-recursion compiled as a goto cannot be hooked at the function level.",
+    "approach": "An idempotent anchor insertion into generated files that fails loudly if the anchor is missing.",
+    "scope": "game-specific",
+    "scope_evidence": "title-specific content; the need it shows (an in-body hook point) is general",
+    "reference": "read",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "unknown",
+    "priority": 4,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "BT3-POSTGEN",
+      "repo": "BT3",
+      "revision": "e22a34be",
+      "license": "GPL-3.0",
+      "files": [
+        "games/bt3/apply_patches.py",
+        "apply_overlay_patches.py"
+      ],
+      "title": "Anchor-based patching of generated C++",
+      "category": "F/E",
+      "subsystem": "adapter",
+      "problem": "Self-recursion compiled as a goto cannot be hooked at the function level.",
+      "approach": "An idempotent anchor insertion into generated files that fails loudly if the anchor is missing.",
+      "general_or_specific": "title-specific content; the need it shows (an in-body hook point) is general",
+      "reference": "read",
+      "upstream_already_has": "no",
+      "risk": "fragile",
+      "priority": 4,
+      "recommended_status": "REJECTED"
+    },
+    "source_id": "BT3-POSTGEN"
+  },
+  {
+    "id": "vendored-41",
+    "source": {
+      "repository": "z3xox/BT3-Recomp",
+      "revision": "e22a34be",
+      "involved": "BT3",
+      "files": [
+        "ps2xRuntime/include/ps2x_mod_api.h",
+        "src/lib/ps2x_mods.cpp"
+      ]
+    },
+    "title": "Versioned, size-prefixed mod ABI table (replaceFunction/lookupFunction chaining)",
+    "category": "E",
+    "subsystem": "mods",
+    "problem": "The executable exports no symbols on Windows.",
+    "approach": "A struct of function pointers carrying size and version; chaining through lookup.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "read",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "BT3-MODAPI",
+      "repo": "BT3",
+      "revision": "e22a34be",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/include/ps2x_mod_api.h",
+        "src/lib/ps2x_mods.cpp"
+      ],
+      "title": "Versioned, size-prefixed mod ABI table (replaceFunction/lookupFunction chaining)",
+      "category": "E",
+      "subsystem": "mods",
+      "problem": "The executable exports no symbols on Windows.",
+      "approach": "A struct of function pointers carrying size and version; chaining through lookup.",
+      "general_or_specific": "general",
+      "reference": "read",
+      "upstream_already_has": "no",
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "BT3-MODAPI"
+  },
+  {
+    "id": "vendored-42",
+    "source": {
+      "repository": "sal063/Ace-Combat-5-Static-recompilation",
+      "revision": "078662b4",
+      "involved": "AC5",
+      "files": [
+        "tools/ps2recomp/*.py",
+        "runtime/src/ps2_vu.c",
+        "ps2_gs.c",
+        "shaders/gs.frag",
+        "runtime/src/rn/*",
+        "config/render_emitters.json"
+      ]
+    },
+    "title": "Independent C runtime: musttail codegen, Vulkan GS, VU recompiler, native VU1-replacement renderer",
+    "category": "D",
+    "subsystem": "whole runtime",
+    "problem": "-",
+    "approach": "Every function becomes C with guaranteed tail calls (GCC 15). The 3D path replaces VU1 programs with native mesh rendering; the emulated GS covers the rest.",
+    "scope": "game-specific",
+    "scope_evidence": "rn/ is title-specific (render_emitters.json addresses); musttail and the VU recompiler are general ideas",
+    "reference": "README",
+    "license": "Apache-2.0",
+    "upstream_equivalent": null,
+    "risk": "unknown",
+    "priority": 4,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "AC5-RUNTIME",
+      "repo": "AC5",
+      "revision": "078662b4",
+      "license": "Apache-2.0",
+      "files": [
+        "tools/ps2recomp/*.py",
+        "runtime/src/ps2_vu.c",
+        "ps2_gs.c",
+        "shaders/gs.frag",
+        "runtime/src/rn/*",
+        "config/render_emitters.json"
+      ],
+      "title": "Independent C runtime: musttail codegen, Vulkan GS, VU recompiler, native VU1-replacement renderer",
+      "category": "D/B",
+      "subsystem": "whole runtime",
+      "problem": "-",
+      "approach": "Every function becomes C with guaranteed tail calls (GCC 15). The 3D path replaces VU1 programs with native mesh rendering; the emulated GS covers the rest.",
+      "general_or_specific": "rn/ is title-specific (render_emitters.json addresses); musttail and the VU recompiler are general ideas",
+      "reference": "README",
+      "upstream_already_has": "no",
+      "risk": "n/a",
+      "priority": 4,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    },
+    "source_id": "AC5-RUNTIME"
+  },
+  {
+    "id": "vendored-43",
+    "source": {
+      "repository": "thiagordsfx/urban-reign-recomp",
+      "revision": "2fa53c4d",
+      "involved": "UR (from AC5)",
+      "files": [
+        "runtime/ps2xRuntime/src/lib/ipu/ps2_ipu.c",
+        "ps2_ipu_dct.inc"
+      ]
+    },
+    "title": "IPU decoder in C",
+    "category": "C",
+    "subsystem": "IPU",
+    "problem": "FMV without FFmpeg HLE.",
+    "approach": "not read in detail",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "UR runtime/README.md",
+    "license": "Apache-2.0 (in a GPL-3.0 tree)",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "UR-IPU",
+      "repo": "UR (from AC5)",
+      "revision": "2fa53c4d",
+      "license": "Apache-2.0 (in a GPL-3.0 tree)",
+      "files": [
+        "runtime/ps2xRuntime/src/lib/ipu/ps2_ipu.c",
+        "ps2_ipu_dct.inc"
+      ],
+      "title": "IPU decoder in C",
+      "category": "C",
+      "subsystem": "IPU",
+      "problem": "FMV without FFmpeg HLE.",
+      "approach": "not read in detail",
+      "general_or_specific": "general",
+      "reference": "UR runtime/README.md",
+      "upstream_already_has": "no (upstream uses MPEG HLE)",
+      "risk": "medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    },
+    "source_id": "UR-IPU"
+  },
+  {
+    "id": "vendored-44",
+    "source": {
+      "repository": "all",
+      "revision": "as above",
+      "involved": "all",
+      "files": [
+        "KZ src/kz_*.cpp",
+        "BT3 game_overrides.cpp (506 KB), games/bt3/*",
+        "GOW src/gow_overrides.cpp",
+        "UR src/urban/*",
+        "DJ overrides/*.cpp + config/patches.toml",
+        "AC5 rn/*, config/*"
+      ]
+    },
+    "title": "Widescreen, menus, camera, FMV quirks, address overrides",
+    "category": "F",
+    "subsystem": "-",
+    "problem": "-",
+    "approach": "Hardcoded addresses and ELF names (e.g. DJ PS2_REGISTER_GAME_OVERRIDE(...,\"SLUS_206.39\",0x100008...); GOW 0x00296C48 sceSifInitRpc recovery)",
+    "scope": "game-specific",
+    "scope_evidence": "title-specific",
+    "reference": "-",
+    "license": "various",
+    "upstream_equivalent": null,
+    "risk": "unknown",
+    "priority": 5,
+    "status": "GAME_SPECIFIC",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "GAME-SPECIFIC-BULK",
+      "repo": "all",
+      "revision": "as above",
+      "license": "various",
+      "files": [
+        "KZ src/kz_*.cpp",
+        "BT3 game_overrides.cpp (506 KB), games/bt3/*",
+        "GOW src/gow_overrides.cpp",
+        "UR src/urban/*",
+        "DJ overrides/*.cpp + config/patches.toml",
+        "AC5 rn/*, config/*"
+      ],
+      "title": "Widescreen, menus, camera, FMV quirks, address overrides",
+      "category": "F",
+      "subsystem": "-",
+      "problem": "-",
+      "approach": "Hardcoded addresses and ELF names (e.g. DJ PS2_REGISTER_GAME_OVERRIDE(...,\"SLUS_206.39\",0x100008...); GOW 0x00296C48 sceSifInitRpc recovery)",
+      "general_or_specific": "title-specific",
+      "reference": "-",
+      "upstream_already_has": "n/a",
+      "risk": "-",
+      "priority": 5,
+      "recommended_status": "GAME_SPECIFIC"
+    },
+    "source_id": "GAME-SPECIFIC-BULK"
+  }
+]

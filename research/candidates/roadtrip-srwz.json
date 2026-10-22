@@ -1,0 +1,2832 @@
+[
+  {
+    "id": "roadtrip-01",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "046fb2a1",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp",
+        "CD.h"
+      ]
+    },
+    "title": "registerCdFileAtLbn: map host files at their original disc LBN",
+    "category": "C",
+    "subsystem": "CDVD HLE (Stubs/CD.cpp)",
+    "problem": "Games that read raw LBNs from a hardcoded TOC (not sceCdSearchFile) fail on an extracted disc tree; upstream only hands out pseudo LBNs from 0x100000.",
+    "approach": "New registerCdFileAtLbn(ps2Path, hostPath, lbn, size) inserts a CdFileEntry with baseLbn = the real LBN (refused if lbn >= kCdPseudoLbnStart). It is an API only; the host app must call it with a LBN map.",
+    "scope": "general",
+    "scope_evidence": "General mechanism; the LBN map has to come from the game's ISO (supplied by the Road Trip port).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none (related #267 'Search files in the configured disc image')",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-01",
+      "commits": [
+        "046fb2a1"
+      ],
+      "title": "registerCdFileAtLbn: map host files at their original disc LBN",
+      "category": "C",
+      "subsystem": "CDVD HLE (Stubs/CD.cpp)",
+      "problem": "Games that read raw LBNs from a hardcoded TOC (not sceCdSearchFile) fail on an extracted disc tree; upstream only hands out pseudo LBNs from 0x100000.",
+      "approach": "New registerCdFileAtLbn(ps2Path, hostPath, lbn, size) inserts a CdFileEntry with baseLbn = the real LBN (refused if lbn >= kCdPseudoLbnStart). It is an API only; the host app must call it with a LBN map.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp",
+        "CD.h"
+      ],
+      "general_or_specific": "General mechanism; the LBN map has to come from the game's ISO (supplied by the Road Trip port).",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low (additive)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none (related #267 'Search files in the configured disc image')",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-02",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "39bd485d",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "Keep a host-chosen memory card root in configureIoPathsFromElf",
+    "category": "C",
+    "subsystem": "runtime IO paths (ps2_runtime.cpp)",
+    "problem": "configureIoPathsFromElf always resets mcRoot to <elfDir>/mc0, overwriting a custom saves folder.",
+    "approach": "Keep mcRoot when it is non-empty and differs from the old ELF-relative default.",
+    "scope": "general",
+    "scope_evidence": "general (host embedding)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-02",
+      "commits": [
+        "39bd485d"
+      ],
+      "title": "Keep a host-chosen memory card root in configureIoPathsFromElf",
+      "category": "C",
+      "subsystem": "runtime IO paths (ps2_runtime.cpp)",
+      "problem": "configureIoPathsFromElf always resets mcRoot to <elfDir>/mc0, overwriting a custom saves folder.",
+      "approach": "Keep mcRoot when it is non-empty and differs from the old ELF-relative default.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "general (host embedding)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-03",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "4eb3ce09",
+      "files": [
+        "ps2xRecomp/CMakeLists.txt"
+      ]
+    },
+    "title": "ps2xRecomp CMake: include ReleaseMode.cmake via CMAKE_CURRENT_SOURCE_DIR",
+    "category": "E",
+    "subsystem": "build",
+    "problem": "${CMAKE_SOURCE_DIR}/ps2xRuntime/... breaks when PS2Recomp is pulled in with add_subdirectory from a game repo.",
+    "approach": "Use ${CMAKE_CURRENT_SOURCE_DIR}/../ps2xRuntime/cmake/ReleaseMode.cmake. Upstream ps2xAnalyzer, ps2xStudio and ps2xTest have the same pattern and could get the same fix.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "unknown",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-03",
+      "commits": [
+        "4eb3ce09"
+      ],
+      "title": "ps2xRecomp CMake: include ReleaseMode.cmake via CMAKE_CURRENT_SOURCE_DIR",
+      "category": "E",
+      "subsystem": "build",
+      "problem": "${CMAKE_SOURCE_DIR}/ps2xRuntime/... breaks when PS2Recomp is pulled in with add_subdirectory from a game repo.",
+      "approach": "Use ${CMAKE_CURRENT_SOURCE_DIR}/../ps2xRuntime/cmake/ReleaseMode.cmake. Upstream ps2xAnalyzer, ps2xStudio and ps2xTest have the same pattern and could get the same fix.",
+      "files": [
+        "ps2xRecomp/CMakeLists.txt"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "very low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-04",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "c1d36e04",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ]
+    },
+    "title": "Synthesize wrappers for configured stubs (name@addr) that function discovery never found",
+    "category": "B",
+    "subsystem": "recompiler (ps2_recompiler.cpp)",
+    "problem": "In stripped ELFs, SDK routines reached only by tail-call J are never discovered, so a bound runtime handler gets no wrapper and dispatch fails. Upstream discoverAdditionalEntryPoints synthesizes entries only for stubs whose handler is Unknown; resolved-handler stubs are skipped.",
+    "approach": "For each entry in m_stubHandlerBindingsByStart with a resolved handler and no function at that start, push Function{name=handler, start, end=start+4}.",
+    "scope": "general",
+    "scope_evidence": "general (any stripped retail ELF)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "related #150, #330",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-04",
+      "commits": [
+        "c1d36e04"
+      ],
+      "title": "Synthesize wrappers for configured stubs (name@addr) that function discovery never found",
+      "category": "B",
+      "subsystem": "recompiler (ps2_recompiler.cpp)",
+      "problem": "In stripped ELFs, SDK routines reached only by tail-call J are never discovered, so a bound runtime handler gets no wrapper and dispatch fails. Upstream discoverAdditionalEntryPoints synthesizes entries only for stubs whose handler is Unknown; resolved-handler stubs are skipped.",
+      "approach": "For each entry in m_stubHandlerBindingsByStart with a resolved handler and no function at that start, push Function{name=handler, start, end=start+4}.",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ],
+      "general_or_specific": "general (any stripped retail ELF)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low-medium (adds 4-byte functions; check overlap with the 'synthesized standalone configured guest entry' path)",
+      "conflicts_with_our_branch": "none known",
+      "upstream_pr_equivalent": "related #150, #330",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-05",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "b3e0cd6d",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "Present into a 4:3 box instead of 1:1 pixel scaling",
+    "category": "D",
+    "subsystem": "raylib presenter",
+    "problem": "640x224 or 512x448 buffers are shown at pixel aspect, not the TV's 4:3.",
+    "approach": "dstWidth = min(screenW, screenH*4/3), dstHeight = dstWidth*3/4.",
+    "scope": "general",
+    "scope_evidence": "general (but forces 4:3; 16:9 games need an option)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#177 (present preserves display aspect); also see srwz-19",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-05",
+      "commits": [
+        "b3e0cd6d"
+      ],
+      "title": "Present into a 4:3 box instead of 1:1 pixel scaling",
+      "category": "D",
+      "subsystem": "raylib presenter",
+      "problem": "640x224 or 512x448 buffers are shown at pixel aspect, not the TV's 4:3.",
+      "approach": "dstWidth = min(screenW, screenH*4/3), dstHeight = dstWidth*3/4.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "general (but forces 4:3; 16:9 games need an option)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#177 (present preserves display aspect); also see srwz-19",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-06",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "2628fbff, 0fd786c8",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/GS.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h"
+      ]
+    },
+    "title": "libgraph double-buffer layout and DISPLAY in VCK units (MAGH/DW)",
+    "category": "A",
+    "subsystem": "GS SDK stubs (Stubs/GS.cpp, Helpers/Support.h)",
+    "problem": "(1) Upstream sceGsSetDefDBuffDc uses fbp1 = zbufAddr (GS.cpp:906), so the second framebuffer lands on the Z buffer. (2) Every sceGsSetDefDispEnv / DBuff / DBuffDc / ResetGraph stub builds DISPLAY with MAGH=0 and DW=w-1. Hardware reads DW in video clocks.",
+    "approach": "fbp1 = fbw*ceil(h/pageLines), where pageLines is 64 for 16-bit PSM and 32 otherwise. New makeLibgraphDisplay(dx,dy,w,h): MAGH = min(ceil(2560/w)-1, 15), DW = (MAGH+1)*w-1. The upstream CPU backend computes (DW+1)/(MAGH+1), so its output does not change.",
+    "scope": "general",
+    "scope_evidence": "general (every libgraph game; matters for any accurate GS backend)",
+    "reference": "PCSX2 pcsx2/GS/GSState.cpp ~7326: magnification = MAGH+1, renderWidth = (DW+1)/magnification, final width capped at DW/(VideoModeDivider+1). With upstream MAGH=0, DW=639 the real-GS width would be 160 px.",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#336 (lay out sceGsSetDefDBuff/DispEnv/zbufaddr like libgraph), #186, #331; srwz-03 is a superset",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-06",
+      "commits": [
+        "2628fbff",
+        "0fd786c8"
+      ],
+      "title": "libgraph double-buffer layout and DISPLAY in VCK units (MAGH/DW)",
+      "category": "A",
+      "subsystem": "GS SDK stubs (Stubs/GS.cpp, Helpers/Support.h)",
+      "problem": "(1) Upstream sceGsSetDefDBuffDc uses fbp1 = zbufAddr (GS.cpp:906), so the second framebuffer lands on the Z buffer. (2) Every sceGsSetDefDispEnv / DBuff / DBuffDc / ResetGraph stub builds DISPLAY with MAGH=0 and DW=w-1. Hardware reads DW in video clocks.",
+      "approach": "fbp1 = fbw*ceil(h/pageLines), where pageLines is 64 for 16-bit PSM and 32 otherwise. New makeLibgraphDisplay(dx,dy,w,h): MAGH = min(ceil(2560/w)-1, 15), DW = (MAGH+1)*w-1. The upstream CPU backend computes (DW+1)/(MAGH+1), so its output does not change.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/GS.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h"
+      ],
+      "general_or_specific": "general (every libgraph game; matters for any accurate GS backend)",
+      "reference": "PCSX2 pcsx2/GS/GSState.cpp ~7326: magnification = MAGH+1, renderWidth = (DW+1)/magnification, final width capped at DW/(VideoModeDivider+1). With upstream MAGH=0, DW=639 the real-GS width would be 160 px.",
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#336 (lay out sceGsSetDefDBuff/DispEnv/zbufaddr like libgraph), #186, #331; srwz-03 is a superset",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-07",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "0fbfe7b7, 40f93d75 (part)",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_vu1.h",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ]
+    },
+    "title": "VU1 interpreter: skip commitReadyPipelines until the earliest queued entry is due; event-stepping flushPipelines",
+    "category": "D",
+    "subsystem": "VU1 interpreter",
+    "problem": "commitReadyPipelines scans every pipeline array every cycle.",
+    "approach": "Track m_nextCommitCycle plus live counts per pipeline, and return early. flushPipelines jumps event to event. 40f93d75 also stops zeroing the 64 KiB XGKICK buffer on reset.",
+    "scope": "general",
+    "scope_evidence": "general (performance only, same results)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#306 (same idea, VariableDeclared)",
+    "risk": "low",
+    "priority": 3,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-07",
+      "commits": [
+        "0fbfe7b7",
+        "40f93d75 (part)"
+      ],
+      "title": "VU1 interpreter: skip commitReadyPipelines until the earliest queued entry is due; event-stepping flushPipelines",
+      "category": "D",
+      "subsystem": "VU1 interpreter",
+      "problem": "commitReadyPipelines scans every pipeline array every cycle.",
+      "approach": "Track m_nextCommitCycle plus live counts per pipeline, and return early. flushPipelines jumps event to event. 40f93d75 also stops zeroing the 64 KiB XGKICK buffer on reset.",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_vu1.h",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ],
+      "general_or_specific": "general (performance only, same results)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork reports 300/300 bit-exact replay; no upstream tests added",
+      "risk": "low-medium (every queue site must call notePipelineReady)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#306 (same idea, VariableDeclared)",
+      "priority": 3,
+      "recommended_status": "DUPLICATE"
+    }
+  },
+  {
+    "id": "roadtrip-08",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "164f5eca (part)",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "EE FPU: SQRT.S reads ft; CVT.W.S truncates and saturates",
+    "category": "B",
+    "subsystem": "recompiler FPU translator + runtime macros",
+    "problem": "Upstream fpu_translator.cpp:61 emits FPU_SQRT_S(ctx->f[fs]); on the EE the operand is in the ft field. FPU_CVT_W_S uses nearbyintf (round to nearest).",
+    "approach": "SQRT.S uses the ft field, sqrt(|ft|), sign-preserved zero, I/SI flags on negative input. CVT.W.S truncates when exponent <= 0x4E800000, else 0x7FFFFFFF / 0x80000000 by sign. The fork's DIV.S/RSQRT.S changes are already covered upstream by #272 (ps2_fdiv/ps2_frsqrt).",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "PCSX2 pcsx2/FPU.cpp: SQRT_S uses _FtValUl_ and sqrt(fabs(ft)); CVT_W: (s32) cast when (Fs & 0x7F800000) <= 0x4E800000, else 0x7fffffff / 0x80000000. Verified.",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#382, #277 (SQRT.S ft); #316, #215, #383 (CVT.W.S)",
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-08",
+      "commits": [
+        "164f5eca (part)"
+      ],
+      "title": "EE FPU: SQRT.S reads ft; CVT.W.S truncates and saturates",
+      "category": "B",
+      "subsystem": "recompiler FPU translator + runtime macros",
+      "problem": "Upstream fpu_translator.cpp:61 emits FPU_SQRT_S(ctx->f[fs]); on the EE the operand is in the ft field. FPU_CVT_W_S uses nearbyintf (round to nearest).",
+      "approach": "SQRT.S uses the ft field, sqrt(|ft|), sign-preserved zero, I/SI flags on negative input. CVT.W.S truncates when exponent <= 0x4E800000, else 0x7FFFFFFF / 0x80000000 by sign. The fork's DIV.S/RSQRT.S changes are already covered upstream by #272 (ps2_fdiv/ps2_frsqrt).",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "general_or_specific": "general",
+      "reference": "PCSX2 pcsx2/FPU.cpp: SQRT_S uses _FtValUl_ and sqrt(fabs(ft)); CVT_W: (s32) cast when (Fs & 0x7F800000) <= 0x4E800000, else 0x7fffffff / 0x80000000. Verified.",
+      "upstream_already_has": "partial (DIV.S/RSQRT.S done by #272; SQRT.S operand and CVT.W.S not)",
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#382, #277 (SQRT.S ft); #316, #215, #383 (CVT.W.S)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "SQRT.S via sotc-02 (a3c7f21), CVT.W.S via sotc-05 (252de7c)."
+  },
+  {
+    "id": "roadtrip-09",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "164f5eca (part)",
+      "files": [
+        "vu_translation_helpers.cpp",
+        "ps2_runtime_macros.h"
+      ]
+    },
+    "title": "VU0 macro VDIV/VSQRT/VRSQRT: x/0 gives ±MAX, sqrt(|ft|), VRSQRT = fs/sqrt(ft)",
+    "category": "D",
+    "subsystem": "recompiler VU0 macro (vu_translation_helpers.cpp)",
+    "problem": "Upstream VRSQRT ignores fs (1/sqrt(ft)); VDIV by 0 gives 0; VSQRT clamps negatives to 0.",
+    "approach": "ps2_vu_div/sqrt/rsqrt helpers. Status D/I flags are not set (srwz-02 sets them).",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#317, #198",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-09",
+      "commits": [
+        "164f5eca (part)"
+      ],
+      "title": "VU0 macro VDIV/VSQRT/VRSQRT: x/0 gives ±MAX, sqrt(|ft|), VRSQRT = fs/sqrt(ft)",
+      "category": "D",
+      "subsystem": "recompiler VU0 macro (vu_translation_helpers.cpp)",
+      "problem": "Upstream VRSQRT ignores fs (1/sqrt(ft)); VDIV by 0 gives 0; VSQRT clamps negatives to 0.",
+      "approach": "ps2_vu_div/sqrt/rsqrt helpers. Status D/I flags are not set (srwz-02 sets them).",
+      "files": [
+        "vu_translation_helpers.cpp",
+        "ps2_runtime_macros.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "possible textual conflict in vu_translation_helpers.cpp (PR #310 slice)",
+      "upstream_pr_equivalent": "#317, #198",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-10",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "164f5eca (part)",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRecomp/src/lib/vu_translator.cpp",
+        "instruction_translator.cpp"
+      ]
+    },
+    "title": "VF0 hard-wired to (0,0,0,1) in every R5900Context; writes to VF0 dropped",
+    "category": "D",
+    "subsystem": "runtime context + recompiler COP2",
+    "problem": "EeScheduler.cpp:492 does target->context = R5900Context{} for new threads, so VF0 = 0 there (upstream only fixes VF0 for m_cpuContext and VU0 state sync). VSUB vf0,... used as a flag test, and QMTC2/LQC2 into vf0, overwrite VF0.",
+    "approach": "Default member initializer vu0_vf[32] = {{0,0,0,1}}. LQC2 to vf0 is ignored. The VuTranslator::translate wrapper re-pins vf0 after COP2 ops that name it.",
+    "scope": "general",
+    "scope_evidence": "general (libvu0 sceVu0UnitMatrix depends on it)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#187, #320, #201, #292",
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-10",
+      "commits": [
+        "164f5eca (part)"
+      ],
+      "title": "VF0 hard-wired to (0,0,0,1) in every R5900Context; writes to VF0 dropped",
+      "category": "D",
+      "subsystem": "runtime context + recompiler COP2",
+      "problem": "EeScheduler.cpp:492 does target->context = R5900Context{} for new threads, so VF0 = 0 there (upstream only fixes VF0 for m_cpuContext and VU0 state sync). VSUB vf0,... used as a flag test, and QMTC2/LQC2 into vf0, overwrite VF0.",
+      "approach": "Default member initializer vu0_vf[32] = {{0,0,0,1}}. LQC2 to vf0 is ignored. The VuTranslator::translate wrapper re-pins vf0 after COP2 ops that name it.",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRecomp/src/lib/vu_translator.cpp",
+        "instruction_translator.cpp"
+      ],
+      "general_or_specific": "general (libvu0 sceVu0UnitMatrix depends on it)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "vu_translator.cpp wraps translate(): small textual conflict with PR #310/#268 slices",
+      "upstream_pr_equivalent": "#187, #320, #201, #292",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-11",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "164f5eca (part)",
+      "files": [
+        "vu_translator.cpp",
+        "ps2_runtime_macros.h"
+      ]
+    },
+    "title": "VU0 macro FMAC ops set MAC and status (Z/S/O plus sticky) flags",
+    "category": "D",
+    "subsystem": "recompiler VU0 macro",
+    "problem": "Upstream never updates vu0_mac_flags or vu0_status from macro FMAC ops; culling code reads them with CFC2 vi16/vi17.",
+    "approach": "Append ps2_vu0_fmac_flags(ctx, result, dest) after FMAC ops chosen by opcode tables. No U flag, and no clamping of the result.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#292, #383",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-11",
+      "commits": [
+        "164f5eca (part)"
+      ],
+      "title": "VU0 macro FMAC ops set MAC and status (Z/S/O plus sticky) flags",
+      "category": "D",
+      "subsystem": "recompiler VU0 macro",
+      "problem": "Upstream never updates vu0_mac_flags or vu0_status from macro FMAC ops; culling code reads them with CFC2 vi16/vi17.",
+      "approach": "Append ps2_vu0_fmac_flags(ctx, result, dest) after FMAC ops chosen by opcode tables. No U flag, and no clamping of the result.",
+      "files": [
+        "vu_translator.cpp",
+        "ps2_runtime_macros.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "medium (hand-written opcode classification tables; srwz-02 does this more completely)",
+      "conflicts_with_our_branch": "vu_translator.cpp",
+      "upstream_pr_equivalent": "#292, #383",
+      "priority": 3,
+      "recommended_status": "SUPERSEDED (prefer srwz-02 or #292)"
+    }
+  },
+  {
+    "id": "roadtrip-12",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "d14f9d51",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp"
+      ]
+    },
+    "title": "sceMcOpen with only O_CREAT (no access bits) creates the file",
+    "category": "C",
+    "subsystem": "memory card HLE",
+    "problem": "openMcHostFile treats access==0 as read-only and opens with fopen('rb'), so a create-only open fails with 'no entry'.",
+    "approach": "createOnly = access==0 && O_CREAT is treated as read/write. Adds an RT_MC_TRACE log.",
+    "scope": "general",
+    "scope_evidence": "general per the fork ('libmc games commonly...'); seen in Road Trip",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-12",
+      "commits": [
+        "d14f9d51"
+      ],
+      "title": "sceMcOpen with only O_CREAT (no access bits) creates the file",
+      "category": "C",
+      "subsystem": "memory card HLE",
+      "problem": "openMcHostFile treats access==0 as read-only and opens with fopen('rb'), so a create-only open fails with 'no entry'.",
+      "approach": "createOnly = access==0 && O_CREAT is treated as read/write. Adds an RT_MC_TRACE log.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp"
+      ],
+      "general_or_specific": "general per the fork ('libmc games commonly...'); seen in Road Trip",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-13",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "4300d5d6 (part)",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_memory.cpp/.h"
+      ]
+    },
+    "title": "IOP heap: first-fit allocation reusing freed blocks, then fallback to RAM above loaded modules",
+    "category": "C",
+    "subsystem": "ps2xIOP iop_memory",
+    "problem": "Upstream allocate() starts at m_heapCursor (a bump pointer), so freed blocks are never reused and sound-bank buffers fail.",
+    "approach": "findFree(begin,end) first fit from HeapBase; fallback to [m_lowArenaBase, HeapBase).",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#315 (first fit), #342 (sysmem arena); srwz-10 is fuller",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-13",
+      "commits": [
+        "4300d5d6 (part)"
+      ],
+      "title": "IOP heap: first-fit allocation reusing freed blocks, then fallback to RAM above loaded modules",
+      "category": "C",
+      "subsystem": "ps2xIOP iop_memory",
+      "problem": "Upstream allocate() starts at m_heapCursor (a bump pointer), so freed blocks are never reused and sound-bank buffers fail.",
+      "approach": "findFree(begin,end) first fit from HeapBase; fallback to [m_lowArenaBase, HeapBase).",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_memory.cpp/.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#315 (first fit), #342 (sysmem arena); srwz-10 is fuller",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-14",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "4300d5d6 (part)",
+      "files": [
+        "ps2xIOP/include/ps2x/iop/iop_host.h",
+        "iop_cdvd.cpp",
+        "ps2_iop_host.cpp/.h"
+      ]
+    },
+    "title": "IOP sceCdRead reads through the host's LBN map (one LSN space for EE and IOP)",
+    "category": "C",
+    "subsystem": "ps2xIOP cdvd + IopHost",
+    "problem": "IOP disc reads used a virtual ISO with its own layout, so IOP drivers got different files than the EE.",
+    "approach": "New virtual IopHost::readCdSectors, tried first in iop_cdvd.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none (srwz-14 does the same independently)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-14",
+      "commits": [
+        "4300d5d6 (part)"
+      ],
+      "title": "IOP sceCdRead reads through the host's LBN map (one LSN space for EE and IOP)",
+      "category": "C",
+      "subsystem": "ps2xIOP cdvd + IopHost",
+      "problem": "IOP disc reads used a virtual ISO with its own layout, so IOP drivers got different files than the EE.",
+      "approach": "New virtual IopHost::readCdSectors, tried first in iop_cdvd.",
+      "files": [
+        "ps2xIOP/include/ps2x/iop/iop_host.h",
+        "iop_cdvd.cpp",
+        "ps2_iop_host.cpp/.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none (srwz-14 does the same independently)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-15",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "baf79e9a, 628a5993, 08403e0f",
+      "files": [
+        "ps2xIOP/src/emulator/spu2/*",
+        "iop_kernel.cpp",
+        "iop_emulator.cpp",
+        "iop_memory.cpp",
+        "ps2_audio_out.cpp"
+      ]
+    },
+    "title": "Register-level SPU2 (24 ADPCM voices x2, ADSR, DMA ch4/7, IRQA, reverb), waits outside IOP threads, batched EE->IOP cycles",
+    "category": "A",
+    "subsystem": "ps2xIOP SPU2 + kernel + audio out",
+    "problem": "Upstream has no SPU2. WaitSema/WaitEventFlag on a temporary context (synchronous RPC server) fails at once.",
+    "approach": "New iop_spu2.cpp model. setWaitWithoutThreadHook advances to the next pending DMA interrupt (guard 4096). IOP cycles batched by 512.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": "fork says it was verified against a PCSX2 savestate (I did not check)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#308 (SPU2), #266 (WaitSema outside a thread), #328 (quanta)",
+    "risk": "high",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-15",
+      "commits": [
+        "baf79e9a",
+        "628a5993",
+        "08403e0f"
+      ],
+      "title": "Register-level SPU2 (24 ADPCM voices x2, ADSR, DMA ch4/7, IRQA, reverb), waits outside IOP threads, batched EE->IOP cycles",
+      "category": "A",
+      "subsystem": "ps2xIOP SPU2 + kernel + audio out",
+      "problem": "Upstream has no SPU2. WaitSema/WaitEventFlag on a temporary context (synchronous RPC server) fails at once.",
+      "approach": "New iop_spu2.cpp model. setWaitWithoutThreadHook advances to the next pending DMA interrupt (guard 4096). IOP cycles batched by 512.",
+      "files": [
+        "ps2xIOP/src/emulator/spu2/*",
+        "iop_kernel.cpp",
+        "iop_emulator.cpp",
+        "iop_memory.cpp",
+        "ps2_audio_out.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": "fork says it was verified against a PCSX2 savestate (I did not check)",
+      "upstream_already_has": false,
+      "has_tests": "ps2xIOP/tests/iop_spu2_tests.cpp",
+      "risk": "high (large; overlaps #308, #266 and srwz-13)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#308 (SPU2), #266 (WaitSema outside a thread), #328 (quanta)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (pick one SPU2 implementation)"
+    }
+  },
+  {
+    "id": "roadtrip-16",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "5820d9ac",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_vu1.h",
+        "ps2_vu1_core.cpp (vu1_exec.inl in fork)"
+      ]
+    },
+    "title": "VU1 exact FMAC results in double, not long double",
+    "category": "D",
+    "subsystem": "VU1 interpreter",
+    "problem": "On arm64 Linux/Android, long double is software quad precision: about 20% of VU1 time.",
+    "approach": "long double -> double in calculateFmacExactResult/normalizeFmacExactResult. Upstream still uses long double (ps2_vu1.h:264, ps2_vu1_core.cpp:206).",
+    "scope": "general",
+    "scope_evidence": "general (performance; no change on MSVC where long double == double)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-16",
+      "commits": [
+        "5820d9ac"
+      ],
+      "title": "VU1 exact FMAC results in double, not long double",
+      "category": "D",
+      "subsystem": "VU1 interpreter",
+      "problem": "On arm64 Linux/Android, long double is software quad precision: about 20% of VU1 time.",
+      "approach": "long double -> double in calculateFmacExactResult/normalizeFmacExactResult. Upstream still uses long double (ps2_vu1.h:264, ps2_vu1_core.cpp:206).",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_vu1.h",
+        "ps2_vu1_core.cpp (vu1_exec.inl in fork)"
+      ],
+      "general_or_specific": "general (performance; no change on MSVC where long double == double)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork regression suite",
+      "risk": "low-medium (MADD sums are not always exact in double, but MSVC already behaves this way)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-17",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "7f567f2e, 37030795, e741b8d0, e56ad7dc, 24511705, b31927af, d232ed6c, 4b2f0095, 02bca77c, 66428986",
+      "files": [
+        "ps2xRuntime/include/runtime/vu/ps2_vu1_exec.inl",
+        "ps2_vu1_native.h",
+        "tools/vu1_recomp",
+        "tools/vu1_replay"
+      ]
+    },
+    "title": "VU1 static recompiler (ps2_vu1_recomp), capture/replay checker, header-inline semantics, lean codegen",
+    "category": "D",
+    "subsystem": "VU1",
+    "problem": "VU1 interpreter cost.",
+    "approach": "Offline recompile microprograms (--split), RT_VU1_CAPTURE + vu1_replay bit-exact checker, liveness-pruned flags.",
+    "scope": "general",
+    "scope_evidence": "general framework; microprograms are per game",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#254 (compile whole VU1 programs, DQ8 fork)",
+    "risk": "high",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-17",
+      "commits": [
+        "7f567f2e",
+        "37030795",
+        "e741b8d0",
+        "e56ad7dc",
+        "24511705",
+        "b31927af",
+        "d232ed6c",
+        "4b2f0095",
+        "02bca77c",
+        "66428986"
+      ],
+      "title": "VU1 static recompiler (ps2_vu1_recomp), capture/replay checker, header-inline semantics, lean codegen",
+      "category": "D",
+      "subsystem": "VU1",
+      "problem": "VU1 interpreter cost.",
+      "approach": "Offline recompile microprograms (--split), RT_VU1_CAPTURE + vu1_replay bit-exact checker, liveness-pruned flags.",
+      "files": [
+        "ps2xRuntime/include/runtime/vu/ps2_vu1_exec.inl",
+        "ps2_vu1_native.h",
+        "tools/vu1_recomp",
+        "tools/vu1_replay"
+      ],
+      "general_or_specific": "general framework; microprograms are per game",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "replay tool",
+      "risk": "high (deletes ps2_vu1_lower/upper.cpp)",
+      "conflicts_with_our_branch": "none direct",
+      "upstream_pr_equivalent": "#254 (compile whole VU1 programs, DQ8 fork)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (long-term; the capture/replay checker is worth extracting first)"
+    }
+  },
+  {
+    "id": "roadtrip-18",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "bceee0ca, 91f5b219, 0a4dcf91, 55cd0c85, 20af225d, 75b93157, 37834d6e, 0778f7b7",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "gs/ps2_gif_arbiter.cpp",
+        "ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "GIF/VIF1/VU1 worker thread and GS thread; pooled packets; allocation-free arbiter ordering",
+    "category": "C",
+    "subsystem": "ps2_memory / GIF arbiter",
+    "problem": "Single-threaded GIF/VIF1/VU1/GS path; per-packet heap allocation; stable_sort after every VU1 program.",
+    "approach": "Snapshot DMA at kick and process on a worker. EE GS/VIF accesses sync the worker. Insertion sort for small queues. RT_GIF_THREAD=0 / RT_GS_THREAD=0 turn it off.",
+    "scope": "general",
+    "scope_evidence": "general (performance)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#299 (drain GIF arbiter in order), #314 (fast unmasked UNPACK)",
+    "risk": "high",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-18",
+      "commits": [
+        "bceee0ca",
+        "91f5b219",
+        "0a4dcf91",
+        "55cd0c85",
+        "20af225d",
+        "75b93157",
+        "37834d6e",
+        "0778f7b7"
+      ],
+      "title": "GIF/VIF1/VU1 worker thread and GS thread; pooled packets; allocation-free arbiter ordering",
+      "category": "C",
+      "subsystem": "ps2_memory / GIF arbiter",
+      "problem": "Single-threaded GIF/VIF1/VU1/GS path; per-packet heap allocation; stable_sort after every VU1 program.",
+      "approach": "Snapshot DMA at kick and process on a worker. EE GS/VIF accesses sync the worker. Insertion sort for small queues. RT_GIF_THREAD=0 / RT_GS_THREAD=0 turn it off.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "gs/ps2_gif_arbiter.cpp",
+        "ps2_vif1_interpreter.cpp"
+      ],
+      "general_or_specific": "general (performance)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "high (threading; ordering semantics)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#299 (drain GIF arbiter in order), #314 (fast unmasked UNPACK)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (only the small arbiter-ordering 55cd0c85 and pooling 0a4dcf91 are low risk)"
+    }
+  },
+  {
+    "id": "roadtrip-19",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "41940429, 963ff64e, bceee0ca (pgs), 130c93d5, b8d566af, 078647a8, 10469b04-23d83be9 presenter/upscalers, 3ea0d672..e50ffcef hardware GS",
+      "files": [
+        "ps2xRuntime/src/lib/gs/*",
+        "third_party/parallel-gs"
+      ]
+    },
+    "title": "paraLLEl-GS Vulkan backend, Road Trip hardware GS, Vulkan/Metal presenter, FXAA/SMAA/FSR/GSR/ASR/MetalFX, frame generation, texture packs",
+    "category": "D",
+    "subsystem": "GS backends / presenter",
+    "problem": "Accuracy and resolution of the CPU GS.",
+    "approach": "paraLLEl-GS submodule (fork of Arntzen-Software). Hardware raster 'for what Road Trip draws' (RT_GS_BACKEND=hw), with classifiers, map layer and UI mask.",
+    "scope": "game-specific",
+    "scope_evidence": "paraLLEl-GS backend is general; the hardware GS is explicitly game-specific ('for what Road Trip draws', map layer, button glyph repaint)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#285 (GS performance patch), #144 (texture cache)",
+    "risk": "high",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-19",
+      "commits": [
+        "41940429",
+        "963ff64e",
+        "bceee0ca (pgs)",
+        "130c93d5",
+        "b8d566af",
+        "078647a8",
+        "10469b04-23d83be9 presenter/upscalers",
+        "3ea0d672..e50ffcef hardware GS"
+      ],
+      "title": "paraLLEl-GS Vulkan backend, Road Trip hardware GS, Vulkan/Metal presenter, FXAA/SMAA/FSR/GSR/ASR/MetalFX, frame generation, texture packs",
+      "category": "D",
+      "subsystem": "GS backends / presenter",
+      "problem": "Accuracy and resolution of the CPU GS.",
+      "approach": "paraLLEl-GS submodule (fork of Arntzen-Software). Hardware raster 'for what Road Trip draws' (RT_GS_BACKEND=hw), with classifiers, map layer and UI mask.",
+      "files": [
+        "ps2xRuntime/src/lib/gs/*",
+        "third_party/parallel-gs"
+      ],
+      "general_or_specific": "paraLLEl-GS backend is general; the hardware GS is explicitly game-specific ('for what Road Trip draws', map layer, button glyph repaint)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#285 (GS performance patch), #144 (texture cache)",
+      "priority": 4,
+      "recommended_status": "GAME_SPECIFIC (hardware GS, widescreen); the paraLLEl-GS backend could be generalized"
+    }
+  },
+  {
+    "id": "roadtrip-20",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "4ca87de3, 286ac875, d7ccb76d, 05400174, 8e52ffb3, b285c14f, 0f02e527, dc60c70f, 15003754, 94928f5f, 494550b8, 5573d367, 1f3c54c9",
+      "files": [
+        "ps2xRuntime/src/lib/test/*",
+        "Kernel/SaveState*.cpp",
+        "ps2xIOP/include/ps2x/state_archive.h"
+      ]
+    },
+    "title": "Deterministic virtual time, test harness (movies, lockstep socket, state hashes), headless, save states, RPC trace, write watch",
+    "category": "E",
+    "subsystem": "tooling",
+    "problem": "No reproducible regression runs.",
+    "approach": "RT_TIME=virtual, RT_SPEED, RT_FAKE_CLOCK, per-vblank input. state_archive.h + SaveState with zstd and ELF CRC. PS2X_WRITE_WATCH.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#157 (observability layer), #221 (ps2xAutoTests)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-20",
+      "commits": [
+        "4ca87de3",
+        "286ac875",
+        "d7ccb76d",
+        "05400174",
+        "8e52ffb3",
+        "b285c14f",
+        "0f02e527",
+        "dc60c70f",
+        "15003754",
+        "94928f5f",
+        "494550b8",
+        "5573d367",
+        "1f3c54c9"
+      ],
+      "title": "Deterministic virtual time, test harness (movies, lockstep socket, state hashes), headless, save states, RPC trace, write watch",
+      "category": "E",
+      "subsystem": "tooling",
+      "problem": "No reproducible regression runs.",
+      "approach": "RT_TIME=virtual, RT_SPEED, RT_FAKE_CLOCK, per-vblank input. state_archive.h + SaveState with zstd and ELF CRC. PS2X_WRITE_WATCH.",
+      "files": [
+        "ps2xRuntime/src/lib/test/*",
+        "Kernel/SaveState*.cpp",
+        "ps2xIOP/include/ps2x/state_archive.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "harness itself",
+      "risk": "medium (touches the scheduler)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#157 (observability layer), #221 (ps2xAutoTests)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (tooling; see srwz-24 for the parallel design)"
+    }
+  },
+  {
+    "id": "roadtrip-21",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "96140e65",
+      "files": [
+        "Stubs/Pad.cpp/.h",
+        "test harness"
+      ]
+    },
+    "title": "Pad: per-port state, unplugged pads (DISCONNECTED), FINDPAD on replug, actuator align/direct",
+    "category": "C",
+    "subsystem": "Pad HLE",
+    "problem": "One shared pad state; no disconnect; no vibration.",
+    "approach": "setPadOverridePort, scePadSetActAlign/ActDirect, RT_PAD_TRACE.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#381 (open port with no controller reports disconnected), #329",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-21",
+      "commits": [
+        "96140e65"
+      ],
+      "title": "Pad: per-port state, unplugged pads (DISCONNECTED), FINDPAD on replug, actuator align/direct",
+      "category": "C",
+      "subsystem": "Pad HLE",
+      "problem": "One shared pad state; no disconnect; no vibration.",
+      "approach": "setPadOverridePort, scePadSetActAlign/ActDirect, RT_PAD_TRACE.",
+      "files": [
+        "Stubs/Pad.cpp/.h",
+        "test harness"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "harness",
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#381 (open port with no controller reports disconnected), #329",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "roadtrip-22",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "45ae42eb, 10469b04, 9d0f0263, 91745766, fdb401a7, f6b8c758",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_host_presenter.h",
+        "src/lib/host/raylib_presenter.cpp",
+        "ps2x_compat.h",
+        "CMakeLists.txt",
+        "rt_upscaler_api.h"
+      ]
+    },
+    "title": "Platform abstractions: GLFW/SDL3 host option, HostPresenter interface, Android, Windows llvm-mingw, upscaler plugin C ABI",
+    "category": "E",
+    "subsystem": "platform layer",
+    "problem": "Upstream is tied to raylib/GLFW inside PS2Runtime::run().",
+    "approach": "PS2X_HOST_PLATFORM (GLFW or SDL3). ps2x::HostPresenter interface, with the raylib loop moved into RaylibPresenter unchanged. rt_upscaler_api.h plugin ABI. llvm-mingw build (ps2x_compat.h; exported globals instead of inline statics when the game is a DLL).",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#353 (GameThread stack size), #202 (Studio raylib)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-22",
+      "commits": [
+        "45ae42eb",
+        "10469b04",
+        "9d0f0263",
+        "91745766",
+        "fdb401a7",
+        "f6b8c758"
+      ],
+      "title": "Platform abstractions: GLFW/SDL3 host option, HostPresenter interface, Android, Windows llvm-mingw, upscaler plugin C ABI",
+      "category": "E",
+      "subsystem": "platform layer",
+      "problem": "Upstream is tied to raylib/GLFW inside PS2Runtime::run().",
+      "approach": "PS2X_HOST_PLATFORM (GLFW or SDL3). ps2x::HostPresenter interface, with the raylib loop moved into RaylibPresenter unchanged. rt_upscaler_api.h plugin ABI. llvm-mingw build (ps2x_compat.h; exported globals instead of inline statics when the game is a DLL).",
+      "files": [
+        "ps2xRuntime/include/runtime/ps2_host_presenter.h",
+        "src/lib/host/raylib_presenter.cpp",
+        "ps2x_compat.h",
+        "CMakeLists.txt",
+        "rt_upscaler_api.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "medium (CMake/FetchContent churn)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#353 (GameThread stack size), #202 (Studio raylib)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (HostPresenter split worth generalizing)"
+    }
+  },
+  {
+    "id": "roadtrip-23",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "c9700301, 9cc35ba4, e4e9983d, d31cef60, 01aea62f, 786b6cbd, 11b6b33a, 9082817a",
+      "files": [
+        "ps2_audio_out.cpp",
+        "host/display_clock_*",
+        "EeScheduler.cpp"
+      ]
+    },
+    "title": "Audio rate matching/suspend, vblank locked to display refresh, judder-free pacing",
+    "category": "C",
+    "subsystem": "host audio / pacing",
+    "problem": "Audio underruns; pacing tied to raylib's sleep.",
+    "approach": "Rate matching, re-prime after stalls, 60/120/240 Hz lock.",
+    "scope": "general",
+    "scope_evidence": "general but tightly bound to the fork's presenter",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#332 (cap VBlank pacing debt)",
+    "risk": "medium",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-23",
+      "commits": [
+        "c9700301",
+        "9cc35ba4",
+        "e4e9983d",
+        "d31cef60",
+        "01aea62f",
+        "786b6cbd",
+        "11b6b33a",
+        "9082817a"
+      ],
+      "title": "Audio rate matching/suspend, vblank locked to display refresh, judder-free pacing",
+      "category": "C",
+      "subsystem": "host audio / pacing",
+      "problem": "Audio underruns; pacing tied to raylib's sleep.",
+      "approach": "Rate matching, re-prime after stalls, 60/120/240 Hz lock.",
+      "files": [
+        "ps2_audio_out.cpp",
+        "host/display_clock_*",
+        "EeScheduler.cpp"
+      ],
+      "general_or_specific": "general but tightly bound to the fork's presenter",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "medium-high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#332 (cap VBlank pacing debt)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (later)"
+    }
+  },
+  {
+    "id": "roadtrip-24",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "934ba667, 0a091109, 92517ea6, 6fd54ba5, 538342f6, 387dd63d, 9efbd1ae, a0afd523, 70a467b8, 816f279b",
+      "files": [
+        "gs_wide_layout.cpp",
+        "hw/*"
+      ]
+    },
+    "title": "16:9 widescreen layout, town dialogue window, map second screen, UI mask",
+    "category": "F",
+    "subsystem": "GS frontend / hardware GS",
+    "problem": "Road Trip presentation.",
+    "approach": "gs_wide_layout classifier for Road Trip screens.",
+    "scope": "game-specific",
+    "scope_evidence": "game-specific (commit titles name Road Trip screens: town dialogue, map)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "unknown",
+    "priority": 5,
+    "status": "GAME_SPECIFIC",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-24",
+      "commits": [
+        "934ba667",
+        "0a091109",
+        "92517ea6",
+        "6fd54ba5",
+        "538342f6",
+        "387dd63d",
+        "9efbd1ae",
+        "a0afd523",
+        "70a467b8",
+        "816f279b"
+      ],
+      "title": "16:9 widescreen layout, town dialogue window, map second screen, UI mask",
+      "category": "F",
+      "subsystem": "GS frontend / hardware GS",
+      "problem": "Road Trip presentation.",
+      "approach": "gs_wide_layout classifier for Road Trip screens.",
+      "files": [
+        "gs_wide_layout.cpp",
+        "hw/*"
+      ],
+      "general_or_specific": "game-specific (commit titles name Road Trip screens: town dialogue, map)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "n/a",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 5,
+      "recommended_status": "GAME_SPECIFIC"
+    }
+  },
+  {
+    "id": "roadtrip-25",
+    "source": {
+      "repository": "silentsudin/PS2Recomp",
+      "branch": "roadtrip",
+      "upstream_base": "c5a9d025",
+      "revision": "aa769f1d",
+      "files": [
+        "ps2xIOP/include/ps2x/iop/iop_native.h",
+        "iop_emulator.cpp"
+      ]
+    },
+    "title": "IOP native stand-ins bound by code hash; sticky VU float mode",
+    "category": "C",
+    "subsystem": "ps2xIOP",
+    "problem": "IOP interpreter CPU cost.",
+    "approach": "Replace a module routine with host code bound by a hash of its code; instruction debt keeps state hashes equal.",
+    "scope": "general",
+    "scope_evidence": "general mechanism; the bound routines are Road Trip's",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#254 (sound IRX natively)",
+    "risk": "medium",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "roadtrip-25",
+      "commits": [
+        "aa769f1d"
+      ],
+      "title": "IOP native stand-ins bound by code hash; sticky VU float mode",
+      "category": "C",
+      "subsystem": "ps2xIOP",
+      "problem": "IOP interpreter CPU cost.",
+      "approach": "Replace a module routine with host code bound by a hash of its code; instruction debt keeps state hashes equal.",
+      "files": [
+        "ps2xIOP/include/ps2x/iop/iop_native.h",
+        "iop_emulator.cpp"
+      ],
+      "general_or_specific": "general mechanism; the bound routines are Road Trip's",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#254 (sound IRX natively)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (mechanism only)"
+    }
+  },
+  {
+    "id": "srwz-01",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xTest/src/ps2_mmi_hilo_tests.cpp"
+      ]
+    },
+    "title": "MMI HI/LO family moves all 128 bits (PMFHI/PMFLO/PMTHI/PMTLO) and PMFHL.LW/UW/SLW/LH/SH, PMTHL.LW use LO1/HI1",
+    "category": "B",
+    "subsystem": "recompiler MMI + runtime macros",
+    "problem": "Upstream (mmi_translation_helpers.cpp:144, 231-252, 588): PMFHI/PMFLO move 64 bits, PMTHI/PMTLO 32 bits, and PMFHL ignores hi1/lo1 and mixes words. multu+pmfhl.lw 64-bit products come out wrong, so soft-float __muldf3/__muldi3 are wrong ('Wall 21' hang).",
+    "approach": "New ps2_pmfhl_{lw,uw,slw,lh,sh}(hi,lo,hi1,lo1) and ps2_pmthl_lw (keeps upper words). PMFHI/PMFLO use _mm_set_epi64x(hi1,hi). PMTHI/PMTLO extract both 64-bit halves.",
+    "scope": "general",
+    "scope_evidence": "general (any game using libgcc soft-double or 64-bit multiply)",
+    "reference": "PCSX2 pcsx2/MMI.cpp PMFHL (LW: rd.UL[0..3] = LO.UL[0], HI.UL[0], LO.UL[2], HI.UL[2]), PMTHL, PMFHI/PMFLO/PMTHI/PMTLO (UD[0] and UD[1]). Verified.",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#322 (give MMI HI/LO family both pipelines' registers)",
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-01",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "MMI HI/LO family moves all 128 bits (PMFHI/PMFLO/PMTHI/PMTLO) and PMFHL.LW/UW/SLW/LH/SH, PMTHL.LW use LO1/HI1",
+      "category": "B",
+      "subsystem": "recompiler MMI + runtime macros",
+      "problem": "Upstream (mmi_translation_helpers.cpp:144, 231-252, 588): PMFHI/PMFLO move 64 bits, PMTHI/PMTLO 32 bits, and PMFHL ignores hi1/lo1 and mixes words. multu+pmfhl.lw 64-bit products come out wrong, so soft-float __muldf3/__muldi3 are wrong ('Wall 21' hang).",
+      "approach": "New ps2_pmfhl_{lw,uw,slw,lh,sh}(hi,lo,hi1,lo1) and ps2_pmthl_lw (keeps upper words). PMFHI/PMFLO use _mm_set_epi64x(hi1,hi). PMTHI/PMTLO extract both 64-bit halves.",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xTest/src/ps2_mmi_hilo_tests.cpp"
+      ],
+      "general_or_specific": "general (any game using libgcc soft-double or 64-bit multiply)",
+      "reference": "PCSX2 pcsx2/MMI.cpp PMFHL (LW: rd.UL[0..3] = LO.UL[0], HI.UL[0], LO.UL[2], HI.UL[2]), PMTHL, PMFHI/PMFLO/PMTHI/PMTLO (UD[0] and UD[1]). Verified.",
+      "upstream_already_has": false,
+      "has_tests": "ps2_mmi_hilo_tests (8 cases)",
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#322 (give MMI HI/LO family both pipelines' registers)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-02",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/include/ps2_vu0_macro.h",
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "vu_translator.cpp",
+        "ps2xTest/src/ps2_vu0_macro_tests.cpp"
+      ]
+    },
+    "title": "ps2_vu0_macro.h: full COP2 macro semantics (operand clamp, MAC/status Z S U O plus sticky, DIV/SQRT/RSQRT I/D flags, FTOI saturate, CLIP vs |w|, CTC2 STATUS sticky-only, R register LFSR, VF0/VI0 writes dropped)",
+    "category": "D",
+    "subsystem": "recompiler VU0 macro + runtime",
+    "problem": "Upstream macro VU0 uses IEEE host math: no clamping, no flags, VDIV by 0 gives 0, VF0 writable. HiG's clip loops write VF0 for flags, so 3D maps went black ('Wall 17').",
+    "approach": "All COP2 arithmetic goes through ps2x_vu0::{add,sub,mul,madd,msub,fmac,vdiv,vsqrt,vrsqrt,clip,ftoi,itof,rnext,...}. dst nullptr = VF0. QMTC2/LQC2 to vf0 dropped (the LQC2 load still executes). vu_translation_helpers.cpp rewritten (+184/-564), including VILWR/VISWR via vu0DataAddress.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#292, #293, #317, #318, #320, #383, #201, #198",
+    "risk": "medium",
+    "priority": 2,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-02",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "ps2_vu0_macro.h: full COP2 macro semantics (operand clamp, MAC/status Z S U O plus sticky, DIV/SQRT/RSQRT I/D flags, FTOI saturate, CLIP vs |w|, CTC2 STATUS sticky-only, R register LFSR, VF0/VI0 writes dropped)",
+      "category": "D",
+      "subsystem": "recompiler VU0 macro + runtime",
+      "problem": "Upstream macro VU0 uses IEEE host math: no clamping, no flags, VDIV by 0 gives 0, VF0 writable. HiG's clip loops write VF0 for flags, so 3D maps went black ('Wall 17').",
+      "approach": "All COP2 arithmetic goes through ps2x_vu0::{add,sub,mul,madd,msub,fmac,vdiv,vsqrt,vrsqrt,clip,ftoi,itof,rnext,...}. dst nullptr = VF0. QMTC2/LQC2 to vf0 dropped (the LQC2 load still executes). vu_translation_helpers.cpp rewritten (+184/-564), including VILWR/VISWR via vu0DataAddress.",
+      "files": [
+        "ps2xRuntime/include/ps2_vu0_macro.h",
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "vu_translator.cpp",
+        "ps2xTest/src/ps2_vu0_macro_tests.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "ps2_vu0_macro_tests.cpp",
+      "risk": "medium-high (rewrites every macro op; also changes ILWR/ISWR/LQI/SQI addressing, which duplicates our PR #310)",
+      "conflicts_with_our_branch": "YES: VILWR/VISWR/VLQI/VSQI and VU0 data memory overlap PR #310; vu_translator.cpp overlaps #268",
+      "upstream_pr_equivalent": "#292, #293, #317, #318, #320, #383, #201, #198",
+      "priority": 2,
+      "recommended_status": "CANDIDATE (header and flag/clamp logic; the ILWR/ISWR/LQI parts are DUPLICATE of PR #310)"
+    }
+  },
+  {
+    "id": "srwz-03",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/GS.cpp",
+        "Helpers/Support.h",
+        "ps2xTest/gs_dbuff/*"
+      ]
+    },
+    "title": "libgraph GS stubs rebuilt field by field from SDK 3.1.0 (sceGsSetDefDBuff/DBuffDc/DispEnv/DrawEnv(2)/Clear/zbufaddr/SwapDBuff/PutDrawEnv/ResetGraph/GetGParam/SetDefLoad/StoreImage)",
+    "category": "A",
+    "subsystem": "GS SDK stubs",
+    "problem": "Upstream issues: args 5-8 read from sp+16..28 when t0-t3 are zero (decodeGsTrailingArgs2/3, GS.cpp:74-98; EE ABI uses t0-t3). sceGsSetDefClear is empty. SetDefDispEnv leaves pmode/smode2/bgcolor as stack garbage. sceGszbufaddr is called with the wrong registers. GsGParam is bytes, not 4 shorts. fbp1 = zbuf. Load/StoreImage block address scaled x8. SwapDBuff uses a register-pair heuristic.",
+    "approach": "libgraph* builders. Trailing args only from t0-t3 (9-11 on the stack in 8-byte slots). SwapDBuff/PutDrawEnv send the guest giftag + NLOOP by GIF DMA (ch2). GParam located from the guest's sceGsResetGraph/sceGsGetGParam body (lui/addiu pattern) with a host mirror. DISPLAY MAGH/DW in VCK; DH = 2h-1 in interlaced FRAME mode.",
+    "scope": "general",
+    "scope_evidence": "general (checked against SLPS-25887's libgraph copies; GParam pattern-matching is heuristic)",
+    "reference": "Fork's decompilation of SLPS-25887 libgraph, not checked by me. The DISPLAY part matches PCSX2 GSState.cpp (see roadtrip-06).",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#336, #335, #334, #333, #331, #311, #186, #185",
+    "risk": "medium",
+    "priority": 2,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-03",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "libgraph GS stubs rebuilt field by field from SDK 3.1.0 (sceGsSetDefDBuff/DBuffDc/DispEnv/DrawEnv(2)/Clear/zbufaddr/SwapDBuff/PutDrawEnv/ResetGraph/GetGParam/SetDefLoad/StoreImage)",
+      "category": "A",
+      "subsystem": "GS SDK stubs",
+      "problem": "Upstream issues: args 5-8 read from sp+16..28 when t0-t3 are zero (decodeGsTrailingArgs2/3, GS.cpp:74-98; EE ABI uses t0-t3). sceGsSetDefClear is empty. SetDefDispEnv leaves pmode/smode2/bgcolor as stack garbage. sceGszbufaddr is called with the wrong registers. GsGParam is bytes, not 4 shorts. fbp1 = zbuf. Load/StoreImage block address scaled x8. SwapDBuff uses a register-pair heuristic.",
+      "approach": "libgraph* builders. Trailing args only from t0-t3 (9-11 on the stack in 8-byte slots). SwapDBuff/PutDrawEnv send the guest giftag + NLOOP by GIF DMA (ch2). GParam located from the guest's sceGsResetGraph/sceGsGetGParam body (lui/addiu pattern) with a host mirror. DISPLAY MAGH/DW in VCK; DH = 2h-1 in interlaced FRAME mode.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/GS.cpp",
+        "Helpers/Support.h",
+        "ps2xTest/gs_dbuff/*"
+      ],
+      "general_or_specific": "general (checked against SLPS-25887's libgraph copies; GParam pattern-matching is heuristic)",
+      "reference": "Fork's decompilation of SLPS-25887 libgraph, not checked by me. The DISPLAY part matches PCSX2 GSState.cpp (see roadtrip-06).",
+      "upstream_already_has": false,
+      "has_tests": "gs_dbuff tests (expected values from gen_expected.py)",
+      "risk": "medium (large; GIF DMA path change affects every libgraph game; GParam guest-code pattern-matching)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#336, #335, #334, #333, #331, #311, #186, #185",
+      "priority": 2,
+      "recommended_status": "CANDIDATE (split: t0-t3 decoding and SetDefClear first)"
+    }
+  },
+  {
+    "id": "srwz-04",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h",
+        "Font.cpp",
+        "LibC.cpp"
+      ]
+    },
+    "title": "EE EABI varargs for printf-family stubs: 8 arg registers, then 8-byte stack slots from caller sp+0; va_list steps 8 bytes; %q, %h/%hh, %ld = 64-bit",
+    "category": "C",
+    "subsystem": "LibC stubs (Helpers/Support.h Ps2VarArgCursor/Ps2VaListCursor)",
+    "problem": "Upstream (Support.h:784, 802, 855) uses an o32 model: stack base sp+0x10, 4-byte slots, even-slot alignment for 64-bit values; va_list steps 4 bytes. On the EE every vararg is one 64-bit register or 8-byte slot, so printf/sprintf/vsprintf output with more than 8 args, or with doubles/long long, is garbage.",
+    "approach": "readSlot reads a full 64-bit register (r[4+i]) or 8-byte slot at sp+(i-8)*8. va_list reads 8 bytes and steps 8.",
+    "scope": "general",
+    "scope_evidence": "general (SCE ee-gcc EABI)",
+    "reference": "Fork's disassembly of SRWZ newlib vfprintf 0x1a19b0 and sceSnprintf 0x11dc90; not independently verified by me. Consistent with upstream's own comment that EE calls use a0-a3,t0-t3.",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-04",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "EE EABI varargs for printf-family stubs: 8 arg registers, then 8-byte stack slots from caller sp+0; va_list steps 8 bytes; %q, %h/%hh, %ld = 64-bit",
+      "category": "C",
+      "subsystem": "LibC stubs (Helpers/Support.h Ps2VarArgCursor/Ps2VaListCursor)",
+      "problem": "Upstream (Support.h:784, 802, 855) uses an o32 model: stack base sp+0x10, 4-byte slots, even-slot alignment for 64-bit values; va_list steps 4 bytes. On the EE every vararg is one 64-bit register or 8-byte slot, so printf/sprintf/vsprintf output with more than 8 args, or with doubles/long long, is garbage.",
+      "approach": "readSlot reads a full 64-bit register (r[4+i]) or 8-byte slot at sp+(i-8)*8. va_list reads 8 bytes and steps 8.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h",
+        "Font.cpp",
+        "LibC.cpp"
+      ],
+      "general_or_specific": "general (SCE ee-gcc EABI)",
+      "reference": "Fork's disassembly of SRWZ newlib vfprintf 0x1a19b0 and sceSnprintf 0x11dc90; not independently verified by me. Consistent with upstream's own comment that EE calls use a0-a3,t0-t3.",
+      "upstream_already_has": false,
+      "has_tests": "ps2_stub_poison_tests / stub ABI tests",
+      "risk": "low-medium (homebrew built with a different ABI could differ)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-05",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ]
+    },
+    "title": "DMA chain walk: no 4096-tag cutoff (1<<20 loop guard plus 64 MiB data bound, logged)",
+    "category": "A",
+    "subsystem": "DMAC chain mode (ps2_memory.cpp)",
+    "problem": "Upstream ps2_memory.cpp:1347 kMaxChainTags = 4096 silently ends long chains. SRWZ's ~2 MB VIF1 chain lost its tail (PRMODECONT restore), breaking every later 2D draw ('Wall 19').",
+    "approach": "kMaxChainTags = 1<<20, kMaxChainBytes = 64 MiB, capped [dma:chain] warning with the stop reason.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#297 (raise DMA chain tag limit and warn)",
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-05",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "DMA chain walk: no 4096-tag cutoff (1<<20 loop guard plus 64 MiB data bound, logged)",
+      "category": "A",
+      "subsystem": "DMAC chain mode (ps2_memory.cpp)",
+      "problem": "Upstream ps2_memory.cpp:1347 kMaxChainTags = 4096 silently ends long chains. SRWZ's ~2 MB VIF1 chain lost its tail (PRMODECONT restore), breaking every later 2D draw ('Wall 19').",
+      "approach": "kMaxChainTags = 1<<20, kMaxChainBytes = 64 MiB, capped [dma:chain] warning with the stop reason.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork regress",
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#297 (raise DMA chain tag limit and warn)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-06",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2_memory.h"
+      ]
+    },
+    "title": "VIF1 DIRECT: GIF IMAGE continuation consumed only from later DIRECT payloads; DIRECT payload split across transfers resumes",
+    "category": "A",
+    "subsystem": "VIF1 interpreter",
+    "problem": "Upstream processVIF1Data (ps2_vif1_interpreter.cpp:307-332) takes pending IMAGE qwords straight from the raw VIF stream, so VIFcodes after a DIRECT are fed to the GS as pixels.",
+    "approach": "submitVif1DirectPayload() applies m_vif1PendingPath2ImageQwc only inside DIRECT payloads. m_vif1DirectRemainQwc carries an unfinished DIRECT into the next transfer.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#269 (parse VIFcodes between DIRECT image tag and pixel data), #373 (PATH2 packets split across DIRECTs)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-06",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "VIF1 DIRECT: GIF IMAGE continuation consumed only from later DIRECT payloads; DIRECT payload split across transfers resumes",
+      "category": "A",
+      "subsystem": "VIF1 interpreter",
+      "problem": "Upstream processVIF1Data (ps2_vif1_interpreter.cpp:307-332) takes pending IMAGE qwords straight from the raw VIF stream, so VIFcodes after a DIRECT are fed to the GS as pixels.",
+      "approach": "submitVif1DirectPayload() applies m_vif1PendingPath2ImageQwc only inside DIRECT payloads. m_vif1DirectRemainQwc carries an unfinished DIRECT into the next transfer.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2_memory.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork tests (ps2_memory_tests modified)",
+      "risk": "low-medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#269 (parse VIFcodes between DIRECT image tag and pixel data), #373 (PATH2 packets split across DIRECTs)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-07",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "EeScheduler.cpp",
+        "ee_scheduler.h"
+      ]
+    },
+    "title": "dispatchGuestBranch: an unwind to the scheduler with ctx->pc == entryPc is not taken as 'callee returned'",
+    "category": "C",
+    "subsystem": "runtime dispatch / EeScheduler",
+    "problem": "Upstream ps2_runtime.cpp:1406 sets pc = fallthroughPc when ctx->pc == entryPc. A checkpoint that unwinds from a nested self-call or a loop to entry then resumes the caller with the callee's registers ('Wall 18': sprite interpreter garbage).",
+    "approach": "EeScheduler::unwindingToDispatcher() is true from checkpointDue()==true until the next dispatch; dispatchGuestBranch returns false while it holds.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "possibly #270 (unwind all callers when guest yields to EE scheduler)",
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-07",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "dispatchGuestBranch: an unwind to the scheduler with ctx->pc == entryPc is not taken as 'callee returned'",
+      "category": "C",
+      "subsystem": "runtime dispatch / EeScheduler",
+      "problem": "Upstream ps2_runtime.cpp:1406 sets pc = fallthroughPc when ctx->pc == entryPc. A checkpoint that unwinds from a nested self-call or a loop to entry then resumes the caller with the callee's registers ('Wall 18': sprite interpreter garbage).",
+      "approach": "EeScheduler::unwindingToDispatcher() is true from checkpointDue()==true until the next dispatch; dispatchGuestBranch returns false while it holds.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "EeScheduler.cpp",
+        "ee_scheduler.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork A/B (11/12 hangs down to 0/12)",
+      "risk": "medium (the flag must be cleared on every dispatch path)",
+      "conflicts_with_our_branch": "none (orthogonal to our invocation-stack work, but same scheduler file)",
+      "upstream_pr_equivalent": "possibly #270 (unwind all callers when guest yields to EE scheduler)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-08",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h"
+      ]
+    },
+    "title": "Guest clock catches up with wall-clock time (PS2X_REALTIME_CLOCK)",
+    "category": "C",
+    "subsystem": "EeScheduler accountCycles",
+    "problem": "Upstream accountCycles (EeScheduler.cpp:391) advances guest time only by fixed charges, so timer-polling loops around runtime calls crawl (movie at 1 frame per 3 s, 'Wall 6').",
+    "approach": "Every 32nd accountCycles tops m_eeCycle up to the host clock, capped at 250 ms per top-up. PS2X_REALTIME_CLOCK=0 disables.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "related #369, #332",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-08",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Guest clock catches up with wall-clock time (PS2X_REALTIME_CLOCK)",
+      "category": "C",
+      "subsystem": "EeScheduler accountCycles",
+      "problem": "Upstream accountCycles (EeScheduler.cpp:391) advances guest time only by fixed charges, so timer-polling loops around runtime calls crawl (movie at 1 frame per 3 s, 'Wall 6').",
+      "approach": "Every 32nd accountCycles tops m_eeCycle up to the host clock, capped at 250 ms per top-up. PS2X_REALTIME_CLOCK=0 disables.",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork tests force it off for determinism",
+      "risk": "medium (makes runs non-deterministic; conflicts in spirit with roadtrip's virtual time)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "related #369, #332",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (behind an option)"
+    }
+  },
+  {
+    "id": "srwz-09",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "EeScheduler.cpp",
+        "ps2_runtime.h",
+        "iop_emulator.cpp"
+      ]
+    },
+    "title": "Batched EE timer/IOP timing (PS2X_BATCH_TIMING) with exact next-event deadlines; syncIopTime before EE-visible IOP ops",
+    "category": "C",
+    "subsystem": "EeScheduler / IOP",
+    "problem": "Each guest charge runs a full IOP iteration.",
+    "approach": "Defer to the earliest of the next EE timer compare, the next IOP event, a register write, or maxBatch. Default off.",
+    "scope": "general",
+    "scope_evidence": "general (performance)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#328 (4096-cycle quanta); roadtrip-15 batches by 512",
+    "risk": "medium",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-09",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Batched EE timer/IOP timing (PS2X_BATCH_TIMING) with exact next-event deadlines; syncIopTime before EE-visible IOP ops",
+      "category": "C",
+      "subsystem": "EeScheduler / IOP",
+      "problem": "Each guest charge runs a full IOP iteration.",
+      "approach": "Defer to the earliest of the next EE timer compare, the next IOP event, a register write, or maxBatch. Default off.",
+      "files": [
+        "EeScheduler.cpp",
+        "ps2_runtime.h",
+        "iop_emulator.cpp"
+      ],
+      "general_or_specific": "general (performance)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork tests",
+      "risk": "medium-high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#328 (4096-cycle quanta); roadtrip-15 batches by 512",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-10",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "iop_memory.cpp/.h",
+        "iop_module_loader.cpp",
+        "iop_emulator.cpp"
+      ]
+    },
+    "title": "IOP memory: one sysmem pool from 0x10000 for module images and heap; first fit; QueryMaxFreeMemSize = largest gap",
+    "category": "A",
+    "subsystem": "ps2xIOP iop_memory / module loader",
+    "problem": "Upstream splits IOP RAM: a module arena [0x10000,0x120000) and an 832 KB heap [HeapBase 0x120000, HeapLimit 0x1F0000), bump allocated. Large sound banks fail; sceSifAllocSysMemory returning 0 led to code overwrite ('Wall 20').",
+    "approach": "Single pool; images allocated from it, freed on failed load; fixed-address images claim their range or fail.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#342, #315, #349",
+    "risk": "medium",
+    "priority": 2,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-10",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "IOP memory: one sysmem pool from 0x10000 for module images and heap; first fit; QueryMaxFreeMemSize = largest gap",
+      "category": "A",
+      "subsystem": "ps2xIOP iop_memory / module loader",
+      "problem": "Upstream splits IOP RAM: a module arena [0x10000,0x120000) and an 832 KB heap [HeapBase 0x120000, HeapLimit 0x1F0000), bump allocated. Large sound banks fail; sceSifAllocSysMemory returning 0 led to code overwrite ('Wall 20').",
+      "approach": "Single pool; images allocated from it, freed on failed load; fixed-address images claim their range or fail.",
+      "files": [
+        "iop_memory.cpp/.h",
+        "iop_module_loader.cpp",
+        "iop_emulator.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "new pool test",
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#342, #315, #349",
+      "priority": 2,
+      "recommended_status": "CANDIDATE (supersedes roadtrip-13)"
+    }
+  },
+  {
+    "id": "srwz-11",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xIOP/src/emulator/services/iop_module_loader.cpp/.h"
+      ]
+    },
+    "title": "sceSifLoadModuleBuffer reads the IRX from IOP memory first",
+    "category": "C",
+    "subsystem": "ps2xIOP module loader",
+    "problem": "Upstream readElfFromGuest reads EE memory, but SCE SDK callers pass an IOP address (IRX copied there by sceSifSetDma first). All 12 SRWZ modules failed ('Wall 4').",
+    "approach": "readElf(ByteReader) with readElfFromIop tried first, EE as fallback.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#355 (Load IRX module buffers from IOP RAM)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-11",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "sceSifLoadModuleBuffer reads the IRX from IOP memory first",
+      "category": "C",
+      "subsystem": "ps2xIOP module loader",
+      "problem": "Upstream readElfFromGuest reads EE memory, but SCE SDK callers pass an IOP address (IRX copied there by sceSifSetDma first). All 12 SRWZ modules failed ('Wall 4').",
+      "approach": "readElf(ByteReader) with readElfFromIop tried first, EE as fallback.",
+      "files": [
+        "ps2xIOP/src/emulator/services/iop_module_loader.cpp/.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#355 (Load IRX module buffers from IOP RAM)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-12",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_call_wait.h",
+        "iop_kernel.cpp/.h",
+        "iop_emulator.cpp",
+        "services/iop_rpc.cpp"
+      ]
+    },
+    "title": "IOP: WaitSema/WaitEventFlag outside a thread advance hardware events (iop_call_wait.h); RPC server runs after higher/equal-priority ready threads",
+    "category": "A",
+    "subsystem": "ps2xIOP kernel / RPC",
+    "problem": "Blocking waits in synchronously called RPC servers fail. Servers ran while a higher-priority thread was preempted mid-work (ezmidi/modhsyn voice list corruption).",
+    "approach": "CallContextWait loop bounded by a transfer cap. runThreadsBeforeServer, with IOP time ahead repaid from later EE slices. PS2X_IOP_RPC_PRIORITY=0 turns it off.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#266, #338 (run RPC servers on their sceSifRpcLoop thread)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-12",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "IOP: WaitSema/WaitEventFlag outside a thread advance hardware events (iop_call_wait.h); RPC server runs after higher/equal-priority ready threads",
+      "category": "A",
+      "subsystem": "ps2xIOP kernel / RPC",
+      "problem": "Blocking waits in synchronously called RPC servers fail. Servers ran while a higher-priority thread was preempted mid-work (ezmidi/modhsyn voice list corruption).",
+      "approach": "CallContextWait loop bounded by a transfer cap. runThreadsBeforeServer, with IOP time ahead repaid from later EE slices. PS2X_IOP_RPC_PRIORITY=0 turns it off.",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_call_wait.h",
+        "iop_kernel.cpp/.h",
+        "iop_emulator.cpp",
+        "services/iop_rpc.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "iop_sched tests",
+      "risk": "medium-high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#266, #338 (run RPC servers on their sceSifRpcLoop thread)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-13",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_spu2*.cpp",
+        "ps2xRuntime/src/lib/ps2_spu2_output.cpp",
+        "Stubs/Audio.cpp"
+      ]
+    },
+    "title": "Own SPU2 voice/timing model + reverb + mixed output (WAV/device); sceSdBlockTrans position on the guest clock",
+    "category": "A",
+    "subsystem": "ps2xIOP SPU2, Stubs/Audio.cpp",
+    "problem": "No SPU2: voice-progress waits never end ('Wall 13/14').",
+    "approach": "iop_spu2.cpp (1176 lines), iop_spu2_reverb.cpp, ps2_spu2_output.cpp. Block transfer advances 1024 bytes per 256 samples at 48 kHz.",
+    "scope": "general",
+    "scope_evidence": "general (written without PCSX2 code, 'licence stays open')",
+    "reference": "docs/SPU2-MODEL.md in the fork (not checked)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#308; roadtrip-15 is a parallel implementation",
+    "risk": "high",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-13",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Own SPU2 voice/timing model + reverb + mixed output (WAV/device); sceSdBlockTrans position on the guest clock",
+      "category": "A",
+      "subsystem": "ps2xIOP SPU2, Stubs/Audio.cpp",
+      "problem": "No SPU2: voice-progress waits never end ('Wall 13/14').",
+      "approach": "iop_spu2.cpp (1176 lines), iop_spu2_reverb.cpp, ps2_spu2_output.cpp. Block transfer advances 1024 bytes per 256 samples at 48 kHz.",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_spu2*.cpp",
+        "ps2xRuntime/src/lib/ps2_spu2_output.cpp",
+        "Stubs/Audio.cpp"
+      ],
+      "general_or_specific": "general (written without PCSX2 code, 'licence stays open')",
+      "reference": "docs/SPU2-MODEL.md in the fork (not checked)",
+      "upstream_already_has": false,
+      "has_tests": "iop_spu2 tests (47)",
+      "risk": "high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#308; roadtrip-15 is a parallel implementation",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (pick one of srwz/roadtrip/#308)"
+    }
+  },
+  {
+    "id": "srwz-14",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "Helpers/Support.h",
+        "iop_cdvd.cpp",
+        "ps2_iop_host.cpp"
+      ]
+    },
+    "title": "CD pseudo-LSN base moved above dual-layer DVD (0x500000) and past the image size; one CD registry for EE and IOP",
+    "category": "C",
+    "subsystem": "CDVD HLE",
+    "problem": "Upstream kCdPseudoLbnStart = 0x100000 sectors (2 GB), so DVD images over 2 GB collide with registered files. IOP and EE had different LSN spaces.",
+    "approach": "Raise the base; bump g_nextPseudoLbn past tryGetCdImageTotalSectors; IOP iop_cdvd queries the host registry.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none (overlaps roadtrip-01/14)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-14",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "CD pseudo-LSN base moved above dual-layer DVD (0x500000) and past the image size; one CD registry for EE and IOP",
+      "category": "C",
+      "subsystem": "CDVD HLE",
+      "problem": "Upstream kCdPseudoLbnStart = 0x100000 sectors (2 GB), so DVD images over 2 GB collide with registered files. IOP and EE had different LSN spaces.",
+      "approach": "Raise the base; bump g_nextPseudoLbn past tryGetCdImageTotalSectors; IOP iop_cdvd queries the host registry.",
+      "files": [
+        "Helpers/Support.h",
+        "iop_cdvd.cpp",
+        "ps2_iop_host.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none (overlaps roadtrip-01/14)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-15",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/include/ps2_stub_abi.h",
+        "src/lib/Kernel/ps2_stub_abi.cpp",
+        "Stubs/*.cpp",
+        "ps2xTest/stubsigs",
+        "ps2_stub_poison_tests.cpp"
+      ]
+    },
+    "title": "Typed stub ABI (ps2_stub_abi.h: PS2_STUB_TYPED/DISPATCH/DEVIATION), poison-stack tests, stubsigs; sceSifSendCmd dest/size from t0/t1",
+    "category": "E",
+    "subsystem": "stub framework",
+    "problem": "Hand-written register decoding produced argument bugs (7 confirmed by stubaudit), e.g. sceSifSendCmd reading sp+16/20.",
+    "approach": "Declare a typed signature; arguments decoded per EE ABI. A legacy path is kept (PS2X_TYPED_STUBS=0). All 666 handlers are called with poisoned caller stack.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#195, #339 (sceSifSendCmd args)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-15",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Typed stub ABI (ps2_stub_abi.h: PS2_STUB_TYPED/DISPATCH/DEVIATION), poison-stack tests, stubsigs; sceSifSendCmd dest/size from t0/t1",
+      "category": "E",
+      "subsystem": "stub framework",
+      "problem": "Hand-written register decoding produced argument bugs (7 confirmed by stubaudit), e.g. sceSifSendCmd reading sp+16/20.",
+      "approach": "Declare a typed signature; arguments decoded per EE ABI. A legacy path is kept (PS2X_TYPED_STUBS=0). All 666 handlers are called with poisoned caller stack.",
+      "files": [
+        "ps2xRuntime/include/ps2_stub_abi.h",
+        "src/lib/Kernel/ps2_stub_abi.cpp",
+        "Stubs/*.cpp",
+        "ps2xTest/stubsigs",
+        "ps2_stub_poison_tests.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "yes",
+      "risk": "medium (touches every stub file; heavy rebase cost)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#195, #339 (sceSifSendCmd args)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (framework worth generalizing; take the sceSifSendCmd t0/t1 fix alone first)"
+    }
+  },
+  {
+    "id": "srwz-16",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ]
+    },
+    "title": "MPEG: sceMpegGetPicture writes sys->isEnd; pulls through the game's no-data callback; pacing",
+    "category": "C",
+    "subsystem": "Stubs/MPEG.cpp (+1569/-118)",
+    "problem": "The player loops forever after the last picture because isEnd is never set ('Wall 9'); stalls under load.",
+    "approach": "Set isEnd when the program end is demuxed and the last picture is shown; callback-driven feed.",
+    "scope": "general",
+    "scope_evidence": "general intent; large and tuned on SRWZ's movie; fork review notes say sceMpegIsEnd uses a different end rule",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#376, #175, #178",
+    "risk": "high",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-16",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "MPEG: sceMpegGetPicture writes sys->isEnd; pulls through the game's no-data callback; pacing",
+      "category": "C",
+      "subsystem": "Stubs/MPEG.cpp (+1569/-118)",
+      "problem": "The player loops forever after the last picture because isEnd is never set ('Wall 9'); stalls under load.",
+      "approach": "Set isEnd when the program end is demuxed and the last picture is shown; callback-driven feed.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ],
+      "general_or_specific": "general intent; large and tuned on SRWZ's movie; fork review notes say sceMpegIsEnd uses a different end rule",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "high (not read in full)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#376, #175, #178",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (isEnd write only)"
+    }
+  },
+  {
+    "id": "srwz-17",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "Stubs/MemoryCard.cpp/.h",
+        "ps2_call_list.h"
+      ]
+    },
+    "title": "Memory card: sceMcReadFast/WriteFast (RPC func 0x16/0x1B via sceMcSync), reopen without truncation",
+    "category": "C",
+    "subsystem": "Stubs/MemoryCard.cpp",
+    "problem": "Upstream has no *Fast handlers (no match in ps2xRuntime).",
+    "approach": "Share the read/write bodies; report the SDK's command numbers.",
+    "scope": "general",
+    "scope_evidence": "general (numbers checked against SDK 3.1.0 libmc per fork)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#220 (sceMc2), #174",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-17",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Memory card: sceMcReadFast/WriteFast (RPC func 0x16/0x1B via sceMcSync), reopen without truncation",
+      "category": "C",
+      "subsystem": "Stubs/MemoryCard.cpp",
+      "problem": "Upstream has no *Fast handlers (no match in ps2xRuntime).",
+      "approach": "Share the read/write bodies; report the SDK's command numbers.",
+      "files": [
+        "Stubs/MemoryCard.cpp/.h",
+        "ps2_call_list.h"
+      ],
+      "general_or_specific": "general (numbers checked against SDK 3.1.0 libmc per fork)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#220 (sceMc2), #174",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-18",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a (6b5bef2+1ab8ceb pre-squash)",
+      "files": [
+        "EeScheduler.cpp"
+      ]
+    },
+    "title": "Callback/interrupt invocation stacks from 0x90000 up to the lowest loaded segment",
+    "category": "C",
+    "subsystem": "EeScheduler",
+    "problem": "Callback stacks carved from top of RAM overlap the main thread stack ('Wall 5').",
+    "approach": "Stacks in 0x90000..first segment; top of RAM as fallback with a warning.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#298",
+    "risk": "unknown",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-18",
+      "commits": [
+        "c32b589a (6b5bef2+1ab8ceb pre-squash)"
+      ],
+      "title": "Callback/interrupt invocation stacks from 0x90000 up to the lowest loaded segment",
+      "category": "C",
+      "subsystem": "EeScheduler",
+      "problem": "Callback stacks carved from top of RAM overlap the main thread stack ('Wall 5').",
+      "approach": "Stacks in 0x90000..first segment; top of RAM as fallback with a warning.",
+      "files": [
+        "EeScheduler.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "n/a",
+      "conflicts_with_our_branch": "YES: same as our issue #258 work (0x90000-0xF0000 with reuse)",
+      "upstream_pr_equivalent": "#298",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "srwz-19",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "gs_frontend.cpp"
+      ]
+    },
+    "title": "Presenter follows SMODE2/DISPLAY like the CRTC (FRAME mode shows (DH+1)/2 lines doubled; DH>511 crops)",
+    "category": "D",
+    "subsystem": "GS CPU backend presenter",
+    "problem": "224-line interlaced buffers shown at half height ('Wall 10').",
+    "approach": "Per PROGRESS.md (db6eb6f). gs_cpu_backend.cpp diff not read line by line.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#344, #375",
+    "risk": "medium",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-19",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Presenter follows SMODE2/DISPLAY like the CRTC (FRAME mode shows (DH+1)/2 lines doubled; DH>511 crops)",
+      "category": "D",
+      "subsystem": "GS CPU backend presenter",
+      "problem": "224-line interlaced buffers shown at half height ('Wall 10').",
+      "approach": "Per PROGRESS.md (db6eb6f). gs_cpu_backend.cpp diff not read line by line.",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "gs_frontend.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "ps2_gs_tests modified",
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#344, #375",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (needs code review)"
+    }
+  },
+  {
+    "id": "srwz-20",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "gs_cpu_backend.cpp",
+        "gs_raster_pool.h",
+        "EeScheduler.cpp",
+        "ps2xTest/gs_replay"
+      ]
+    },
+    "title": "CPU GS rasterizer rewrite + raster thread pool (gs_raster_pool.h); PS2X_GS_ASYNC; pacing sleep-then-spin waits",
+    "category": "D",
+    "subsystem": "GS CPU backend / scheduler pacing",
+    "problem": "Title at 3.4 fps (raster 94% of time); Windows CV waits end 1-2 ms late ('Wall 15').",
+    "approach": "Chunked rasterizer on N workers with CV sleep. PS2X_PACE_SPIN_US margin polling.",
+    "scope": "general",
+    "scope_evidence": "general (performance)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#285 (GS performance patch 1), #364",
+    "risk": "high",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-20",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "CPU GS rasterizer rewrite + raster thread pool (gs_raster_pool.h); PS2X_GS_ASYNC; pacing sleep-then-spin waits",
+      "category": "D",
+      "subsystem": "GS CPU backend / scheduler pacing",
+      "problem": "Title at 3.4 fps (raster 94% of time); Windows CV waits end 1-2 ms late ('Wall 15').",
+      "approach": "Chunked rasterizer on N workers with CV sleep. PS2X_PACE_SPIN_US margin polling.",
+      "files": [
+        "gs_cpu_backend.cpp",
+        "gs_raster_pool.h",
+        "EeScheduler.cpp",
+        "ps2xTest/gs_replay"
+      ],
+      "general_or_specific": "general (performance)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "gs_raster_pool_tests, gs_replay harness",
+      "risk": "high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#285 (GS performance patch 1), #364",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (spin-wait pacing is small and separable)"
+    }
+  },
+  {
+    "id": "srwz-21",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2_recompiler.cpp",
+        "control_flow_emitter.cpp",
+        "control_flow_analyzer.cpp",
+        "function_table_emitter.cpp",
+        "types.h",
+        "config_manager.cpp"
+      ]
+    },
+    "title": "Recompiler resume_into_owner: entry_* labels inside real functions resume via the owner's pc switch; BAL/BGEZAL resume targets; delay-slot entry runs as a plain instruction",
+    "category": "B",
+    "subsystem": "recompiler control flow",
+    "problem": "Every Ghidra label became a fragment returning to the scheduler (slow). Entering at a delay slot set in_delay_slot wrongly.",
+    "approach": "Default off. m_resumeOwnerByTarget, eeCheckpointDue safe point on cross-function jumps into labels.",
+    "scope": "general",
+    "scope_evidence": "general (opt-in)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#279, #323",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-21",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Recompiler resume_into_owner: entry_* labels inside real functions resume via the owner's pc switch; BAL/BGEZAL resume targets; delay-slot entry runs as a plain instruction",
+      "category": "B",
+      "subsystem": "recompiler control flow",
+      "problem": "Every Ghidra label became a fragment returning to the scheduler (slow). Entering at a delay slot set in_delay_slot wrongly.",
+      "approach": "Default off. m_resumeOwnerByTarget, eeCheckpointDue safe point on cross-function jumps into labels.",
+      "files": [
+        "ps2_recompiler.cpp",
+        "control_flow_emitter.cpp",
+        "control_flow_analyzer.cpp",
+        "function_table_emitter.cpp",
+        "types.h",
+        "config_manager.cpp"
+      ],
+      "general_or_specific": "general (opt-in)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "ps2_recompiler_tests / code_generator_tests modified",
+      "risk": "medium (default off)",
+      "conflicts_with_our_branch": "control_flow_emitter.cpp delay-slot emission: may conflict textually with our PR #304 slices",
+      "upstream_pr_equivalent": "#279, #323",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-22",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "code_generator.cpp",
+        "instruction_translator.cpp",
+        "function_emitter.cpp",
+        "ps2_runtime_lean_macros.h",
+        "docs/LEAN-CODEGEN.md"
+      ]
+    },
+    "title": "lean_codegen: pc stores only where observable, inline memory helpers with _DS slow path, scalar GPR access, $zero folding",
+    "category": "B",
+    "subsystem": "recompiler codegen",
+    "problem": "Generated code size and build time (exe 87 to 53 MB, build 478 to 320 s per fork).",
+    "approach": "Per-trim TOML keys, default off and output byte-identical to before.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#156, #352",
+    "risk": "medium",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-22",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "lean_codegen: pc stores only where observable, inline memory helpers with _DS slow path, scalar GPR access, $zero folding",
+      "category": "B",
+      "subsystem": "recompiler codegen",
+      "problem": "Generated code size and build time (exe 87 to 53 MB, build 478 to 320 s per fork).",
+      "approach": "Per-trim TOML keys, default off and output byte-identical to before.",
+      "files": [
+        "code_generator.cpp",
+        "instruction_translator.cpp",
+        "function_emitter.cpp",
+        "ps2_runtime_lean_macros.h",
+        "docs/LEAN-CODEGEN.md"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "fork hash comparison",
+      "risk": "medium (default off)",
+      "conflicts_with_our_branch": "control_flow_emitter.cpp delay-slot code paths (our PR #304 slices)",
+      "upstream_pr_equivalent": "#156, #352",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "srwz-23",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2_recompiler.cpp",
+        "function_table_emitter.cpp",
+        "recompiler_reporter.cpp"
+      ]
+    },
+    "title": "Recompiler output: output_group_bytes windows, write-if-unchanged (keeps mtime), stale file cleanup via manifest, guest name table, per-stub trace wrapper",
+    "category": "E",
+    "subsystem": "recompiler output",
+    "problem": "One .cpp per function means a full rebuild on every binding change. Fork notes the parallel single-file writer races ('completion queue is missing index N').",
+    "approach": "Grouped TUs declare only callees; manifest-based stale removal; ps2_guest_names table.",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#352",
+    "risk": "low",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-23",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Recompiler output: output_group_bytes windows, write-if-unchanged (keeps mtime), stale file cleanup via manifest, guest name table, per-stub trace wrapper",
+      "category": "E",
+      "subsystem": "recompiler output",
+      "problem": "One .cpp per function means a full rebuild on every binding change. Fork notes the parallel single-file writer races ('completion queue is missing index N').",
+      "approach": "Grouped TUs declare only callees; manifest-based stale removal; ps2_guest_names table.",
+      "files": [
+        "ps2_recompiler.cpp",
+        "function_table_emitter.cpp",
+        "recompiler_reporter.cpp"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "recompiler tests",
+      "risk": "low-medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#352",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (write-if-unchanged is tiny and high value)"
+    }
+  },
+  {
+    "id": "srwz-24",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_snapshot.cpp",
+        "ps2_headless.cpp",
+        "ps2_watchdog.cpp",
+        "ps2_crash.cpp",
+        "ps2_call_trace.cpp",
+        "ps2_fastforward.h",
+        "PadScript.cpp",
+        "ps2xIOP/include/ps2x/state_stream.h"
+      ]
+    },
+    "title": "Tooling: sectioned snapshots with tagged closures, deterministic mode, frame/VRAM/GS hashes, headless, crash reports, stall watchdog, call trace, fast-forward governor, cheats, pad script, pace log",
+    "category": "E",
+    "subsystem": "runtime tooling",
+    "problem": "Debugging and regression.",
+    "approach": "ps2_snapshot.cpp + state_stream.h, GuestInvocationCompleteKind tags, PS2X_* env switches.",
+    "scope": "general",
+    "scope_evidence": "general (watchdog is Windows x64 only)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#157, #221",
+    "risk": "medium",
+    "priority": 4,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-24",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Tooling: sectioned snapshots with tagged closures, deterministic mode, frame/VRAM/GS hashes, headless, crash reports, stall watchdog, call trace, fast-forward governor, cheats, pad script, pace log",
+      "category": "E",
+      "subsystem": "runtime tooling",
+      "problem": "Debugging and regression.",
+      "approach": "ps2_snapshot.cpp + state_stream.h, GuestInvocationCompleteKind tags, PS2X_* env switches.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_snapshot.cpp",
+        "ps2_headless.cpp",
+        "ps2_watchdog.cpp",
+        "ps2_crash.cpp",
+        "ps2_call_trace.cpp",
+        "ps2_fastforward.h",
+        "PadScript.cpp",
+        "ps2xIOP/include/ps2x/state_stream.h"
+      ],
+      "general_or_specific": "general (watchdog is Windows x64 only)",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": "ps2_snapshot_tests, ps2_fastforward_tests, pad_script tests",
+      "risk": "medium",
+      "conflicts_with_our_branch": "EeScheduler invocation completion tags touch the same code as our invocation-stack reuse",
+      "upstream_pr_equivalent": "#157, #221",
+      "priority": 4,
+      "recommended_status": "CANDIDATE (pick one design: this or roadtrip-20)"
+    }
+  },
+  {
+    "id": "srwz-25",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "ps2xRuntime/include/ps2_overlays.h",
+        "src/lib/Kernel/ps2_overlays.cpp"
+      ]
+    },
+    "title": "Code overlays: hasFunction/lookupFunction fall back to ps2xOverlayLookup, chosen by the overlay name in guest memory",
+    "category": "C",
+    "subsystem": "runtime function lookup",
+    "problem": "206 overlays share load addresses.",
+    "approach": "Per-overlay namespace with static registration; lookup reads the MWo3 header name at the load address.",
+    "scope": "unknown",
+    "scope_evidence": "hook is general; the MWo3 header format is game/toolchain-specific (Metrowerks overlays), and tools/overlays.py lives in the game repo",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#348 (follow J/JAL the guest rewrites)",
+    "risk": "low",
+    "priority": 3,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-25",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "Code overlays: hasFunction/lookupFunction fall back to ps2xOverlayLookup, chosen by the overlay name in guest memory",
+      "category": "C",
+      "subsystem": "runtime function lookup",
+      "problem": "206 overlays share load addresses.",
+      "approach": "Per-overlay namespace with static registration; lookup reads the MWo3 header name at the load address.",
+      "files": [
+        "ps2xRuntime/include/ps2_overlays.h",
+        "src/lib/Kernel/ps2_overlays.cpp"
+      ],
+      "general_or_specific": "hook is general; the MWo3 header format is game/toolchain-specific (Metrowerks overlays), and tools/overlays.py lives in the game repo",
+      "reference": null,
+      "upstream_already_has": false,
+      "has_tests": false,
+      "risk": "low (fallback only)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#348 (follow J/JAL the guest rewrites)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE (generalize the identification callback)"
+    }
+  },
+  {
+    "id": "srwz-26",
+    "source": {
+      "repository": "SloppyWyn/PS2Recomp",
+      "branch": "srwz",
+      "upstream_base": "2c5fbb93",
+      "revision": "c32b589a",
+      "files": [
+        "iop_timrman.cpp/.h"
+      ]
+    },
+    "title": "IOP timrman: log when a handler returns 0 and stops its timer; describe() debug text",
+    "category": "E",
+    "subsystem": "ps2xIOP timrman",
+    "problem": "Diagnostics only. Upstream already calls stop(timer) on result 0.",
+    "approach": "fprintf (16 lines max), describe().",
+    "scope": "general",
+    "scope_evidence": "general",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "unknown",
+    "priority": 5,
+    "status": "ANALYZED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "srwz-26",
+      "commits": [
+        "c32b589a"
+      ],
+      "title": "IOP timrman: log when a handler returns 0 and stops its timer; describe() debug text",
+      "category": "E",
+      "subsystem": "ps2xIOP timrman",
+      "problem": "Diagnostics only. Upstream already calls stop(timer) on result 0.",
+      "approach": "fprintf (16 lines max), describe().",
+      "files": [
+        "iop_timrman.cpp/.h"
+      ],
+      "general_or_specific": "general",
+      "reference": null,
+      "upstream_already_has": "behaviour yes; log no",
+      "has_tests": false,
+      "risk": "none",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "none",
+      "priority": 5,
+      "recommended_status": "REJECTED (log only)"
+    }
+  }
+]

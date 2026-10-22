@@ -1,0 +1,2183 @@
+[
+  {
+    "id": "sotc-01",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "278818e6",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ]
+    },
+    "title": "Signed EE branches compare the full 64-bit register",
+    "category": "B",
+    "subsystem": "recompiler control_flow_emitter (BLEZ/BGTZ/BLTZ/BGEZ incl. likely/link)",
+    "problem": "BLEZ(L)/BGTZ(L)/BLTZ(AL)(L)/BGEZ(AL)(L) were emitted as GPR_S32(ctx,rs) compared with 0. That tests bit 31, but the R5900 tests bit 63 of the 64-bit GPR.",
+    "approach": "4 lines in ps2xRecomp/src/lib/control_flow_emitter.cpp change GPR_S32 to GPR_S64 (GPR_S64 already exists in our ps2_runtime_macros.h:969).",
+    "scope": "general",
+    "scope_evidence": "General ISA semantics. No addresses or title checks in the code.",
+    "reference": "pcsx2/Interpreter.cpp BGEZ/BLEZ/BLTZ use cpuRegs.GPR.r[_Rs_].SD[0] (verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none found in open PR list",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "verified_by_lead": "PCSX2 Interpreter.cpp BGEZ/BLEZ/BLTZ/BGTZ use GPR.SD[0]; SET_GPR_U32/S32 sign-extend so 32-bit results are unaffected",
+      "tests_added": [
+        "signed branches compare the full 64-bit EE register (ported unchanged)"
+      ],
+      "integration_commit": "a3c7f21",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462, ps2xIOP 4/4; mutation (fix reverted) fails the test"
+    },
+    "agent_report": {
+      "id": "sotc-01",
+      "commits": [
+        "278818e6"
+      ],
+      "title": "Signed EE branches compare the full 64-bit register",
+      "category": "B",
+      "subsystem": "recompiler control_flow_emitter (BLEZ/BGTZ/BLTZ/BGEZ incl. likely/link)",
+      "problem": "BLEZ(L)/BGTZ(L)/BLTZ(AL)(L)/BGEZ(AL)(L) were emitted as GPR_S32(ctx,rs) compared with 0. That tests bit 31, but the R5900 tests bit 63 of the 64-bit GPR.",
+      "approach": "4 lines in ps2xRecomp/src/lib/control_flow_emitter.cpp change GPR_S32 to GPR_S64 (GPR_S64 already exists in our ps2_runtime_macros.h:969).",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ],
+      "general_or_specific": "General ISA semantics. No addresses or title checks in the code.",
+      "reference": "pcsx2/Interpreter.cpp BGEZ/BLEZ/BLTZ use cpuRegs.GPR.r[_Rs_].SD[0] (verified)",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "code_generator_tests: 'signed branches compare the full 64-bit EE register'"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "None. Our lines 409-425 are byte-identical to the pre-patch code.",
+      "upstream_pr_equivalent": "none found in open PR list",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-02",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "243e0fbf (fpu_translator hunk only), af46b6da (SQRT ft part)",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ]
+    },
+    "title": "EE SQRT.S reads its operand from ft, not fs",
+    "category": "A",
+    "subsystem": "recompiler fpu_translator",
+    "problem": "The EE COP1 encoding puts the SQRT.S source in ft. Upstream #272 and our branch emit FPU_SQRT_S(ctx->f[fs]). The commit message reports 69 of 133 sqrt.s sites in SotC have fs=0.",
+    "approach": "One line: COP1_S_SQRT emits FPU_SQRT_S(ctx->f[ft]).",
+    "scope": "general",
+    "scope_evidence": "General hardware behaviour. SotC is only the example in the comment.",
+    "reference": "pcsx2/FPU.cpp SQRT_S() uses _FtValUl_/_FtValf_ only (verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#382 'Translate EE SQRT.S from ft, not fs'; #277 'Fix SQRT.S operand selection'",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "verified_by_lead": "PCSX2 FPU.cpp SQRT_S reads only Ft",
+      "tests_added": [
+        "SQRT.S reads its operand from ft, not fs"
+      ],
+      "integration_commit": "a3c7f21",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "agent_report": {
+      "id": "sotc-02",
+      "commits": [
+        "243e0fbf (fpu_translator hunk only)",
+        "af46b6da (SQRT ft part)"
+      ],
+      "title": "EE SQRT.S reads its operand from ft, not fs",
+      "category": "A",
+      "subsystem": "recompiler fpu_translator",
+      "problem": "The EE COP1 encoding puts the SQRT.S source in ft. Upstream #272 and our branch emit FPU_SQRT_S(ctx->f[fs]). The commit message reports 69 of 133 sqrt.s sites in SotC have fs=0.",
+      "approach": "One line: COP1_S_SQRT emits FPU_SQRT_S(ctx->f[ft]).",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ],
+      "general_or_specific": "General hardware behaviour. SotC is only the example in the comment.",
+      "reference": "pcsx2/FPU.cpp SQRT_S() uses _FtValUl_/_FtValf_ only (verified)",
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our fpu_translator.cpp:61 still reads fs. Our upstream test ps2_float_semantics_tests.cpp only checks the FPU_SQRT_S macro, not the emitted operand, so a new codegen test is needed.",
+      "upstream_pr_equivalent": "#382 'Translate EE SQRT.S from ft, not fs'; #277 'Fix SQRT.S operand selection'",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Only the operand fix; the fork's float-semantics revert in the same commit (sotc-03) is rejected."
+  },
+  {
+    "id": "sotc-03",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "243e0fbf (runtime macros hunk), 77d58c2c (FPU align/nearest part), 6545e121 (merge)",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "Revert of upstream #272 float macros to the fork's clamp/align/nearest-rounding FPU semantics",
+    "category": "A",
+    "subsystem": "runtime ps2_runtime_macros.h FPU_ADD/SUB/MUL/DIV/SQRT_S, PS2_VADD/VSUB/VMUL",
+    "problem": "The fork says SotC gameplay math matched only with its own semantics. These are: ADD/SUB drop operand bits shifted out of the aligned mantissa; DIV/SQRT switch MXCSR to round-to-nearest; results clamped to +/-FLT_MAX.",
+    "approach": "Replaces ps2_fadd/fsub/fmul/fdiv/fsqrt and ps2_vadd/vsub/vmul with ps2FpuAdd/Sub (ps2FpuAlignOperands), ps2FpuClamp(a*b), ps2FpuDivideNearest, ps2FpuSqrtNearest(fabs). The VU macros become ps2VuClampVector(_mm_add_ps).",
+    "scope": "unknown",
+    "scope_evidence": "Intent is general, but this is a whole-scheme swap tuned and bisected on SotC ('Bisect revert'). It drops #272's handling of exponent-255 inputs: host a+b sees them as Inf/NaN before the clamp. I verified PCSX2 FPU.cpp interpreter ADD_S does NOT align operands; alignment exists only in PCSX2's recompiler, which I did not verify this session.",
+    "reference": "pcsx2/FPU.cpp ADD_S (fpuDouble, no alignment; verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none (upstream chose #272)",
+    "risk": "high",
+    "priority": 4,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-03",
+      "commits": [
+        "243e0fbf (runtime macros hunk)",
+        "77d58c2c (FPU align/nearest part)",
+        "6545e121 (merge)"
+      ],
+      "title": "Revert of upstream #272 float macros to the fork's clamp/align/nearest-rounding FPU semantics",
+      "category": "A",
+      "subsystem": "runtime ps2_runtime_macros.h FPU_ADD/SUB/MUL/DIV/SQRT_S, PS2_VADD/VSUB/VMUL",
+      "problem": "The fork says SotC gameplay math matched only with its own semantics. These are: ADD/SUB drop operand bits shifted out of the aligned mantissa; DIV/SQRT switch MXCSR to round-to-nearest; results clamped to +/-FLT_MAX.",
+      "approach": "Replaces ps2_fadd/fsub/fmul/fdiv/fsqrt and ps2_vadd/vsub/vmul with ps2FpuAdd/Sub (ps2FpuAlignOperands), ps2FpuClamp(a*b), ps2FpuDivideNearest, ps2FpuSqrtNearest(fabs). The VU macros become ps2VuClampVector(_mm_add_ps).",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "general_or_specific": "Intent is general, but this is a whole-scheme swap tuned and bisected on SotC ('Bisect revert'). It drops #272's handling of exponent-255 inputs: host a+b sees them as Inf/NaN before the clamp. I verified PCSX2 FPU.cpp interpreter ADD_S does NOT align operands; alignment exists only in PCSX2's recompiler, which I did not verify this session.",
+      "reference": "pcsx2/FPU.cpp ADD_S (fpuDouble, no alignment; verified)",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_vu_tests: 'EE FPU add/sub drops operand bits shifted out of the aligned mantissa' (77d58c2c)"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Directly conflicts with #272 in our ps2_runtime_macros.h (ps2_fadd_slow/ps2_to_double/ps2_from_double) and its tests in ps2_float_semantics_tests.cpp.",
+      "upstream_pr_equivalent": "none (upstream chose #272)",
+      "priority": 4,
+      "recommended_status": "REJECTED"
+    }
+  },
+  {
+    "id": "sotc-04",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "69c98998",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ]
+    },
+    "title": "EE FPU C.cond.S compares PS2 floats as ordered sign-magnitude values",
+    "category": "A",
+    "subsystem": "runtime macros FPU_C_*_S",
+    "problem": "Host float compares treat exponent-255 patterns (e.g. 0x7FFFFFFF) as NaN, so EQ/LT/LE come out false and UN true. The EE has no NaN. -0 and denormals must compare equal to 0.",
+    "approach": "New ps2FpuCompareKey(): denormal/zero becomes 0, then a sign-magnitude-to-unsigned ordering key. All C.cond macros compare keys. UN, NGLE and SF return 0; the U*/NG* variants alias the ordered ones.",
+    "scope": "general",
+    "scope_evidence": "General. The test comment mentions SotC's horse steering sentinel, but the code has no title logic. It fits #272's extended-range semantics. Slight difference from the PCSX2 interpreter: PCSX2 fpuDouble clamps exponent 255 to 0x7F7FFFFF, so PCSX2 treats 0x7FFFFFFF == 0x7F7FFFFF; the key scheme orders them.",
+    "reference": "pcsx2/FPU.cpp C_cond_S uses fpuDouble() compares (verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#321 'order PS2 floats as sign-magnitude for compares, MIN/MAX and VU MAX/MINI' (broader)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-04",
+      "commits": [
+        "69c98998"
+      ],
+      "title": "EE FPU C.cond.S compares PS2 floats as ordered sign-magnitude values",
+      "category": "A",
+      "subsystem": "runtime macros FPU_C_*_S",
+      "problem": "Host float compares treat exponent-255 patterns (e.g. 0x7FFFFFFF) as NaN, so EQ/LT/LE come out false and UN true. The EE has no NaN. -0 and denormals must compare equal to 0.",
+      "approach": "New ps2FpuCompareKey(): denormal/zero becomes 0, then a sign-magnitude-to-unsigned ordering key. All C.cond macros compare keys. UN, NGLE and SF return 0; the U*/NG* variants alias the ordered ones.",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ],
+      "general_or_specific": "General. The test comment mentions SotC's horse steering sentinel, but the code has no title logic. It fits #272's extended-range semantics. Slight difference from the PCSX2 interpreter: PCSX2 fpuDouble clamps exponent 255 to 0x7F7FFFFF, so PCSX2 treats 0x7FFFFFFF == 0x7F7FFFFF; the key scheme orders them.",
+      "reference": "pcsx2/FPU.cpp C_cond_S uses fpuDouble() compares (verified)",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_vu_tests: 'EE FPU compares extended finite values'"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our ps2_runtime_macros.h:860-875 still uses host compares. The patch applies cleanly (ps2FloatBits exists).",
+      "upstream_pr_equivalent": "#321 'order PS2 floats as sign-magnitude for compares, MIN/MAX and VU MAX/MINI' (broader)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-05",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "af46b6da",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "VU0 macro VDIV/VSQRT/VRSQRT FDIV-unit rules and FPU CVT.W.S truncation/saturation",
+    "category": "A",
+    "subsystem": "recompiler vu_translation_helpers (Q unit), fpu_translator, runtime macros",
+    "problem": "VRSQRT ignored fs and computed 1/sqrt(ft); hardware computes fs/sqrt(|ft|). VSQRT clamped negatives to 0 instead of using |ft|. VDIV by zero returned 0 instead of +/-max with the D/I status flags. CVT.W.S rounded to nearest with no saturation.",
+    "approach": "ps2VuDivide/ps2VuSqrt/ps2VuRsqrt(status,...) set the I/D/IS/DS bits in vu0_status and return ps2SignedFloatMax(sign xor) on a zero divisor. ps2FpuConvertToWord truncates and saturates when exponent >= 0x4F000000. The FPU DIV/RSQRT flag helpers are mostly superseded by #272 in our branch.",
+    "scope": "general",
+    "scope_evidence": "General hardware semantics.",
+    "reference": "pcsx2/FPU.cpp CVT_W (truncate, saturate at exponent >= 0x4E800000+) and RSQRT_S (fs/sqrt(|ft|), D/I flags) verified. VU RSQRT/DIV in pcsx2/VUops.cpp not individually re-read.",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#198 (VDIV/VRSQRT saturate, VSQRT radicand magnitude), #317 (VU0 DIV/SQRT/RSQRT FDIV rules), #316/#215/#383 (CVT.W.S)",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "verified_by_lead": "PCSX2 VUops.cpp _vuDIV/_vuSQRT/_vuRSQRT and FPU.cpp CVT_W read",
+      "regression": "ps2x_tests 466/466, ps2xIOP 4/4; mutation (each fix reverted) fails its test",
+      "build": "MSVC 14.44 Release OK",
+      "integration_commit": "252de7c",
+      "tests_added": [
+        "CVT.W.S truncates toward zero and saturates by sign",
+        "VU0 macro DIV/SQRT/RSQRT follow the FDIV-unit rules and set I/D",
+        "VU0 macro VRSQRT reads its fs numerator"
+      ]
+    },
+    "agent_report": {
+      "id": "sotc-05",
+      "commits": [
+        "af46b6da"
+      ],
+      "title": "VU0 macro VDIV/VSQRT/VRSQRT FDIV-unit rules and FPU CVT.W.S truncation/saturation",
+      "category": "A",
+      "subsystem": "recompiler vu_translation_helpers (Q unit), fpu_translator, runtime macros",
+      "problem": "VRSQRT ignored fs and computed 1/sqrt(ft); hardware computes fs/sqrt(|ft|). VSQRT clamped negatives to 0 instead of using |ft|. VDIV by zero returned 0 instead of +/-max with the D/I status flags. CVT.W.S rounded to nearest with no saturation.",
+      "approach": "ps2VuDivide/ps2VuSqrt/ps2VuRsqrt(status,...) set the I/D/IS/DS bits in vu0_status and return ps2SignedFloatMax(sign xor) on a zero divisor. ps2FpuConvertToWord truncates and saturates when exponent >= 0x4F000000. The FPU DIV/RSQRT flag helpers are mostly superseded by #272 in our branch.",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "general_or_specific": "General hardware semantics.",
+      "reference": "pcsx2/FPU.cpp CVT_W (truncate, saturate at exponent >= 0x4E800000+) and RSQRT_S (fs/sqrt(|ft|), D/I flags) verified. VU RSQRT/DIV in pcsx2/VUops.cpp not individually re-read.",
+      "has_tests": {
+        "value": false,
+        "names": [
+          "no tests in af46b6da itself; later ps2xTest checks referenced in the 6545e121 merge message"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our vu_translation_helpers.cpp:78/85/92 and FPU_CVT_W_S (nearbyintf) still have the bugs. Take only the VU0 Q-unit and CVT.W.S parts. Keep our #272 DIV.S/RSQRT.S emission.",
+      "upstream_pr_equivalent": "#198 (VDIV/VRSQRT saturate, VSQRT radicand magnitude), #317 (VU0 DIV/SQRT/RSQRT FDIV rules), #316/#215/#383 (CVT.W.S)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Written independently against PCSX2; +-max is 0x7FFFFFFF (PCSX2 clamps to 0x7F7FFFFF)."
+  },
+  {
+    "id": "sotc-06",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "e6997335",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_host_input.cpp (tooling)",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ]
+    },
+    "title": "VF00 = (0,0,0,1) in the R5900Context constructor",
+    "category": "A",
+    "subsystem": "runtime R5900Context",
+    "problem": "Every context except the boot thread's (threads, interrupt handlers, alarms, callbacks) started with VF00 = 0. Code that relies on VF00.w = 1 broke (SotC cos/sin, i.e. every 3D camera).",
+    "approach": "One line after vu0_q=1.0f in the ps2_runtime.h constructor: vu0_vf[0] = _mm_set_ps(1,0,0,0). The rest of the commit is PS2X_PAD_SCRIPT 'v'-suffix timing, which is tooling.",
+    "scope": "general",
+    "scope_evidence": "General: VF00 is hardwired on the VU. SotC is only the symptom.",
+    "reference": "PS2 VU manual (VF00 fixed to 0,0,0,1); not fetched this session",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#187 'pin vf0 to (0,0,0,1) in every constructed R5900Context'; #320",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "tests_added": [
+        "every R5900Context starts with VF00 = (0, 0, 0, 1)"
+      ],
+      "integration_commit": "a42c052",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "agent_report": {
+      "id": "sotc-06",
+      "commits": [
+        "e6997335"
+      ],
+      "title": "VF00 = (0,0,0,1) in the R5900Context constructor",
+      "category": "A",
+      "subsystem": "runtime R5900Context",
+      "problem": "Every context except the boot thread's (threads, interrupt handlers, alarms, callbacks) started with VF00 = 0. Code that relies on VF00.w = 1 broke (SotC cos/sin, i.e. every 3D camera).",
+      "approach": "One line after vu0_q=1.0f in the ps2_runtime.h constructor: vu0_vf[0] = _mm_set_ps(1,0,0,0). The rest of the commit is PS2X_PAD_SCRIPT 'v'-suffix timing, which is tooling.",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_host_input.cpp (tooling)",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ],
+      "general_or_specific": "General: VF00 is hardwired on the VU. SotC is only the symptom.",
+      "reference": "PS2 VU manual (VF00 fixed to 0,0,0,1); not fetched this session",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_vu_tests (+9 lines in e6997335)"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our constructor (ps2_runtime.h:147-152) memsets to 0 with no VF00 init. Only the main/VU0-state paths in ps2_runtime.cpp:279/496 set it. b60446a/f8292ed protect VF0 from writes but do not initialise it.",
+      "upstream_pr_equivalent": "#187 'pin vf0 to (0,0,0,1) in every constructed R5900Context'; #320",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Initialisation only; suppressing VF0 writes from every emitter (GOW/roadtrip) is a separate candidate."
+  },
+  {
+    "id": "sotc-07",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "77d58c2c (memory hunk)",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "LQ/SQ/LQC2/SQC2 ignore the low four address bits",
+    "category": "A",
+    "subsystem": "runtime memory macros (READ128/WRITE128, Ps2FastRead128/Write128, PS2Runtime::Load128/Store128)",
+    "problem": "Quadword accesses at unaligned addresses read/wrote the unaligned 16 bytes. The EE silently aligns them.",
+    "approach": "Applies `& ~0xFu` to the address in READ128 and WRITE128, Ps2FastRead128/Ps2FastWrite128 offsets, and PS2Runtime::Load128/Store128 (including the write trace).",
+    "scope": "general",
+    "scope_evidence": "General ISA behaviour.",
+    "reference": "pcsx2/R5900OpcodeImpl.cpp LQ/SQ: memRead128(addr & ~0xf)/memWrite128(addr & ~0xf) (verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#319 'mask the low four address bits of quadword accesses'",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "verified_by_lead": "PCSX2 R5900OpcodeImpl.cpp LQ/SQ use addr & ~0xf; runtime-internal Load128 callers (IPU) use aligned bases",
+      "tests_added": [
+        "quadword loads and stores ignore the low four address bits"
+      ],
+      "integration_commit": "a42c052",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "agent_report": {
+      "id": "sotc-07",
+      "commits": [
+        "77d58c2c (memory hunk)"
+      ],
+      "title": "LQ/SQ/LQC2/SQC2 ignore the low four address bits",
+      "category": "A",
+      "subsystem": "runtime memory macros (READ128/WRITE128, Ps2FastRead128/Write128, PS2Runtime::Load128/Store128)",
+      "problem": "Quadword accesses at unaligned addresses read/wrote the unaligned 16 bytes. The EE silently aligns them.",
+      "approach": "Applies `& ~0xFu` to the address in READ128 and WRITE128, Ps2FastRead128/Ps2FastWrite128 offsets, and PS2Runtime::Load128/Store128 (including the write trace).",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "General ISA behaviour.",
+      "reference": "pcsx2/R5900OpcodeImpl.cpp LQ/SQ: memRead128(addr & ~0xf)/memWrite128(addr & ~0xf) (verified)",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_runtime_expansion_tests (+70 in 77d58c2c; exact case names not read)"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "None. Our READ128 (macros.h:579) and Ps2FastRead128 (:456) are unmasked.",
+      "upstream_pr_equivalent": "#319 'mask the low four address bits of quadword accesses'",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-08",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "6404d040 (vu_translator hunk)",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ]
+    },
+    "title": "VU0 macro VCLIP flag bit order and |w| comparison",
+    "category": "A",
+    "subsystem": "recompiler vu_translator VCLIP",
+    "problem": "The old code put the -x judgement in bit 0 and +x in bit 1 (swapped). It also compared floats with host compares instead of the PS2 integer-magnitude rule, including the denormal-w case.",
+    "approach": "Integer compares of fs bits and (fs^sign) against limit = |w| bits, or 0x7FFFFF when w's exponent is 0. Sets flags |= 1<<(2c) for +, 2<<(2c) for -, then shifts the 24-bit history by 6.",
+    "scope": "general",
+    "scope_evidence": "General. Matches PCSX2 exactly.",
+    "reference": "pcsx2/VUops.cpp _vuCLIP (verified: same limit, same bit order)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#293 'Fix the VU0 macro VCLIP judgement bits and compare against |w|'",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-08",
+      "commits": [
+        "6404d040 (vu_translator hunk)"
+      ],
+      "title": "VU0 macro VCLIP flag bit order and |w| comparison",
+      "category": "A",
+      "subsystem": "recompiler vu_translator VCLIP",
+      "problem": "The old code put the -x judgement in bit 0 and +x in bit 1 (swapped). It also compared floats with host compares instead of the PS2 integer-magnitude rule, including the denormal-w case.",
+      "approach": "Integer compares of fs bits and (fs^sign) against limit = |w| bits, or 0x7FFFFF when w's exponent is 0. Sets flags |= 1<<(2c) for +, 2<<(2c) for -, then shifts the 24-bit history by 6.",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ],
+      "general_or_specific": "General. Matches PCSX2 exactly.",
+      "reference": "pcsx2/VUops.cpp _vuCLIP (verified: same limit, same bit order)",
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our vu_translator.cpp:277 has the swapped order.",
+      "upstream_pr_equivalent": "#293 'Fix the VU0 macro VCLIP judgement bits and compare against |w|'",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-09",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "ee8d1604 (VU parts)",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ]
+    },
+    "title": "VU0 R register (VRNEXT/VRINIT/VRXOR/VRGET/CTC2 R), VFTOI saturation, VABS denormal flush, shared R across contexts",
+    "category": "A",
+    "subsystem": "recompiler vu_translation_helpers/vu_translator; runtime EeScheduler",
+    "problem": "VRNEXT used an invented LFSR and never wrote Ft. VRINIT/VRXOR used invented mixing. CTC2 R did not force 0x3F800000|mantissa. VFTOI did not saturate positive overflow (cvttps gives 0x80000000). VABS kept denormals. Each thread had its own R.",
+    "approach": "VRNEXT: r=((r<<1)^bit4^bit22)&0x7FFFFF|0x3F800000, written to Ft by the dest mask. VRINIT and VRXOR as in PCSX2. VFTOI XORs a positive-overflow mask. vf0 writes skipped. EeScheduler load/saveSharedVu0Random around each guest run.",
+    "scope": "general",
+    "scope_evidence": "General. One deviation from PCSX2: the fork's VRNEXT advances R even when ft==0, while PCSX2 _vuRNEXT returns early without advancing.",
+    "reference": "pcsx2/VUops.cpp _vuRINIT/_vuRXOR/_vuRGET/_vuRNEXT/floatToInt (verified)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#318 (VFTOI saturation), #383 (VFTOI). No PR found for VRNEXT/LFSR.",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-09",
+      "commits": [
+        "ee8d1604 (VU parts)"
+      ],
+      "title": "VU0 R register (VRNEXT/VRINIT/VRXOR/VRGET/CTC2 R), VFTOI saturation, VABS denormal flush, shared R across contexts",
+      "category": "A",
+      "subsystem": "recompiler vu_translation_helpers/vu_translator; runtime EeScheduler",
+      "problem": "VRNEXT used an invented LFSR and never wrote Ft. VRINIT/VRXOR used invented mixing. CTC2 R did not force 0x3F800000|mantissa. VFTOI did not saturate positive overflow (cvttps gives 0x80000000). VABS kept denormals. Each thread had its own R.",
+      "approach": "VRNEXT: r=((r<<1)^bit4^bit22)&0x7FFFFF|0x3F800000, written to Ft by the dest mask. VRINIT and VRXOR as in PCSX2. VFTOI XORs a positive-overflow mask. vf0 writes skipped. EeScheduler load/saveSharedVu0Random around each guest run.",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ],
+      "general_or_specific": "General. One deviation from PCSX2: the fork's VRNEXT advances R even when ft==0, while PCSX2 _vuRNEXT returns early without advancing.",
+      "reference": "pcsx2/VUops.cpp _vuRINIT/_vuRXOR/_vuRGET/_vuRNEXT/floatToInt (verified)",
+      "has_tests": {
+        "value": true,
+        "names": [
+          "code_generator_tests (random ops, VFTOI/VABS)",
+          "ps2xTest/tools/vu0_audit.cpp (opt-in PS2X_VU0_AUDIT_CORPUS)"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our VRNEXT/VRINIT/VRXOR are the old versions. CTC2 R in our vu_translator.cpp:90 is unmasked. The shared-R hunk targets EeScheduler::run, whose structure differs slightly (EeDispatcherTransfer catch at :306), so it needs adapting.",
+      "upstream_pr_equivalent": "#318 (VFTOI saturation), #383 (VFTOI). No PR found for VRNEXT/LFSR.",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-10",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "ee8d1604 (ps2_memory hunk)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ]
+    },
+    "title": "DMA chain walker no longer stops after 4096 tags",
+    "category": "C",
+    "subsystem": "runtime ps2_memory DMA chain",
+    "problem": "Chains of more than 4096 tags (4190-4600 in heavy SotC frames) lost their tail. That left the GIF in IMAGE mode and swallowed the next frame's A+D setup.",
+    "approach": "kMaxChainTags raised to 1<<20, plus a stderr log when the limit is hit.",
+    "scope": "general",
+    "scope_evidence": "General. The 4096 cap is an emulator artefact, not hardware.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#297 'Raise the DMA chain tag limit and warn when it is hit'; #313",
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "tests_added": [
+        "GIF DMA chain longer than 4096 tags is transferred to its END tag (ported unchanged)"
+      ],
+      "integration_commit": "9ed5b6e",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 462/462; mutation fails the test"
+    },
+    "agent_report": {
+      "id": "sotc-10",
+      "commits": [
+        "ee8d1604 (ps2_memory hunk)"
+      ],
+      "title": "DMA chain walker no longer stops after 4096 tags",
+      "category": "C",
+      "subsystem": "runtime ps2_memory DMA chain",
+      "problem": "Chains of more than 4096 tags (4190-4600 in heavy SotC frames) lost their tail. That left the GIF in IMAGE mode and swallowed the next frame's A+D setup.",
+      "approach": "kMaxChainTags raised to 1<<20, plus a stderr log when the limit is hit.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ],
+      "general_or_specific": "General. The 4096 cap is an emulator artefact, not hardware.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_memory_tests long DMA chain (+40 lines)"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our ps2_memory.cpp:1347 has kMaxChainTags = 4096.",
+      "upstream_pr_equivalent": "#297 'Raise the DMA chain tag limit and warn when it is hit'; #313",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Cap raised to 1<<20 with a warning; DQ8's cycle detection (dq8-21) and SRWZ's 64 MiB byte cap remain candidates."
+  },
+  {
+    "id": "sotc-11",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "7e6dfd97, 6404d040 (unwind hunk)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ]
+    },
+    "title": "dispatchGuestBranch: a checkpoint unwind or recursive tail jump is not an implicit return",
+    "category": "C",
+    "subsystem": "runtime PS2Runtime::dispatchGuestBranch / EeScheduler",
+    "problem": "After targetFn returns, `if (ctx->pc == entryPc) ctx->pc = fallthroughPc` treated the callee as having returned. Two cases trigger it falsely. (a) A scheduler checkpoint unwind in recursive code leaves pc == entry, which lost frames. (b) A guest tail jump back to the callee's entry (e.g. execSCRBaseFunc -> j execSCRBaseFunc) does the same. The caller then resumed with the callee's sp and corrupted a saved ra.",
+    "approach": "(a) EeScheduler gets m_unwinding, set wherever checkpointDue returns true and cleared before each run(). dispatchGuestBranch returns false if unwinding(). (b) A thread_local g_guestJumpSerial increments on every non-call dispatch. The heuristic applies only if the serial did not change during the callee. 7e6dfd97 also adds the PS2X_BRANCH_TRACE ring and PS2X_DUMP_RAM_ON_MISSING diagnostics.",
+    "scope": "general",
+    "scope_evidence": "General control-flow correctness for recursive or tail-jumping guest code. The function names are only examples.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#270 'unwind all callers when guest code yields to the EE scheduler' (related); #323 (related)",
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-11",
+      "commits": [
+        "7e6dfd97",
+        "6404d040 (unwind hunk)"
+      ],
+      "title": "dispatchGuestBranch: a checkpoint unwind or recursive tail jump is not an implicit return",
+      "category": "C",
+      "subsystem": "runtime PS2Runtime::dispatchGuestBranch / EeScheduler",
+      "problem": "After targetFn returns, `if (ctx->pc == entryPc) ctx->pc = fallthroughPc` treated the callee as having returned. Two cases trigger it falsely. (a) A scheduler checkpoint unwind in recursive code leaves pc == entry, which lost frames. (b) A guest tail jump back to the callee's entry (e.g. execSCRBaseFunc -> j execSCRBaseFunc) does the same. The caller then resumed with the callee's sp and corrupted a saved ra.",
+      "approach": "(a) EeScheduler gets m_unwinding, set wherever checkpointDue returns true and cleared before each run(). dispatchGuestBranch returns false if unwinding(). (b) A thread_local g_guestJumpSerial increments on every non-call dispatch. The heuristic applies only if the serial did not change during the callee. 7e6dfd97 also adds the PS2X_BRANCH_TRACE ring and PS2X_DUMP_RAM_ON_MISSING diagnostics.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ],
+      "general_or_specific": "General control-flow correctness for recursive or tail-jumping guest code. The function names are only examples.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_runtime_expansion_tests (+32 in 7e6dfd97)"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "Our dispatchGuestBranch (ps2_runtime.cpp:1408-1422) has no transferPending/unwinding guard; the fork's transferPending comes from 6810ee6e. Port m_unwinding into our checkpointDue (EeScheduler.cpp:360) plus the serial counter. Must be re-verified against #304 slice handling.",
+      "upstream_pr_equivalent": "#270 'unwind all callers when guest code yields to the EE scheduler' (related); #323 (related)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-12",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "51f11a99",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/GuestKernelMemory.h",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Helpers/State.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/StateIo.cpp",
+        "ps2xTest/src/ps2_sif_rpc_tests.cpp"
+      ]
+    },
+    "title": "Runtime-owned guest records (RPC packet/server pools, TLS, boot-mode) moved out of game RAM",
+    "category": "C",
+    "subsystem": "runtime SIF RPC / kernel memory layout",
+    "problem": "The pools at 0x1F00000-0x1F31000 lie inside title RAM. SotC's heap overwrote the RPC server descriptors, and SifCallRpc then wrote through garbage pointers.",
+    "approach": "GuestKernelMemory.h places the pools at 0x40000-0x48000 and callback stacks at 0x48000-0x74000 (0x2000 each). Old save states are relocated on load.",
+    "scope": "general",
+    "scope_evidence": "General: any title whose heap reaches the top of RAM is affected. The chosen range is the EE kernel area (below 0x80000), unused by recompiled titles; I found no other use of 0x40000-0x7FFFF in our branch.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#347 'keep kernel records out of title RAM'; #298 (stacks)",
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-12",
+      "commits": [
+        "51f11a99"
+      ],
+      "title": "Runtime-owned guest records (RPC packet/server pools, TLS, boot-mode) moved out of game RAM",
+      "category": "C",
+      "subsystem": "runtime SIF RPC / kernel memory layout",
+      "problem": "The pools at 0x1F00000-0x1F31000 lie inside title RAM. SotC's heap overwrote the RPC server descriptors, and SifCallRpc then wrote through garbage pointers.",
+      "approach": "GuestKernelMemory.h places the pools at 0x40000-0x48000 and callback stacks at 0x48000-0x74000 (0x2000 each). Old save states are relocated on load.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/GuestKernelMemory.h",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Helpers/State.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/StateIo.cpp",
+        "ps2xTest/src/ps2_sif_rpc_tests.cpp"
+      ],
+      "general_or_specific": "General: any title whose heap reaches the top of RAM is affected. The chosen range is the EE kernel area (below 0x80000), unused by recompiled titles; I found no other use of 0x40000-0x7FFFF in our branch.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_sif_rpc_tests (+64)",
+          "ps2_gs_tests (+4)"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "The callback-stack half is SUPERSEDED by our #258 fix (0x90000-0xF0000 with reuse); keep ours. The pool relocation (State.h:246-259) is still needed. Skip the save-state relocation unless save states are ported.",
+      "upstream_pr_equivalent": "#347 'keep kernel records out of title RAM'; #298 (stacks)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-13",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "90aea066",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ]
+    },
+    "title": "VBlank period follows SetGsCrt video mode (PAL 20000 us, NTSC 16683 us)",
+    "category": "C",
+    "subsystem": "runtime EeScheduler VBlank / SetGsCrt syscall",
+    "problem": "VBlank was fixed at 16667 us, so PAL titles ran VSync logic 20% fast. NTSC is 59.94 Hz, not 60.",
+    "approach": "Atomic m_vblankPeriodMicroseconds, default 16683. SetGsCrt with mode 2 (NTSC) or 3 (PAL) sets it. reset() and processDueDeadlines use vblankPeriod()/vblankPeriodCycles(). kVBlankDuration is unchanged; the IOP-side kVblankPeriodCycles stays NTSC.",
+    "scope": "general",
+    "scope_evidence": "General (PS2SDK SetGsCrt mode 2=NTSC, 3=PAL).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none (#332 is about pacing debt)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-13",
+      "commits": [
+        "90aea066"
+      ],
+      "title": "VBlank period follows SetGsCrt video mode (PAL 20000 us, NTSC 16683 us)",
+      "category": "C",
+      "subsystem": "runtime EeScheduler VBlank / SetGsCrt syscall",
+      "problem": "VBlank was fixed at 16667 us, so PAL titles ran VSync logic 20% fast. NTSC is 59.94 Hz, not 60.",
+      "approach": "Atomic m_vblankPeriodMicroseconds, default 16683. SetGsCrt with mode 2 (NTSC) or 3 (PAL) sets it. reset() and processDueDeadlines use vblankPeriod()/vblankPeriodCycles(). kVBlankDuration is unchanged; the IOP-side kVblankPeriodCycles stays NTSC.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ],
+      "general_or_specific": "General (PS2SDK SetGsCrt mode 2=NTSC, 3=PAL).",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our EeScheduler.cpp:34/53 constants; same call sites. The NTSC change from 16667 to 16683 may shift timing-sensitive tests (e.g. sceGsSyncV parity tests).",
+      "upstream_pr_equivalent": "none (#332 is about pacing debt)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-14",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "2280db28",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ]
+    },
+    "title": "Deliver every EE timer overflow/compare event (per-timer backlog)",
+    "category": "C",
+    "subsystem": "runtime ps2_memory EE timers",
+    "problem": "Several overflows in one batch of elapsed cycles raised a single interrupt. Events while OVFF/EQUF were still set were dropped. SotC counts timer-0 overflows as a clock and ran at 0.89x.",
+    "approach": "A global map keyed by the PS2Memory pointer holds backlog counts per timer (cap 2^20). Missed events are re-raised each time the guest clears the flag via a MODE write. Interrupts found during timer register reads are kept in 'undelivered' and the event budget is forced to 0.",
+    "scope": "general",
+    "scope_evidence": "Semi-general. It compensates for coarse batched timer evaluation; on hardware an event while the flag is set is not queued, so this deliberately deviates when the guest acks late. The global mutex-guarded unordered_map keyed by this pointer is a design smell.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#328 (timer quanta, related); none equivalent",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-14",
+      "commits": [
+        "2280db28"
+      ],
+      "title": "Deliver every EE timer overflow/compare event (per-timer backlog)",
+      "category": "C",
+      "subsystem": "runtime ps2_memory EE timers",
+      "problem": "Several overflows in one batch of elapsed cycles raised a single interrupt. Events while OVFF/EQUF were still set were dropped. SotC counts timer-0 overflows as a clock and ran at 0.89x.",
+      "approach": "A global map keyed by the PS2Memory pointer holds backlog counts per timer (cap 2^20). Missed events are re-raised each time the guest clears the flag via a MODE write. Interrupts found during timer register reads are kept in 'undelivered' and the event budget is forced to 0.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ],
+      "general_or_specific": "Semi-general. It compensates for coarse batched timer evaluation; on hardware an event while the flag is set is not queued, so this deliberately deviates when the guest acks late. The global mutex-guarded unordered_map keyed by this pointer is a design smell.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_memory_tests (+31)"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "Written against the fork's lazy flushEeTimers (6810ee6e). Our branch has advanceEeTimers (ps2_memory.cpp:407) with the same flag logic, so it needs re-porting. Better to add the backlog as PS2Memory members.",
+      "upstream_pr_equivalent": "#328 (timer quanta, related); none equivalent",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-15",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "59d92f29",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Dispatcher.cpp"
+      ]
+    },
+    "title": "Syscalls 0x0D/0x0E SetVTLBRefillHandler/SetVCommonHandler record handlers",
+    "category": "C",
+    "subsystem": "runtime syscall dispatcher",
+    "problem": "These were reported as unimplemented syscalls.",
+    "approach": "A static mutex and unordered_map keyed (syscall<<32 | a0 cause) store a1 and return the previous handler. The handlers are never invoked.",
+    "scope": "general",
+    "scope_evidence": "General kernel API (PS2SDK kernel.h syscalls 13/14).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none found",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-15",
+      "commits": [
+        "59d92f29"
+      ],
+      "title": "Syscalls 0x0D/0x0E SetVTLBRefillHandler/SetVCommonHandler record handlers",
+      "category": "C",
+      "subsystem": "runtime syscall dispatcher",
+      "problem": "These were reported as unimplemented syscalls.",
+      "approach": "A static mutex and unordered_map keyed (syscall<<32 | a0 cause) store a1 and return the previous handler. The handlers are never invoked.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Dispatcher.cpp"
+      ],
+      "general_or_specific": "General kernel API (PS2SDK kernel.h syscalls 13/14).",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "None; no 0x0D/0x0E case in our Kernel code. The function-static map is not cleared on runtime reset.",
+      "upstream_pr_equivalent": "none found",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-16",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "6d137301",
+      "files": [
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/services/iop_module_loader.cpp",
+        "ps2xIOP/src/emulator/services/iop_module_loader.h"
+      ]
+    },
+    "title": "IOP sceSifLoadModuleBuffer reads the ELF from IOP RAM",
+    "category": "C",
+    "subsystem": "ps2xIOP module loader",
+    "problem": "The SCE API passes an IOP address (the EE copied the module there with sceSifSetDma). The emulator read EE RAM instead.",
+    "approach": "IopModuleLoader::readElf(MemoryReader) is generalised. loadModuleBuffer tries IOP RAM first and falls back to the EE-address path.",
+    "scope": "general",
+    "scope_evidence": "General (libsif LoadModuleBuffer semantics).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#355 'Load IRX module buffers from IOP RAM'",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-16",
+      "commits": [
+        "6d137301"
+      ],
+      "title": "IOP sceSifLoadModuleBuffer reads the ELF from IOP RAM",
+      "category": "C",
+      "subsystem": "ps2xIOP module loader",
+      "problem": "The SCE API passes an IOP address (the EE copied the module there with sceSifSetDma). The emulator read EE RAM instead.",
+      "approach": "IopModuleLoader::readElf(MemoryReader) is generalised. loadModuleBuffer tries IOP RAM first and falls back to the EE-address path.",
+      "files": [
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/services/iop_module_loader.cpp",
+        "ps2xIOP/src/emulator/services/iop_module_loader.h"
+      ],
+      "general_or_specific": "General (libsif LoadModuleBuffer semantics).",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "None expected; same base code.",
+      "upstream_pr_equivalent": "#355 'Load IRX module buffers from IOP RAM'",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-17",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "4676c99f (EeScheduler/ps2_memory hunks)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h",
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ]
+    },
+    "title": "GS CSR bits 0-4 write-1-to-clear, VSINT at VBlank start, INTC 0 raised for unmasked GS events",
+    "category": "D",
+    "subsystem": "runtime GS privileged regs / EeScheduler",
+    "problem": "Only SIGNAL/FINISH were W1C. HSINT/VSINT/EDWINT were never set or cleared, and the GS interrupt (INTC 0) was never raised.",
+    "approach": "kW1cMask 0x3 becomes 0x1F in writeCsrHalf/writeCsrFull. VBlankStart does csr|=0x8. pendingGsInterruptEvents() = csr & ~(IMR>>8) & 0x1F, latched with m_gsInterruptLatched. dispatchIrq(false,0) on newly raised bits from processPendingEvents. accountCycles sets a checkpoint when pending differs from the latch.",
+    "scope": "general",
+    "scope_evidence": "General GS/INTC behaviour (GS manual CSR/IMR).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none found",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-17",
+      "commits": [
+        "4676c99f (EeScheduler/ps2_memory hunks)"
+      ],
+      "title": "GS CSR bits 0-4 write-1-to-clear, VSINT at VBlank start, INTC 0 raised for unmasked GS events",
+      "category": "D",
+      "subsystem": "runtime GS privileged regs / EeScheduler",
+      "problem": "Only SIGNAL/FINISH were W1C. HSINT/VSINT/EDWINT were never set or cleared, and the GS interrupt (INTC 0) was never raised.",
+      "approach": "kW1cMask 0x3 becomes 0x1F in writeCsrHalf/writeCsrFull. VBlankStart does csr|=0x8. pendingGsInterruptEvents() = csr & ~(IMR>>8) & 0x1F, latched with m_gsInterruptLatched. dispatchIrq(false,0) on newly raised bits from processPendingEvents. accountCycles sets a checkpoint when pending differs from the latch.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h",
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ],
+      "general_or_specific": "General GS/INTC behaviour (GS manual CSR/IMR).",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_gs_tests CSR event clearing"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "The hooks (accountCycles, processPendingEvents, processEvent VBlankStart) exist in our EeScheduler. Titles with an INTC0 handler will now receive VSINT every field.",
+      "upstream_pr_equivalent": "none found",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-18",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "4676c99f (CD.cpp hunk)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp"
+      ]
+    },
+    "title": "sceCdReadIOPm reads into IOP RAM",
+    "category": "C",
+    "subsystem": "runtime CD stub",
+    "problem": "It was aliased to sceCdRead, which writes EE RAM.",
+    "approach": "Reads the sectors and calls runtime->writeIopMemory(a2), checked with isIopMemoryRange. Returns 1 or 0 and advances g_cdStreamingLbn.",
+    "scope": "general",
+    "scope_evidence": "General (libcdvd API).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none found",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-18",
+      "commits": [
+        "4676c99f (CD.cpp hunk)"
+      ],
+      "title": "sceCdReadIOPm reads into IOP RAM",
+      "category": "C",
+      "subsystem": "runtime CD stub",
+      "problem": "It was aliased to sceCdRead, which writes EE RAM.",
+      "approach": "Reads the sectors and calls runtime->writeIopMemory(a2), checked with isIopMemoryRange. Returns 1 or 0 and advances g_cdStreamingLbn.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp"
+      ],
+      "general_or_specific": "General (libcdvd API).",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Needs isIopMemoryRange/writeIopMemory on PS2Runtime; I did not verify they exist in our branch.",
+      "upstream_pr_equivalent": "none found",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-19",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "4676c99f (presentation)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xRuntime/src/lib/gs/gs_frontend.cpp",
+        "ps2xTest/src/ps2_gs_tests.cpp"
+      ]
+    },
+    "title": "CRTC presentation model (PMODE/DISPFB/DISPLAY both circuits, ALP blend, SMODE2 interlace), 4:3 bilinear host output",
+    "category": "D",
+    "subsystem": "runtime presentation",
+    "problem": "Presentation used preferred-source and black-display fallbacks instead of modelling the CRTC.",
+    "approach": "Rewrites the present path in ps2_runtime.cpp/gs_cpu_backend/gs_frontend (+43-112, +128-298). I did not read it in detail.",
+    "scope": "general",
+    "scope_evidence": "General intent; details not verified.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#375, #344 (interlace), #152, #177 (related)",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-19",
+      "commits": [
+        "4676c99f (presentation)"
+      ],
+      "title": "CRTC presentation model (PMODE/DISPFB/DISPLAY both circuits, ALP blend, SMODE2 interlace), 4:3 bilinear host output",
+      "category": "D",
+      "subsystem": "runtime presentation",
+      "problem": "Presentation used preferred-source and black-display fallbacks instead of modelling the CRTC.",
+      "approach": "Rewrites the present path in ps2_runtime.cpp/gs_cpu_backend/gs_frontend (+43-112, +128-298). I did not read it in detail.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xRuntime/src/lib/gs/gs_frontend.cpp",
+        "ps2xTest/src/ps2_gs_tests.cpp"
+      ],
+      "general_or_specific": "General intent; details not verified.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_gs_tests CRTC presentation"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Large overlap with our GS/present code; later rewritten by the fork's threaded/GPU paths.",
+      "upstream_pr_equivalent": "#375, #344 (interlace), #152, #177 (related)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-20",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "56af7ef3 (VIF1 hunk)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ]
+    },
+    "title": "VIF1 DIRECT continues a pending GIF IMAGE only from the next DIRECT payload",
+    "category": "D",
+    "subsystem": "runtime VIF1 interpreter",
+    "problem": "At the top of the VIFcode loop, a pending PATH2 IMAGE consumed the following raw VIF codes as pixels. That desynchronised the stream and lost texture uploads split across DIRECT 1 + DIRECT n.",
+    "approach": "The pending-image block is removed from the loop head. Inside DIRECT/DIRECTHL, the first min(pending, qwCount) qwords go out as an IMAGE packet and the rest are submitted and parsed for new pending image QWC.",
+    "scope": "general",
+    "scope_evidence": "General VIF/GIF behaviour.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#269 'parse VIFcodes between a DIRECT image tag and its pixel data'; #373",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-20",
+      "commits": [
+        "56af7ef3 (VIF1 hunk)"
+      ],
+      "title": "VIF1 DIRECT continues a pending GIF IMAGE only from the next DIRECT payload",
+      "category": "D",
+      "subsystem": "runtime VIF1 interpreter",
+      "problem": "At the top of the VIFcode loop, a pending PATH2 IMAGE consumed the following raw VIF codes as pixels. That desynchronised the stream and lost texture uploads split across DIRECT 1 + DIRECT n.",
+      "approach": "The pending-image block is removed from the loop head. Inside DIRECT/DIRECTHL, the first min(pending, qwCount) qwords go out as an IMAGE packet and the rest are submitted and parsed for new pending image QWC.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2xTest/src/ps2_memory_tests.cpp"
+      ],
+      "general_or_specific": "General VIF/GIF behaviour.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_memory_tests VIF DIRECT continuation (updated)"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our ps2_vif1_interpreter.cpp:307 has the old loop-head block. Later fork commits (6404d040, ee11d6f2) also touch this file.",
+      "upstream_pr_equivalent": "#269 'parse VIFcodes between a DIRECT image tag and its pixel data'; #373",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-21",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "77d58c2c (COLCLAMP)",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xRuntime/src/lib/gs/gs_cpu_raster_inline.h"
+      ]
+    },
+    "title": "GS alpha blend honours COLCLAMP (wrap when CLAMP=0)",
+    "category": "D",
+    "subsystem": "runtime GS CPU backend blend",
+    "problem": "The blend always saturated. With COLCLAMP.CLAMP=0 hardware keeps the low 8 bits, which games use for shadow-volume tricks (SotC hull artifacts).",
+    "approach": "Blend result r/g/b becomes colclamp&1 ? clampU8(x) : (x & 0xFF). Applied in gs_cpu_backend.cpp and gs_cpu_raster_inline.h (the fork's new raster).",
+    "scope": "general",
+    "scope_evidence": "General (GS manual COLCLAMP).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none found",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-21",
+      "commits": [
+        "77d58c2c (COLCLAMP)"
+      ],
+      "title": "GS alpha blend honours COLCLAMP (wrap when CLAMP=0)",
+      "category": "D",
+      "subsystem": "runtime GS CPU backend blend",
+      "problem": "The blend always saturated. With COLCLAMP.CLAMP=0 hardware keeps the low 8 bits, which games use for shadow-volume tricks (SotC hull artifacts).",
+      "approach": "Blend result r/g/b becomes colclamp&1 ? clampU8(x) : (x & 0xFF). Applied in gs_cpu_backend.cpp and gs_cpu_raster_inline.h (the fork's new raster).",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xRuntime/src/lib/gs/gs_cpu_raster_inline.h"
+      ],
+      "general_or_specific": "General (GS manual COLCLAMP).",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": [
+          "goldens re-recorded; no named test found"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Our gs_frontend stores m_colclamp and batch.state.colclamp but the backend never reads it, so the hunk must be re-applied to our blend code (only the gs_cpu_backend.cpp equivalent).",
+      "upstream_pr_equivalent": "none found",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-22",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "77d58c2c (sprite/triangle rules), 56af7ef3 (flat-Z)",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_sprite_rules.h",
+        "ps2xRuntime/src/lib/gs/gs_triangle_rules.h",
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+      ]
+    },
+    "title": "GS rasterization rules: sprite ceil coverage + integer-position attributes, 12.4 integer edge functions with top-left rule, flat-Z exact depth",
+    "category": "D",
+    "subsystem": "runtime GS CPU rasterizer",
+    "problem": "Float barycentrics gave off-by-one coverage, and z-1 on flat-Z triangles dropped pixels under ZTST=GEQUAL. Sprite UV/edge rules were wrong.",
+    "approach": "gs_sprite_rules.h: first=ceil(min), last=ceil(max)-1, parameter=(pixel-origin)/extent. gs_triangle_rules.h: llround(x*16)-ofx, int64 edges, bias for the top-left rule, double invArea. Flat-Z uses z = v0.z + dz1*w1 + dz2*w2 with a clamp.",
+    "scope": "general",
+    "scope_evidence": "General.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#364 (top-left rule), #377/#366/#281 (sprite fractional edges)",
+    "risk": "high",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-22",
+      "commits": [
+        "77d58c2c (sprite/triangle rules)",
+        "56af7ef3 (flat-Z)"
+      ],
+      "title": "GS rasterization rules: sprite ceil coverage + integer-position attributes, 12.4 integer edge functions with top-left rule, flat-Z exact depth",
+      "category": "D",
+      "subsystem": "runtime GS CPU rasterizer",
+      "problem": "Float barycentrics gave off-by-one coverage, and z-1 on flat-Z triangles dropped pixels under ZTST=GEQUAL. Sprite UV/edge rules were wrong.",
+      "approach": "gs_sprite_rules.h: first=ceil(min), last=ceil(max)-1, parameter=(pixel-origin)/extent. gs_triangle_rules.h: llround(x*16)-ofx, int64 edges, bias for the top-left rule, double invArea. Flat-Z uses z = v0.z + dz1*w1 + dz2*w2 with a clamp.",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_sprite_rules.h",
+        "ps2xRuntime/src/lib/gs/gs_triangle_rules.h",
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+      ],
+      "general_or_specific": "General.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_gs_tests (updated)",
+          "gs_golden_tests (re-recorded)"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Built on the fork's refactored rasterizer (e191b8bf). Must be rewritten against our gs_cpu_backend.",
+      "upstream_pr_equivalent": "#364 (top-left rule), #377/#366/#281 (sprite fractional edges)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-23",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "7f990a62, a5c44d15 (recompiler hunk), 2f0eb216",
+      "files": [
+        "ps2xRecomp/src/lib/code_generator.cpp",
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp",
+        "ps2xRecomp/src/lib/config_manager.cpp",
+        "ps2xRecomp/src/lib/gif_dma_kick_analyzer.cpp",
+        "ps2xRecomp/include/ps2recomp/types.h",
+        "ps2xRecomp/include/ps2recomp/code_generator.h"
+      ]
+    },
+    "title": "Recompiler options: runtime_relocations CSV (j26/hi16/lo16 read from live guest words), constant-prop invalidation at those sites, auto_stub_by_name, direct_tail_calls",
+    "category": "B",
+    "subsystem": "recompiler code_generator/control_flow_emitter/gif_dma_kick_analyzer/config",
+    "problem": "Games that link code modules at runtime patch immediates and jump targets after boot. Baked link-time values or constant-propagated addresses go stale. Name-based auto stubs and direct J tail calls bypass replaceFunction().",
+    "approach": "Sentinel substitution replaces the immediate with FAST_READ32(addr)&0xFFFF (signed/unsigned). J/JAL at listed sites decode the target from the live word and dispatch through the runtime. updateConstantRegisters invalidates rt for listed lui/addiu/ori, via a file-scope global pointer. Config flags all default to existing behaviour.",
+    "scope": "general",
+    "scope_evidence": "General opt-in mechanism, but the relocation CSV is per-game data (SotC's loader). Defaults keep current behaviour.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#348 'follow J/JAL the guest rewrites at dispatched sites' (related)",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-23",
+      "commits": [
+        "7f990a62",
+        "a5c44d15 (recompiler hunk)",
+        "2f0eb216"
+      ],
+      "title": "Recompiler options: runtime_relocations CSV (j26/hi16/lo16 read from live guest words), constant-prop invalidation at those sites, auto_stub_by_name, direct_tail_calls",
+      "category": "B",
+      "subsystem": "recompiler code_generator/control_flow_emitter/gif_dma_kick_analyzer/config",
+      "problem": "Games that link code modules at runtime patch immediates and jump targets after boot. Baked link-time values or constant-propagated addresses go stale. Name-based auto stubs and direct J tail calls bypass replaceFunction().",
+      "approach": "Sentinel substitution replaces the immediate with FAST_READ32(addr)&0xFFFF (signed/unsigned). J/JAL at listed sites decode the target from the live word and dispatch through the runtime. updateConstantRegisters invalidates rt for listed lui/addiu/ori, via a file-scope global pointer. Config flags all default to existing behaviour.",
+      "files": [
+        "ps2xRecomp/src/lib/code_generator.cpp",
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp",
+        "ps2xRecomp/src/lib/config_manager.cpp",
+        "ps2xRecomp/src/lib/gif_dma_kick_analyzer.cpp",
+        "ps2xRecomp/include/ps2recomp/types.h",
+        "ps2xRecomp/include/ps2recomp/code_generator.h"
+      ],
+      "general_or_specific": "General opt-in mechanism, but the relocation CSV is per-game data (SotC's loader). Defaults keep current behaviour.",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": [
+          "code_generator_tests modified in the range, but I could not attribute specific cases to these commits"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Touches emitStaticJump and emitDirectFunctionJumpIfAvailable, near our #304 delay-slot edits; manual merge.",
+      "upstream_pr_equivalent": "#348 'follow J/JAL the guest rewrites at dispatched sites' (related)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-24",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "a5c44d15 (IOP hunk)",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_memory.cpp",
+        "ps2xIOP/src/emulator/core/iop_memory.h"
+      ]
+    },
+    "title": "IOP heap: first-fit reuse of freed blocks; heap base 0x120000 -> 0x80000",
+    "category": "C",
+    "subsystem": "ps2xIOP IopMemory::allocate",
+    "problem": "The allocation cursor never reused freed blocks.",
+    "approach": "The candidate starts at HeapBase each time and scans all blocks (the break is removed). HeapBase becomes 0x80000.",
+    "scope": "general",
+    "scope_evidence": "General.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#315 'Reuse freed IOP heap blocks (first fit)'; #342",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-24",
+      "commits": [
+        "a5c44d15 (IOP hunk)"
+      ],
+      "title": "IOP heap: first-fit reuse of freed blocks; heap base 0x120000 -> 0x80000",
+      "category": "C",
+      "subsystem": "ps2xIOP IopMemory::allocate",
+      "problem": "The allocation cursor never reused freed blocks.",
+      "approach": "The candidate starts at HeapBase each time and scans all blocks (the break is removed). HeapBase becomes 0x80000.",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_memory.cpp",
+        "ps2xIOP/src/emulator/core/iop_memory.h"
+      ],
+      "general_or_specific": "General.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "IOP heap expectations updated in 56af7ef3 (iop_emulator_tests)"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "Modules load upward from kModuleLoadBase 0x10000 (iop_emulator_const.h). I could not determine whether module images are protected from a heap starting at 0x80000, since I saw no explicit guard. Take first-fit only; keep 0x120000 unless proven safe.",
+      "upstream_pr_equivalent": "#315 'Reuse freed IOP heap blocks (first fit)'; #342",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-25",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "95e96f25 (IOP kernel hunk)",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp",
+        "ps2xIOP/src/emulator/core/iop_kernel.h",
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/iop_emulator_const.h"
+      ]
+    },
+    "title": "IOP kernel preemption on wake/signal; IRX module_start runs in a real IOP thread",
+    "category": "C",
+    "subsystem": "ps2xIOP IopKernel",
+    "problem": "StartThread/WakeupThread/ResumeThread/SignalSema/SetEventFlag never yielded to a higher-priority ready thread. module_start could not block.",
+    "approach": "yieldIfHigherPriorityReady sets cpu.yielded when a ready thread has a numerically lower priority. createModuleStartThread/threadFinished/releaseModuleStartThread run module_start at priority 8 with a 0x4000 stack and a 2 s max.",
+    "scope": "general",
+    "scope_evidence": "General (IOP thbase semantics).",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#338 (RPC servers on their thread), related",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-25",
+      "commits": [
+        "95e96f25 (IOP kernel hunk)"
+      ],
+      "title": "IOP kernel preemption on wake/signal; IRX module_start runs in a real IOP thread",
+      "category": "C",
+      "subsystem": "ps2xIOP IopKernel",
+      "problem": "StartThread/WakeupThread/ResumeThread/SignalSema/SetEventFlag never yielded to a higher-priority ready thread. module_start could not block.",
+      "approach": "yieldIfHigherPriorityReady sets cpu.yielded when a ready thread has a numerically lower priority. createModuleStartThread/threadFinished/releaseModuleStartThread run module_start at priority 8 with a 0x4000 stack and a 2 s max.",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp",
+        "ps2xIOP/src/emulator/core/iop_kernel.h",
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/iop_emulator_const.h"
+      ],
+      "general_or_specific": "General (IOP thbase semantics).",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "iop_emulator_tests (+101 in 95e96f25)"
+        ]
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "Same base IOP code; ordinal-specific hooks should apply.",
+      "upstream_pr_equivalent": "#338 (RPC servers on their thread), related",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-26",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "56af7ef3 (SIO2/sifman), 38615a99, b11b2d8a (memcard part), 702c5620 (pad center)",
+      "files": [
+        "ps2xIOP/src/emulator/devices/*",
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/services/iop_rpc.cpp",
+        "ps2xIOP/tests/iop_sio2_tests.cpp"
+      ]
+    },
+    "title": "SIO2 controller + virtual DualShock2 + IOP memory card; sceSifSetDmaIntr completion callback; IOP 128/1024-cycle batching",
+    "category": "C",
+    "subsystem": "ps2xIOP devices",
+    "problem": "Real SIO2MAN/PADMAN/MCMAN could not run, and sifman #32 never completed, so DBCMAN failed every transfer.",
+    "approach": "New IopSio2/IopDualShock2/IopMemcard devices, dmacman 28/32 routed to SIO2, sifman callback scheduled at 64 + bytes/4 cycles, stick centre 0x7F.",
+    "scope": "general",
+    "scope_evidence": "General hardware emulation.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#381, #265, #329 (pad, related)",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-26",
+      "commits": [
+        "56af7ef3 (SIO2/sifman)",
+        "38615a99",
+        "b11b2d8a (memcard part)",
+        "702c5620 (pad center)"
+      ],
+      "title": "SIO2 controller + virtual DualShock2 + IOP memory card; sceSifSetDmaIntr completion callback; IOP 128/1024-cycle batching",
+      "category": "C",
+      "subsystem": "ps2xIOP devices",
+      "problem": "Real SIO2MAN/PADMAN/MCMAN could not run, and sifman #32 never completed, so DBCMAN failed every transfer.",
+      "approach": "New IopSio2/IopDualShock2/IopMemcard devices, dmacman 28/32 routed to SIO2, sifman callback scheduled at 64 + bytes/4 cycles, stick centre 0x7F.",
+      "files": [
+        "ps2xIOP/src/emulator/devices/*",
+        "ps2xIOP/src/emulator/iop_emulator.cpp",
+        "ps2xIOP/src/emulator/services/iop_rpc.cpp",
+        "ps2xIOP/tests/iop_sio2_tests.cpp"
+      ],
+      "general_or_specific": "General hardware emulation.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "iop_sio2_tests.cpp",
+          "iop_emulator_tests (+165 in 38615a99)"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Large new subsystem. It replaces the HLE pad (ps2_pad.cpp -106) and pulls in host input.",
+      "upstream_pr_equivalent": "#381, #265, #329 (pad, related)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-27",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "c4c1030d, 872c0cf7",
+      "files": [
+        "ps2xIOP/src/emulator/devices/iop_spu2.cpp",
+        "ps2xIOP/src/emulator/core/iop_memory.cpp",
+        "ps2xRuntime/src/lib/ps2_audio.cpp",
+        "ps2xIOP/tests/iop_spu2_tests.cpp"
+      ]
+    },
+    "title": "SPU2 voice model (NAX/ENDX/ADSR/DMA 4/7) and ADPCM stereo output",
+    "category": "C",
+    "subsystem": "ps2xIOP SPU2 / runtime audio",
+    "problem": "SPU2 was a register store, so NAX never moved and sound drivers polling stream ends hung scripted events.",
+    "approach": "New IopSpu2 (both cores, 48 kHz pitch from the IOP clock) and host audio mixing.",
+    "scope": "general",
+    "scope_evidence": "General.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#308 'emulate the SPU2 so a game's own LIBSD.IRX produces sound'",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-27",
+      "commits": [
+        "c4c1030d",
+        "872c0cf7"
+      ],
+      "title": "SPU2 voice model (NAX/ENDX/ADSR/DMA 4/7) and ADPCM stereo output",
+      "category": "C",
+      "subsystem": "ps2xIOP SPU2 / runtime audio",
+      "problem": "SPU2 was a register store, so NAX never moved and sound drivers polling stream ends hung scripted events.",
+      "approach": "New IopSpu2 (both cores, 48 kHz pitch from the IOP clock) and host audio mixing.",
+      "files": [
+        "ps2xIOP/src/emulator/devices/iop_spu2.cpp",
+        "ps2xIOP/src/emulator/core/iop_memory.cpp",
+        "ps2xRuntime/src/lib/ps2_audio.cpp",
+        "ps2xIOP/tests/iop_spu2_tests.cpp"
+      ],
+      "general_or_specific": "General.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "iop_spu2_tests.cpp"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "New files, plus IopMemory hooks that clash with other IOP edits.",
+      "upstream_pr_equivalent": "#308 'emulate the SPU2 so a game's own LIBSD.IRX produces sound'",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-28",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "6810ee6e, 95e96f25 (idle skip), 5be66d59",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRecomp/src/lib/special_translator.cpp",
+        "ps2xTest/src/ps2_runtime_kernel_tests.cpp"
+      ]
+    },
+    "title": "Non-throwing syscall transfers, lazy EE timers, idle skip, cycle-timed waits, host pacing, IOP cycle debit",
+    "category": "C",
+    "subsystem": "runtime EeScheduler/handleSyscall/IOP host",
+    "problem": "Performance and pacing. Exception-based transfers ran guest instructions between block and dispatch.",
+    "approach": "handleSyscall returns bool, scheduler defers transfers, lazy timer flush, GIF_STAT.FQC cleared only on write, Sync(Finish) queued, skipIdleCycles, hostCatchUp, PS2_FORCEINLINE.",
+    "scope": "general",
+    "scope_evidence": "General architecture, tuned to SotC load.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#328 (timer quanta), #307 (IOP time), related",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-28",
+      "commits": [
+        "6810ee6e",
+        "95e96f25 (idle skip)",
+        "5be66d59"
+      ],
+      "title": "Non-throwing syscall transfers, lazy EE timers, idle skip, cycle-timed waits, host pacing, IOP cycle debit",
+      "category": "C",
+      "subsystem": "runtime EeScheduler/handleSyscall/IOP host",
+      "problem": "Performance and pacing. Exception-based transfers ran guest instructions between block and dispatch.",
+      "approach": "handleSyscall returns bool, scheduler defers transfers, lazy timer flush, GIF_STAT.FQC cleared only on write, Sync(Finish) queued, skipIdleCycles, hostCatchUp, PS2_FORCEINLINE.",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRecomp/src/lib/special_translator.cpp",
+        "ps2xTest/src/ps2_runtime_kernel_tests.cpp"
+      ],
+      "general_or_specific": "General architecture, tuned to SotC load.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_runtime_kernel_tests (+153: deferred sleep/wakeup, semaphore hand-over)",
+          "ps2_memory_tests (lazy vs eager timers)"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Deep scheduler and codegen changes. They overlap #258 (invocation stacks) and our syscall resume (d9ea4fb #210).",
+      "upstream_pr_equivalent": "#328 (timer quanta), #307 (IOP time), related",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-29",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "e191b8bf, a5c44d15 (GS fill fast path), 6404d040 (GPU/asyncvif), 702c5620, 6aa85e39, 5a582206, 2bca36b9, 67bbd44c (GS/asyncvif parts)",
+      "files": [
+        "ps2xRuntime/src/lib/gs/**",
+        "ps2xRuntime/src/lib/ps2_async_vif.cpp",
+        "ps2xTest/gs_reference/**",
+        "ps2xTest/tools/gs_replay.cpp"
+      ]
+    },
+    "title": "Threaded GS, refactored software rasterizer, OpenGL compute/hardware GS renderer, async VIF1/GIF threads, shader cache, thread priorities",
+    "category": "D",
+    "subsystem": "runtime GS backends",
+    "problem": "Performance.",
+    "approach": "Large rewrites (gs_gpu_backend.cpp +2829, gs_gpu_shaders +1252, gs_threaded_backend, gs_recording, golden replay tests).",
+    "scope": "general",
+    "scope_evidence": "General but performance-only. 5a582206 includes 'canyon-investigation' changes. 5a582206 also skips I/O range checks below 0x10000000 and makes GPR writes a single 64-bit store; not separately reviewed.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#285 'GS performance patch 1', #144 (related)",
+    "risk": "high",
+    "priority": 5,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-29",
+      "commits": [
+        "e191b8bf",
+        "a5c44d15 (GS fill fast path)",
+        "6404d040 (GPU/asyncvif)",
+        "702c5620",
+        "6aa85e39",
+        "5a582206",
+        "2bca36b9",
+        "67bbd44c (GS/asyncvif parts)"
+      ],
+      "title": "Threaded GS, refactored software rasterizer, OpenGL compute/hardware GS renderer, async VIF1/GIF threads, shader cache, thread priorities",
+      "category": "D",
+      "subsystem": "runtime GS backends",
+      "problem": "Performance.",
+      "approach": "Large rewrites (gs_gpu_backend.cpp +2829, gs_gpu_shaders +1252, gs_threaded_backend, gs_recording, golden replay tests).",
+      "files": [
+        "ps2xRuntime/src/lib/gs/**",
+        "ps2xRuntime/src/lib/ps2_async_vif.cpp",
+        "ps2xTest/gs_reference/**",
+        "ps2xTest/tools/gs_replay.cpp"
+      ],
+      "general_or_specific": "General but performance-only. 5a582206 includes 'canyon-investigation' changes. 5a582206 also skips I/O range checks below 0x10000000 and makes GPR writes a single 64-bit store; not separately reviewed.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "gs_golden_tests",
+          "gs_replay --compare-backends"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Massive overlap with the GS code.",
+      "upstream_pr_equivalent": "#285 'GS performance patch 1', #144 (related)",
+      "priority": 5,
+      "recommended_status": "REJECTED"
+    }
+  },
+  {
+    "id": "sotc-30",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "95e96f25 (VU1), 6404d040 (vu1_recomp), ee11d6f2, 861f9e0c, 702c5620 (VU1), 64f8ca16, cb222e4b, 67bbd44c (VU1/VIF1)",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_impl.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp",
+        "ps2xTest/tools/vu1_recomp.cpp",
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "VU1 interpreter speedups, VU1 AOT recompiler (image-hash registry), VU1 timing model, VIF1 UNPACK fast paths",
+    "category": "D",
+    "subsystem": "runtime VU1 / ps2xTest tools/vu1_recomp",
+    "problem": "Performance; VU1 timing for frame-skipping.",
+    "approach": "Per-op C++ generation with verify mode (PS2X_VU1_VERIFY reports 0 mismatches). Compiled programs are matched by image hash or memcmp. The D1_CHCR timing model consumes EE cycles.",
+    "scope": "unknown",
+    "scope_evidence": "Mechanism general. The compiled programs are per-game artefacts. The timing model was tuned on SotC scenes.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#254 (DQ8 VU1 compile), #306, #314 (unpack fast path), related",
+    "risk": "high",
+    "priority": 5,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-30",
+      "commits": [
+        "95e96f25 (VU1)",
+        "6404d040 (vu1_recomp)",
+        "ee11d6f2",
+        "861f9e0c",
+        "702c5620 (VU1)",
+        "64f8ca16",
+        "cb222e4b",
+        "67bbd44c (VU1/VIF1)"
+      ],
+      "title": "VU1 interpreter speedups, VU1 AOT recompiler (image-hash registry), VU1 timing model, VIF1 UNPACK fast paths",
+      "category": "D",
+      "subsystem": "runtime VU1 / ps2xTest tools/vu1_recomp",
+      "problem": "Performance; VU1 timing for frame-skipping.",
+      "approach": "Per-op C++ generation with verify mode (PS2X_VU1_VERIFY reports 0 mismatches). Compiled programs are matched by image hash or memcmp. The D1_CHCR timing model consumes EE cycles.",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_impl.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp",
+        "ps2xTest/tools/vu1_recomp.cpp",
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "general_or_specific": "Mechanism general. The compiled programs are per-game artefacts. The timing model was tuned on SotC scenes.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "ps2_vu1_tests",
+          "lean-vs-reference FMAC test (cb222e4b)"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Removes ps2_vu1_lower.cpp/upper.cpp that our branch still uses.",
+      "upstream_pr_equivalent": "#254 (DQ8 VU1 compile), #306, #314 (unpack fast path), related",
+      "priority": 5,
+      "recommended_status": "REJECTED"
+    }
+  },
+  {
+    "id": "sotc-31",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "fb7937a7",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ]
+    },
+    "title": "VU0 macro VSQI/VLQD/VILWR/VISWR use VU0 data memory, field fixes, VI0/VF0 never written",
+    "category": "A",
+    "subsystem": "recompiler VU0 macro",
+    "problem": "Fields swapped and memory target wrong (SotC matrix stack).",
+    "approach": "Same as our PR #310 slice.",
+    "scope": "general",
+    "scope_evidence": "General.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#310",
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-31",
+      "commits": [
+        "fb7937a7"
+      ],
+      "title": "VU0 macro VSQI/VLQD/VILWR/VISWR use VU0 data memory, field fixes, VI0/VF0 never written",
+      "category": "A",
+      "subsystem": "recompiler VU0 macro",
+      "problem": "Fields swapped and memory target wrong (SotC matrix stack).",
+      "approach": "Same as our PR #310 slice.",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ],
+      "general_or_specific": "General.",
+      "reference": null,
+      "has_tests": {
+        "value": true,
+        "names": [
+          "code_generator_tests matrix-stack vsqi/vlqd words"
+        ]
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Already in our branch (b60446a, f8292ed).",
+      "upstream_pr_equivalent": "#310",
+      "priority": 5,
+      "recommended_status": "DUPLICATE"
+    },
+    "limitations": "Same fix integrated from upstream PR #310 (upstream-03)."
+  },
+  {
+    "id": "sotc-32",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "d1eb6b41",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_cd_image.cpp",
+        "ps2xRuntime/src/lib/ps2_vfs.cpp",
+        "ps2xRuntime/src/lib/ps2_iop_host.cpp",
+        "*/CMakeLists.txt"
+      ]
+    },
+    "title": "ISO9660 disc image backend for cdrom0:, IOP module loads, sceCdSearchFile; CMake subproject-relative paths",
+    "category": "E",
+    "subsystem": "runtime VFS/CD, build",
+    "problem": "Games needed extracted files; CMake broke as a subproject.",
+    "approach": "PS2CdImage indexes the ISO (IoPaths::cdImage). ps2_vfs and ps2_iop_host serve it. CMake uses CMAKE_CURRENT_LIST_DIR.",
+    "scope": "general",
+    "scope_evidence": "General.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#267 'Search files in the configured disc image' (related), #239",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-32",
+      "commits": [
+        "d1eb6b41"
+      ],
+      "title": "ISO9660 disc image backend for cdrom0:, IOP module loads, sceCdSearchFile; CMake subproject-relative paths",
+      "category": "E",
+      "subsystem": "runtime VFS/CD, build",
+      "problem": "Games needed extracted files; CMake broke as a subproject.",
+      "approach": "PS2CdImage indexes the ISO (IoPaths::cdImage). ps2_vfs and ps2_iop_host serve it. CMake uses CMAKE_CURRENT_LIST_DIR.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_cd_image.cpp",
+        "ps2xRuntime/src/lib/ps2_vfs.cpp",
+        "ps2xRuntime/src/lib/ps2_iop_host.cpp",
+        "*/CMakeLists.txt"
+      ],
+      "general_or_specific": "General.",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "med",
+      "conflicts_with_our_branch": "Possible overlap with #267-style disc search, if present.",
+      "upstream_pr_equivalent": "#267 'Search files in the configured disc image' (related), #239",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-33",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "b11b2d8a",
+      "files": [
+        "ps2xIOP/include/ps2x/state_io.h",
+        "ps2xRuntime/src/lib/ps2_save_state.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/StateIo.cpp"
+      ]
+    },
+    "title": "Machine save states (+ opt-in memory card)",
+    "category": "E",
+    "subsystem": "runtime/IOP serialization",
+    "problem": "Feature.",
+    "approach": "state_io.h serializer, ps2_save_state.cpp (+761).",
+    "scope": "general",
+    "scope_evidence": "General feature.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "high",
+    "priority": 5,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-33",
+      "commits": [
+        "b11b2d8a"
+      ],
+      "title": "Machine save states (+ opt-in memory card)",
+      "category": "E",
+      "subsystem": "runtime/IOP serialization",
+      "problem": "Feature.",
+      "approach": "state_io.h serializer, ps2_save_state.cpp (+761).",
+      "files": [
+        "ps2xIOP/include/ps2x/state_io.h",
+        "ps2xRuntime/src/lib/ps2_save_state.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/StateIo.cpp"
+      ],
+      "general_or_specific": "General feature.",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": [
+          "not determined"
+        ]
+      },
+      "risk": "high",
+      "conflicts_with_our_branch": "Touches every subsystem's state.",
+      "upstream_pr_equivalent": "none",
+      "priority": 5,
+      "recommended_status": "REJECTED"
+    }
+  },
+  {
+    "id": "sotc-34",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "7e6dfd97 (diagnostics), 6810ee6e (PS2X_TRACE_SCHED), 56af7ef3 (PS2X_GS_TRACE), 3e84bb77",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ]
+    },
+    "title": "Diagnostics/tooling: branch-trace ring + RAM dump on missing target, scheduler/GS traces, headless mode, skip-identical recompiler output",
+    "category": "E",
+    "subsystem": "runtime diagnostics, recompiler output",
+    "problem": "Debuggability and incremental builds (3e84bb77 avoids rewriting unchanged generated files).",
+    "approach": "Env-gated traces. ps2_recompiler.cpp +15 for skip-identical writes (not read in detail).",
+    "scope": "general",
+    "scope_evidence": "General tooling.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#157 (observability layer), related",
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-34",
+      "commits": [
+        "7e6dfd97 (diagnostics)",
+        "6810ee6e (PS2X_TRACE_SCHED)",
+        "56af7ef3 (PS2X_GS_TRACE)",
+        "3e84bb77"
+      ],
+      "title": "Diagnostics/tooling: branch-trace ring + RAM dump on missing target, scheduler/GS traces, headless mode, skip-identical recompiler output",
+      "category": "E",
+      "subsystem": "runtime diagnostics, recompiler output",
+      "problem": "Debuggability and incremental builds (3e84bb77 avoids rewriting unchanged generated files).",
+      "approach": "Env-gated traces. ps2_recompiler.cpp +15 for skip-identical writes (not read in detail).",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ],
+      "general_or_specific": "General tooling.",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Minor.",
+      "upstream_pr_equivalent": "#157 (observability layer), related",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "sotc-35",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "85973d61, 7122eaaf, b0c23d83, 247aa675, d06a4ab4, e6997335 (pad script), 702c5620 (right-stick invert)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_host_input.cpp",
+        "ps2xRuntime/src/lib/ps2_perf_overlay.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "Host UX: Escape doesn't close, configurable pad bindings/mouse camera, adaptive sizing/F11, F3 perf overlay, pad scripts",
+    "category": "E",
+    "subsystem": "runtime host window/input",
+    "problem": "Port UX.",
+    "approach": "Host-side only.",
+    "scope": "game-specific",
+    "scope_evidence": "Port UX; mouse-camera and stick inversion are camera-game oriented.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "none",
+    "risk": "low",
+    "priority": 5,
+    "status": "GAME_SPECIFIC",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-35",
+      "commits": [
+        "85973d61",
+        "7122eaaf",
+        "b0c23d83",
+        "247aa675",
+        "d06a4ab4",
+        "e6997335 (pad script)",
+        "702c5620 (right-stick invert)"
+      ],
+      "title": "Host UX: Escape doesn't close, configurable pad bindings/mouse camera, adaptive sizing/F11, F3 perf overlay, pad scripts",
+      "category": "E",
+      "subsystem": "runtime host window/input",
+      "problem": "Port UX.",
+      "approach": "Host-side only.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_host_input.cpp",
+        "ps2xRuntime/src/lib/ps2_perf_overlay.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "Port UX; mouse-camera and stick inversion are camera-game oriented.",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "Depends on the fork's ps2_host_input (56af7ef3).",
+      "upstream_pr_equivalent": "none",
+      "priority": 5,
+      "recommended_status": "GAME_SPECIFIC"
+    }
+  },
+  {
+    "id": "sotc-36",
+    "source": {
+      "repository": "LightVelox/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "eb8688b",
+      "revision": "59c7a928, 6545e121",
+      "files": []
+    },
+    "title": "Merge commits (sotc-port into main; upstream main incl. #271/#272/#274)",
+    "category": "E",
+    "subsystem": "n/a",
+    "problem": "n/a",
+    "approach": "Merge only. 6545e121 adopted #272 but kept port helpers (ps2FpuCompareKey, ps2FpuConvertToWord, ps2VuDivide/Sqrt/Rsqrt, ps2VuClampVector).",
+    "scope": "unknown",
+    "scope_evidence": "n/a",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "n/a",
+    "risk": "low",
+    "priority": 5,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "sotc-36",
+      "commits": [
+        "59c7a928",
+        "6545e121"
+      ],
+      "title": "Merge commits (sotc-port into main; upstream main incl. #271/#272/#274)",
+      "category": "E",
+      "subsystem": "n/a",
+      "problem": "n/a",
+      "approach": "Merge only. 6545e121 adopted #272 but kept port helpers (ps2FpuCompareKey, ps2FpuConvertToWord, ps2VuDivide/Sqrt/Rsqrt, ps2VuClampVector).",
+      "files": [],
+      "general_or_specific": "n/a",
+      "reference": null,
+      "has_tests": {
+        "value": false,
+        "names": []
+      },
+      "risk": "low",
+      "conflicts_with_our_branch": "n/a",
+      "upstream_pr_equivalent": "n/a",
+      "priority": 5,
+      "recommended_status": "REJECTED"
+    }
+  }
+]

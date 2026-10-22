@@ -25,3 +25,16 @@ After: `ps2x_tests` 454/454, `ps2xIOP` ctest 4/4.
   (#258). The top-of-RAM region remains only as a logged fallback.
 
 See `docs/INTEGRATION_MATRIX.md` for the evidence behind each decision, including the proposals not taken (#260).
+
+## Phase 0b — community engineering integration (2026-10-23)
+
+After: `ps2x_tests` 466/466, `ps2xIOP` ctest 4/4, `research_database_valid` ctest passing.
+Every fix below was checked against PCSX2 source and has a regression test that fails when the fix is reverted.
+
+- Signed branches test bit 63; SQRT.S reads ft (from the SotC fork, also found by DQ8, Killzone, Def Jam, BT3).
+- VF00 = (0,0,0,1) in every context; LQ/SQ/LQC2/SQC2 align to 16 bytes (SotC, Killzone, God of War).
+- DMA source chains are no longer cut at 4096 tags (SotC).
+- CVT.W.S truncates and saturates; VU0 DIV/SQRT/RSQRT follow the FDIV-unit rules with I/D flags; PEXEW lanes.
+- `SetupThread(-1)` records the stack base (#259); `D_ENABLEW` mirrors to `D_ENABLER` (PR #284).
+- Community research database: 185 records from 4 forensic passes over 15 listed projects plus a 205-fork scan,
+  with a schema, a validator run by ctest, and generated reports in `docs/community-research/`.

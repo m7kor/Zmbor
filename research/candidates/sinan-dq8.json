@@ -1,0 +1,2768 @@
+[
+  {
+    "id": "dq8-01",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "20848417",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ]
+    },
+    "title": "Relational branches compare the full 64-bit GPR",
+    "category": "B",
+    "subsystem": "recompiler/control_flow_emitter",
+    "problem": "BLEZ/BGTZ/BLTZ/BGEZ (and L/AL variants) are emitted as GPR_S32 compares; BEQ/BNE already use 64-bit. Wrong branch when the upper half matters (dsll32/dsra32 idiom).",
+    "approach": "GPR_S32 -> GPR_S64 in 4 format strings.",
+    "scope": "general",
+    "scope_evidence": "General R5900 behavior",
+    "reference": "PCSX2 pcsx2/Interpreter.cpp BGEZ/BGTZ use cpuRegs.GPR.r[_Rs_].SD[0] (64-bit)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-01",
+      "commits": [
+        "20848417"
+      ],
+      "title": "Relational branches compare the full 64-bit GPR",
+      "category": "B",
+      "subsystem": "recompiler/control_flow_emitter",
+      "problem": "BLEZ/BGTZ/BLTZ/BGEZ (and L/AL variants) are emitted as GPR_S32 compares; BEQ/BNE already use 64-bit. Wrong branch when the upper half matters (dsll32/dsra32 idiom).",
+      "approach": "GPR_S32 -> GPR_S64 in 4 format strings.",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ],
+      "general_or_specific": "General R5900 behavior",
+      "reference": "PCSX2 pcsx2/Interpreter.cpp BGEZ/BGTZ use cpuRegs.GPR.r[_Rs_].SD[0] (64-bit)",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt control_flow_emitter.cpp:409 still GPR_S32"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Integrated via sotc-01 (a3c7f21); independent confirmation from the DQ8 fork."
+  },
+  {
+    "id": "dq8-02",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "f1e71ef6",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ]
+    },
+    "title": "EE SQRT.S reads ft, not fs",
+    "category": "A",
+    "subsystem": "recompiler/fpu_translator",
+    "problem": "R5900 SQRT.S takes its source from ft; the translator reads fs.",
+    "approach": "Read ctx->f[ft]; code_generator test.",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": "PCSX2 pcsx2/FPU.cpp SQRT_S uses _FtValUl_/_FtValf_",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#382, #277 (open)",
+    "risk": "low",
+    "priority": 1,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-02",
+      "commits": [
+        "f1e71ef6"
+      ],
+      "title": "EE SQRT.S reads ft, not fs",
+      "category": "A",
+      "subsystem": "recompiler/fpu_translator",
+      "problem": "R5900 SQRT.S takes its source from ft; the translator reads fs.",
+      "approach": "Read ctx->f[ft]; code_generator test.",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": "PCSX2 pcsx2/FPU.cpp SQRT_S uses _FtValUl_/_FtValf_",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt fpu_translator.cpp:61 uses fs"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#382, #277 (open)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Integrated via sotc-02 (a3c7f21); independent confirmation from the DQ8 fork."
+  },
+  {
+    "id": "dq8-03",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "7b94f012 (FPU part)",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ]
+    },
+    "title": "EE RSQRT.S = fs/sqrt(ft)",
+    "category": "A",
+    "subsystem": "recompiler/fpu",
+    "problem": "RSQRT.S ignored its numerator",
+    "approach": "fs/sqrtf(ft)",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": "PCSX2 pcsx2/FPU.cpp RSQRT_S",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#272 merged",
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-03",
+      "commits": [
+        "7b94f012 (FPU part)"
+      ],
+      "title": "EE RSQRT.S = fs/sqrt(ft)",
+      "category": "A",
+      "subsystem": "recompiler/fpu",
+      "problem": "RSQRT.S ignored its numerator",
+      "approach": "fs/sqrtf(ft)",
+      "files": [
+        "ps2xRecomp/src/lib/fpu_translator.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": "PCSX2 pcsx2/FPU.cpp RSQRT_S",
+      "upstream_already_has": {
+        "value": true,
+        "where": "eb8688b (#272) FPU_RSQRT_S(fs,ft)"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#272 merged",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "dq8-04",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "7b94f012 (VU part)",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+      ]
+    },
+    "title": "VU0 macro VRSQRT uses fs numerator",
+    "category": "A",
+    "subsystem": "recompiler/vu_translation_helpers",
+    "problem": "VRSQRT computed 1/sqrt(ft)",
+    "approach": "Q = fs/sqrt(ft) if ft>0, else 0. Returning 0 is not hardware: PCSX2 uses |ft| and sets flags.",
+    "scope": "general",
+    "scope_evidence": "General (numerator); the 0-on-nonpositive choice is a fork choice",
+    "reference": "PCSX2 FPU/VU RSQRT semantics fs/sqrt(|ft|) (FPU.cpp RSQRT_S checked)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#198, #317 (open; more faithful zero/negative handling)",
+    "risk": "low",
+    "priority": 2,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-04",
+      "commits": [
+        "7b94f012 (VU part)"
+      ],
+      "title": "VU0 macro VRSQRT uses fs numerator",
+      "category": "A",
+      "subsystem": "recompiler/vu_translation_helpers",
+      "problem": "VRSQRT computed 1/sqrt(ft)",
+      "approach": "Q = fs/sqrt(ft) if ft>0, else 0. Returning 0 is not hardware: PCSX2 uses |ft| and sets flags.",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+      ],
+      "general_or_specific": "General (numerator); the 0-on-nonpositive choice is a fork choice",
+      "reference": "PCSX2 FPU/VU RSQRT semantics fs/sqrt(|ft|) (FPU.cpp RSQRT_S checked)",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt vu_translation_helpers.cpp:92 1/sqrtf(ft)"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "same file as our PR#310/VCALLMSR edits, textual only",
+      "upstream_pr_equivalent": "#198, #317 (open; more faithful zero/negative handling)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Integrated via sotc-05 (252de7c); the fork's 0-on-nonpositive choice was not taken."
+  },
+  {
+    "id": "dq8-05",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "becb2be5",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_analyzer.cpp"
+      ]
+    },
+    "title": "Resume entry at syscall+4",
+    "category": "B",
+    "subsystem": "control_flow_analyzer",
+    "problem": "Thread resumed after a guest syscall override had no entry point",
+    "approach": "queueResumeEntryTarget(addr+4)",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#210",
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-05",
+      "commits": [
+        "becb2be5"
+      ],
+      "title": "Resume entry at syscall+4",
+      "category": "B",
+      "subsystem": "control_flow_analyzer",
+      "problem": "Thread resumed after a guest syscall override had no entry point",
+      "approach": "queueResumeEntryTarget(addr+4)",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_analyzer.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": true,
+        "where": "#210 merged; wt control_flow_analyzer.cpp:141"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#210",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "dq8-06",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "2ac2ce63",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "Main thread COP0 Status = EIE|IE; no memset of ctx",
+    "category": "A",
+    "subsystem": "runtime/R5900Context",
+    "problem": "StartThread guard failed because Status.IE=0",
+    "approach": "cop0_status=0x00010001; m_cpuContext=R5900Context{}",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#214",
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-06",
+      "commits": [
+        "2ac2ce63"
+      ],
+      "title": "Main thread COP0 Status = EIE|IE; no memset of ctx",
+      "category": "A",
+      "subsystem": "runtime/R5900Context",
+      "problem": "StartThread guard failed because Status.IE=0",
+      "approach": "cop0_status=0x00010001; m_cpuContext=R5900Context{}",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": true,
+        "where": "#214 merged; wt ps2_runtime.h:159, ps2_runtime.cpp:492"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#214",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "dq8-07",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "75d5085a",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_analyzer.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ]
+    },
+    "title": "Unresolved JALR does not force indirect-fallback entries for the whole function",
+    "category": "B",
+    "subsystem": "control_flow_analyzer",
+    "problem": "Any unresolved JALR (a call) turned every instruction of the function into an entry point",
+    "approach": "Only JR sets needsIndirectFallback; JALR already queues +8 resume",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#286 (open; also treats JALR rd=0 as a jump, which is better)",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-07",
+      "commits": [
+        "75d5085a"
+      ],
+      "title": "Unresolved JALR does not force indirect-fallback entries for the whole function",
+      "category": "B",
+      "subsystem": "control_flow_analyzer",
+      "problem": "Any unresolved JALR (a call) turned every instruction of the function into an entry point",
+      "approach": "Only JR sets needsIndirectFallback; JALR already queues +8 resume",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_analyzer.cpp",
+        "ps2xTest/src/code_generator_tests.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt control_flow_analyzer.cpp:396-398"
+      },
+      "has_tests": true,
+      "risk": "low-medium (misses jalr rd=$zero, which is really a jump)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#286 (open; also treats JALR rd=0 as a jump, which is better)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-08",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "21671a28",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ]
+    },
+    "title": "Decode trailing branch delay slot past mapped end",
+    "category": "B",
+    "subsystem": "ps2_recompiler",
+    "problem": "Delay slot at function end replaced by NOP",
+    "approach": "extend end by 4 once",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#304",
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-08",
+      "commits": [
+        "21671a28"
+      ],
+      "title": "Decode trailing branch delay slot past mapped end",
+      "category": "B",
+      "subsystem": "ps2_recompiler",
+      "problem": "Delay slot at function end replaced by NOP",
+      "approach": "extend end by 4 once",
+      "files": [
+        "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "our branch e88054b/f8292ed (PR #304 + slices)"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "duplicate of ours",
+      "upstream_pr_equivalent": "#304",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    },
+    "limitations": "Integrated via upstream-01 (PR #304 + slices)."
+  },
+  {
+    "id": "dq8-09",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "6bf1feff, 2648de05",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ]
+    },
+    "title": "return true after queueing syscall override (reverted)",
+    "category": "C",
+    "subsystem": "Syscalls/System.cpp",
+    "problem": "Claimed UB from falling off a bool function",
+    "approach": "Added then removed: invokeCurrent is [[noreturn]] (wt ee_scheduler.h:319), so no bug; net diff is zero",
+    "scope": "unknown",
+    "scope_evidence": "n/a",
+    "reference": "wt ps2xRuntime/include/runtime/ee_scheduler.h:319",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#211 closed",
+    "risk": "unknown",
+    "priority": 5,
+    "status": "REJECTED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-09",
+      "commits": [
+        "6bf1feff",
+        "2648de05"
+      ],
+      "title": "return true after queueing syscall override (reverted)",
+      "category": "C",
+      "subsystem": "Syscalls/System.cpp",
+      "problem": "Claimed UB from falling off a bool function",
+      "approach": "Added then removed: invokeCurrent is [[noreturn]] (wt ee_scheduler.h:319), so no bug; net diff is zero",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ],
+      "general_or_specific": "n/a",
+      "reference": "wt ps2xRuntime/include/runtime/ee_scheduler.h:319",
+      "upstream_already_has": {
+        "value": true,
+        "where": "not a bug"
+      },
+      "has_tests": false,
+      "risk": "none",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#211 closed",
+      "priority": 5,
+      "recommended_status": "REJECTED"
+    }
+  },
+  {
+    "id": "dq8-10",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "8baabbaf",
+      "files": [
+        "ps2xRecomp/src/lib/elf_parser.cpp"
+      ]
+    },
+    "title": "Explicit function map overrides JAL-target carvings",
+    "category": "B",
+    "subsystem": "elf_parser (Ghidra map load)",
+    "problem": "A sub_ carving with the same start as a FUN_ map row survives the purge and wins the larger-end tie-break, giving runaway bounds",
+    "approach": "Collect map rows separately, drop all auto-named carvings, append the map rows",
+    "scope": "general",
+    "scope_evidence": "General (single-PROGBITS ELFs)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-10",
+      "commits": [
+        "8baabbaf"
+      ],
+      "title": "Explicit function map overrides JAL-target carvings",
+      "category": "B",
+      "subsystem": "elf_parser (Ghidra map load)",
+      "problem": "A sub_ carving with the same start as a FUN_ map row survives the purge and wins the larger-end tie-break, giving runaway bounds",
+      "approach": "Collect map rows separately, drop all auto-named carvings, append the map rows",
+      "files": [
+        "ps2xRecomp/src/lib/elf_parser.cpp"
+      ],
+      "general_or_specific": "General (single-PROGBITS ELFs)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt elf_parser.cpp:2225 still keeps carvings whose start is in mapStarts"
+      },
+      "has_tests": false,
+      "risk": "medium: drops every auto carving, so an incomplete map loses functions",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-11",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "5c906ddf",
+      "files": [
+        "ps2xRecomp/src/lib/function_table_emitter.cpp"
+      ]
+    },
+    "title": "Warn instead of throwing when no function covers e_entry",
+    "category": "E",
+    "subsystem": "function_table_emitter",
+    "problem": "CodeWarrior crt0 puts a data table at e_entry; the recompiler aborts after writing sources",
+    "approach": "reporter warning and skip registration",
+    "scope": "general",
+    "scope_evidence": "General (Metrowerks toolchain)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-11",
+      "commits": [
+        "5c906ddf"
+      ],
+      "title": "Warn instead of throwing when no function covers e_entry",
+      "category": "E",
+      "subsystem": "function_table_emitter",
+      "problem": "CodeWarrior crt0 puts a data table at e_entry; the recompiler aborts after writing sources",
+      "approach": "reporter warning and skip registration",
+      "files": [
+        "ps2xRecomp/src/lib/function_table_emitter.cpp"
+      ],
+      "general_or_specific": "General (Metrowerks toolchain)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt function_table_emitter.cpp:98 throws"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-12",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "0627c0d7",
+      "files": [
+        "ps2xRecomp/CMakeLists.txt",
+        "ps2xAnalyzer/CMakeLists.txt"
+      ]
+    },
+    "title": "CMAKE_CURRENT_SOURCE_DIR paths for ReleaseMode.cmake",
+    "category": "E",
+    "subsystem": "build",
+    "problem": "add_subdirectory consumers fail at configure",
+    "approach": "${CMAKE_CURRENT_SOURCE_DIR}/../ps2xRuntime/...",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-12",
+      "commits": [
+        "0627c0d7"
+      ],
+      "title": "CMAKE_CURRENT_SOURCE_DIR paths for ReleaseMode.cmake",
+      "category": "E",
+      "subsystem": "build",
+      "problem": "add_subdirectory consumers fail at configure",
+      "approach": "${CMAKE_CURRENT_SOURCE_DIR}/../ps2xRuntime/...",
+      "files": [
+        "ps2xRecomp/CMakeLists.txt",
+        "ps2xAnalyzer/CMakeLists.txt"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2xRecomp/CMakeLists.txt:133, ps2xAnalyzer/CMakeLists.txt:53"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-13",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "226bae25, 9a89c896, 89e7569f",
+      "files": [
+        "ps2xRuntime/cmake/ReleaseMode.cmake",
+        "ps2xRuntime/CMakeLists.txt"
+      ]
+    },
+    "title": "-msse4.1 baseline for GCC/Clang x86; MSVC /arch:AVX2 opt-in (PS2X_ENABLE_AVX2)",
+    "category": "E",
+    "subsystem": "build",
+    "problem": "SSE4.1 intrinsics not enabled on GCC/Clang; unconditional AVX2 Release builds crash on pre-Haswell CPUs",
+    "approach": "EnableX86SimdBaseline PUBLIC -msse4.1; option() gate for /arch:AVX2",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-13",
+      "commits": [
+        "226bae25",
+        "9a89c896",
+        "89e7569f"
+      ],
+      "title": "-msse4.1 baseline for GCC/Clang x86; MSVC /arch:AVX2 opt-in (PS2X_ENABLE_AVX2)",
+      "category": "E",
+      "subsystem": "build",
+      "problem": "SSE4.1 intrinsics not enabled on GCC/Clang; unconditional AVX2 Release builds crash on pre-Haswell CPUs",
+      "approach": "EnableX86SimdBaseline PUBLIC -msse4.1; option() gate for /arch:AVX2",
+      "files": [
+        "ps2xRuntime/cmake/ReleaseMode.cmake",
+        "ps2xRuntime/CMakeLists.txt"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ReleaseMode.cmake:20 unconditional /arch:AVX2; no msse4.1 anywhere"
+      },
+      "has_tests": false,
+      "risk": "low (AVX2 off by default may cost speed)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-14",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "50dc8681",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Deci2.cpp"
+      ]
+    },
+    "title": "PS2X_DECI2_LOG_LIMIT env (0 = unlimited)",
+    "category": "E",
+    "subsystem": "Syscalls/Deci2",
+    "problem": "Fixed 256-line cap truncates boot traces silently",
+    "approach": "env-parsed limit",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-14",
+      "commits": [
+        "50dc8681"
+      ],
+      "title": "PS2X_DECI2_LOG_LIMIT env (0 = unlimited)",
+      "category": "E",
+      "subsystem": "Syscalls/Deci2",
+      "problem": "Fixed 256-line cap truncates boot traces silently",
+      "approach": "env-parsed limit",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/Deci2.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt Deci2.cpp:67"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 5,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-15",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "91ac6594",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ]
+    },
+    "title": "IRQ/alarm/GS VSync callbacks get sp=0 (invocation stack); pool kept below guest stacks",
+    "category": "C",
+    "subsystem": "EeScheduler",
+    "problem": "Handlers ran on a stale recorded $sp and corrupted live stacks",
+    "approach": "sp=0 in dispatchIrq, alarm and GS VSync callback; reserveGuestStackFromAsyncPool lowers the pool top",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#298 (stacks), our #258",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-15",
+      "commits": [
+        "91ac6594"
+      ],
+      "title": "IRQ/alarm/GS VSync callbacks get sp=0 (invocation stack); pool kept below guest stacks",
+      "category": "C",
+      "subsystem": "EeScheduler",
+      "problem": "Handlers ran on a stale recorded $sp and corrupted live stacks",
+      "approach": "sp=0 in dispatchIrq, alarm and GS VSync callback; reserveGuestStackFromAsyncPool lowers the pool top",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": true,
+        "where": "dispatchIrq (wt EeScheduler.cpp:1314) and alarm (:1960) already use 0; the GS VSync callback still passes m_gsVSyncCallbackSp (:1930)"
+      },
+      "has_tests": false,
+      "risk": "low for the VSync line",
+      "conflicts_with_our_branch": "Pool-reservation part superseded by our #258 low-region pool (0x90000-0xF0000). Only the one-line VSync-callback sp=0 is still useful.",
+      "upstream_pr_equivalent": "#298 (stacks), our #258",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-16",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "910a1182",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ]
+    },
+    "title": "Recycle invocation stacks when a thread record goes away",
+    "category": "C",
+    "subsystem": "EeScheduler",
+    "problem": "Per-(thread,depth) stacks never freed",
+    "approach": "free list + releaseInvocationStacks",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-16",
+      "commits": [
+        "910a1182"
+      ],
+      "title": "Recycle invocation stacks when a thread record goes away",
+      "category": "C",
+      "subsystem": "EeScheduler",
+      "problem": "Per-(thread,depth) stacks never freed",
+      "approach": "free list + releaseInvocationStacks",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "our branch has releaseInvocationStacks + m_freeInvocationStackTops called from makeDormant (wt EeScheduler.cpp:1195,1681)"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "duplicate of #258 work",
+      "upstream_pr_equivalent": null,
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    },
+    "limitations": "Integrated via upstream-04 (#258)."
+  },
+  {
+    "id": "dq8-17",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "de62c4c6",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ]
+    },
+    "title": "Cap invocation nesting at 4",
+    "category": "C",
+    "subsystem": "EeScheduler::run",
+    "problem": "RPC callback storm nested 13 deep and exhausted the stack pool",
+    "approach": "Leave pending invocations queued while running->invocations.size()>=4",
+    "scope": "general",
+    "scope_evidence": "General mechanism, constant tuned on DQ8",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-17",
+      "commits": [
+        "de62c4c6"
+      ],
+      "title": "Cap invocation nesting at 4",
+      "category": "C",
+      "subsystem": "EeScheduler::run",
+      "problem": "RPC callback storm nested 13 deep and exhausted the stack pool",
+      "approach": "Leave pending invocations queued while running->invocations.size()>=4",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ],
+      "general_or_specific": "General mechanism, constant tuned on DQ8",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "medium (can delay interrupts behind callbacks)",
+      "conflicts_with_our_branch": "complements #258 (low region holds about 24 x16KiB)",
+      "upstream_pr_equivalent": null,
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-18",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "73ae4ba6, 1b29ba68",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "SetupThread automatic stack starts at top of area",
+    "category": "C",
+    "subsystem": "Syscalls/System.cpp SetupThread",
+    "problem": "Main thread frames overran invocation stacks",
+    "approach": "initialStack=base, sp=RAM top when pool is below",
+    "scope": "general",
+    "scope_evidence": "General, tied to the fork's high-RAM pool",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-18",
+      "commits": [
+        "73ae4ba6",
+        "1b29ba68"
+      ],
+      "title": "SetupThread automatic stack starts at top of area",
+      "category": "C",
+      "subsystem": "Syscalls/System.cpp SetupThread",
+      "problem": "Main thread frames overran invocation stacks",
+      "approach": "initialStack=base, sp=RAM top when pool is below",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "general_or_specific": "General, tied to the fork's high-RAM pool",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "our branch records the base (#259) and moved the pool low"
+      },
+      "has_tests": true,
+      "risk": "medium",
+      "conflicts_with_our_branch": "YES: same lines as our #258/#259 SetupThread change",
+      "upstream_pr_equivalent": null,
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    },
+    "limitations": "Covered by upstream-04/upstream-05 (#258/#259)."
+  },
+  {
+    "id": "dq8-19",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "76af5aa9, 20973e8e (fast path)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/include/runtime/ps2_memory.h",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ]
+    },
+    "title": "VIFcode i-bit raises INTC VIF0(4)/VIF1(5)",
+    "category": "A",
+    "subsystem": "VIF interpreter / EeScheduler",
+    "problem": "STAT.INT set but no interrupt; games waiting on the VIF1 handler hang",
+    "approach": "atomic pending mask in PS2Memory, drained in processPendingEvents -> dispatchIrq. No VIF stall.",
+    "scope": "general",
+    "scope_evidence": "General hardware",
+    "reference": "PCSX2 pcsx2/Vif1_Dma.cpp: stat.INT=true; hwIntcIrq(VIF1intc) (and VIF_IRQ_STALL in Vif_Transfer.cpp)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#367, #295 (open; #295 also stalls VIF1)",
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-19",
+      "commits": [
+        "76af5aa9",
+        "20973e8e (fast path)"
+      ],
+      "title": "VIFcode i-bit raises INTC VIF0(4)/VIF1(5)",
+      "category": "A",
+      "subsystem": "VIF interpreter / EeScheduler",
+      "problem": "STAT.INT set but no interrupt; games waiting on the VIF1 handler hang",
+      "approach": "atomic pending mask in PS2Memory, drained in processPendingEvents -> dispatchIrq. No VIF stall.",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp",
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/include/runtime/ps2_memory.h",
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ],
+      "general_or_specific": "General hardware",
+      "reference": "PCSX2 pcsx2/Vif1_Dma.cpp: stat.INT=true; hwIntcIrq(VIF1intc) (and VIF_IRQ_STALL in Vif_Transfer.cpp)",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_vif1_interpreter.cpp:116,347 only set STAT"
+      },
+      "has_tests": false,
+      "risk": "low-medium (no stall, unlike hardware)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#367, #295 (open; #295 also stalls VIF1)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-20",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "75da1599 (scheduler part)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ]
+    },
+    "title": "Latch INTC/DMAC causes while masked or without a handler",
+    "category": "A",
+    "subsystem": "EeScheduler IRQ",
+    "problem": "Interrupts raised while disabled were lost",
+    "approach": "m_pendingIntcMask/DmacMask; replay on AddHandler/EnableHandler/EnableCause",
+    "scope": "general",
+    "scope_evidence": "General (INTC_STAT latches)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#296, #151 (open)",
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-20",
+      "commits": [
+        "75da1599 (scheduler part)"
+      ],
+      "title": "Latch INTC/DMAC causes while masked or without a handler",
+      "category": "A",
+      "subsystem": "EeScheduler IRQ",
+      "problem": "Interrupts raised while disabled were lost",
+      "approach": "m_pendingIntcMask/DmacMask; replay on AddHandler/EnableHandler/EnableCause",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+        "ps2xRuntime/include/runtime/ee_scheduler.h"
+      ],
+      "general_or_specific": "General (INTC_STAT latches)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "medium (spurious replays if a game expects drops)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#296, #151 (open)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-21",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "75da1599 (DMA part)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ]
+    },
+    "title": "Source-chain DMA: Brent cycle detection instead of a 4096-tag cap",
+    "category": "C",
+    "subsystem": "ps2_memory DMA chain",
+    "problem": "Long finite chains cut at 4096 tags",
+    "approach": "cycle check over (tadr,asr0,asr1,asp)",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#297, #313 (open)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-21",
+      "commits": [
+        "75da1599 (DMA part)"
+      ],
+      "title": "Source-chain DMA: Brent cycle detection instead of a 4096-tag cap",
+      "category": "C",
+      "subsystem": "ps2_memory DMA chain",
+      "problem": "Long finite chains cut at 4096 tags",
+      "approach": "cycle check over (tadr,asr0,asr1,asp)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_memory.cpp:1347 kMaxChainTags=4096"
+      },
+      "has_tests": true,
+      "risk": "low-medium",
+      "conflicts_with_our_branch": "our ps2_memory.cpp edits (VU0 mem) are elsewhere",
+      "upstream_pr_equivalent": "#297, #313 (open)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-22",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "75da1599 (VIF1 part)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "GIF IMAGE continuation consumes only DIRECT payload, not VIFcodes",
+    "category": "D",
+    "subsystem": "VIF1 interpreter PATH2",
+    "problem": "The pending image was fed raw VIF stream words",
+    "approach": "Handle the pending image QWC inside DIRECT/DIRECTHL",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#269, #373 (open)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-22",
+      "commits": [
+        "75da1599 (VIF1 part)"
+      ],
+      "title": "GIF IMAGE continuation consumes only DIRECT payload, not VIFcodes",
+      "category": "D",
+      "subsystem": "VIF1 interpreter PATH2",
+      "problem": "The pending image was fed raw VIF stream words",
+      "approach": "Handle the pending image QWC inside DIRECT/DIRECTHL",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_vif1_interpreter.cpp:307"
+      },
+      "has_tests": true,
+      "risk": "low-medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#269, #373 (open)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-23",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "75da1599 (TTE/CHCR part)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h"
+      ]
+    },
+    "title": "TTE-gated VIF tag data; SDK DMA kick preserves CHCR TIE/TTE",
+    "category": "D",
+    "subsystem": "DMA",
+    "problem": "Tag data was sent by tag id",
+    "approach": "CHCR bit 6; chcr=(old&~0xC)|0x101",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-23",
+      "commits": [
+        "75da1599 (TTE/CHCR part)"
+      ],
+      "title": "TTE-gated VIF tag data; SDK DMA kick preserves CHCR TIE/TTE",
+      "category": "D",
+      "subsystem": "DMA",
+      "problem": "Tag data was sent by tag id",
+      "approach": "CHCR bit 6; chcr=(old&~0xC)|0x101",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/Helpers/Support.h"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": true,
+        "where": "wt ps2_memory.cpp appendVifTagData (TTE) and Support.h:1361 (TTE only, TIE forced)"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "dq8-24",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "7bb6dbde",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp",
+        "ps2xTest/src/ps2_vu1_tests.cpp"
+      ]
+    },
+    "title": "VU JR/JALR read current VI, not the branch-delayed VI",
+    "category": "D",
+    "subsystem": "VU1 interpreter lower",
+    "problem": "Register jumps used readBranchVi, the conditional-branch VI-delay rule",
+    "approach": "m_state.vi[is]",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": "PCSX2 pcsx2/x86/microVU_Analyze.inl: mVUanalyzeJump does not call analyzeBranchVI; only conditional branches do",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-24",
+      "commits": [
+        "7bb6dbde"
+      ],
+      "title": "VU JR/JALR read current VI, not the branch-delayed VI",
+      "category": "D",
+      "subsystem": "VU1 interpreter lower",
+      "problem": "Register jumps used readBranchVi, the conditional-branch VI-delay rule",
+      "approach": "m_state.vi[is]",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp",
+        "ps2xTest/src/ps2_vu1_tests.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": "PCSX2 pcsx2/x86/microVU_Analyze.inl: mVUanalyzeJump does not call analyzeBranchVI; only conditional branches do",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_vu1_lower.cpp:287"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-25",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "0adeffb5",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_lower.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_exec.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_program.h",
+        "tools/compile_vu_programs.py"
+      ]
+    },
+    "title": "EFU sub-opcodes: ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D, EEXP 0x7E; 0x77/0x7F reserved",
+    "category": "D",
+    "subsystem": "VU1 interpreter lower + latency table",
+    "problem": "ERSQRT ran ESIN, ESIN ran EATAN, and so on; EEXP was treated as reserved",
+    "approach": "Renumber cases and latencies",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": "PCSX2 pcsx2/x86/microVU_Tables.inl mVULowerOP_T3_00..11 (row 0x1E: ESQRT/ERSQRT/ERCPR/WAITP; row 0x1F: ESIN/EATAN/EEXP/unknown)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#312 (open)",
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-25",
+      "commits": [
+        "0adeffb5"
+      ],
+      "title": "EFU sub-opcodes: ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D, EEXP 0x7E; 0x77/0x7F reserved",
+      "category": "D",
+      "subsystem": "VU1 interpreter lower + latency table",
+      "problem": "ERSQRT ran ESIN, ESIN ran EATAN, and so on; EEXP was treated as reserved",
+      "approach": "Renumber cases and latencies",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_lower.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_exec.inl",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_program.h",
+        "tools/compile_vu_programs.py"
+      ],
+      "general_or_specific": "General",
+      "reference": "PCSX2 pcsx2/x86/microVU_Tables.inl mVULowerOP_T3_00..11 (row 0x1E: ESQRT/ERSQRT/ERCPR/WAITP; row 0x1F: ESIN/EATAN/EEXP/unknown)",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_vu1_lower.cpp:726-769 (0x77 ERSQRT, 0x79 ESIN, 0x7C EATAN, 0x7D EEXP)"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none (must port into upstream's un-split ps2_vu1_lower.cpp/core.cpp)",
+      "upstream_pr_equivalent": "#312 (open)",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-26",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "85e80c19",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ]
+    },
+    "title": "Don't memset the 64 KiB XGKICK buffer on every VU1 start",
+    "category": "D",
+    "subsystem": "VU1 core perf",
+    "problem": "m_xgkick={} zeroes 64 KiB per MSCAL",
+    "approach": "Reset only the transfer-state fields",
+    "scope": "general",
+    "scope_evidence": "General perf",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-26",
+      "commits": [
+        "85e80c19"
+      ],
+      "title": "Don't memset the 64 KiB XGKICK buffer on every VU1 start",
+      "category": "D",
+      "subsystem": "VU1 core perf",
+      "problem": "m_xgkick={} zeroes 64 KiB per MSCAL",
+      "approach": "Reset only the transfer-state fields",
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+      ],
+      "general_or_specific": "General perf",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt ps2_vu1_core.cpp:76,935; XgkickPipeline fields match (ps2_vu1.h:180)"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-27",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "221b064f",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ]
+    },
+    "title": "currentVSyncTick reads the published atomic",
+    "category": "C",
+    "subsystem": "EeScheduler",
+    "problem": "Data race with the host presenter",
+    "approach": "gs().vsyncTick.load(acquire)",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-27",
+      "commits": [
+        "221b064f"
+      ],
+      "title": "currentVSyncTick reads the published atomic",
+      "category": "C",
+      "subsystem": "EeScheduler",
+      "problem": "Data race with the host presenter",
+      "approach": "gs().vsyncTick.load(acquire)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt EeScheduler.cpp:1337; upstream gs_types.h:286 vsyncTick is a plain uint64_t, so this does not port as-is"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-28",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "67647a89, b8daf5ae, 7c88922d, 869da91a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/VU.cpp",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ]
+    },
+    "title": "libvu0 HLE stubs match SDK code (MulMatrix order, Normalize/InnerProduct xyz-only, RotTransPers flag, ScaleVector f12, ClipScreen sticky Z/S)",
+    "category": "D",
+    "subsystem": "Kernel/Stubs/VU.cpp",
+    "problem": "Stubs disagreed with SCE libvu0 (worked out from disassembly of DQ8's copy)",
+    "approach": "Per-routine fixes plus tests",
+    "scope": "general",
+    "scope_evidence": "General SDK library, but evidence comes from one title's copy. #363 independently reached the same MulMatrix order.",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#363 (MulMatrix only)",
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-28",
+      "commits": [
+        "67647a89",
+        "b8daf5ae",
+        "7c88922d",
+        "869da91a"
+      ],
+      "title": "libvu0 HLE stubs match SDK code (MulMatrix order, Normalize/InnerProduct xyz-only, RotTransPers flag, ScaleVector f12, ClipScreen sticky Z/S)",
+      "category": "D",
+      "subsystem": "Kernel/Stubs/VU.cpp",
+      "problem": "Stubs disagreed with SCE libvu0 (worked out from disassembly of DQ8's copy)",
+      "approach": "Per-routine fixes plus tests",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/VU.cpp",
+        "ps2xTest/src/ps2_vu_tests.cpp"
+      ],
+      "general_or_specific": "General SDK library, but evidence comes from one title's copy. #363 independently reached the same MulMatrix order.",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt VU.cpp:173 kScreenClipGuard, :705 mulVuMatrix(m0,m1), :891/:908 fullFtoi4 != 0, :940 a2 fallback"
+      },
+      "has_tests": true,
+      "risk": "medium (changes results for every title using these stubs)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#363 (MulMatrix only)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-29",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "dfeefc92, 869da91a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/LibC.cpp",
+        "ps2xTest/src/ps2_runtime_kernel_tests.cpp"
+      ]
+    },
+    "title": "libm sin/cos/tan/atan/floor/fabs use the soft-float double ABI ($a0 in, $v0 out)",
+    "category": "C",
+    "subsystem": "Kernel/Stubs/LibC.cpp",
+    "problem": "Stubs read f12 and wrote f0; EE GCC/newlib doubles travel in 64-bit GPRs",
+    "approach": "memcpy GPR_U64(a0) <-> double; setReturnU64",
+    "scope": "general",
+    "scope_evidence": "General for EE GCC -msingle-float/newlib (fork's disassembly evidence); not checked against SN/CodeWarrior libm",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-29",
+      "commits": [
+        "dfeefc92",
+        "869da91a"
+      ],
+      "title": "libm sin/cos/tan/atan/floor/fabs use the soft-float double ABI ($a0 in, $v0 out)",
+      "category": "C",
+      "subsystem": "Kernel/Stubs/LibC.cpp",
+      "problem": "Stubs read f12 and wrote f0; EE GCC/newlib doubles travel in 64-bit GPRs",
+      "approach": "memcpy GPR_U64(a0) <-> double; setReturnU64",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/LibC.cpp",
+        "ps2xTest/src/ps2_runtime_kernel_tests.cpp"
+      ],
+      "general_or_specific": "General for EE GCC -msingle-float/newlib (fork's disassembly evidence); not checked against SN/CodeWarrior libm",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt LibC.cpp:925-1044 use f12"
+      },
+      "has_tests": true,
+      "risk": "medium (stubs bind by name; a title whose 'sin' is really float would break)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-30",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "2e538a7f (MC part)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp"
+      ]
+    },
+    "title": "isValidMcPortSlot accepts slot>=0",
+    "category": "C",
+    "subsystem": "MemoryCard stubs",
+    "problem": "Only slot 0 accepted; DQ8 passes slot=1",
+    "approach": "slot>=0 (no multitap modelled)",
+    "scope": "general",
+    "scope_evidence": "General-ish",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#174 (open)",
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-30",
+      "commits": [
+        "2e538a7f (MC part)"
+      ],
+      "title": "isValidMcPortSlot accepts slot>=0",
+      "category": "C",
+      "subsystem": "MemoryCard stubs",
+      "problem": "Only slot 0 accepted; DQ8 passes slot=1",
+      "approach": "slot>=0 (no multitap modelled)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp"
+      ],
+      "general_or_specific": "General-ish",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt MemoryCard.cpp:112"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#174 (open)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-31",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "85464987",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp",
+        "ps2xTest/src/ps2_runtime_io_tests.cpp"
+      ]
+    },
+    "title": "MCMAN wildcard semantics and basename rename",
+    "category": "C",
+    "subsystem": "MemoryCard stubs",
+    "problem": "'*?' runs and a trailing '?' on a shorter name mismatched; rename resolved newPath as a full path",
+    "approach": "Skip */? runs, accept a trailing '?'; rename inside the parent dir; reject separators and existing targets",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": "PS2SDK iop/memorycard/mcman/src/main.c mcman_checkdirpath",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-31",
+      "commits": [
+        "85464987"
+      ],
+      "title": "MCMAN wildcard semantics and basename rename",
+      "category": "C",
+      "subsystem": "MemoryCard stubs",
+      "problem": "'*?' runs and a trailing '?' on a shorter name mismatched; rename resolved newPath as a full path",
+      "approach": "Skip */? runs, accept a trailing '?'; rename inside the parent dir; reject separators and existing targets",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp",
+        "ps2xTest/src/ps2_runtime_io_tests.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": "PS2SDK iop/memorycard/mcman/src/main.c mcman_checkdirpath",
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt MemoryCard.cpp:341 starPos = patternPos++"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-32",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "85464987 (RPC part)",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/RPC.cpp"
+      ]
+    },
+    "title": "SifInitRpc no longer resets the IOP transport",
+    "category": "C",
+    "subsystem": "RPC",
+    "problem": "EE RPC init rebooted IOP services",
+    "approach": "remove reset",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-32",
+      "commits": [
+        "85464987 (RPC part)"
+      ],
+      "title": "SifInitRpc no longer resets the IOP transport",
+      "category": "C",
+      "subsystem": "RPC",
+      "problem": "EE RPC init rebooted IOP services",
+      "approach": "remove reset",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Syscalls/RPC.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": true,
+        "where": "wt RPC.cpp:228 has no reset"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "dq8-33",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "2e538a7f, 85464987, 8b83b2bc (env parts)",
+      "files": [
+        "MemoryCard.cpp",
+        "ps2_pad.cpp",
+        "gs_frontend.cpp",
+        "ps2_runtime.cpp"
+      ]
+    },
+    "title": "DQ8_MC_TRACE, DQ8_PAD_SCRIPT, DQ8_SKIP_MOVIES, DQ8_GFX_SCREENSHOT_DIR, PS2X_KERNEL_TRACE_MS debug hooks",
+    "category": "E",
+    "subsystem": "diagnostics",
+    "problem": "Debug tooling",
+    "approach": "Env-gated logging and replay",
+    "scope": "game-specific",
+    "scope_evidence": "Title-named env vars (DQ8_*); PS2X_KERNEL_TRACE_MS is generic",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#157 (observability layer)",
+    "risk": "low",
+    "priority": 5,
+    "status": "GAME_SPECIFIC",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-33",
+      "commits": [
+        "2e538a7f",
+        "85464987",
+        "8b83b2bc (env parts)"
+      ],
+      "title": "DQ8_MC_TRACE, DQ8_PAD_SCRIPT, DQ8_SKIP_MOVIES, DQ8_GFX_SCREENSHOT_DIR, PS2X_KERNEL_TRACE_MS debug hooks",
+      "category": "E",
+      "subsystem": "diagnostics",
+      "problem": "Debug tooling",
+      "approach": "Env-gated logging and replay",
+      "files": [
+        "MemoryCard.cpp",
+        "ps2_pad.cpp",
+        "gs_frontend.cpp",
+        "ps2_runtime.cpp"
+      ],
+      "general_or_specific": "Title-named env vars (DQ8_*); PS2X_KERNEL_TRACE_MS is generic",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#157 (observability layer)",
+      "priority": 5,
+      "recommended_status": "GAME_SPECIFIC"
+    }
+  },
+  {
+    "id": "dq8-34",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "dc4bbd8a",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp",
+        "ps2xTest/src/ps2_runtime_expansion_tests.cpp"
+      ]
+    },
+    "title": "sceMpegCreate ends with sceMpegReset",
+    "category": "C",
+    "subsystem": "MPEG stubs",
+    "problem": "A stale end flag in reused memory ends the movie before its first picture",
+    "approach": "call sceMpegReset",
+    "scope": "general",
+    "scope_evidence": "General (libmpeg behavior; source not public)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#376 (open)",
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-34",
+      "commits": [
+        "dc4bbd8a"
+      ],
+      "title": "sceMpegCreate ends with sceMpegReset",
+      "category": "C",
+      "subsystem": "MPEG stubs",
+      "problem": "A stale end flag in reused memory ends the movie before its first picture",
+      "approach": "call sceMpegReset",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp",
+        "ps2xTest/src/ps2_runtime_expansion_tests.cpp"
+      ],
+      "general_or_specific": "General (libmpeg behavior; source not public)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent in wt MPEG.cpp"
+      },
+      "has_tests": true,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#376 (open)",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-35",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "96c2ecf9, 3ae58059, e3f7eb29, 052915df (MPEG part), f6903fb7, 54164502",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ]
+    },
+    "title": "PSS movie pipeline: no-FFmpeg failure flag, sequence-end as EOS, upload gate, demux yield, lazy decode, in-order audio callbacks, 150 ms audio lead",
+    "category": "C",
+    "subsystem": "MPEG stubs",
+    "problem": "Movies hang or spin; decoderFailed never set (dead path); audio shuffled",
+    "approach": "Several changes; mpeg[0x08] and inner[0x00] layout taken from DQ8's code",
+    "scope": "unknown",
+    "scope_evidence": "Mixed: decoderFailed/kAvailable and sequence-end EOS are general; struct offsets and audio lead are DQ8-derived",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#178, #175 (related)",
+    "risk": "high",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-35",
+      "commits": [
+        "96c2ecf9",
+        "3ae58059",
+        "e3f7eb29",
+        "052915df (MPEG part)",
+        "f6903fb7",
+        "54164502"
+      ],
+      "title": "PSS movie pipeline: no-FFmpeg failure flag, sequence-end as EOS, upload gate, demux yield, lazy decode, in-order audio callbacks, 150 ms audio lead",
+      "category": "C",
+      "subsystem": "MPEG stubs",
+      "problem": "Movies hang or spin; decoderFailed never set (dead path); audio shuffled",
+      "approach": "Several changes; mpeg[0x08] and inner[0x00] layout taken from DQ8's code",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ],
+      "general_or_specific": "Mixed: decoderFailed/kAvailable and sequence-end EOS are general; struct offsets and audio lead are DQ8-derived",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt MPEG.cpp has no 'decoderFailed = true'; sawSequenceEnd only logged (:2480)"
+      },
+      "has_tests": false,
+      "risk": "high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#178, #175 (related)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-36",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "7ab0b7c7, d3666775",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xTest/src/ps2_gs_tests.cpp"
+      ]
+    },
+    "title": "Interlaced presentation: weave FFMD=0, line-double FFMD=1; snap 1-row flicker-filter circuits",
+    "category": "D",
+    "subsystem": "gs_cpu_backend presentation",
+    "problem": "FFMD=0 frames were line-doubled from one field (half the vertical detail)",
+    "approach": "doubleSourceRows for FRAME mode; remove applyFieldPresentation; PCSX2-style snap of circuits 1 row apart",
+    "scope": "general",
+    "scope_evidence": "General, plus one deliberate non-hardware hack (the snap)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#375, #344 (open, competing)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-36",
+      "commits": [
+        "7ab0b7c7",
+        "d3666775"
+      ],
+      "title": "Interlaced presentation: weave FFMD=0, line-double FFMD=1; snap 1-row flicker-filter circuits",
+      "category": "D",
+      "subsystem": "gs_cpu_backend presentation",
+      "problem": "FFMD=0 frames were line-doubled from one field (half the vertical detail)",
+      "approach": "doubleSourceRows for FRAME mode; remove applyFieldPresentation; PCSX2-style snap of circuits 1 row apart",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+        "ps2xTest/src/ps2_gs_tests.cpp"
+      ],
+      "general_or_specific": "General, plus one deliberate non-hardware hack (the snap)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt gs_cpu_backend.cpp:397,1865"
+      },
+      "has_tests": true,
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#375, #344 (open, competing)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-37",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "60a0d2df, 39473db0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_pad.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/include/runtime/ps2_pad_host.h"
+      ]
+    },
+    "title": "Latched pad input from the render thread, keyboard analog, integer-scale presentation, SetExitKey(KEY_NULL)",
+    "category": "E",
+    "subsystem": "host pad/presentation (raylib)",
+    "problem": "Short taps lost; uneven nearest scaling; Esc (Circle) quit",
+    "approach": "atomics latch; floor(scale)",
+    "scope": "general",
+    "scope_evidence": "General host",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-37",
+      "commits": [
+        "60a0d2df",
+        "39473db0"
+      ],
+      "title": "Latched pad input from the render thread, keyboard analog, integer-scale presentation, SetExitKey(KEY_NULL)",
+      "category": "E",
+      "subsystem": "host pad/presentation (raylib)",
+      "problem": "Short taps lost; uneven nearest scaling; Esc (Circle) quit",
+      "approach": "atomics latch; floor(scale)",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_pad.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/include/runtime/ps2_pad_host.h"
+      ],
+      "general_or_specific": "General host",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "medium (large pad diff)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-38",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "266e3675, 438d05ed, a458d417",
+      "files": [
+        "gs_types.h",
+        "gs_frontend.cpp",
+        "ps2_runtime.cpp"
+      ]
+    },
+    "title": "Pitch-explicit PresentationFrame, external presenter hook",
+    "category": "E",
+    "subsystem": "gs_frontend/runtime",
+    "problem": "640-stride assumption; no native backend path",
+    "approach": "rowPitchBytes, GSPresentationMode, external presenter",
+    "scope": "general",
+    "scope_evidence": "General API",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-38",
+      "commits": [
+        "266e3675",
+        "438d05ed",
+        "a458d417"
+      ],
+      "title": "Pitch-explicit PresentationFrame, external presenter hook",
+      "category": "E",
+      "subsystem": "gs_frontend/runtime",
+      "problem": "640-stride assumption; no native backend path",
+      "approach": "rowPitchBytes, GSPresentationMode, external presenter",
+      "files": [
+        "gs_types.h",
+        "gs_frontend.cpp",
+        "ps2_runtime.cpp"
+      ],
+      "general_or_specific": "General API",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-39",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "8b83b2bc, 684c3ce9, e44c0295, 3a2bb267, b26188d2, a12955ba, 429c2192",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeFiber.cpp",
+        "ps2xRuntime/include/runtime/ee_fiber.h",
+        "EeScheduler.cpp",
+        "ps2xTest/src/ee_fiber_tests.cpp"
+      ]
+    },
+    "title": "EE threads on fibers (x86-64/ARM64 asm, Win32 fibers, ucontext)",
+    "category": "C",
+    "subsystem": "EeScheduler/EeFiber",
+    "problem": "Exception-unwind context switches about 10us each",
+    "approach": "Per-thread stacks with guard pages; keep a self-deleted record until its fiber stops",
+    "scope": "general",
+    "scope_evidence": "General architecture",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#137 (open, alternative fiber scheduler)",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-39",
+      "commits": [
+        "8b83b2bc",
+        "684c3ce9",
+        "e44c0295",
+        "3a2bb267",
+        "b26188d2",
+        "a12955ba",
+        "429c2192"
+      ],
+      "title": "EE threads on fibers (x86-64/ARM64 asm, Win32 fibers, ucontext)",
+      "category": "C",
+      "subsystem": "EeScheduler/EeFiber",
+      "problem": "Exception-unwind context switches about 10us each",
+      "approach": "Per-thread stacks with guard pages; keep a self-deleted record until its fiber stops",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeFiber.cpp",
+        "ps2xRuntime/include/runtime/ee_fiber.h",
+        "EeScheduler.cpp",
+        "ps2xTest/src/ee_fiber_tests.cpp"
+      ],
+      "general_or_specific": "General architecture",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "no ee_fiber in upstream"
+      },
+      "has_tests": true,
+      "risk": "high",
+      "conflicts_with_our_branch": "touches the same scheduler areas as #258",
+      "upstream_pr_equivalent": "#137 (open, alternative fiber scheduler)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-40",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "2e538a7f (sched/timer part), 052915df (snapshot/event pump), 20973e8e, 7ff61110",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h",
+        "ps2_memory.cpp"
+      ]
+    },
+    "title": "Scheduler fixed-cost cuts: ready bitmask with countr_zero, division-free timers, lazy snapshot, lock-free pending-event count",
+    "category": "C",
+    "subsystem": "EeScheduler/ps2_memory timers",
+    "problem": "Hot-path overhead",
+    "approach": "Perf only",
+    "scope": "general",
+    "scope_evidence": "General perf",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#328 (related)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-40",
+      "commits": [
+        "2e538a7f (sched/timer part)",
+        "052915df (snapshot/event pump)",
+        "20973e8e",
+        "7ff61110"
+      ],
+      "title": "Scheduler fixed-cost cuts: ready bitmask with countr_zero, division-free timers, lazy snapshot, lock-free pending-event count",
+      "category": "C",
+      "subsystem": "EeScheduler/ps2_memory timers",
+      "problem": "Hot-path overhead",
+      "approach": "Perf only",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h",
+        "ps2_memory.cpp"
+      ],
+      "general_or_specific": "General perf",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "medium",
+      "conflicts_with_our_branch": "same files as #258; textual",
+      "upstream_pr_equivalent": "#328 (related)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-41",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "834dbd80, 979903de",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h",
+        "ps2_runtime_kernel_tests.cpp"
+      ]
+    },
+    "title": "Charge 512 EE cycles per switch to a different thread",
+    "category": "C",
+    "subsystem": "EeScheduler timing",
+    "problem": "Yield loops spun about 117k turns per field",
+    "approach": "kThreadSwitchCycles; forgetLastRun on delete",
+    "scope": "general",
+    "scope_evidence": "General idea, constant tuned on DQ8",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-41",
+      "commits": [
+        "834dbd80",
+        "979903de"
+      ],
+      "title": "Charge 512 EE cycles per switch to a different thread",
+      "category": "C",
+      "subsystem": "EeScheduler timing",
+      "problem": "Yield loops spun about 117k turns per field",
+      "approach": "kThreadSwitchCycles; forgetLastRun on delete",
+      "files": [
+        "EeScheduler.cpp",
+        "ee_scheduler.h",
+        "ps2_runtime_kernel_tests.cpp"
+      ],
+      "general_or_specific": "General idea, constant tuned on DQ8",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "medium (shifts timing for all titles)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-42",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "3506d028, 21bbb248, a26eae15, cd478bdc",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeHostPacing.h",
+        "EeScheduler.cpp",
+        "ps2xTest/src/ps2_ee_pacing_tests.cpp"
+      ]
+    },
+    "title": "Bounded VBlank host debt; host pause/speed pacing clock",
+    "category": "C",
+    "subsystem": "EeScheduler pacing",
+    "problem": "Catch-up bursts; no pause/fast-forward",
+    "approach": "EeHostPacing clock, rebasing",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#332 (debt cap)",
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-42",
+      "commits": [
+        "3506d028",
+        "21bbb248",
+        "a26eae15",
+        "cd478bdc"
+      ],
+      "title": "Bounded VBlank host debt; host pause/speed pacing clock",
+      "category": "C",
+      "subsystem": "EeScheduler pacing",
+      "problem": "Catch-up bursts; no pause/fast-forward",
+      "approach": "EeHostPacing clock, rebasing",
+      "files": [
+        "ps2xRuntime/src/lib/Kernel/EeHostPacing.h",
+        "EeScheduler.cpp",
+        "ps2xTest/src/ps2_ee_pacing_tests.cpp"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "medium",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#332 (debt cap)",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-43",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "5c108381, fde5e92c, 5e8d2ace, 817a8fad, baf084b4, 2cadc665, 6185a24e, 33b82f4f, 63b4d27b",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_threaded_backend.cpp",
+        "gs_backend.h",
+        "gs_frontend.cpp"
+      ]
+    },
+    "title": "Threaded GS backend with batching and immutable presentation snapshots",
+    "category": "D",
+    "subsystem": "gs_threaded_backend",
+    "problem": "Raster work on the game thread",
+    "approach": "Ordered bounded worker",
+    "scope": "general",
+    "scope_evidence": "General perf",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#285 (GS perf, related)",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-43",
+      "commits": [
+        "5c108381",
+        "fde5e92c",
+        "5e8d2ace",
+        "817a8fad",
+        "baf084b4",
+        "2cadc665",
+        "6185a24e",
+        "33b82f4f",
+        "63b4d27b"
+      ],
+      "title": "Threaded GS backend with batching and immutable presentation snapshots",
+      "category": "D",
+      "subsystem": "gs_threaded_backend",
+      "problem": "Raster work on the game thread",
+      "approach": "Ordered bounded worker",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_threaded_backend.cpp",
+        "gs_backend.h",
+        "gs_frontend.cpp"
+      ],
+      "general_or_specific": "General perf",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "high (threading)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#285 (GS perf, related)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-44",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "aed0458d, d435fc58, 8841a88b, 9387f245, 81d327bc, eb6cf14b, 6e3cfd25, b24ccbf7, 221a0b61, e68d340b, 2442640a, 0ccd8730, 97b2e0a7",
+      "files": [
+        "ps2xRuntime/src/lib/vu/*",
+        "tools/compile_vu_blocks.py",
+        "ps2xTest/data/*.vublocks"
+      ]
+    },
+    "title": "VU1 interpreter perf refactor plus profile-driven block/region/loop compilers",
+    "category": "D",
+    "subsystem": "ps2xRuntime/src/lib/vu/*",
+    "problem": "VU1 interpreter cost",
+    "approach": "Split .inl files, pipeline masks, compiled blocks from profiles (tools/compile_vu_blocks.py); synthetic fixtures",
+    "scope": "general",
+    "scope_evidence": "General mechanism; profiles come from a game run (local)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#254, #306 (related)",
+    "risk": "high",
+    "priority": 5,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-44",
+      "commits": [
+        "aed0458d",
+        "d435fc58",
+        "8841a88b",
+        "9387f245",
+        "81d327bc",
+        "eb6cf14b",
+        "6e3cfd25",
+        "b24ccbf7",
+        "221a0b61",
+        "e68d340b",
+        "2442640a",
+        "0ccd8730",
+        "97b2e0a7"
+      ],
+      "title": "VU1 interpreter perf refactor plus profile-driven block/region/loop compilers",
+      "category": "D",
+      "subsystem": "ps2xRuntime/src/lib/vu/*",
+      "problem": "VU1 interpreter cost",
+      "approach": "Split .inl files, pipeline masks, compiled blocks from profiles (tools/compile_vu_blocks.py); synthetic fixtures",
+      "files": [
+        "ps2xRuntime/src/lib/vu/*",
+        "tools/compile_vu_blocks.py",
+        "ps2xTest/data/*.vublocks"
+      ],
+      "general_or_specific": "General mechanism; profiles come from a game run (local)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "very high (removes about 1500 lines from ps2_vu1_core.cpp)",
+      "conflicts_with_our_branch": "none directly; blocks porting dq8-24/25 cleanly",
+      "upstream_pr_equivalent": "#254, #306 (related)",
+      "priority": 5,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-45",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "97d12144, 1e19e66e, e10dc7fc, ef8eca6c, fe6f5679, 5a50a2a8, ea46bcb1, 4d4d8c59, 7d4779e1, 03fb6605, 96308706, c50e587a, 6ee021d1, 47dfc97c",
+      "files": [
+        "tools/*.py",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_program.*",
+        "ps2xTest/data/vu_programs.py"
+      ]
+    },
+    "title": "Whole-program VU1 AOT compiler and manifest tooling",
+    "category": "E",
+    "subsystem": "tools/compile_vu_programs.py, ps2_vu1_program.*",
+    "problem": "Per-pair interpreter cost",
+    "approach": "Compile recorded microprograms; check word-for-word at run time",
+    "scope": "general",
+    "scope_evidence": "General tooling; inputs are the user's own game recordings (not committed)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#254",
+    "risk": "high",
+    "priority": 5,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-45",
+      "commits": [
+        "97d12144",
+        "1e19e66e",
+        "e10dc7fc",
+        "ef8eca6c",
+        "fe6f5679",
+        "5a50a2a8",
+        "ea46bcb1",
+        "4d4d8c59",
+        "7d4779e1",
+        "03fb6605",
+        "96308706",
+        "c50e587a",
+        "6ee021d1",
+        "47dfc97c"
+      ],
+      "title": "Whole-program VU1 AOT compiler and manifest tooling",
+      "category": "E",
+      "subsystem": "tools/compile_vu_programs.py, ps2_vu1_program.*",
+      "problem": "Per-pair interpreter cost",
+      "approach": "Compile recorded microprograms; check word-for-word at run time",
+      "files": [
+        "tools/*.py",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_program.*",
+        "ps2xTest/data/vu_programs.py"
+      ],
+      "general_or_specific": "General tooling; inputs are the user's own game recordings (not committed)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "very high",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#254",
+      "priority": 5,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-46",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "f16758da, 2d03b8c4, 5ccf82f9, 8220b4af, d9ad24c7",
+      "files": [
+        "ps2xIOP/src/lle/*",
+        "ps2xIOP/src/native_iop.cpp",
+        "ps2xRuntime/src/lib/ps2_native_iop.cpp",
+        "SIF.cpp",
+        "RPC.cpp"
+      ]
+    },
+    "title": "Native LLE IOP (R3000A interpreter, HLE IOP kernel, SPU2) for a game's own sound IRX",
+    "category": "C",
+    "subsystem": "ps2xIOP/src/lle, SIF/RPC hooks",
+    "problem": "HLE sound drivers inadequate",
+    "approach": "Emulate the IOP and SPU2; route the SID to native modules",
+    "scope": "general",
+    "scope_evidence": "General approach (any title's LIBSD IRX)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#308 (open, SPU2 for LIBSD.IRX), #254",
+    "risk": "high",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-46",
+      "commits": [
+        "f16758da",
+        "2d03b8c4",
+        "5ccf82f9",
+        "8220b4af",
+        "d9ad24c7"
+      ],
+      "title": "Native LLE IOP (R3000A interpreter, HLE IOP kernel, SPU2) for a game's own sound IRX",
+      "category": "C",
+      "subsystem": "ps2xIOP/src/lle, SIF/RPC hooks",
+      "problem": "HLE sound drivers inadequate",
+      "approach": "Emulate the IOP and SPU2; route the SID to native modules",
+      "files": [
+        "ps2xIOP/src/lle/*",
+        "ps2xIOP/src/native_iop.cpp",
+        "ps2xRuntime/src/lib/ps2_native_iop.cpp",
+        "SIF.cpp",
+        "RPC.cpp"
+      ],
+      "general_or_specific": "General approach (any title's LIBSD IRX)",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": true,
+      "risk": "very high (about 3.5k LOC)",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": "#308 (open, SPU2 for LIBSD.IRX), #254",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-47",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "1d4c4dc1",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ]
+    },
+    "title": "Guest-owned heap ceiling (SetupHeap/EndOfHeap) and FunctionRegionResolver for overlays",
+    "category": "C",
+    "subsystem": "ps2_runtime/System.cpp",
+    "problem": "Runtime arena collided with the guest dlmalloc; no overlay dispatch",
+    "approach": "Opt-in host APIs, default-off",
+    "scope": "general",
+    "scope_evidence": "General API, used by the DQ8 host",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": "#347 (kernel records out of title RAM, related)",
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-47",
+      "commits": [
+        "1d4c4dc1"
+      ],
+      "title": "Guest-owned heap ceiling (SetupHeap/EndOfHeap) and FunctionRegionResolver for overlays",
+      "category": "C",
+      "subsystem": "ps2_runtime/System.cpp",
+      "problem": "Runtime arena collided with the guest dlmalloc; no overlay dispatch",
+      "approach": "Opt-in host APIs, default-off",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime.h",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp",
+        "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+      ],
+      "general_or_specific": "General API, used by the DQ8 host",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "absent"
+      },
+      "has_tests": false,
+      "risk": "low (default-off) / medium (adds a lookup to the dispatch hot path)",
+      "conflicts_with_our_branch": "ps2_runtime.cpp near our reserveAsyncCallbackStack edits",
+      "upstream_pr_equivalent": "#347 (kernel records out of title RAM, related)",
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "dq8-48",
+    "source": {
+      "repository": "Sinan-Karakaya/PS2Recomp",
+      "branch": "main",
+      "upstream_base": "d74a3ce1",
+      "revision": "5ebe4c2e",
+      "files": [
+        "ps2xRuntime/CMakeLists.txt"
+      ]
+    },
+    "title": "Pin the Windows FFmpeg prebuilt by SHA-256",
+    "category": "E",
+    "subsystem": "build",
+    "problem": "Unverified download",
+    "approach": "URL_HASH",
+    "scope": "general",
+    "scope_evidence": "General",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 4,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "dq8-48",
+      "commits": [
+        "5ebe4c2e"
+      ],
+      "title": "Pin the Windows FFmpeg prebuilt by SHA-256",
+      "category": "E",
+      "subsystem": "build",
+      "problem": "Unverified download",
+      "approach": "URL_HASH",
+      "files": [
+        "ps2xRuntime/CMakeLists.txt"
+      ],
+      "general_or_specific": "General",
+      "reference": null,
+      "upstream_already_has": {
+        "value": false,
+        "where": "wt CMakeLists.txt:260-270 has no hash"
+      },
+      "has_tests": false,
+      "risk": "low",
+      "conflicts_with_our_branch": "none",
+      "upstream_pr_equivalent": null,
+      "priority": 4,
+      "recommended_status": "CANDIDATE"
+    }
+  }
+]

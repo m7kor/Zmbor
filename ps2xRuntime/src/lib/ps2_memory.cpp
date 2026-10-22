@@ -1362,7 +1362,9 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                     uint32_t asr1 = m_ioRegisters[channelBase + 0x50];
                     uint32_t asp = (chcr >> 4) & 0x3u;
                     const bool tieEnabled = (chcr & (1u << 7)) != 0u;
-                    const int kMaxChainTags = 4096;
+                    // Only a guard against a malformed (looping) chain: hardware has no tag limit, and heavy frames
+                    // exceed 4096 tags (4190-4600 measured in Shadow of the Colossus), losing the chain's tail.
+                    const int kMaxChainTags = 1 << 20;
                     std::vector<uint8_t> chainBuf;
 
                     auto appendData = [&](uint32_t srcAddr, uint32_t qwCount)
@@ -1537,6 +1539,12 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                             endChain = true;
                         if (endChain)
                             break;
+                    }
+                    if (tagsProcessed >= kMaxChainTags)
+                    {
+                        std::cerr << "[DMA] chain on channel base 0x" << std::hex << channelBase
+                                  << " stopped after " << std::dec << kMaxChainTags
+                                  << " tags without an end tag; next tag 0x" << std::hex << tagAddr << std::dec << std::endl;
                     }
 
                     m_ioRegisters[channelBase + 0x30] = tagAddr;

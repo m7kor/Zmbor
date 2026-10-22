@@ -66,7 +66,7 @@ namespace ps2recomp
         std::unordered_map<uint32_t, std::string> m_relocationCallNames;
         std::unordered_map<uint32_t, std::vector<uint32_t>> m_configJumpTableTargetsByAddress;
         std::unordered_map<uint32_t, std::vector<uint32_t>> m_resumeEntryTargetsByOwner;
-        const std::vector<Section>& m_sections;
+        std::vector<Section> m_sections; // owned copy: callers (and tests) may pass a temporary
         BootstrapInfo m_bootstrapInfo;
         bool m_emitInstructionComments = true;
         RecompilerReporter *m_reporter = nullptr;

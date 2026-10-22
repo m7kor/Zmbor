@@ -1387,6 +1387,82 @@ void register_code_generator_tests()
             }
         });
 
+        tc.Run("VU0 macro loads/stores keep vi0 and vf0 hardwired", [](TestCase &t) {
+            CodeGenerator gen({}, {});
+
+            Instruction sq{};
+            sq.rd = 4; // fs
+            sq.rt = 0; // it = vi0
+            sq.vectorInfo.vectorField = 0xF;
+            for (const std::string &out : {gen.translateVU_VSQI(sq), gen.translateVU_VSQD(sq)})
+            {
+                t.IsTrue(out.find("ctx->vi[0] =") == std::string::npos, "SQI/SQD must not step vi0");
+                t.IsTrue(out.find("_mm_storeu_ps") != std::string::npos, "SQI/SQD through vi0 should still store");
+            }
+
+            Instruction lq{};
+            lq.rd = 0; // is = vi0
+            lq.rt = 0; // ft = vf0
+            lq.vectorInfo.vectorField = 0xF;
+            for (const std::string &out : {gen.translateVU_VLQI(lq), gen.translateVU_VLQD(lq)})
+            {
+                t.IsTrue(out.find("ctx->vi[0] =") == std::string::npos, "LQI/LQD must not step vi0");
+                t.IsTrue(out.find("ctx->vu0_vf[0] =") == std::string::npos, "LQI/LQD must not write vf0");
+            }
+
+            Instruction lqStep{};
+            lqStep.rd = 7; // is
+            lqStep.rt = 0; // ft = vf0
+            lqStep.vectorInfo.vectorField = 0xF;
+            t.IsTrue(gen.translateVU_VLQI(lqStep).find("ctx->vi[7] = static_cast<uint16_t>(ctx->vi[7] + 1)") != std::string::npos,
+                     "LQI into vf0 should still post-increment vi[is]");
+            t.IsTrue(gen.translateVU_VLQD(lqStep).find("ctx->vi[7] = static_cast<uint16_t>(ctx->vi[7] - 1)") != std::string::npos,
+                     "LQD into vf0 should still pre-decrement vi[is]");
+
+            Instruction ilwr{};
+            ilwr.rd = 3; // is
+            ilwr.rt = 0; // it = vi0
+            ilwr.vectorInfo.vectorField = 0x8;
+            t.IsTrue(gen.translateVU_VILWR(ilwr).find("ctx->vi[0] =") == std::string::npos, "ILWR must not write vi0");
+        });
+
+        tc.Run("a delay slot past the decoded range is translated from the ELF section", [](TestCase &t) {
+            // jr $ra ; lw $v0, 0x64($a0) -- the function range covers only the jr.
+            const uint32_t words[2] = {0x03E00008u, 0x8C820064u};
+            std::vector<Section> sections = {
+                {".text", 0x2000u, sizeof(words), 0u, true, false, false, true,
+                 const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(words))}};
+
+            Function func;
+            func.name = "short_leaf";
+            func.start = 0x2000u;
+            func.end = 0x2004u;
+            func.isRecompiled = true;
+
+            CodeGenerator gen({}, sections);
+            const std::string generated = gen.generateFunction(func, {makeJr(0x2000u, 31)}, false);
+            printGeneratedCode("a delay slot past the decoded range is translated from the ELF section", generated);
+            t.IsTrue(generated.find("READ32(ADD32(GPR_U32(ctx, 4), 100))") != std::string::npos,
+                     "the lw in the delay slot must be translated, not replaced by a NOP");
+            t.IsTrue(generated.find("ctx->branch_pc = 0x2000u;") != std::string::npos,
+                     "the recovered delay slot should run as a delay slot of the jr");
+        });
+
+        tc.Run("a delay slot outside every section still falls back to a NOP", [](TestCase &t) {
+            Function func;
+            func.name = "orphan_leaf";
+            func.start = 0x3000u;
+            func.end = 0x3004u;
+            func.isRecompiled = true;
+
+            CodeGenerator gen({}, {});
+            const std::string generated = gen.generateFunction(func, {makeJr(0x3000u, 31)}, false);
+            t.IsTrue(generated.find("ctx->in_delay_slot = true;") == std::string::npos,
+                     "with no section data the delay slot should stay a NOP");
+            t.IsTrue(generated.find("void orphan_leaf") != std::string::npos || generated.find("0x3000") != std::string::npos,
+                     "the function should still be emitted");
+        });
+
         tc.Run("VU0 ILWR/ISWR address VU0 data memory by qword and field", [](TestCase &t) {
             CodeGenerator gen({}, {});
 

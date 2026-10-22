@@ -7,6 +7,7 @@
 #include "ps2recomp/types.h"
 
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -23,6 +24,24 @@ namespace ps2recomp
             inst.opcode = OPCODE_SPECIAL;
             inst.function = SPECIAL_SLL;
             return inst;
+        }
+
+        // Last resort for a delay slot that was not decoded with its function (its owner's range ends on the
+        // branch): read the real word from the ELF section. Configured patches and MMIO hints are not applied here;
+        // the recompiler decodes trailing delay slots itself, so reaching this path means a range was cut short.
+        bool readSectionWord(const std::vector<Section> &sections, uint32_t address, uint32_t &word)
+        {
+            for (const Section &section : sections)
+            {
+                if (!section.data || section.isBSS || address < section.address ||
+                    address - section.address > section.size || section.size - (address - section.address) < 4u)
+                {
+                    continue;
+                }
+                std::memcpy(&word, section.data + (address - section.address), sizeof(word));
+                return true;
+            }
+            return false;
         }
     }
 
@@ -143,8 +162,22 @@ namespace ps2recomp
                     }
                     else
                     {
-                        syntheticDelaySlot = makeSyntheticDelaySlot(inst.address + 4u);
+                        const uint32_t delayAddress = inst.address + 4u;
+                        uint32_t delayWord = 0;
+                        const bool haveWord = readSectionWord(cg.m_sections, delayAddress, delayWord);
+                        syntheticDelaySlot = haveWord
+                                                 ? R5900Decoder().decodeInstruction(delayAddress, delayWord, false)
+                                                 : makeSyntheticDelaySlot(delayAddress);
                         delaySlot = &syntheticDelaySlot;
+
+                        if (cg.m_reporter && (!haveWord || delayWord != 0u))
+                        {
+                            std::ostringstream msg;
+                            msg << "delay slot at 0x" << std::hex << delayAddress
+                                << (haveWord ? " lies outside the function's decoded range; translated from the ELF section"
+                                             : " lies outside the function and every section; substituted a NOP");
+                            cg.m_reporter->warningAt("codegen", function.name, delayAddress, msg.str());
+                        }
                     }
 
                     if (hasDecodedDelaySlot && internalTargets.contains(delaySlot->address))

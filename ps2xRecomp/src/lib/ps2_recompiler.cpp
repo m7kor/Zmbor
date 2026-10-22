@@ -20,6 +20,7 @@
 #include <optional>
 #include <limits>
 #include <functional>
+#include <iterator>
 #include <thread>
 
 namespace fs = std::filesystem;
@@ -28,6 +29,24 @@ namespace ps2recomp
 {
     namespace
     {
+        // A slice that ends on a branch/jump still executes that branch's delay slot, which sits just past the slice
+        // end. Keep it in the slice so the emitter translates the real instruction instead of a synthetic NOP.
+        template <typename InstructionIt>
+        InstructionIt extendSliceOverDelaySlot(InstructionIt sliceBegin, InstructionIt sliceEnd, InstructionIt containerEnd)
+        {
+            if (sliceEnd == sliceBegin || sliceEnd == containerEnd)
+            {
+                return sliceEnd;
+            }
+
+            const Instruction &last = *std::prev(sliceEnd);
+            if (last.hasDelaySlot && sliceEnd->address == last.address + 4u)
+            {
+                return std::next(sliceEnd);
+            }
+            return sliceEnd;
+        }
+
         uint32_t decodeAbsoluteJumpTarget(uint32_t address, uint32_t target)
         {
             return ((address + 4) & 0xF0000000u) | (target << 2);
@@ -550,6 +569,7 @@ namespace ps2recomp
                             continue;
                         }
 
+                        sliceEndIt = extendSliceOverDelaySlot(sliceIt, sliceEndIt, containingInstructions.end());
                         std::vector<Instruction> slicedInstructions(sliceIt, sliceEndIt);
                         decodedFunctions[target] = std::move(slicedInstructions);
                         entryFunction.end = sliceEndAddress;
@@ -723,6 +743,7 @@ namespace ps2recomp
                     continue;
                 }
 
+                sliceEndIt = extendSliceOverDelaySlot(sliceBeginIt, sliceEndIt, sourceInstructions->end());
                 std::vector<Instruction> slicedInstructions(sliceBeginIt, sliceEndIt);
                 bool changed = (function.end != sliceEndAddress);
                 auto existingIt = decodedFunctions.find(function.start);

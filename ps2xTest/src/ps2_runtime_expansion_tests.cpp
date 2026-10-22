@@ -315,6 +315,56 @@ void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
+        tc.Run("every R5900Context starts with VF00 = (0, 0, 0, 1)", [](TestCase &t)
+        {
+            // Threads, interrupt handlers and callbacks all get a fresh context, not only the boot thread.
+            const R5900Context context{};
+            alignas(16) float lanes[4];
+            _mm_store_ps(lanes, context.vu0_vf[0]);
+            t.IsTrue(lanes[0] == 0.0f && lanes[1] == 0.0f && lanes[2] == 0.0f && lanes[3] == 1.0f,
+                     "VF00 must read (x, y, z, w) = (0, 0, 0, 1)");
+        });
+
+        tc.Run("quadword loads and stores ignore the low four address bits", [](TestCase &t)
+        {
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
+            constexpr uint32_t kBase = 0x00120000u;
+            for (uint32_t i = 0; i < 32u; ++i)
+            {
+                rdram[kBase + i] = static_cast<uint8_t>(i);
+            }
+
+            const __m128i loaded = Ps2FastRead128(rdram.data(), kBase + 0x7u);
+            alignas(16) uint8_t bytes[16];
+            _mm_store_si128(reinterpret_cast<__m128i *>(bytes), loaded);
+            bool loadAligned = true;
+            for (uint32_t i = 0; i < 16u; ++i)
+            {
+                loadAligned = loadAligned && bytes[i] == static_cast<uint8_t>(i);
+            }
+            t.IsTrue(loadAligned, "LQ at base+7 must read the quadword at base");
+
+            Ps2FastWrite128(rdram.data(), kBase + 0x1Bu, _mm_set1_epi8(static_cast<char>(0xAB)));
+            bool storeAligned = true;
+            for (uint32_t i = 0; i < 32u; ++i)
+            {
+                const uint8_t expected = (i >= 16u) ? 0xABu : static_cast<uint8_t>(i);
+                storeAligned = storeAligned && rdram[kBase + i] == expected;
+            }
+            t.IsTrue(storeAligned, "SQ at base+0x1B must write exactly the quadword at base+0x10");
+
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "runtime memory should initialize");
+            R5900Context ctx{};
+            uint8_t *ram = runtime.memory().getRDRAM();
+            for (uint32_t i = 0; i < 16u; ++i)
+            {
+                ram[kBase + i] = static_cast<uint8_t>(0x30u + i);
+            }
+            _mm_store_si128(reinterpret_cast<__m128i *>(bytes), runtime.Load128(ram, &ctx, kBase + 0xCu));
+            t.Equals(static_cast<uint32_t>(bytes[0]), 0x30u, "PS2Runtime::Load128 must align the address too");
+        });
+
         tc.Run("differential decoder/codegen gpr-write contract for MULT and DIV families", [](TestCase &t)
         {
             R5900Decoder decoder;

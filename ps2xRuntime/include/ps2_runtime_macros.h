@@ -451,9 +451,11 @@ static inline uint64_t Ps2FastRead64(const uint8_t *rdram, uint32_t addr)
     return value;
 }
 
+// LQ/SQ/LQC2/SQC2 ignore the low four address bits: the EE aligns quadword accesses silently
+// (PCSX2 R5900OpcodeImpl.cpp: memRead128(addr & ~0xf)).
 static inline __m128i Ps2FastRead128(const uint8_t *rdram, uint32_t addr)
 {
-    const uint32_t offset = addr & PS2_RAM_MASK;
+    const uint32_t offset = addr & PS2_RAM_MASK & ~0xFu;
     if (!Ps2FastRangeIsContiguous(offset, sizeof(__m128i)))
     {
         alignas(16) uint8_t wrapped[sizeof(__m128i)];
@@ -526,7 +528,7 @@ static inline void Ps2FastWrite64(uint8_t *rdram, uint32_t addr, uint64_t value)
 
 static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
 {
-    const uint32_t offset = addr & PS2_RAM_MASK;
+    const uint32_t offset = addr & PS2_RAM_MASK & ~0xFu;
     if (!Ps2FastRangeIsContiguous(offset, sizeof(__m128i)))
     {
         alignas(16) uint8_t wrapped[sizeof(__m128i)];
@@ -577,7 +579,7 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
         : FAST_READ64(_addr); }())
 
 #define READ128(addr) ([&]() -> __m128i {                     \
-    uint32_t _addr = (uint32_t)(addr);                        \
+    uint32_t _addr = (uint32_t)(addr) & ~0xFu;                \
     return PS2Runtime::isSpecialAddress(_addr)                \
         ? runtime->Load128(rdram, ctx, _addr)                 \
         : FAST_READ128(_addr); }())
@@ -637,7 +639,7 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
 #define WRITE128(addr, val)                                                          \
     do                                                                               \
     {                                                                                \
-        uint32_t _addr = (addr);                                                     \
+        uint32_t _addr = (uint32_t)(addr) & ~0xFu;                                   \
         __m128i _value = (val);                                                      \
         if (PS2Runtime::isSpecialAddress(_addr))                                     \
             runtime->Store128(rdram, ctx, _addr, _value);                            \

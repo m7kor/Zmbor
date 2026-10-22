@@ -2092,6 +2092,7 @@ uint64_t PS2Runtime::Load64(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
 
 __m128i PS2Runtime::Load128(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
 {
+    vaddr &= ~0xFu; // quadword accesses ignore the low four address bits
     try
     {
         return m_memory.read128(vaddr);
@@ -2158,6 +2159,7 @@ void PS2Runtime::Store64(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
 
 void PS2Runtime::Store128(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, __m128i value)
 {
+    vaddr &= ~0xFu; // quadword accesses ignore the low four address bits
     alignas(16) uint64_t _parts[2];
     _mm_storeu_si128(reinterpret_cast<__m128i *>(_parts), value);
     ps2TraceGuestWrite(rdram, vaddr, 16u, _parts[0], _parts[1], "WRITE128", ctx);

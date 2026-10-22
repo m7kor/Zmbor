@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ps2recomp-ultimate/research/candidate.schema.json",
+  "title": "Community engineering candidate",
+  "description": "One reusable discovery from a community PS2 recompilation project. Enforced by tools/research/validate_research.py.",
+  "type": "object",
+  "required": ["id", "source", "title", "category", "subsystem", "problem", "approach", "scope", "status", "evidence", "license"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{2,}$"},
+    "source": {
+      "type": "object",
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": {"type": "string", "description": "owner/name on GitHub"},
+        "branch": {"type": "string"},
+        "revision": {"type": "string", "description": "commit SHA(s) the analysis read"},
+        "upstream_base": {"type": "string", "description": "ran-j/PS2Recomp merge base, if identifiable"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "authors": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "title": {"type": "string"},
+    "category": {"enum": ["A", "B", "C", "D", "E", "F"], "description": "A hardware accuracy, B compiler, C runtime, D graphics/vector, E tooling, F game-specific"},
+    "subsystem": {"type": "string"},
+    "problem": {"type": "string"},
+    "approach": {"type": "string"},
+    "scope": {"enum": ["general", "game-specific", "unknown"]},
+    "scope_evidence": {"type": "string"},
+    "reference": {"type": ["string", "null"], "description": "hardware/emulator reference actually checked"},
+    "license": {"type": "string", "description": "SPDX id of the source repository"},
+    "upstream_equivalent": {"type": ["string", "null"], "description": "ran-j/PS2Recomp PR/commit with the same fix, if any"},
+    "risk": {"enum": ["low", "medium", "high", "unknown"]},
+    "priority": {"type": "integer", "minimum": 1, "maximum": 5},
+    "status": {"enum": ["DISCOVERED", "ANALYZED", "CANDIDATE", "TESTED", "INTEGRATED", "VERIFIED", "REJECTED", "INCOMPATIBLE", "SUPERSEDED", "BLOCKED", "GAME_SPECIFIC", "ARCHITECTURE_REFERENCE"]},
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "analysis": {"type": "string", "description": "what was read (source inspection only)"},
+        "tests_added": {"type": "array", "items": {"type": "string"}},
+        "integration_commit": {"type": "string"},
+        "build": {"type": "string"},
+        "regression": {"type": "string"},
+        "game_level": {"type": "string", "description": "only results actually observed by this project"}
+      }
+    },
+    "limitations": {"type": "string"}
+  }
+}

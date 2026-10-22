@@ -8,6 +8,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(gs_cache)
+
+    # The community research database (research/) must keep provenance and never claim unearned statuses.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME research_database_valid
+                 COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/research/validate_research.py)
+    endif()
 endif()
 
 # Static library with test logic (no main), used by ps2xStudio

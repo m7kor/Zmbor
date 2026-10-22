@@ -1,0 +1,261 @@
+[
+  {
+    "repository": "sal063/Ace-Combat-5-Static-recompilation",
+    "license": "Apache-2.0",
+    "default_branch": "main",
+    "pushed_at": "2026-09-19T19:22:43Z",
+    "archived": false,
+    "relationship": "independent-runtime",
+    "engine_repository": null,
+    "engine_branch": null,
+    "status": "DISCOVERED"
+  },
+  {
+    "repository": "thiagordsfx/urban-reign-recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-22T20:51:28Z",
+    "archived": false,
+    "relationship": "vendored",
+    "engine_repository": null,
+    "engine_branch": null,
+    "status": "DISCOVERED"
+  },
+  {
+    "repository": "LightVelox/sotc-vibe-pc",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-20T18:21:55Z",
+    "archived": false,
+    "relationship": "submodule",
+    "engine_repository": "LightVelox/PS2Recomp",
+    "engine_branch": "main",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "ahead",
+      "ahead_by": 46,
+      "behind_by": 0,
+      "merge_base": "eb8688b2fd191129f103a39543002c005b33409c",
+      "head": "d06a4ab4a6902e0ae324f184c22581c3aa387c36",
+      "files_changed": 152
+    }
+  },
+  {
+    "repository": "z3xox/BT3-Recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-01T01:05:10Z",
+    "archived": false,
+    "relationship": "vendored",
+    "engine_repository": null,
+    "engine_branch": null,
+    "status": "DISCOVERED"
+  },
+  {
+    "repository": "KIexster/god-of-war-recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-18T18:20:07Z",
+    "archived": false,
+    "relationship": "vendored-or-patched",
+    "engine_repository": null,
+    "engine_branch": null,
+    "status": "DISCOVERED"
+  },
+  {
+    "repository": "drakolordx7/KillzoneRecomp",
+    "license": "GPL-3.0",
+    "default_branch": "master",
+    "pushed_at": "2026-10-22T14:24:12Z",
+    "archived": false,
+    "relationship": "submodule",
+    "engine_repository": "drakolordx7/PS2Recomp",
+    "engine_branch": "killzone",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 4,
+      "merge_base": "75d729ce40d7eed9649fd4bb05628dee520f3d0c",
+      "head": "cc1fc7d87930b48d20abd52974d1be77368eb60a",
+      "files_changed": 59
+    }
+  },
+  {
+    "repository": "jcsix694/def-jam-vendetta-recomp",
+    "license": "GPL-3.0",
+    "default_branch": "master",
+    "pushed_at": "2026-10-22T21:06:43Z",
+    "archived": false,
+    "relationship": "submodule-upstream+patches",
+    "engine_repository": "ran-j/PS2Recomp",
+    "engine_branch": "main",
+    "status": "DISCOVERED"
+  },
+  {
+    "repository": "Sinan-Karakaya/DQ8-Recompiled",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-11T15:44:45Z",
+    "archived": false,
+    "relationship": "submodule",
+    "engine_repository": "Sinan-Karakaya/PS2Recomp",
+    "engine_branch": "main",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "diverged",
+      "ahead_by": 139,
+      "behind_by": 7,
+      "merge_base": "d74a3ce1396ca8b2e1092b807aec0e62133aec83",
+      "head": "379b9cad694ba61de4690826ae3d1df31bd1bfe4",
+      "files_changed": 127
+    }
+  },
+  {
+    "repository": "silentsudin/RoadTripAdventure-recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-21T10:12:40Z",
+    "archived": false,
+    "relationship": "submodule",
+    "engine_repository": "silentsudin/PS2Recomp",
+    "engine_branch": "roadtrip",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "diverged",
+      "ahead_by": 117,
+      "behind_by": 3,
+      "merge_base": "c5a9d02573410a2085a4b4b831b0b68ba3515440",
+      "head": "1f3c54c9914e394ea36e42764d69a94fad4e094b",
+      "files_changed": 183
+    }
+  },
+  {
+    "repository": "SloppyWyn/SRWZ-native",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-11T12:08:06Z",
+    "archived": false,
+    "relationship": "submodule",
+    "engine_repository": "SloppyWyn/PS2Recomp",
+    "engine_branch": "srwz",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1,
+      "merge_base": "2c5fbb9389e11dd95693385969490c9e8e6f57b4",
+      "head": "c32b589aa38976e39fef360717a8f3496c9bab3e",
+      "files_changed": 199
+    }
+  },
+  {
+    "repository": "Lautreck/PS2Recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-10-22T07:16:44Z",
+    "archived": false,
+    "relationship": "fork",
+    "engine_repository": "Lautreck/PS2Recomp",
+    "engine_branch": "main",
+    "status": "ANALYZED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "identical",
+      "ahead_by": 0,
+      "behind_by": 0,
+      "merge_base": "eb8688b2fd191129f103a39543002c005b33409c",
+      "head": null,
+      "files_changed": 0
+    },
+    "note": "no commits beyond upstream on the default branch; nothing to extract there"
+  },
+  {
+    "repository": "aslanhudajev/PS2RecompPlayground",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-02-25T20:26:20Z",
+    "archived": false,
+    "relationship": "fork",
+    "engine_repository": "aslanhudajev/PS2RecompPlayground",
+    "engine_branch": "main",
+    "status": "ANALYZED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 50,
+      "merge_base": "bac1fc9ef81d7c411193eea309fe963d1aa3a16f",
+      "head": null,
+      "files_changed": 0
+    },
+    "note": "no commits beyond upstream on the default branch; nothing to extract there"
+  },
+  {
+    "repository": "dothacktranslate/PS2Recomp-dothack-recomp",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-09-14T06:12:54Z",
+    "archived": false,
+    "relationship": "fork",
+    "engine_repository": "dothacktranslate/PS2Recomp-dothack-recomp",
+    "engine_branch": "main",
+    "status": "ANALYZED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 5,
+      "merge_base": "14b1e5cb39b4af7e6fc12f9a29fdc751efde49d7",
+      "head": null,
+      "files_changed": 0
+    },
+    "note": "no commits beyond upstream on the default branch; nothing to extract there"
+  },
+  {
+    "repository": "BlackLineInteractive/PS2Recomp-Studio",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-08-06T15:00:32Z",
+    "archived": true,
+    "relationship": "fork",
+    "engine_repository": "BlackLineInteractive/PS2Recomp-Studio",
+    "engine_branch": "main",
+    "status": "DISCOVERED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "diverged",
+      "ahead_by": 4,
+      "behind_by": 10,
+      "merge_base": "f49ca4edbcd0306ffb1e8883bbd226fb0f242c4c",
+      "head": "423c4b76f01042e77505dd4b44f2909c44d49de7",
+      "files_changed": 7
+    }
+  },
+  {
+    "repository": "TheGameMecha/HauntingGround",
+    "license": "GPL-3.0",
+    "default_branch": "main",
+    "pushed_at": "2026-03-14T04:43:39Z",
+    "archived": false,
+    "relationship": "fork",
+    "engine_repository": "TheGameMecha/HauntingGround",
+    "engine_branch": "main",
+    "status": "ANALYZED",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp@main (eb8688b)",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 39,
+      "merge_base": "7ca6a866c92f812fff44110a0602c2eac0b2a8e2",
+      "head": null,
+      "files_changed": 0
+    },
+    "note": "no commits beyond upstream on the default branch; nothing to extract there"
+  }
+]

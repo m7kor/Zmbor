@@ -124,6 +124,9 @@ void EeScheduler::reset(uint8_t *rdram, const R5900Context &mainContext)
     }
     m_eventSequence = 0;
     m_invocationSequence = 0;
+    // Forget, not recycle: loadELF restarts the runtime's stack region, so a cached top could be handed out twice.
+    m_invocationStackTops.clear();
+    m_freeInvocationStackTops.clear();
     m_vsyncTick = 0;
     m_vsyncFlagAddress = 0;
     m_vsyncTickAddress = 0;
@@ -1171,13 +1174,40 @@ uint32_t EeScheduler::invocationStackTop()
         return existing->second;
     }
     constexpr uint32_t kInvocationStackSize = 0x4000u;
-    const uint32_t top = m_runtime.reserveAsyncCallbackStack(kInvocationStackSize, 16u);
+    uint32_t top = 0u;
+    if (!m_freeInvocationStackTops.empty())
+    {
+        top = m_freeInvocationStackTops.back();
+        m_freeInvocationStackTops.pop_back();
+    }
+    else
+    {
+        top = m_runtime.reserveAsyncCallbackStack(kInvocationStackSize, 16u);
+    }
     if (top == 0u)
     {
         throw std::runtime_error("EE invocation stack space exhausted");
     }
     m_invocationStackTops.emplace(key, top);
     return top;
+}
+
+void EeScheduler::releaseInvocationStacks(int threadId)
+{
+    // Only valid once the thread holds no live invocation: makeDormant clears them before calling this.
+    const uint32_t ownerKey = static_cast<uint32_t>(threadId);
+    for (auto it = m_invocationStackTops.begin(); it != m_invocationStackTops.end();)
+    {
+        if (static_cast<uint32_t>(it->first >> 32u) == ownerKey)
+        {
+            m_freeInvocationStackTops.push_back(it->second);
+            it = m_invocationStackTops.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 int EeScheduler::addIrqHandler(bool dmac,
@@ -1648,6 +1678,7 @@ void EeScheduler::makeDormant(GuestThread &item)
     item.suspendCount = 0;
     item.wakeupCount = 0;
     item.invocations.clear();
+    releaseInvocationStacks(item.id);
 }
 
 void EeScheduler::removeFromWaitObject(GuestThread &item)

@@ -3,6 +3,7 @@
 #include "ps2_syscalls.h"
 #include "runtime/ee_scheduler.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -373,6 +374,84 @@ namespace
         ctx->pc = 0u;
         runtime->requestStop();
     }
+
+    // Thread churn: the main thread starts kStackChurnThreads short-lived threads one after another; each takes
+    // one invocation, then exits and deletes itself. More threads than the low stack region holds stacks.
+    constexpr uint32_t kStackChurnMainPc = 0x00160600u;
+    constexpr uint32_t kStackChurnThreadPc = 0x00160610u;
+    constexpr uint32_t kStackChurnThreadResumePc = 0x00160620u;
+    constexpr uint32_t kStackChurnHandlerPc = 0x00160630u;
+    constexpr uint32_t kStackChurnParamAddr = 0x00001400u;
+    constexpr uint32_t kStackChurnThreadStack = 0x00180000u;
+    constexpr uint32_t kStackChurnThreads = 40u;
+    uint32_t g_stackChurnStarted = 0u;
+    uint32_t g_stackChurnHandled = 0u;
+    bool g_stackChurnPrioritySet = false;
+    uint32_t g_stackChurnMinSp = 0xFFFFFFFFu;
+    uint32_t g_stackChurnMaxSp = 0u;
+
+    void schedulerStackChurnMain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        ctx->pc = kStackChurnMainPc;
+        if (!g_stackChurnPrioritySet)
+        {
+            // The main thread runs at priority 0; drop it so each started thread runs before the main loop resumes.
+            g_stackChurnPrioritySet = true;
+            setRegU32(*ctx, 4, 1u);
+            setRegU32(*ctx, 5, 64u);
+            ChangeThreadPriority(rdram, ctx, runtime);
+            return;
+        }
+        if (g_stackChurnStarted == kStackChurnThreads)
+        {
+            ctx->pc = 0u;
+            runtime->requestStop();
+            return;
+        }
+
+        // PS2SDK ee_thread_t: status, func, stack, stack_size, gp_reg, initial_priority, current_priority, attr, option.
+        const uint32_t param[9] = {0u, kStackChurnThreadPc, kStackChurnThreadStack, 0x1000u, 0u, 1u, 1u, 0u, 0u};
+        std::memcpy(rdram + kStackChurnParamAddr, param, sizeof(param));
+        setRegU32(*ctx, 4, kStackChurnParamAddr);
+        CreateThread(rdram, ctx, runtime);
+        const int32_t tid = getRegS32(*ctx, 2);
+        if (tid <= 0)
+        {
+            ctx->pc = 0u;
+            runtime->requestStop();
+            return;
+        }
+        ++g_stackChurnStarted;
+        setRegU32(*ctx, 4, static_cast<uint32_t>(tid));
+        setRegU32(*ctx, 5, 0u);
+        StartThread(rdram, ctx, runtime);
+    }
+
+    void schedulerStackChurnThread(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        ctx->pc = kStackChurnThreadResumePc;
+        GuestInvocation invocation{};
+        invocation.kind = GuestInvocationKind::Interrupt;
+        invocation.context = *ctx;
+        invocation.context.pc = kStackChurnHandlerPc;
+        setRegU32(invocation.context, 29, 0u);
+        setRegU32(invocation.context, 31, 0u);
+        runtime->eeScheduler().invokeCurrent(std::move(invocation));
+    }
+
+    void schedulerStackChurnHandler(uint8_t *, R5900Context *ctx, PS2Runtime *)
+    {
+        const uint32_t sp = getRegU32(ctx, 29);
+        g_stackChurnMinSp = std::min(g_stackChurnMinSp, sp);
+        g_stackChurnMaxSp = std::max(g_stackChurnMaxSp, sp);
+        ++g_stackChurnHandled;
+        ctx->pc = 0u;
+    }
+
+    void schedulerStackChurnThreadResume(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        ExitDeleteThread(rdram, ctx, runtime);
+    }
 }
 
 void register_ps2_runtime_interrupt_tests()
@@ -600,6 +679,66 @@ void register_ps2_runtime_interrupt_tests()
             t.IsFalse(exhausted, "queued callbacks must not consume one invocation stack per pending item");
             t.Equals(g_invocationQueueRuns, 96u, "every queued callback should execute exactly once");
             t.IsFalse(g_invocationQueueSpChanged, "sequential callbacks should reuse the same stack depth");
+        });
+
+        tc.Run("async callback stacks come from below the ELF before the top of RAM", [](TestCase &t)
+        {
+            TestEnv env;
+            constexpr uint32_t kStackSize = 0x4000u;
+            constexpr uint32_t kLowFloor = 0x00090000u;
+            constexpr uint32_t kLowCeiling = 0x000F0000u;
+            constexpr uint32_t kLowStacks = (kLowCeiling - kLowFloor) / kStackSize;
+
+            bool allLow = true;
+            uint32_t previous = 0xFFFFFFFFu;
+            for (uint32_t i = 0; i < kLowStacks; ++i)
+            {
+                const uint32_t sp = env.runtime.reserveAsyncCallbackStack(kStackSize, 16u);
+                allLow = allLow && sp > kLowFloor && sp < kLowCeiling && sp < previous;
+                previous = sp;
+            }
+            t.IsTrue(allLow, "the first stacks should be distinct and inside [0x00090000, 0x000F0000)");
+
+            const uint32_t fallback = env.runtime.reserveAsyncCallbackStack(kStackSize, 16u);
+            t.IsTrue(fallback >= 0x01F00000u && fallback < PS2_RAM_SIZE,
+                     "once the low region is full, allocation should fall back to the top of RAM");
+        });
+
+        tc.Run("threads that come and go reuse invocation stacks instead of exhausting them", [](TestCase &t)
+        {
+            TestEnv env;
+            env.runtime.registerFunction(kStackChurnMainPc, schedulerStackChurnMain);
+            env.runtime.registerFunction(kStackChurnThreadPc, schedulerStackChurnThread);
+            env.runtime.registerFunction(kStackChurnThreadResumePc, schedulerStackChurnThreadResume);
+            env.runtime.registerFunction(kStackChurnHandlerPc, schedulerStackChurnHandler);
+
+            g_stackChurnStarted = 0u;
+            g_stackChurnHandled = 0u;
+            g_stackChurnPrioritySet = false;
+            g_stackChurnMinSp = 0xFFFFFFFFu;
+            g_stackChurnMaxSp = 0u;
+
+            R5900Context mainContext{};
+            mainContext.pc = kStackChurnMainPc;
+            env.runtime.eeScheduler().reset(env.rdram.data(), mainContext);
+
+            bool exhausted = false;
+            try
+            {
+                env.runtime.eeScheduler().run();
+            }
+            catch (const std::runtime_error &error)
+            {
+                exhausted = std::string_view(error.what()) == "EE invocation stack space exhausted";
+            }
+
+            t.IsFalse(exhausted, "short-lived threads must not exhaust the invocation stack region");
+            t.Equals(g_stackChurnStarted, kStackChurnThreads, "every churn thread should be created and started");
+            t.Equals(g_stackChurnHandled, kStackChurnThreads, "every churn thread should run its invocation");
+            t.IsTrue(g_stackChurnMaxSp < 0x000F0000u && g_stackChurnMinSp > 0x00090000u,
+                     "every invocation should stay in the low region, never on the main thread's stack at the top of RAM");
+            t.IsTrue(g_stackChurnMaxSp - g_stackChurnMinSp < 0x8000u,
+                     "a deleted thread's stack should be reused by the next thread");
         });
 
         tc.Run("iSignalSema defers selection until IRQ return", [](TestCase &t)

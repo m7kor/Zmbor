@@ -377,6 +377,7 @@ private:
     [[nodiscard]] GuestThread *selectReady();
     void makeRunning(GuestThread &thread);
     void makeDormant(GuestThread &thread);
+    void releaseInvocationStacks(int threadId);
     void removeFromWaitObject(GuestThread &thread);
     [[noreturn]] void blockCurrent(EeWaitState wait);
     void makeReady(GuestThread &thread, int result, bool interruptSafe);
@@ -447,7 +448,11 @@ private:
     uint32_t m_gsVSyncCallback = 0;
     uint32_t m_gsVSyncCallbackGp = 0;
     uint32_t m_gsVSyncCallbackSp = 0;
+    // One stack per (thread id, invocation depth) while that thread can still hold a live invocation; a
+    // thread's stacks return to m_freeInvocationStackTops when it goes Dormant, so threads that come and go
+    // reuse them instead of exhausting the region.
     std::unordered_map<uint64_t, uint32_t> m_invocationStackTops;
+    std::vector<uint32_t> m_freeInvocationStackTops;
     std::atomic<uint64_t> m_nextDeadlineCycle{0};
 
     mutable std::mutex m_snapshotMutex;

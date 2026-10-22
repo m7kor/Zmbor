@@ -91,6 +91,9 @@ namespace
     constexpr uint32_t kGuestHeapDefaultAlignment = 16u;
     constexpr uint32_t kGuestHeapSafetyPad = 0x1000u;
     constexpr uint32_t kGuestHeapHardLimit = 0x01F00000u;
+    // Below the usual ELF load address (0x00100000) and above the EE kernel area (0x00000000..0x0007FFFF).
+    constexpr uint32_t kAsyncCallbackLowStackFloor = 0x00090000u;
+    constexpr uint32_t kAsyncCallbackLowStackCeiling = 0x000F0000u;
 
     constexpr uint32_t COP0_CAUSE_EXCCODE_MASK = 0x0000007Cu;
     constexpr uint32_t COP0_CAUSE_BD = 0x80000000u;
@@ -505,6 +508,9 @@ PS2Runtime::PS2Runtime()
     m_guestHeapConfigured = false;
     m_asyncCallbackStackFloor = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     m_asyncCallbackStackTop = PS2_RAM_SIZE;
+    m_asyncCallbackLowStackFloor = kAsyncCallbackLowStackFloor;
+    m_asyncCallbackLowStackTop = kAsyncCallbackLowStackCeiling;
+    m_asyncCallbackFallbackWarned = false;
 }
 
 void PS2Runtime::setDebugUiCallbacks(DebugUiCallback initCallback,
@@ -821,6 +827,7 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
     m_debugPc.store(m_cpuContext.pc, std::memory_order_relaxed);
 
     uint32_t maxLoadedRdramEnd = kGuestHeapDefaultBase;
+    uint32_t minLoadedRdramStart = PS2_RAM_SIZE;
     uint32_t moduleBase = std::numeric_limits<uint32_t>::max();
     uint32_t moduleEnd = 0u;
     bool loadedAnySegment = false;
@@ -922,6 +929,7 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         if (!scratch)
         {
             maxLoadedRdramEnd = std::max(maxLoadedRdramEnd, static_cast<uint32_t>(segmentMemEnd));
+            minLoadedRdramStart = std::min(minLoadedRdramStart, physAddr);
         }
 
         if (ph.flags & 0x1u) // PF_X
@@ -974,6 +982,11 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         const uint32_t hardLimit = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
         m_asyncCallbackStackFloor = std::min(std::max(hardLimit, suggestedHeapBase), PS2_RAM_SIZE);
         m_asyncCallbackStackTop = PS2_RAM_SIZE;
+        // Never let the low region reach into an ELF that loads below the usual 0x00100000.
+        m_asyncCallbackLowStackFloor = kAsyncCallbackLowStackFloor;
+        m_asyncCallbackLowStackTop =
+            std::min(kAsyncCallbackLowStackCeiling, minLoadedRdramStart & ~(kGuestHeapDefaultAlignment - 1u));
+        m_asyncCallbackFallbackWarned = false;
     }
 
     LoadedModule module;
@@ -1989,28 +2002,40 @@ uint32_t PS2Runtime::reserveAsyncCallbackStack(uint32_t size, uint32_t alignment
         return 0u;
     }
 
+    // Carve [floor, regionTop) downwards; returns the new stack's initial $sp, or 0 when the region is full.
+    auto carve = [&](uint32_t &regionTop, uint32_t floor) -> uint32_t
+    {
+        uint32_t top = std::min(regionTop, PS2_RAM_SIZE);
+        top &= ~(kGuestHeapDefaultAlignment - 1u);
+        if (top <= allocSize)
+        {
+            return 0u;
+        }
+        uint32_t base = top - allocSize;
+        base &= ~(normalizedAlignment - 1u);
+        if (base < floor || base >= top)
+        {
+            return 0u;
+        }
+        regionTop = base;
+        return top - 0x10u;
+    };
+
     std::lock_guard<std::mutex> lock(m_asyncCallbackStackMutex);
-    uint32_t top = m_asyncCallbackStackTop;
-    if (top > PS2_RAM_SIZE)
+    if (const uint32_t sp = carve(m_asyncCallbackLowStackTop, m_asyncCallbackLowStackFloor); sp != 0u)
     {
-        top = PS2_RAM_SIZE;
-    }
-    top &= ~(kGuestHeapDefaultAlignment - 1u);
-
-    if (top <= allocSize)
-    {
-        return 0u;
+        return sp;
     }
 
-    uint32_t base = top - allocSize;
-    base &= ~(normalizedAlignment - 1u);
-    if (base < m_asyncCallbackStackFloor || base >= top)
+    const uint32_t sp = carve(m_asyncCallbackStackTop, m_asyncCallbackStackFloor);
+    if (sp != 0u && !m_asyncCallbackFallbackWarned)
     {
-        return 0u;
+        m_asyncCallbackFallbackWarned = true;
+        std::cerr << "[runtime] async callback stack region below the ELF is full; falling back to the top of RAM at 0x"
+                  << std::hex << sp << std::dec
+                  << ", which can overlap the main thread's stack" << std::endl;
     }
-
-    m_asyncCallbackStackTop = base;
-    return top - 0x10u;
+    return sp;
 }
 
 uint8_t PS2Runtime::Load8(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)

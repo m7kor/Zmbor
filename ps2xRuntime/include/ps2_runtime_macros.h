@@ -855,7 +855,79 @@ inline __m128i ps2_u64_to_epi64_pair(uint64_t value)
 #define FPU_FLOOR_W_S(a) ((int32_t)floorf((float)(a)))
 #define FPU_CVT_S_W(a) ((float)(int32_t)(a))
 #define FPU_CVT_S_L(a) ((float)(int64_t)(a))
-#define FPU_CVT_W_S(a) ((int32_t)nearbyintf((float)(a)))
+// CVT.W.S truncates toward zero; a magnitude of 2^31 or more saturates by sign (PCSX2 FPU.cpp CVT_W).
+inline int32_t ps2_fcvt_w_s(float a)
+{
+    const uint32_t bits = std::bit_cast<uint32_t>(a);
+    if ((bits & PS2_FLOAT_EXP_MASK) <= 0x4E800000u)
+        return static_cast<int32_t>(a);
+    return (bits & PS2_FLOAT_SIGN_MASK) ? INT32_MIN : INT32_MAX;
+}
+#define FPU_CVT_W_S(a) ps2_fcvt_w_s((float)(a))
+
+// VU0 macro-mode Q-unit operations (DIV/SQRT/RSQRT). They clear and set the status I (0x10) and D (0x20) flags
+// and their sticky copies IS (0x400) and DS (0x800). Semantics follow PCSX2 VUops.cpp _vuDIV/_vuSQRT/_vuRSQRT;
+// the +-max result is the PS2's 0x7FFFFFFF used by the EE FPU semantics above, where PCSX2 clamps to 0x7F7FFFFF.
+constexpr uint16_t PS2_VU_STATUS_I = 0x0010u;
+constexpr uint16_t PS2_VU_STATUS_D = 0x0020u;
+constexpr uint16_t PS2_VU_STATUS_IS = 0x0400u;
+constexpr uint16_t PS2_VU_STATUS_DS = 0x0800u;
+
+inline bool ps2_fis_zero(float x)
+{
+    return (std::bit_cast<uint32_t>(x) & PS2_FLOAT_EXP_MASK) == 0u;
+}
+
+inline bool ps2_fis_negative_nonzero(float x)
+{
+    return !ps2_fis_zero(x) && (std::bit_cast<uint32_t>(x) & PS2_FLOAT_SIGN_MASK) != 0u;
+}
+
+inline void ps2_vu_raise(uint16_t &status, uint16_t flag)
+{
+    status = static_cast<uint16_t>(status | flag | (flag == PS2_VU_STATUS_I ? PS2_VU_STATUS_IS : PS2_VU_STATUS_DS));
+}
+
+inline float ps2_vu_signed_max(float a, float b)
+{
+    const uint32_t sign = (std::bit_cast<uint32_t>(a) ^ std::bit_cast<uint32_t>(b)) & PS2_FLOAT_SIGN_MASK;
+    return std::bit_cast<float>(sign | PS2_FLOAT_MAX_BITS);
+}
+
+inline float ps2_vu_div(uint16_t &status, float fs, float ft)
+{
+    status = static_cast<uint16_t>(status & ~(PS2_VU_STATUS_I | PS2_VU_STATUS_D));
+    if (ps2_fis_zero(ft))
+    {
+        ps2_vu_raise(status, ps2_fis_zero(fs) ? PS2_VU_STATUS_I : PS2_VU_STATUS_D);
+        return ps2_vu_signed_max(fs, ft);
+    }
+    return ps2_fdiv_slow(fs, ft);
+}
+
+inline float ps2_vu_sqrt(uint16_t &status, float ft)
+{
+    status = static_cast<uint16_t>(status & ~(PS2_VU_STATUS_I | PS2_VU_STATUS_D));
+    if (ps2_fis_negative_nonzero(ft))
+        ps2_vu_raise(status, PS2_VU_STATUS_I);
+    return ps2_fsqrt_slow(ft);
+}
+
+inline float ps2_vu_rsqrt(uint16_t &status, float fs, float ft)
+{
+    status = static_cast<uint16_t>(status & ~(PS2_VU_STATUS_I | PS2_VU_STATUS_D));
+    if (ps2_fis_zero(ft))
+    {
+        ps2_vu_raise(status, PS2_VU_STATUS_D);
+        if (!ps2_fis_zero(fs))
+            return ps2_vu_signed_max(fs, ft);
+        ps2_vu_raise(status, PS2_VU_STATUS_I);
+        return std::bit_cast<float>((std::bit_cast<uint32_t>(fs) ^ std::bit_cast<uint32_t>(ft)) & PS2_FLOAT_SIGN_MASK);
+    }
+    if (ps2_fis_negative_nonzero(ft))
+        ps2_vu_raise(status, PS2_VU_STATUS_I);
+    return ps2_frsqrt_slow(fs, ft);
+}
 #define FPU_CVT_L_S(a) ((int64_t)(float)(a))
 #define FPU_C_F_S(a, b) (0)
 #define FPU_C_UN_S(a, b) (isnan((float)(a)) || isnan((float)(b)))
@@ -958,7 +1030,8 @@ inline __m128i ps2_qfsrv(__m128i rs, __m128i rt, uint32_t sa)
 #define PS2_QFSRV(rs, rt, sa) ps2_qfsrv((__m128i)(rs), (__m128i)(rt), (uint32_t)(sa))
 #define PS2_PCPYLD(rs, rt) _mm_unpacklo_epi64(rt, rs)
 #define PS2_PEXEH(rs) _mm_shufflelo_epi16(_mm_shufflehi_epi16(rs, _MM_SHUFFLE(2, 3, 0, 1)), _MM_SHUFFLE(2, 3, 0, 1))
-#define PS2_PEXEW(rs) _mm_shuffle_epi32(rs, _MM_SHUFFLE(2, 3, 0, 1))
+// PEXEW swaps words 0 and 2: rd = {rt2, rt1, rt0, rt3} (PCSX2 MMI.cpp PEXEW).
+#define PS2_PEXEW(rs) _mm_shuffle_epi32(rs, _MM_SHUFFLE(3, 0, 1, 2))
 #define PS2_PROT3W(rs) _mm_shuffle_epi32(rs, _MM_SHUFFLE(0, 3, 2, 1))
 
 // Additional VU0 operations

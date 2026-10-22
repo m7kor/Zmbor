@@ -18,6 +18,7 @@
 #include "Stubs/VU.h"
 
 #include <atomic>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -315,6 +316,69 @@ void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
+        tc.Run("CVT.W.S truncates toward zero and saturates by sign", [](TestCase &t)
+        {
+            t.Equals(ps2_fcvt_w_s(2.9f), 2, "positive values truncate");
+            t.Equals(ps2_fcvt_w_s(-2.9f), -2, "negative values truncate toward zero");
+            t.Equals(ps2_fcvt_w_s(2147483520.0f), 2147483520, "the largest float below 2^31 converts exactly");
+            t.Equals(ps2_fcvt_w_s(3.0e9f), INT32_MAX, "2^31 and above saturate to INT32_MAX");
+            t.Equals(ps2_fcvt_w_s(-3.0e9f), INT32_MIN, "-2^31 and below saturate to INT32_MIN");
+        });
+
+        tc.Run("VU0 macro DIV/SQRT/RSQRT follow the FDIV-unit rules and set I/D", [](TestCase &t)
+        {
+            auto bits = [](float f) { return std::bit_cast<uint32_t>(f); };
+            uint16_t st = 0u;
+            t.IsTrue(ps2_vu_div(st, 6.0f, 3.0f) == 2.0f && (st & 0x30u) == 0u, "DIV of normal values sets no flag");
+            st = 0u;
+            t.Equals(bits(ps2_vu_div(st, 1.0f, 0.0f)), 0x7FFFFFFFu, "x/0 gives +max");
+            t.IsTrue((st & PS2_VU_STATUS_D) && (st & PS2_VU_STATUS_DS) && !(st & PS2_VU_STATUS_I), "x/0 sets D and DS only");
+            st = 0u;
+            t.Equals(bits(ps2_vu_div(st, -1.0f, 0.0f)), 0xFFFFFFFFu, "-x/0 gives -max (sign of fs xor ft)");
+            st = 0u;
+            (void)ps2_vu_div(st, 0.0f, 0.0f);
+            t.IsTrue((st & PS2_VU_STATUS_I) && (st & PS2_VU_STATUS_IS) && !(st & PS2_VU_STATUS_D), "0/0 sets I and IS");
+            st = PS2_VU_STATUS_I | PS2_VU_STATUS_IS;
+            (void)ps2_vu_div(st, 6.0f, 3.0f);
+            t.IsTrue(!(st & PS2_VU_STATUS_I) && (st & PS2_VU_STATUS_IS), "a later DIV clears I but keeps the sticky IS");
+
+            st = 0u;
+            t.IsTrue(ps2_vu_sqrt(st, -4.0f) == 2.0f && (st & PS2_VU_STATUS_I), "SQRT takes |ft| and flags a negative ft");
+            st = 0u;
+            t.IsTrue(ps2_vu_sqrt(st, 4.0f) == 2.0f && st == 0u, "SQRT of a positive ft sets no flag");
+
+            st = 0u;
+            t.IsTrue(ps2_vu_rsqrt(st, 6.0f, -4.0f) == 3.0f && (st & PS2_VU_STATUS_I), "RSQRT is fs/sqrt(|ft|)");
+            st = 0u;
+            t.Equals(bits(ps2_vu_rsqrt(st, 1.0f, 0.0f)), 0x7FFFFFFFu, "RSQRT by zero gives +-max");
+            t.IsTrue((st & PS2_VU_STATUS_D) && !(st & PS2_VU_STATUS_I), "RSQRT by zero sets D");
+            st = 0u;
+            t.Equals(bits(ps2_vu_rsqrt(st, 0.0f, 0.0f)), 0u, "0/sqrt(0) gives 0");
+            t.IsTrue((st & PS2_VU_STATUS_D) && (st & PS2_VU_STATUS_I), "0/sqrt(0) sets D and I");
+        });
+
+        tc.Run("VU0 macro VRSQRT reads its fs numerator", [](TestCase &t)
+        {
+            Instruction inst{};
+            inst.rd = 4; // fs
+            inst.rt = 7; // ft
+            inst.vectorInfo.fsf = 1;
+            inst.vectorInfo.ftf = 3;
+            ps2recomp::CodeGenerator gen({}, {});
+            const std::string generated = gen.translateVU_VRSQRT(inst);
+            t.IsTrue(generated.find("ctx->vu0_vf[4]") != std::string::npos, "VRSQRT must read fs");
+            t.IsTrue(generated.find("ps2_vu_rsqrt(ctx->vu0_status, fs, ft)") != std::string::npos,
+                     "VRSQRT must compute fs/sqrt(|ft|) and update the status flags");
+        });
+
+        tc.Run("PEXEW swaps words 0 and 2", [](TestCase &t)
+        {
+            alignas(16) uint32_t lanes[4];
+            _mm_store_si128(reinterpret_cast<__m128i *>(lanes), PS2_PEXEW(_mm_set_epi32(3, 2, 1, 0)));
+            t.IsTrue(lanes[0] == 2u && lanes[1] == 1u && lanes[2] == 0u && lanes[3] == 3u,
+                     "rd = {rt2, rt1, rt0, rt3}");
+        });
+
         tc.Run("every R5900Context starts with VF00 = (0, 0, 0, 1)", [](TestCase &t)
         {
             // Threads, interrupt handlers and callbacks all get a fresh context, not only the boot thread.

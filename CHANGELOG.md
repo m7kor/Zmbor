@@ -29,7 +29,9 @@ See `docs/INTEGRATION_MATRIX.md` for the evidence behind each decision, includin
 ## Phase 0b — community engineering integration (2026-10-23)
 
 After: `ps2x_tests` 466/466, `ps2xIOP` ctest 4/4, `research_database_valid` ctest passing.
-Every fix below was checked against PCSX2 source and has a regression test that fails when the fix is reverted.
+The ISA/VU fixes were checked against PCSX2 source; #259 against Play!'s HLE kernel; PR #284 cites PCSX2/ps2tek.
+All have regression tests; for the community-sourced fixes each test was also confirmed to fail with its fix reverted
+(not done for #259 and #284).
 
 - Signed branches test bit 63; SQRT.S reads ft (from the SotC fork, also found by DQ8, Killzone, Def Jam, BT3).
 - VF00 = (0,0,0,1) in every context; LQ/SQ/LQC2/SQC2 align to 16 bytes (SotC, Killzone, God of War).

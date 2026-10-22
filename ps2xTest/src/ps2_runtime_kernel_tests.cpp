@@ -1109,8 +1109,10 @@ void register_ps2_runtime_kernel_tests()
 
             EeThreadStatusAbi status{};
             std::memcpy(&status, env.rdram.data() + K_STATUS_ADDR, sizeof(status));
-            t.Equals(status.stack, kExpectedStack,
-                     "main thread status must expose SetupThread's stable initial stack");
+            t.Equals(status.stack, kExpectedStack - kMainStackSize,
+                     "main thread status must expose the base of SetupThread's stack, like CreateThread threads (#259)");
+            t.Equals(status.stack + static_cast<uint32_t>(status.stack_size), kExpectedStack,
+                     "base + size must be the stack top SetupThread returned");
             t.Equals(status.stack_size, static_cast<int32_t>(kMainStackSize),
                      "main thread status must preserve SetupThread's stack size");
             t.Equals(status.gp_reg, kMainGp,

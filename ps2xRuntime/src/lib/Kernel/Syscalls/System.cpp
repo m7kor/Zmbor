@@ -523,7 +523,10 @@ namespace ps2_syscalls
         sp &= ~0xFu;
         if (stack == 0xFFFFFFFFu)
         {
-            initialStack = sp;
+            // Record the base, as CreateThread does and as ReferThreadStatus reports it (the stack spans
+            // [base, base + size) and grows down from the returned $sp). Storing the top here made
+            // GuestThread::stack mean two different things (#259).
+            initialStack = (stackSize != 0u && sp >= stackSize) ? sp - stackSize : sp;
         }
         else if (stack != 0u)
         {

@@ -1021,9 +1021,17 @@
     "upstream_equivalent": "#367, #295 (open; #295 also stalls VIF1)",
     "risk": "low",
     "priority": 1,
-    "status": "CANDIDATE",
+    "status": "INTEGRATED",
     "evidence": {
-      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "tests_added": [
+        "a VIFcode with the I bit latches INTC VIF0/VIF1 only for its own VIF",
+        "VIF1 I-bit IRQ runs the INTC_VIF1 handler and wakes its waiter"
+      ],
+      "integration_commit": "c8093ef",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 Vif1_Dma.cpp/Vif0_Dma.cpp hwIntcIrq(VIF1intc/VIF0intc) after an I-bit VIFcode",
+      "build": "MSVC 14.44 Release OK"
     },
     "agent_report": {
       "id": "dq8-19",
@@ -1054,7 +1062,8 @@
       "upstream_pr_equivalent": "#367, #295 (open; #295 also stalls VIF1)",
       "priority": 1,
       "recommended_status": "CANDIDATE"
-    }
+    },
+    "limitations": "Interrupt only; the hardware VIF stall (STAT.VIS until FBRST.STC, upstream #295) is not modelled."
   },
   {
     "id": "dq8-20",
@@ -1189,7 +1198,7 @@
     "upstream_equivalent": "#269, #373 (open)",
     "risk": "low",
     "priority": 2,
-    "status": "CANDIDATE",
+    "status": "SUPERSEDED",
     "evidence": {
       "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
     },
@@ -1218,7 +1227,8 @@
       "upstream_pr_equivalent": "#269, #373 (open)",
       "priority": 2,
       "recommended_status": "CANDIDATE"
-    }
+    },
+    "limitations": "Integrated via sotc-20 (c8093ef)."
   },
   {
     "id": "dq8-23",
@@ -1300,9 +1310,17 @@
     "upstream_equivalent": null,
     "risk": "low",
     "priority": 1,
-    "status": "CANDIDATE",
+    "status": "INTEGRATED",
     "evidence": {
-      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "tests_added": [
+        "JR reads the latest VI value after an integer write (replaces upstream test)",
+        "JALR uses the latest target before writing its link register"
+      ],
+      "integration_commit": "3666b1b",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 VUops.cpp _vuJR/_vuJALR read VI[_Is_] (no VI_BACKUP, unlike _vuIBEQ); microVU mVUanalyzeJump has no analyzeBranchVI",
+      "build": "MSVC 14.44 Release OK"
     },
     "agent_report": {
       "id": "dq8-24",
@@ -1358,9 +1376,17 @@
     "upstream_equivalent": "#312 (open)",
     "risk": "low",
     "priority": 1,
-    "status": "CANDIDATE",
+    "status": "INTEGRATED",
     "evidence": {
-      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "tests_added": [
+        "EFU sub-opcodes follow the PCSX2 lower-op tables",
+        "all EFU opcodes produce P at their architectural latency (updated)"
+      ],
+      "integration_commit": "3666b1b",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 VUops.cpp LowerOP_T3_00..T3_11 tables mapped with funct2 = idx*4 + table",
+      "build": "MSVC 14.44 Release OK"
     },
     "agent_report": {
       "id": "dq8-25",

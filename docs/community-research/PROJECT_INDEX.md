@@ -46,6 +46,9 @@ The same defect fixed independently in several engines is the strongest evidence
 | VF00 zero in new contexts | SotC, God of War, Road Trip | integrated (a42c052) |
 | DMA chain cut at 4096 tags | SotC, DQ8, SRWZ | integrated (9ed5b6e) |
 | Invocation stacks on the main thread's stack | DQ8, SRWZ, SotC | integrated (6460dd7) |
-| VIF1 DIRECT pending IMAGE swallowed VIFcodes | SotC, DQ8, Killzone, SRWZ | candidate |
+| VIF1 DIRECT pending IMAGE swallowed VIFcodes | SotC, DQ8, Killzone, SRWZ | integrated (c8093ef) |
 | Whole-GS renderer behind a raw-GIF seam | BT3, Def Jam, Killzone, Urban Reign | design: `docs/decisions/0001-gs-raw-gif-seam.md` |
 | VU1 microprograms compiled ahead of time | Def Jam, God of War, Urban Reign, BT3, AC5 | architecture reference |
+| VU1 EFU sub-opcodes misnumbered (ERSQRT/ESIN/EATAN/EEXP) | DQ8, upstream PR #312 | integrated (3666b1b) |
+| VIF I bit set STAT.INT but raised no INTC interrupt | DQ8, upstream PRs #367/#295 | integrated without the VIF stall (c8093ef) |
+

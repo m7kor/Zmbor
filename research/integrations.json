@@ -137,5 +137,72 @@
     "evidence": {
       "partial_integration": "PEXEW only, in 252de7c with test 'PEXEW swaps words 0 and 2'"
     }
+  },
+  "dq8-25": {
+    "evidence": {
+      "tests_added": [
+        "EFU sub-opcodes follow the PCSX2 lower-op tables",
+        "all EFU opcodes produce P at their architectural latency (updated)"
+      ],
+      "integration_commit": "3666b1b",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 VUops.cpp LowerOP_T3_00..T3_11 tables mapped with funct2 = idx*4 + table",
+      "build": "MSVC 14.44 Release OK"
+    },
+    "status": "INTEGRATED"
+  },
+  "dq8-24": {
+    "evidence": {
+      "tests_added": [
+        "JR reads the latest VI value after an integer write (replaces upstream test)",
+        "JALR uses the latest target before writing its link register"
+      ],
+      "integration_commit": "3666b1b",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 VUops.cpp _vuJR/_vuJALR read VI[_Is_] (no VI_BACKUP, unlike _vuIBEQ); microVU mVUanalyzeJump has no analyzeBranchVI",
+      "build": "MSVC 14.44 Release OK"
+    },
+    "status": "INTEGRATED"
+  },
+  "dq8-19": {
+    "evidence": {
+      "tests_added": [
+        "a VIFcode with the I bit latches INTC VIF0/VIF1 only for its own VIF",
+        "VIF1 I-bit IRQ runs the INTC_VIF1 handler and wakes its waiter"
+      ],
+      "integration_commit": "c8093ef",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 Vif1_Dma.cpp/Vif0_Dma.cpp hwIntcIrq(VIF1intc/VIF0intc) after an I-bit VIFcode",
+      "build": "MSVC 14.44 Release OK"
+    },
+    "status": "INTEGRATED",
+    "note": "Interrupt only; the hardware VIF stall (STAT.VIS until FBRST.STC, upstream #295) is not modelled."
+  },
+  "sotc-20": {
+    "evidence": {
+      "tests_added": [
+        "VIF1 DIRECT image tag continues in the next DIRECT payload (ported)",
+        "VIF1 DIRECT finds an image continuation after packed setup (ported)",
+        "VIF1 DIRECT cut at the end of the data continues in the next transfer"
+      ],
+      "integration_commit": "c8093ef",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "verified_by_lead": "PCSX2 vifCode_Direct keeps GIF path state across DIRECTs and vifX.cmd/tag.size across transfers",
+      "build": "MSVC 14.44 Release OK"
+    },
+    "status": "INTEGRATED",
+    "note": "Adds the cut-DIRECT continuation the fork dropped (Killzone 0005)."
+  },
+  "dq8-22": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-20 (c8093ef)."
+  },
+  "KZ-DIRECTIMG": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-20 (c8093ef), including the cut-DIRECT continuation."
+  },
+  "srwz-06": {
+    "status": "SUPERSEDED",
+    "note": "Integrated via sotc-20 (c8093ef)."
   }
 }

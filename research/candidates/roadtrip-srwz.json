@@ -1696,7 +1696,7 @@
     "upstream_equivalent": "#269 (parse VIFcodes between DIRECT image tag and pixel data), #373 (PATH2 packets split across DIRECTs)",
     "risk": "low",
     "priority": 2,
-    "status": "CANDIDATE",
+    "status": "SUPERSEDED",
     "evidence": {
       "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
     },
@@ -1723,7 +1723,8 @@
       "upstream_pr_equivalent": "#269 (parse VIFcodes between DIRECT image tag and pixel data), #373 (PATH2 packets split across DIRECTs)",
       "priority": 2,
       "recommended_status": "CANDIDATE"
-    }
+    },
+    "limitations": "Integrated via sotc-20 (c8093ef)."
   },
   {
     "id": "srwz-07",

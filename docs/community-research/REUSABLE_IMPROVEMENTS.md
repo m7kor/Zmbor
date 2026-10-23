@@ -10,11 +10,11 @@ CANDIDATE = source inspection only, nothing built or tested here.
 |---|---|
 | ANALYZED | 22 |
 | ARCHITECTURE_REFERENCE | 10 |
-| CANDIDATE | 108 |
+| CANDIDATE | 101 |
 | GAME_SPECIFIC | 4 |
-| INTEGRATED | 12 |
+| INTEGRATED | 17 |
 | REJECTED | 7 |
-| SUPERSEDED | 22 |
+| SUPERSEDED | 25 |
 
 ## Integrated
 
@@ -26,6 +26,11 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | sotc-06 | LightVelox/PS2Recomp | VF00 = (0,0,0,1) in the R5900Context constructor | a42c052 | 1 |
 | sotc-07 | LightVelox/PS2Recomp | LQ/SQ/LQC2/SQC2 ignore the low four address bits | a42c052 | 1 |
 | sotc-10 | LightVelox/PS2Recomp | DMA chain walker no longer stops after 4096 tags | 9ed5b6e | 1 |
+| sotc-20 | LightVelox/PS2Recomp | VIF1 DIRECT continues a pending GIF IMAGE only from the next DIRECT payload | c8093ef | 3 |
+| own-01 | ran-j/PS2Recomp | VU1 EATAN series constant had a dropped digit (-0.13085337519646 vs -0.139085337519646) | 3666b1b | 1 |
+| dq8-19 | Sinan-Karakaya/PS2Recomp | VIFcode i-bit raises INTC VIF0(4)/VIF1(5) | c8093ef | 2 |
+| dq8-24 | Sinan-Karakaya/PS2Recomp | VU JR/JALR read current VI, not the branch-delayed VI | 3666b1b | 2 |
+| dq8-25 | Sinan-Karakaya/PS2Recomp | EFU sub-opcodes: ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D, EEXP 0x7E; 0x77/0x7F reserved | 3666b1b | 2 |
 | upstream-01 | ran-j/PS2Recomp | Decode a delay slot that lies past the function's end (PR #304, issue #370) | e88054b, f8292ed | 3 |
 | upstream-02 | ran-j/PS2Recomp | VCALLMSR starts from CMSAR0 instead of vi[27] (PR #268, issue #262) | dbe446b | 1 |
 | upstream-03 | ran-j/PS2Recomp | VU0 macro LQI/LQD/SQI/SQD/ILWR/ISWR operands and VU0 data memory (PR #310, issue #309) | b60446a, f8292ed | 3 |
@@ -39,9 +44,6 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 
 | Id | Cat | Subsystem | Title | Risk | Upstream equivalent |
 |---|---|---|---|---|---|
-| dq8-19 | A | VIF interpreter / EeScheduler | VIFcode i-bit raises INTC VIF0(4)/VIF1(5) | low | #367, #295 (open; #295 also stalls VIF1) |
-| dq8-24 | D | VU1 interpreter lower | VU JR/JALR read current VI, not the branch-delayed VI | low |  |
-| dq8-25 | D | VU1 interpreter lower + latency table | EFU sub-opcodes: ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D, EEXP 0x7E; 0x77/0x7F reserved | low | #312 (open) |
 | roadtrip-10 | D | runtime context + recompiler COP2 | VF0 hard-wired to (0,0,0,1) in every R5900Context; writes to VF0 dropped | low | #187, #320, #201, #292 |
 | srwz-01 | B | recompiler MMI + runtime macros | MMI HI/LO family moves all 128 bits (PMFHI/PMFLO/PMTHI/PMTLO) and PMFHL.LW/UW/SLW/LH/SH, PMTHL.LW use LO1/HI1 | low | #322 (give MMI HI/LO family both pipelines' registers) |
 | srwz-05 | A | DMAC chain mode (ps2_memory.cpp) | DMA chain walk: no 4096-tag cutoff (1<<20 loop guard plus 64 MiB data bound, logged) | low | #297 (raise DMA chain tag limit and warn) |
@@ -49,11 +51,9 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 | vendored-08 | A | VIF | VIF UNPACK V4-5 scales channels to 8 bits | low |  |
 | vendored-17 | D | GS backend interface | GSRasterBackend raw-GIF extension (WantsRawGif/RawGif/VSync(GSVSyncRegs)/GsReset) | low |  |
 | vendored-23 | E | test harness | EE differential tester: re-run recompiled functions on PCSX2's interpreter and diff | low |  |
-| vendored-10 | A | VIF1/GIF PATH2 | A pending PATH2 IMAGE after DIRECT must not swallow VIFcodes | medium |  |
 | vendored-18 | D | GS | paraLLEl-GS renderer with an ordering contract, mailbox presentation and a threaded CPU backend | medium |  |
 | dq8-15 | C | EeScheduler | IRQ/alarm/GS VSync callbacks get sp=0 (invocation stack); pool kept below guest stacks | low | #298 (stacks), our #258 |
 | dq8-21 | C | ps2_memory DMA chain | Source-chain DMA: Brent cycle detection instead of a 4096-tag cap | low | #297, #313 (open) |
-| dq8-22 | D | VIF1 interpreter PATH2 | GIF IMAGE continuation consumes only DIRECT payload, not VIFcodes | low | #269, #373 (open) |
 | dq8-26 | D | VU1 core perf | Don't memset the 64 KiB XGKICK buffer on every VU1 start | low |  |
 | dq8-31 | C | MemoryCard stubs | MCMAN wildcard semantics and basename rename | low |  |
 | dq8-34 | C | MPEG stubs | sceMpegCreate ends with sceMpegReset | low | #376 (open) |
@@ -69,10 +69,8 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 | sotc-09 | A | recompiler vu_translation_helpers/vu_translator; runtime Ee… | VU0 R register (VRNEXT/VRINIT/VRXOR/VRGET/CTC2 R), VFTOI saturation, VABS denormal flush, shared R across con… | low | #318 (VFTOI saturation), #383 (VFTOI). No PR found for VRNE… |
 | sotc-13 | C | runtime EeScheduler VBlank / SetGsCrt syscall | VBlank period follows SetGsCrt video mode (PAL 20000 us, NTSC 16683 us) | low | none (#332 is about pacing debt) |
 | sotc-16 | C | ps2xIOP module loader | IOP sceSifLoadModuleBuffer reads the ELF from IOP RAM | low | #355 'Load IRX module buffers from IOP RAM' |
-| sotc-20 | D | runtime VIF1 interpreter | VIF1 DIRECT continues a pending GIF IMAGE only from the next DIRECT payload | low | #269 'parse VIFcodes between a DIRECT image tag and its pix… |
 | sotc-21 | D | runtime GS CPU backend blend | GS alpha blend honours COLCLAMP (wrap when CLAMP=0) | low | none found |
 | srwz-04 | C | LibC stubs (Helpers/Support.h Ps2VarArgCursor/Ps2VaListCurs… | EE EABI varargs for printf-family stubs: 8 arg registers, then 8-byte stack slots from caller sp+0; va_list s… | low | none |
-| srwz-06 | A | VIF1 interpreter | VIF1 DIRECT: GIF IMAGE continuation consumed only from later DIRECT payloads; DIRECT payload split across tra… | low | #269 (parse VIFcodes between DIRECT image tag and pixel dat… |
 | srwz-11 | C | ps2xIOP module loader | sceSifLoadModuleBuffer reads the IRX from IOP memory first | low | #355 (Load IRX module buffers from IOP RAM) |
 | srwz-14 | C | CDVD HLE | CD pseudo-LSN base moved above dual-layer DVD (0x500000) and past the image size; one CD registry for EE and … | low | none (overlaps roadtrip-01/14) |
 | srwz-17 | C | Stubs/MemoryCard.cpp | Memory card: sceMcReadFast/WriteFast (RPC func 0x16/0x1B via sceMcSync), reopen without truncation | low | #220 (sceMc2), #174 |

@@ -1,0 +1,35 @@
+[
+  {
+    "scope_evidence": "Every VU1 program using EATAN*",
+    "status": "INTEGRATED",
+    "evidence": {
+      "tests_added": [
+        "EFU sub-opcodes follow the PCSX2 lower-op tables (EATAN at t = 1 within 1e-4 of pi/2)"
+      ],
+      "integration_commit": "3666b1b",
+      "analysis": "found while verifying dq8-25 against PCSX2",
+      "regression": "ps2x_tests 471/471, ps2xIOP 4/4; mutation (fix reverted) fails its tests",
+      "build": "MSVC 14.44 Release OK"
+    },
+    "source": {
+      "files": [
+        "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp"
+      ],
+      "revision": "eb8688b",
+      "branch": "main",
+      "repository": "ran-j/PS2Recomp"
+    },
+    "reference": "PCSX2 pcsx2/VUops.cpp _vuCalculateEATAN",
+    "id": "own-01",
+    "priority": 2,
+    "title": "VU1 EATAN series constant had a dropped digit (-0.13085337519646 vs -0.139085337519646)",
+    "upstream_equivalent": null,
+    "scope": "general",
+    "risk": "low",
+    "problem": "Fourth EATAN series coefficient mistyped; EATAN/EATANxy/EATANxz results off by up to ~0.008 near t = 1.",
+    "category": "D",
+    "license": "GPL-3.0",
+    "approach": "Use PCSX2 _vuCalculateEATAN's constant; the other seven constants already matched it digit for digit.",
+    "subsystem": "VU1 EFU"
+  }
+]

@@ -40,3 +40,18 @@ All have regression tests; for the community-sourced fixes each test was also co
 - `SetupThread(-1)` records the stack base (#259); `D_ENABLEW` mirrors to `D_ENABLER` (PR #284).
 - Community research database: 185 records from 4 forensic passes over 15 listed projects plus a 205-fork scan,
   with a schema, a validator run by ctest, and generated reports in `docs/community-research/`.
+
+## Phase 0c — VU1 and VIF batch (2026-10-23)
+
+After: `ps2x_tests` 471/471, `ps2xIOP` ctest 4/4. Each fix was checked against PCSX2 source, and every new or
+changed test was confirmed to fail with its fix reverted.
+
+- VU1 EFU sub-opcodes decode at the numbers PCSX2's lower-op tables give (ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D,
+  EEXP 0x7E; 0x77/0x7F reserved), with matching latencies (from the DQ8 fork).
+- VU1 EATAN used a mistyped series constant (-0.13085337519646 for -0.139085337519646); found while checking the above.
+- VU1 JR/JALR read the current VI value; the delayed-VI rule applies only to conditional branches (DQ8 fork).
+- A VIFcode with the I bit raises INTC VIF0/VIF1 (DQ8 fork). The accompanying VIF stall is not modelled yet.
+- A GIF IMAGE left open by a DIRECT continues only in the next DIRECT payload, never in VIFcodes; a DIRECT cut at
+  the end of the DMA data continues in the next transfer (SotC fork, also DQ8, Killzone, SRWZ).
+- Two upstream tests encoded the old behaviour (JR's VI timing; raw pixels after a DIRECT) and were replaced with
+  the ported community tests.

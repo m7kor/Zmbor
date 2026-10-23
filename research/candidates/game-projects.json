@@ -463,7 +463,7 @@
     "upstream_equivalent": null,
     "risk": "medium",
     "priority": 1,
-    "status": "CANDIDATE",
+    "status": "SUPERSEDED",
     "evidence": {
       "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
     },
@@ -487,7 +487,8 @@
       "priority": 1,
       "recommended_status": "CANDIDATE"
     },
-    "source_id": "KZ-DIRECTIMG"
+    "source_id": "KZ-DIRECTIMG",
+    "limitations": "Integrated via sotc-20 (c8093ef), including the cut-DIRECT continuation."
   },
   {
     "id": "vendored-11",

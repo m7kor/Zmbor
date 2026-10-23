@@ -769,6 +769,168 @@ void register_ps2_memory_tests()
             t.IsTrue((mem.vif1_regs.stat & (1u << 11)) == 0u, "FBRST.STC should clear VIF1 STAT.INT");
         });
 
+        // VIF stalls, following PCSX2: Vif_Transfer.cpp stops after an I-bit command, Vif1_Dma.cpp/Vif0_Dma.cpp set
+        // INT (unless ER1), raise INTC, set VIS unless the code is MARK and stall while VSS|VIS|VFS is set;
+        // Vif.cpp vifNFBRST STC clears VSS|VFS|VIS|INT|ER0|ER1 and resumes; ERR.MII masks the I bit.
+        tc.Run("VIF1 I bit stalls the VIF after its command until FBRST.STC", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            std::vector<uint8_t> first;
+            appendU32(first, 0x80000000u | makeVifCmd(0x00u, 0u, 0u)); // NOP with the I bit
+            appendU32(first, makeVifCmd(0x07u, 0u, 0x1111u));          // MARK, behind the stall
+            mem.processVIF1Data(first.data(), static_cast<uint32_t>(first.size()));
+
+            const uint32_t stat = mem.readIORegister(0x10003C00u);
+            t.IsTrue((stat & (1u << 10)) != 0u && (stat & (1u << 11)) != 0u, "VIF1_STAT should read VIS and INT");
+            t.Equals(mem.takePendingVifInterrupts(), 0x2u, "the I bit should raise INTC_VIF1");
+            t.Equals(mem.vif1_regs.mark, 0u, "the code after the I-bit command must wait for STC");
+
+            std::vector<uint8_t> second;
+            appendU32(second, makeVifCmd(0x07u, 0u, 0x2222u));         // a later transfer, also held
+            mem.processVIF1Data(second.data(), static_cast<uint32_t>(second.size()));
+            t.Equals(mem.vif1_regs.mark, 0u, "data arriving during the stall must be held as well");
+
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x8u), "FBRST.STC write should succeed");
+            t.Equals(mem.vif1_regs.mark, 0x2222u, "STC should run the held data in arrival order");
+            t.IsTrue((mem.readIORegister(0x10003C00u) & ((1u << 10) | (1u << 11))) == 0u, "STC should clear VIS and INT");
+            t.IsFalse(mem.isVifStalled(1u), "the VIF should run again after STC");
+        });
+
+        tc.Run("VIF1 MARK with the I bit interrupts without stalling", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, 0x80000000u | makeVifCmd(0x07u, 0u, 0x1234u));
+            appendU32(packet, makeVifCmd(0x07u, 0u, 0x5678u));
+            mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            t.Equals(mem.takePendingVifInterrupts(), 0x2u, "MARK with the I bit still raises INTC_VIF1");
+            t.IsTrue((mem.vif1_regs.stat & (1u << 11)) != 0u, "and sets STAT.INT");
+            t.IsTrue((mem.vif1_regs.stat & (1u << 10)) == 0u, "but not VIS");
+            t.Equals(mem.vif1_regs.mark, 0x5678u, "the next code runs immediately");
+        });
+
+        tc.Run("VIF1 ERR.MII masks the I bit", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(mem.writeIORegister(0x10003C20u, 0x1u), "ERR.MII write should succeed");
+            t.Equals(mem.readIORegister(0x10003C20u), 0x1u, "VIF1_ERR should read back");
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, 0x80000000u | makeVifCmd(0x00u, 0u, 0u));
+            appendU32(packet, makeVifCmd(0x07u, 0u, 0x4321u));
+            mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            t.IsFalse(mem.hasPendingVifInterrupts(), "a masked I bit raises no interrupt");
+            t.IsTrue((mem.vif1_regs.stat & ((1u << 10) | (1u << 11))) == 0u, "a masked I bit sets neither INT nor VIS");
+            t.Equals(mem.vif1_regs.mark, 0x4321u, "and does not stall");
+        });
+
+        tc.Run("VIF1 DMA behind an I-bit stall completes only after FBRST.STC", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            constexpr uint32_t kVif1Ch = 0x10009000u;
+            constexpr uint32_t kDStat = 0x1000E010u;
+            constexpr uint32_t kSrc = 0x00024000u;
+            uint8_t *rdram = mem.getRDRAM();
+            const uint32_t words[4] = {0x80000000u, makeVifCmd(0x07u, 0u, 0x0ABCu), 0u, 0u};
+            std::memcpy(rdram + kSrc, words, sizeof(words));
+
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 1u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
+            mem.processPendingTransfers();
+
+            t.IsTrue((mem.readIORegister(kVif1Ch + 0x00u) & 0x100u) != 0u, "CHCR.STR stays set while data is held");
+            t.IsTrue((mem.readIORegister(kDStat) & 0x2u) == 0u, "D_STAT.CIS1 is not raised while data is held");
+            t.IsTrue(mem.consumeCompletedDmacCauses().empty(), "no DMAC completion while data is held");
+
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x8u), "FBRST.STC write should succeed");
+            t.Equals(mem.vif1_regs.mark, 0x0ABCu, "the held data runs on STC");
+            t.IsTrue((mem.readIORegister(kVif1Ch + 0x00u) & 0x100u) == 0u, "the DMA completes after STC");
+            t.IsTrue((mem.readIORegister(kDStat) & 0x2u) != 0u, "D_STAT.CIS1 is raised after STC");
+            const std::vector<uint32_t> causes = mem.consumeCompletedDmacCauses();
+            t.IsTrue(causes.size() == 1u && causes[0] == 1u, "exactly one VIF1 DMAC completion after STC");
+        });
+
+        tc.Run("VIF1 DMA whose last code carries the I bit completes while VIS stays set", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            constexpr uint32_t kVif1Ch = 0x10009000u;
+            constexpr uint32_t kSrc = 0x00024000u;
+            const uint32_t words[4] = {0u, 0u, 0u, 0x80000000u}; // the I-bit NOP is the last word
+            std::memcpy(mem.getRDRAM() + kSrc, words, sizeof(words));
+
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 1u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
+            mem.processPendingTransfers();
+
+            t.IsTrue((mem.readIORegister(kVif1Ch + 0x00u) & 0x100u) == 0u, "nothing is held, so the DMA completes");
+            t.IsTrue(mem.isVifStalled(1u), "but the VIF stays stalled (VIS) until STC");
+        });
+
+        tc.Run("VIF1 FBRST.RST drops held data and releases a held DMA", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            constexpr uint32_t kVif1Ch = 0x10009000u;
+            constexpr uint32_t kSrc = 0x00024000u;
+            const uint32_t words[4] = {0x80000000u, makeVifCmd(0x07u, 0u, 0x0DEFu), 0u, 0u};
+            std::memcpy(mem.getRDRAM() + kSrc, words, sizeof(words));
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 1u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
+            mem.processPendingTransfers();
+
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x1u), "FBRST.RST write should succeed");
+            t.IsFalse(mem.isVifStalled(1u), "RST clears the stall");
+            t.IsTrue(mem.vifStalledData(1u).empty(), "RST drops the held data");
+            t.Equals(mem.vif1_regs.mark, 0u, "the dropped data never runs");
+            t.IsTrue((mem.readIORegister(kVif1Ch + 0x00u) & 0x100u) == 0u, "RST releases the held DMA");
+        });
+
+        tc.Run("VIF1 FBRST.STP stalls incoming data until STC", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x4u), "FBRST.STP write should succeed");
+            t.IsTrue((mem.readIORegister(0x10003C00u) & (1u << 8)) != 0u, "STP sets VSS");
+
+            const uint32_t mark = makeVifCmd(0x07u, 0u, 0x0777u);
+            mem.processVIF1Data(reinterpret_cast<const uint8_t *>(&mark), sizeof(mark));
+            t.Equals(mem.vif1_regs.mark, 0u, "a stopped VIF holds its data");
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x8u), "FBRST.STC write should succeed");
+            t.Equals(mem.vif1_regs.mark, 0x0777u, "STC resumes it");
+        });
+
+        tc.Run("VIF0 I bit stalls until VIF0_FBRST.STC", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, 0x80000000u | makeVifCmd(0x00u, 0u, 0u));
+            appendU32(packet, makeVifCmd(0x07u, 0u, 0x0055u));
+            mem.processVIF0Data(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            t.IsTrue((mem.readIORegister(0x10003800u) & (1u << 10)) != 0u, "VIF0_STAT should read VIS");
+            t.Equals(mem.takePendingVifInterrupts(), 0x1u, "the I bit should raise INTC_VIF0");
+            t.Equals(mem.vif0_regs.mark, 0u, "VIF0 holds the code after the I-bit command");
+            t.IsTrue(mem.writeIORegister(0x10003810u, 0x8u), "VIF0_FBRST.STC write should succeed");
+            t.Equals(mem.vif0_regs.mark, 0x0055u, "STC resumes VIF0");
+        });
+
         tc.Run("VIF FBRST RST clears VIF1 command state", [](TestCase &t)
         {
             PS2Memory mem;

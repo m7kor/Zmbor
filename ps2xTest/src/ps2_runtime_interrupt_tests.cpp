@@ -373,6 +373,39 @@ namespace
         runtime->requestStop();
     }
 
+    // VIF1 stall end to end: the INTC_VIF1 handler releases the stall with FBRST.STC, as a game's handler does.
+    constexpr uint32_t kVifStallWaitPc = 0x00160730u;
+    constexpr uint32_t kVifStallResumePc = 0x00160740u;
+    constexpr uint32_t kVifStallHandlerPc = 0x00160750u;
+    std::atomic<bool> g_vifStallResumed{false};
+    uint32_t g_vifStallMarkInHandler = 0xFFFFFFFFu;
+
+    void schedulerVifStallHandler(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        g_vifStallMarkInHandler = runtime->memory().vif1_regs.mark;
+        runtime->memory().writeIORegister(0x10003C10u, 0x8u); // FBRST.STC
+        runtime->eeScheduler().signalSemaphore(g_testSemaphoreId, true);
+        ctx->pc = 0u;
+    }
+
+    void schedulerVifStallWait(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        EeScheduler &scheduler = runtime->eeScheduler();
+        g_testSemaphoreId = scheduler.createSemaphore(0, 1, 0u, 0u);
+        scheduler.addIrqHandler(false, 5u, kVifStallHandlerPc, true, 0u, 0u, 0u);
+        const uint32_t words[2] = {0x80000000u, (0x07u << 24) | 0x0099u}; // I-bit NOP, then MARK 0x99
+        runtime->memory().processVIF1Data(reinterpret_cast<const uint8_t *>(words), sizeof(words));
+        ctx->pc = kVifStallResumePc;
+        scheduler.waitSemaphore(g_testSemaphoreId);
+    }
+
+    void schedulerVifStallResume(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        g_vifStallResumed.store(true, std::memory_order_release);
+        ctx->pc = 0u;
+        runtime->requestStop();
+    }
+
     void schedulerInvocationQueueHandler(uint8_t *, R5900Context *ctx, PS2Runtime *)
     {
         const uint32_t sp = getRegU32(ctx, 29);
@@ -892,6 +925,43 @@ void register_ps2_runtime_interrupt_tests()
             t.IsFalse(schedulerThrew.load(std::memory_order_acquire), "the VIF IRQ path should not throw");
             const std::vector<int> expected{1, 2, 3};
             t.IsTrue(g_dispatchTrace == expected, "wait, INTC_VIF1 handler, then the resumed waiter");
+        });
+
+        tc.Run("an INTC_VIF1 handler releases the VIF1 stall with FBRST.STC", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.registerFunction(kVifStallWaitPc, schedulerVifStallWait);
+            env.runtime.registerFunction(kVifStallResumePc, schedulerVifStallResume);
+            env.runtime.registerFunction(kVifStallHandlerPc, schedulerVifStallHandler);
+            g_vifStallResumed.store(false, std::memory_order_release);
+            g_vifStallMarkInHandler = 0xFFFFFFFFu;
+
+            R5900Context mainContext{};
+            mainContext.pc = kVifStallWaitPc;
+            std::thread gameThread([&]()
+            {
+                try
+                {
+                    env.runtime.eeScheduler().reset(env.rdram.data(), mainContext);
+                    env.runtime.eeScheduler().run();
+                }
+                catch (...)
+                {
+                }
+            });
+            const bool resumed = waitUntil([]() { return g_vifStallResumed.load(std::memory_order_acquire); },
+                                           std::chrono::milliseconds(150));
+            if (!resumed)
+            {
+                env.runtime.requestStop();
+            }
+            gameThread.join();
+
+            t.IsTrue(resumed, "the waiter should resume after the handler runs");
+            t.Equals(g_vifStallMarkInHandler, 0u, "the code behind the I bit has not run when the handler starts");
+            t.Equals(env.runtime.memory().vif1_regs.mark, 0x0099u, "the handler's STC runs the held code");
+            t.IsFalse(env.runtime.memory().isVifStalled(1u), "the VIF is running again");
         });
 
         tc.Run("EE Timer2 compare IRQ wakes a DelayThread-style semaphore wait", [](TestCase &t)

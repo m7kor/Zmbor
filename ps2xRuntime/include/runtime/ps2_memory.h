@@ -315,6 +315,12 @@ public:
     // (PCSX2 Vif0_Dma.cpp/Vif1_Dma.cpp: hwIntcIrq(VIF0intc/VIF1intc)). The EE scheduler drains these.
     // The VIF stall that accompanies it on hardware (STAT.VIS until FBRST.STC) is not modelled.
     void submitPath2DirectPayload(const uint8_t *payload, uint32_t qwCount, bool directHl);
+
+    // VIFn stall (STAT.VSS/VFS/VIS, set by FBRST.STP/FBK or after an I-bit VIFcode): the VIF processes nothing,
+    // data that arrives is kept, and a VIFn DMA whose data is still waiting does not complete, until FBRST.STC.
+    // Follows PCSX2 Vif.cpp vif0FBRST/vif1FBRST and Vif0_Dma.cpp/Vif1_Dma.cpp.
+    bool isVifStalled(uint32_t vif) const noexcept;
+    const std::vector<uint8_t> &vifStalledData(uint32_t vif) const noexcept { return m_vifStalledData[vif & 1u]; }
     void raiseVifInterrupt(uint32_t vif) noexcept { m_pendingVifInterrupts.fetch_or(1u << vif, std::memory_order_acq_rel); }
     uint32_t takePendingVifInterrupts() noexcept { return m_pendingVifInterrupts.exchange(0u, std::memory_order_acq_rel); }
     bool hasPendingVifInterrupts() const noexcept { return m_pendingVifInterrupts.load(std::memory_order_acquire) != 0u; }
@@ -413,6 +419,19 @@ public:
     uint8_t *m_vu0Code = nullptr;
     uint8_t *m_vu0Data = nullptr;
     std::atomic<uint32_t> m_pendingVifInterrupts{0u};
+    std::vector<uint8_t> m_vifStalledData[2];
+    bool m_vifIrqStallPending[2] = {false, false};
+    bool m_vifDmaHeld[2] = {false, false};
+    VIFRegisters &vifRegs(uint32_t vif) noexcept { return (vif & 1u) ? vif1_regs : vif0_regs; }
+    bool bufferIfVifStalled(uint32_t vif, const uint8_t *data, uint32_t sizeBytes);
+    void takeVifInterruptBit(uint32_t vif, uint32_t cmd);
+    bool stallVifBeforeNextCode(uint32_t vif, const uint8_t *data, uint32_t pos, uint32_t sizeBytes);
+    void finishVifCommandStall(uint32_t vif);
+    void writeVifFbrst(uint32_t vif, uint32_t value);
+    void resumeVifAfterStall(uint32_t vif);
+    void finishVifDma(uint32_t vif);
+    void completeVifDma(uint32_t vif);
+    uint32_t readVifRegister(uint32_t vif, uint32_t offset) const;
     uint8_t *m_vu1Code = nullptr;
     uint8_t *m_vu1Data = nullptr;
     bool m_path3Masked = false;

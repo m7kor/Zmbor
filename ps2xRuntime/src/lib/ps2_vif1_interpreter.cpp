@@ -99,10 +99,15 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
 {
     if (sizeBytes == 0u)
         return;
+    if (bufferIfVifStalled(0u, data, sizeBytes))
+        return;
 
     uint32_t pos = 0;
     while (pos + 4 <= sizeBytes)
     {
+        if (stallVifBeforeNextCode(0u, data, pos, sizeBytes))
+            return;
+
         uint32_t cmd = 0u;
         std::memcpy(&cmd, data + pos, sizeof(cmd));
         pos += 4u;
@@ -115,10 +120,7 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
         vif0_regs.code = cmd;
         vif0_regs.num = num;
         if (irq)
-        {
-            vif0_regs.stat |= (1u << 11);
-            raiseVifInterrupt(0u);
-        }
+            takeVifInterruptBit(0u, cmd);
 
         if (opcode == VIF_NOP)
         {
@@ -286,6 +288,7 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
             break;
         }
     }
+    finishVifCommandStall(0u);
 }
 
 void PS2Memory::processVIF1Data(uint32_t srcPhys, uint32_t sizeBytes)
@@ -341,6 +344,8 @@ void PS2Memory::processVIF1Data(const uint8_t *data, uint32_t sizeBytes)
 {
     if (sizeBytes == 0u)
         return;
+    if (bufferIfVifStalled(1u, data, sizeBytes))
+        return;
 
     uint32_t pos = 0;
 
@@ -361,6 +366,10 @@ void PS2Memory::processVIF1Data(const uint8_t *data, uint32_t sizeBytes)
             continue;
         }
 
+        // An I-bit command has finished (including a DIRECT that continued from an earlier transfer).
+        if (stallVifBeforeNextCode(1u, data, pos, sizeBytes))
+            return;
+
         uint32_t cmd;
         memcpy(&cmd, data + pos, 4);
         pos += 4;
@@ -374,10 +383,7 @@ void PS2Memory::processVIF1Data(const uint8_t *data, uint32_t sizeBytes)
         vif1_regs.code = cmd;
         vif1_regs.num = num;
         if (irq)
-        {
-            vif1_regs.stat |= (1u << 11); // INT
-            raiseVifInterrupt(1u);
-        }
+            takeVifInterruptBit(1u, cmd);
 
         if (opcode == VIF_NOP)
         {
@@ -807,5 +813,150 @@ void PS2Memory::processVIF1Data(const uint8_t *data, uint32_t sizeBytes)
         {
             continue;
         }
+    }
+    if (m_vif1PendingDirectQwc == 0u)
+        finishVifCommandStall(1u);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// VIF stalls (VSS/VFS/VIS). PCSX2 Vif_Transfer.cpp stops the VIFcode loop once an I-bit command has finished;
+// Vif0_Dma.cpp/Vif1_Dma.cpp then set INT (unless ER1), raise INTC VIF0/VIF1, set VIS unless the code was MARK, and
+// stall while VSS|VIS|VFS is set. Vif.cpp vifNFBRST: STC clears VSS|VFS|VIS|INT|ER0|ER1 and resumes a stalled VIF.
+
+namespace
+{
+    constexpr uint32_t kVifStatVss = 1u << 8;
+    constexpr uint32_t kVifStatVfs = 1u << 9;
+    constexpr uint32_t kVifStatVis = 1u << 10;
+    constexpr uint32_t kVifStatInt = 1u << 11;
+    constexpr uint32_t kVifStatEr0 = 1u << 12;
+    constexpr uint32_t kVifStatEr1 = 1u << 13;
+    constexpr uint32_t kVifErrMii = 1u << 0;
+}
+
+bool PS2Memory::isVifStalled(uint32_t vif) const noexcept
+{
+    const VIFRegisters &regs = (vif & 1u) ? vif1_regs : vif0_regs;
+    return (regs.stat & (kVifStatVss | kVifStatVfs | kVifStatVis)) != 0u;
+}
+
+bool PS2Memory::bufferIfVifStalled(uint32_t vif, const uint8_t *data, uint32_t sizeBytes)
+{
+    if (!isVifStalled(vif))
+        return false;
+    std::vector<uint8_t> &held = m_vifStalledData[vif & 1u];
+    held.insert(held.end(), data, data + sizeBytes);
+    return true;
+}
+
+void PS2Memory::takeVifInterruptBit(uint32_t vif, uint32_t cmd)
+{
+    VIFRegisters &regs = vifRegs(vif);
+    if ((regs.err & kVifErrMii) != 0u)
+        return; // ERR.MII masks the I bit entirely
+    if ((regs.stat & kVifStatEr1) == 0u)
+        regs.stat |= kVifStatInt;
+    raiseVifInterrupt(vif);
+    if (((cmd >> 24) & 0x7Fu) != VIF_MARK)
+        m_vifIrqStallPending[vif & 1u] = true;
+}
+
+bool PS2Memory::stallVifBeforeNextCode(uint32_t vif, const uint8_t *data, uint32_t pos, uint32_t sizeBytes)
+{
+    if (!m_vifIrqStallPending[vif & 1u])
+        return false;
+    m_vifIrqStallPending[vif & 1u] = false;
+    vifRegs(vif).stat |= kVifStatVis;
+    std::vector<uint8_t> &held = m_vifStalledData[vif & 1u];
+    held.insert(held.end(), data + pos, data + sizeBytes);
+    return true;
+}
+
+void PS2Memory::finishVifCommandStall(uint32_t vif)
+{
+    if (m_vifIrqStallPending[vif & 1u])
+    {
+        m_vifIrqStallPending[vif & 1u] = false;
+        vifRegs(vif).stat |= kVifStatVis;
+    }
+}
+
+void PS2Memory::writeVifFbrst(uint32_t vif, uint32_t value)
+{
+    VIFRegisters &regs = vifRegs(vif);
+    if (value & 0x2u) // FBK
+        regs.stat |= kVifStatVfs;
+    if (value & 0x4u) // STP
+        regs.stat |= kVifStatVss;
+    if (value & 0x8u) // STC
+    {
+        const bool cancel = isVifStalled(vif);
+        regs.stat &= ~(kVifStatVss | kVifStatVfs | kVifStatVis | kVifStatInt | kVifStatEr0 | kVifStatEr1);
+        if (cancel)
+            resumeVifAfterStall(vif);
+    }
+    if (value & 0x1u) // RST: drop whatever the stall was holding; a held DMA has nothing left to wait for
+    {
+        m_vifStalledData[vif & 1u].clear();
+        m_vifIrqStallPending[vif & 1u] = false;
+        if (m_vifDmaHeld[vif & 1u])
+        {
+            m_vifDmaHeld[vif & 1u] = false;
+            completeVifDma(vif);
+        }
+    }
+}
+
+void PS2Memory::resumeVifAfterStall(uint32_t vif)
+{
+    std::vector<uint8_t> held;
+    held.swap(m_vifStalledData[vif & 1u]);
+    if (!held.empty())
+    {
+        if (vif & 1u)
+            processVIF1Data(held.data(), static_cast<uint32_t>(held.size()));
+        else
+            processVIF0Data(held.data(), static_cast<uint32_t>(held.size()));
+        if (m_gifArbiter)
+            m_gifArbiter->drain();
+    }
+    if (m_vifDmaHeld[vif & 1u] && m_vifStalledData[vif & 1u].empty())
+    {
+        m_vifDmaHeld[vif & 1u] = false;
+        completeVifDma(vif);
+    }
+}
+
+void PS2Memory::finishVifDma(uint32_t vif)
+{
+    // A VIF DMA whose data is held behind a stall is not complete until the stall releases it
+    // (PCSX2 Vif1_Dma.cpp: the DMA stays stalled while qwc > 0 or the chain is not done).
+    if (isVifStalled(vif) && !m_vifStalledData[vif & 1u].empty())
+        m_vifDmaHeld[vif & 1u] = true;
+    else
+        completeVifDma(vif);
+}
+
+uint32_t PS2Memory::readVifRegister(uint32_t vif, uint32_t offset) const
+{
+    const VIFRegisters &regs = (vif & 1u) ? vif1_regs : vif0_regs;
+    switch (offset)
+    {
+    case 0x00: return regs.stat;
+    case 0x10: return 0u; // FBRST is write-only
+    case 0x20: return regs.err;
+    case 0x30: return regs.mark;
+    case 0x40: return regs.cycle;
+    case 0x50: return regs.mode;
+    case 0x60: return regs.num;
+    case 0x70: return regs.mask;
+    case 0x80: return regs.code;
+    case 0x90: return regs.itops;
+    case 0xA0: return regs.base;
+    case 0xB0: return regs.ofst;
+    case 0xC0: return regs.tops;
+    case 0xD0: return regs.itop;
+    case 0xE0: return regs.top;
+    default: return 0u;
     }
 }

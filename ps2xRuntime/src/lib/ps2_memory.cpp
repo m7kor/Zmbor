@@ -340,6 +340,12 @@ bool PS2Memory::initialize(size_t ramSize)
     m_vif1PendingPath2DirectHl = false;
     m_vif1PendingDirectQwc = 0u;
     m_vif1PendingDirectHl = false;
+    for (uint32_t vif = 0u; vif < 2u; ++vif)
+    {
+        m_vifStalledData[vif].clear();
+        m_vifIrqStallPending[vif] = false;
+        m_vifDmaHeld[vif] = false;
+    }
     resetEeTimers();
 
     try
@@ -1245,8 +1251,18 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
 
         switch (address)
         {
+        case 0x10003C00u: // VIF1_STAT: only FDR (bit 23) is writable
+            vif1_regs.stat = (vif1_regs.stat & ~(1u << 23)) | (value & (1u << 23));
+            break;
+        case 0x10003C20u: // VIF1_ERR
+            vif1_regs.err = value & 0x7u;
+            break;
         case 0x10003C10u:     // VIF1_FBRST
-            if (value & 0x1u) // RST
+            if ((value & 0x1u) == 0u)
+            {
+                writeVifFbrst(1u, value);
+            }
+            else // RST
             {
                 const bool wasPath3Masked = m_path3Masked;
                 std::memset(&vif1_regs, 0, sizeof(vif1_regs));
@@ -1257,10 +1273,7 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                 m_path3Masked = false;
                 if (wasPath3Masked)
                     flushMaskedPath3Packets();
-            }
-            if (value & 0x8u) // STC
-            {
-                vif1_regs.stat &= ~((1u << 8) | (1u << 9) | (1u << 10) | (1u << 11) | (1u << 12) | (1u << 13));
+                writeVifFbrst(1u, value & 0x1u); // drop held data, release a held DMA
             }
             break;
         case 0x10003C30u:
@@ -1310,6 +1323,29 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
     if (address >= 0x10003800u && address < 0x10003A00u)
     {
         m_vifWriteCount.fetch_add(1, std::memory_order_relaxed);
+        switch (address)
+        {
+        case 0x10003810u: // VIF0_FBRST
+            if (value & 0x1u)
+            {
+                std::memset(&vif0_regs, 0, sizeof(vif0_regs));
+                writeVifFbrst(0u, value & 0x1u);
+            }
+            else
+            {
+                writeVifFbrst(0u, value);
+            }
+            break;
+        case 0x10003820u: // VIF0_ERR
+            vif0_regs.err = value & 0x7u;
+            break;
+        case 0x10003830u:
+            vif0_regs.mark = value & 0xFFFFu;
+            vif0_regs.stat &= ~(1u << 6);
+            break;
+        default:
+            break;
+        }
         return true;
     }
 
@@ -1921,19 +1957,25 @@ void PS2Memory::processPendingTransfers()
         m_ioRegisters[GIF_CHANNEL + 0x20] = 0;
     }
     if (hadVif0)
-    {
-        raiseDStatChannel(0u); // VIF0 channel
-        queueCompletedDmacCause(0u);
-        m_ioRegisters[VIF0_CHANNEL + 0x00] &= ~0x100u;
-        m_ioRegisters[VIF0_CHANNEL + 0x20] = 0;
-    }
+        finishVifDma(0u);
     if (hadVif1)
-    {
-        raiseDStatChannel(1u); // VIF1 channel
-        queueCompletedDmacCause(1u);
-        m_ioRegisters[VIF1_CHANNEL + 0x00] &= ~0x100u;
-        m_ioRegisters[VIF1_CHANNEL + 0x20] = 0;
-    }
+        finishVifDma(1u);
+}
+
+void PS2Memory::completeVifDma(uint32_t vif)
+{
+    constexpr uint32_t D_STAT = 0x1000E010u;
+    const uint32_t channel = (vif & 1u) ? 0x10009000u : 0x10008000u;
+    uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
+    dstat |= (1u << (vif & 1u));
+    if (((dstat & 0x3FFu) & ((dstat >> 16) & 0x3FFu)) != 0u)
+        dstat |= (1u << 31);
+    else
+        dstat &= ~(1u << 31);
+    m_ioRegisters[D_STAT] = dstat;
+    queueCompletedDmacCause(vif & 1u);
+    m_ioRegisters[channel + 0x00] &= ~0x100u;
+    m_ioRegisters[channel + 0x20] = 0;
 }
 
 void PS2Memory::queueCompletedDmacCause(uint32_t cause)
@@ -2370,6 +2412,11 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
         return val;
     }
 
+    if (address >= 0x10003800u && address < 0x10003900u && (address & 0xFu) == 0u && (address & 0xFFu) <= 0xE0u)
+        return readVifRegister(0u, address & 0xFFu); // VIF0 registers live in vif0_regs
+    if (address >= 0x10003C00u && address < 0x10003D00u && (address & 0xFu) == 0u && (address & 0xFFu) <= 0xE0u)
+        return readVifRegister(1u, address & 0xFFu); // VIF1 registers live in vif1_regs
+
     if (address == 0x10003020u) // GIF_STAT
     {
         uint32_t stat = m_ioRegisters.count(address) ? m_ioRegisters[address] : 0u;
@@ -2392,6 +2439,9 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
         {
             if ((address & 0xFF) == 0x00)
             {
+                // A VIF DMA held behind a VIF stall is still running until FBRST.STC releases it.
+                if ((address == 0x10008000u && m_vifDmaHeld[0]) || (address == 0x10009000u && m_vifDmaHeld[1]))
+                    return m_ioRegisters[address] | 0x100u;
                 uint32_t channelStatus = m_ioRegisters[address] & ~0x100u;
                 m_ioRegisters[address] = channelStatus;
                 return channelStatus;

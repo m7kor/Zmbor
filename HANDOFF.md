@@ -1,16 +1,21 @@
-# PS2Recomp Ultimate — handoff (2026-10-24)
+# Zmbor — handoff (2026-10-24)
 
-Checkpoint of the "PS2Recomp Ultimate" work on top of `ran-j/PS2Recomp@eb8688b`. Everything below was measured on
-the commit that adds this file (parent `eaaa0a4`); re-measure before quoting numbers.
+Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
+built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
 ## State
 
-| check | result |
-|---|---|
-| hardware result tests (ps2autotests, real-PS2 `.expected`) | **47 / 55 exact**, 8172 / 8250 lines (99.1%), 0 crashes, 0 timeouts |
-| `ps2x_tests` (unit) | 519 / 519 |
-| ctest in `build/ps2xTest` without `hwtest` label (research DB, GS cache, end-to-end) | 48 / 48 |
-| `ps2xIOP` ctest | 4 / 4 |
+There are two revisions, measured separately:
+
+| check | pre-integration `ae1c119` (parent `eaaa0a4`) | published Zmbor `main` (`00ac972` merge, docs on top) |
+|---|---|---|
+| hardware result tests (ps2autotests, real-PS2 `.expected`) | **47 / 55 exact**, 8172 / 8250 lines (99.1%), 0 crashes, 0 timeouts (measured on `eaaa0a4`) | **not rerun** after the #384 merge |
+| `ps2x_tests` (unit) | 519 / 519 | 520 / 520 (#384 adds one GS test) |
+| ctest in `build/ps2xTest` without `hwtest` label (research DB, GS cache, end-to-end) | 48 / 48 | 48 / 48 |
+| `ps2xIOP` ctest | 4 / 4 | 4 / 4 |
+
+GitHub Actions on Zmbor (`.github/workflows/build.yml`) builds and runs `ps2x_tests` on Linux GCC, Linux Clang and
+Windows MSVC for every push and pull request.
 
 Commercial game compatibility has **not** been verified. These results come from the hardware test ELFs, unit
 tests and synthetic end-to-end programs.
@@ -20,10 +25,19 @@ Progress of the hardware matrix: first run 6/54 → end of Phase 2 32/55 → Pha
 
 ## Branches and commits
 
-- Local worktree `D:\Project\Zmbor\wt`, branch `ultimate/phase0-recomp-correctness` (the full history).
-- Published as `ultimate/phase3-hwtest-47of55` on https://github.com/m7kor/PS2Recomp.
-- `ultimate/phase3-integration`: that branch merged with the fork's `main` (`e563698`, upstream #384 "GIF: treat
-  FLG=3 like IMAGE"), the source of the draft PR to `main`.
+- **Published:** `main` of https://github.com/m7kor/Zmbor. It is the integration history:
+  - `ae1c119` merged with upstream #384 (`e563698`, "GIF: treat FLG=3 like IMAGE"), giving `00ac972`;
+  - `9abdd93` (Zmbor README and `ROADMAP.md`);
+  - this handoff correction.
+- `main` is protected: pull request required, no force-push, no deletion. Work on a branch and open a PR.
+- **Continue from** local worktree `D:\Project\Zmbor\wt-integration`, branch `ultimate/phase3-integration`, which
+  matches Zmbor `main`. Push with gh credentials:
+  `git -c credential.helper= -c "credential.helper=!'C:/Program Files/GitHub CLI/gh.exe' auth git-credential" push https://github.com/m7kor/Zmbor.git <branch>`.
+- **History only:** local worktree `D:\Project\Zmbor\wt`, branch `ultimate/phase0-recomp-correctness` at `ae1c119`,
+  is the pre-integration development line. It is not published on its own, and its commits are all in Zmbor `main`.
+  `D:\Project\Zmbor\PS2Recomp` is the original upstream clone (`eb8688b`).
+- The fork `m7kor/PS2Recomp` (main `e563698`) and upstream `ran-j/PS2Recomp` were not modified; nothing from this
+  work was pushed there.
 - Key commits: `0d60991` (hwtest pipeline), `934ce1d` (FPU/kernel fixes), `d045786` (VU microcode execution),
   `eaaa0a4` (VIF/SPR/DMAC). `CHANGELOG.md` lists every change by phase with its root cause.
 
@@ -39,6 +53,9 @@ cmake --build build --parallel 10
 - FetchContent dependencies were pre-cloned to `D:\Project\Zmbor\deps` and passed as
   `-DFETCHCONTENT_SOURCE_DIR_{ELFIO,TOML11,FMT,LIBDWARF,RABBITIZER,RAYLIB,IMGUI,RLIMGUI,NLOHMANN_JSON}=...`
   (the default toml11 fetch pulls large submodules and stalls).
+- Existing build directories:
+  - `D:\Project\Zmbor\wt-integration\build` is configured without hardware tests, with IOP tests on.
+  - `D:\Project\Zmbor\wt\build` is the pre-integration tree configured with `PS2X_HWTEST_GENERATED`.
 - Without `PS2X_HWTEST_GENERATED` the build takes about 2 minutes. With it, about 12 minutes, because the 55
   generated test programs compile at /Od. /O2 made it 55 minutes (`PS2X_HWTEST_OPTIMIZE`).
 - Debug builds (`build-debug`) work (CMP0141 /Z7).

@@ -1052,6 +1052,142 @@ static inline void Ps2SetGprLow64(R5900Context *ctx, int reg, __m128i new_low)
     }
 }
 
+// ---- MMI HI/LO family (PCSX2 MMI.cpp). LO and HI are 128-bit on the EE: words 0-1 live in ctx->lo/hi (pipeline 0),
+// words 2-3 in ctx->lo1/hi1 (pipeline 1). All halfword products are exact s32 values, one per word.
+struct Ps2HiLoWords
+{
+    uint32_t lo[4];
+    uint32_t hi[4];
+};
+
+static inline Ps2HiLoWords ps2LoadHiLo(const R5900Context *ctx)
+{
+    Ps2HiLoWords w;
+    w.lo[0] = static_cast<uint32_t>(ctx->lo);
+    w.lo[1] = static_cast<uint32_t>(ctx->lo >> 32);
+    w.lo[2] = static_cast<uint32_t>(ctx->lo1);
+    w.lo[3] = static_cast<uint32_t>(ctx->lo1 >> 32);
+    w.hi[0] = static_cast<uint32_t>(ctx->hi);
+    w.hi[1] = static_cast<uint32_t>(ctx->hi >> 32);
+    w.hi[2] = static_cast<uint32_t>(ctx->hi1);
+    w.hi[3] = static_cast<uint32_t>(ctx->hi1 >> 32);
+    return w;
+}
+
+static inline void ps2StoreHiLo(R5900Context *ctx, const Ps2HiLoWords &w)
+{
+    ctx->lo = static_cast<uint64_t>(w.lo[0]) | (static_cast<uint64_t>(w.lo[1]) << 32);
+    ctx->lo1 = static_cast<uint64_t>(w.lo[2]) | (static_cast<uint64_t>(w.lo[3]) << 32);
+    ctx->hi = static_cast<uint64_t>(w.hi[0]) | (static_cast<uint64_t>(w.hi[1]) << 32);
+    ctx->hi1 = static_cast<uint64_t>(w.hi[2]) | (static_cast<uint64_t>(w.hi[3]) << 32);
+}
+
+static inline __m128i ps2Words128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
+{
+    return _mm_set_epi32(static_cast<int32_t>(w3), static_cast<int32_t>(w2), static_cast<int32_t>(w1), static_cast<int32_t>(w0));
+}
+
+enum class Ps2MmiAccumulate
+{
+    Set,
+    Add,
+    Sub
+};
+
+// PMULTH / PMADDH / PMSUBH: product i of the eight halfword pairs goes to LO word {0,1,_,_,2,3,_,_}[i] or
+// HI word {_,_,0,1,_,_,2,3}[i]; rd = {LO0, HI0, LO2, HI2}.
+static inline __m128i ps2MmiHalfwordMultiply(R5900Context *ctx, __m128i rs, __m128i rt, Ps2MmiAccumulate mode)
+{
+    alignas(16) int16_t a[8];
+    alignas(16) int16_t b[8];
+    _mm_store_si128(reinterpret_cast<__m128i *>(a), rs);
+    _mm_store_si128(reinterpret_cast<__m128i *>(b), rt);
+    Ps2HiLoWords w = ps2LoadHiLo(ctx);
+    for (int i = 0; i < 8; ++i)
+    {
+        const uint32_t product = static_cast<uint32_t>(static_cast<int32_t>(a[i]) * static_cast<int32_t>(b[i]));
+        uint32_t &word = ((i & 2) ? w.hi : w.lo)[((i >> 2) << 1) | (i & 1)];
+        word = (mode == Ps2MmiAccumulate::Set) ? product : (mode == Ps2MmiAccumulate::Add) ? word + product : word - product;
+    }
+    ps2StoreHiLo(ctx, w);
+    return ps2Words128(w.lo[0], w.hi[0], w.lo[2], w.hi[2]);
+}
+
+// PHMADH / PHMSBH: pair k (halfwords 2k, 2k+1) gives first = p[2k+1], sum = first +/- p[2k]; pairs 0..3 go to
+// LO0/1, HI0/1, LO2/3, HI2/3 as {sum, first} (PHMSBH stores ~first, PCSX2's documented-as-undocumented result).
+static inline __m128i ps2MmiHorizontalMultiply(R5900Context *ctx, __m128i rs, __m128i rt, bool subtract)
+{
+    alignas(16) int16_t a[8];
+    alignas(16) int16_t b[8];
+    _mm_store_si128(reinterpret_cast<__m128i *>(a), rs);
+    _mm_store_si128(reinterpret_cast<__m128i *>(b), rt);
+    Ps2HiLoWords w{};
+    for (int k = 0; k < 4; ++k)
+    {
+        const int32_t first = static_cast<int32_t>(a[2 * k + 1]) * static_cast<int32_t>(b[2 * k + 1]);
+        const int32_t second = static_cast<int32_t>(a[2 * k]) * static_cast<int32_t>(b[2 * k]);
+        uint32_t *reg = (k & 1) ? w.hi : w.lo;
+        const int word = (k >> 1) << 1;
+        reg[word] = subtract ? static_cast<uint32_t>(first) - static_cast<uint32_t>(second)
+                             : static_cast<uint32_t>(first) + static_cast<uint32_t>(second);
+        reg[word + 1] = subtract ? ~static_cast<uint32_t>(first) : static_cast<uint32_t>(first);
+    }
+    ps2StoreHiLo(ctx, w);
+    return ps2Words128(w.lo[0], w.hi[0], w.lo[2], w.hi[2]);
+}
+
+static inline uint16_t ps2PmfhlClamp(int32_t v)
+{
+    return static_cast<uint16_t>(v > 0x7FFF ? 0x7FFF : v < -0x8000 ? 0x8000 : v);
+}
+
+static inline uint64_t ps2PmfhlSlw(uint32_t hiWord, uint32_t loWord)
+{
+    const int64_t v = static_cast<int64_t>((static_cast<uint64_t>(hiWord) << 32) | loWord);
+    if (v >= 0x7FFFFFFFLL)
+        return 0x000000007FFFFFFFull;
+    if (v <= -0x80000000LL)
+        return 0xFFFFFFFF80000000ull;
+    return static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(loWord)));
+}
+
+// PMFHL.fmt rd (fmt = sa: 0 LW, 1 UW, 2 SLW, 3 LH, 4 SH).
+static inline __m128i ps2Pmfhl(const R5900Context *ctx, int fmt)
+{
+    const Ps2HiLoWords w = ps2LoadHiLo(ctx);
+    switch (fmt)
+    {
+    case 0:
+        return ps2Words128(w.lo[0], w.hi[0], w.lo[2], w.hi[2]);
+    case 1:
+        return ps2Words128(w.lo[1], w.hi[1], w.lo[3], w.hi[3]);
+    case 2:
+        return _mm_set_epi64x(static_cast<int64_t>(ps2PmfhlSlw(w.hi[2], w.lo[2])), static_cast<int64_t>(ps2PmfhlSlw(w.hi[0], w.lo[0])));
+    case 3:
+        return ps2Words128(static_cast<uint16_t>(w.lo[0]) | (w.lo[1] << 16), static_cast<uint16_t>(w.hi[0]) | (w.hi[1] << 16),
+                           static_cast<uint16_t>(w.lo[2]) | (w.lo[3] << 16), static_cast<uint16_t>(w.hi[2]) | (w.hi[3] << 16));
+    default:
+    {
+        auto pack = [](uint32_t a, uint32_t b)
+        { return static_cast<uint32_t>(ps2PmfhlClamp(static_cast<int32_t>(a))) | (static_cast<uint32_t>(ps2PmfhlClamp(static_cast<int32_t>(b))) << 16); };
+        return ps2Words128(pack(w.lo[0], w.lo[1]), pack(w.hi[0], w.hi[1]), pack(w.lo[2], w.lo[3]), pack(w.hi[2], w.hi[3]));
+    }
+    }
+}
+
+// PMTHL.LW rs: LO0 = rs0, HI0 = rs1, LO2 = rs2, HI2 = rs3; words 1 and 3 keep their values.
+static inline void ps2PmthlLw(R5900Context *ctx, __m128i rs)
+{
+    alignas(16) uint32_t v[4];
+    _mm_store_si128(reinterpret_cast<__m128i *>(v), rs);
+    Ps2HiLoWords w = ps2LoadHiLo(ctx);
+    w.lo[0] = v[0];
+    w.hi[0] = v[1];
+    w.lo[2] = v[2];
+    w.hi[2] = v[3];
+    ps2StoreHiLo(ctx, w);
+}
+
 #define SET_GPR_U32(ctx_ptr, reg_idx, val)                                \
     do                                                                    \
     {                                                                     \

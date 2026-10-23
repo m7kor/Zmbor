@@ -316,6 +316,133 @@ void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
+        // MMI HI/LO family against PCSX2 MMI.cpp, with expectations computed from scalar products here.
+        tc.Run("PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}", [](TestCase &t)
+        {
+            const int16_t a[8] = {3, -4, 300, -32768, 7, 32767, -2, 1000};
+            const int16_t b[8] = {5, 6, 400, -32768, -9, 32767, -3, -1000};
+            int32_t p[8];
+            for (int i = 0; i < 8; ++i)
+                p[i] = static_cast<int32_t>(a[i]) * static_cast<int32_t>(b[i]);
+
+            R5900Context ctx{};
+            ctx.lo = ctx.hi = ctx.lo1 = ctx.hi1 = 0xDEADBEEFDEADBEEFull;
+            __m128i rs, rt;
+            std::memcpy(&rs, a, 16);
+            std::memcpy(&rt, b, 16);
+            const __m128i rd = ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Set);
+
+            auto pair = [](int32_t lo, int32_t hi) { return static_cast<uint64_t>(static_cast<uint32_t>(lo)) | (static_cast<uint64_t>(static_cast<uint32_t>(hi)) << 32); };
+            t.Equals(ctx.lo, pair(p[0], p[1]), "LO words 0,1 = p0,p1");
+            t.Equals(ctx.hi, pair(p[2], p[3]), "HI words 0,1 = p2,p3");
+            t.Equals(ctx.lo1, pair(p[4], p[5]), "LO words 2,3 = p4,p5");
+            t.Equals(ctx.hi1, pair(p[6], p[7]), "HI words 2,3 = p6,p7");
+            alignas(16) int32_t out[4];
+            _mm_store_si128(reinterpret_cast<__m128i *>(out), rd);
+            t.IsTrue(out[0] == p[0] && out[1] == p[2] && out[2] == p[4] && out[3] == p[6], "rd = {p0, p2, p4, p6}");
+        });
+
+        tc.Run("PMADDH/PMSUBH accumulate each product into its own LO/HI word", [](TestCase &t)
+        {
+            const int16_t a[8] = {2, 3, 4, 5, -6, 7, 8, -9};
+            const int16_t b[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+            __m128i rs, rt;
+            std::memcpy(&rs, a, 16);
+            std::memcpy(&rt, b, 16);
+            R5900Context ctx{};
+            ctx.lo = 0x0000000200000001ull;
+            ctx.hi = 0x0000000400000003ull;
+            ctx.lo1 = 0x0000000600000005ull;
+            ctx.hi1 = 0x0000000800000007ull;
+            const uint32_t before[8] = {1, 2, 3, 4, 5, 6, 7, 8}; // LO0, LO1, HI0, HI1, LO2, LO3, HI2, HI3 in product order
+            (void)ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Add);
+            const uint32_t words[8] = {static_cast<uint32_t>(ctx.lo), static_cast<uint32_t>(ctx.lo >> 32),
+                                       static_cast<uint32_t>(ctx.hi), static_cast<uint32_t>(ctx.hi >> 32),
+                                       static_cast<uint32_t>(ctx.lo1), static_cast<uint32_t>(ctx.lo1 >> 32),
+                                       static_cast<uint32_t>(ctx.hi1), static_cast<uint32_t>(ctx.hi1 >> 32)};
+            bool addOk = true;
+            for (int i = 0; i < 8; ++i)
+                addOk = addOk && words[i] == before[i] + static_cast<uint32_t>(a[i] * b[i]);
+            t.IsTrue(addOk, "PMADDH adds product i to word i of the LO/HI layout");
+
+            (void)ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Sub);
+            t.IsTrue(ctx.lo == 0x0000000200000001ull && ctx.hi1 == 0x0000000800000007ull,
+                     "PMSUBH subtracts the same products back out");
+        });
+
+        tc.Run("PHMADH/PHMSBH store pair sums and the odd product per PCSX2", [](TestCase &t)
+        {
+            const int16_t a[8] = {2, 3, 4, 5, 6, 7, 8, 9};
+            const int16_t b[8] = {1, 10, 100, 1000, -1, -10, -100, -1000};
+            __m128i rs, rt;
+            std::memcpy(&rs, a, 16);
+            std::memcpy(&rt, b, 16);
+            R5900Context ctx{};
+            const __m128i rd = ps2MmiHorizontalMultiply(&ctx, rs, rt, false);
+            // pair k: first = p[2k+1], sum = first + p[2k]
+            t.Equals(static_cast<uint32_t>(ctx.lo), static_cast<uint32_t>(30 + 2), "LO0 = p1 + p0");
+            t.Equals(static_cast<uint32_t>(ctx.lo >> 32), static_cast<uint32_t>(30), "LO1 = p1");
+            t.Equals(static_cast<uint32_t>(ctx.hi), static_cast<uint32_t>(5000 + 400), "HI0 = p3 + p2");
+            t.Equals(static_cast<uint32_t>(ctx.lo1), static_cast<uint32_t>(-70 - 6), "LO2 = p5 + p4");
+            t.Equals(static_cast<uint32_t>(ctx.hi1 >> 32), static_cast<uint32_t>(-9000), "HI3 = p7");
+            alignas(16) int32_t out[4];
+            _mm_store_si128(reinterpret_cast<__m128i *>(out), rd);
+            t.IsTrue(out[0] == 32 && out[1] == 5400 && out[2] == -76 && out[3] == -9800, "rd = {LO0, HI0, LO2, HI2}");
+
+            (void)ps2MmiHorizontalMultiply(&ctx, rs, rt, true);
+            t.Equals(static_cast<uint32_t>(ctx.lo), static_cast<uint32_t>(30 - 2), "PHMSBH LO0 = p1 - p0");
+            t.Equals(static_cast<uint32_t>(ctx.lo >> 32), ~static_cast<uint32_t>(30), "PHMSBH LO1 = ~p1");
+        });
+
+        tc.Run("PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words", [](TestCase &t)
+        {
+            R5900Context ctx{};
+            ctx.lo = 0x1111111100000001ull;
+            ctx.hi = 0x2222222200000002ull;
+            ctx.lo1 = 0x3333333300000003ull;
+            ctx.hi1 = 0x4444444400000004ull;
+            alignas(16) uint32_t w[4];
+            _mm_store_si128(reinterpret_cast<__m128i *>(w), ps2Pmfhl(&ctx, 0));
+            t.IsTrue(w[0] == 1u && w[1] == 2u && w[2] == 3u && w[3] == 4u, "PMFHL.LW = {LO0, HI0, LO2, HI2}");
+            _mm_store_si128(reinterpret_cast<__m128i *>(w), ps2Pmfhl(&ctx, 1));
+            t.IsTrue(w[0] == 0x11111111u && w[1] == 0x22222222u && w[2] == 0x33333333u && w[3] == 0x44444444u,
+                     "PMFHL.UW = {LO1, HI1, LO3, HI3}");
+
+            R5900Context sat{};
+            sat.lo = 0x0000000080000000ull; // {HI0,LO0} = 0x00000000_80000000 > INT32_MAX
+            sat.hi = 0;
+            sat.lo1 = 0x00000000FFFFFFFEull; // {HI2,LO2} = 0xFFFFFFFF_FFFFFFFE = -2
+            sat.hi1 = 0x00000000FFFFFFFFull;
+            alignas(16) uint64_t d[2];
+            _mm_store_si128(reinterpret_cast<__m128i *>(d), ps2Pmfhl(&sat, 2));
+            t.IsTrue(d[0] == 0x7FFFFFFFull && d[1] == 0xFFFFFFFFFFFFFFFEull, "PMFHL.SLW saturates the 64-bit HI:LO pair");
+
+            const __m128i v = _mm_set_epi32(0x40, 0x30, 0x20, 0x10);
+            ps2PmthlLw(&ctx, v);
+            t.IsTrue(ctx.lo == 0x1111111100000010ull && ctx.hi == 0x2222222200000020ull &&
+                         ctx.lo1 == 0x3333333300000030ull && ctx.hi1 == 0x4444444400000040ull,
+                     "PMTHL.LW writes words 0 and 2, keeping words 1 and 3");
+        });
+
+        tc.Run("PMFHI/PMFLO/PMTHI/PMTLO translate as 128-bit moves", [](TestCase &t)
+        {
+            ps2recomp::CodeGenerator gen({}, {});
+            Instruction pmulth{};
+            pmulth.opcode = OPCODE_MMI;
+            pmulth.function = MMI_MMI2;
+            pmulth.sa = MMI2_PMULTH;
+            pmulth.rs = 1; pmulth.rt = 2; pmulth.rd = 3;
+            const std::string mul = gen.translatePMULTH(pmulth);
+            t.IsTrue(mul.find("ps2MmiHalfwordMultiply") != std::string::npos, "PMULTH should use the exact-product helper");
+            t.IsTrue(mul.find("_mm_madd_epi16") == std::string::npos, "PMULTH must not sum products pairwise");
+
+            Instruction pmflo = pmulth;
+            pmflo.sa = MMI2_PMFLO;
+            const std::string lo = gen.translateMMI2Instruction(pmflo);
+            t.IsTrue(lo.find("ctx->lo1") != std::string::npos && lo.find("SET_GPR_VEC") != std::string::npos,
+                     "PMFLO should move both LO halves into a 128-bit rd");
+        });
+
         tc.Run("CVT.W.S truncates toward zero and saturates by sign", [](TestCase &t)
         {
             t.Equals(ps2_fcvt_w_s(2.9f), 2, "positive values truncate");

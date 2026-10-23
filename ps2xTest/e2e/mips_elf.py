@@ -101,6 +101,17 @@ class Assembler:
             if value & 0xFFFF:
                 self.i('ori', rt, rt, value & 0xFFFF)
 
+    def li64(self, rt, value, tmp):
+        """Full 64-bit constant: high word, shift, then the zero-extended low word ORed in (clobbers tmp)."""
+        value &= 0xFFFFFFFFFFFFFFFF
+        hi, lo = value >> 32, value & 0xFFFFFFFF
+        self.li(rt, hi)
+        self.r('dsll32', rd=rt, rt=rt, sa=0)
+        self.li(tmp, lo)
+        self.r('dsll32', rd=tmp, rt=tmp, sa=0)
+        self.r('dsrl32', rd=tmp, rt=tmp, sa=0)
+        self.r('or', rd=rt, rs=rt, rt=tmp)
+
     def branch(self, op, rs, rt_or_target, target=None):
         pc = self.pc
         if op in REGIMM_RT:

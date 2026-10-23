@@ -453,6 +453,31 @@ static void UploadFrame(Texture2D &tex, PS2Runtime *rt, uint32_t &outWidth, uint
     s_lastWidth = width;
     s_lastHeight = height;
 
+    // PS2X_DUMP_FRAME=<file.ppm> writes each newly presented guest frame (RGB, as presented) for automated
+    // graphics tests and debugging; the file always holds the latest one.
+    static const char *s_dumpFramePath = std::getenv("PS2X_DUMP_FRAME");
+    if (s_dumpFramePath && s_dumpFramePath[0] != '\0' && width != 0u && height != 0u &&
+        s_scratch.size() >= static_cast<size_t>(width) * height * 4u)
+    {
+        if (FILE *ppm = std::fopen(s_dumpFramePath, "wb"))
+        {
+            std::fprintf(ppm, "P6\n%u %u\n255\n", width, height);
+            std::vector<uint8_t> row(static_cast<size_t>(width) * 3u);
+            for (uint32_t y = 0; y < height; ++y)
+            {
+                const uint8_t *src = s_scratch.data() + static_cast<size_t>(y) * width * 4u;
+                for (uint32_t x = 0; x < width; ++x)
+                {
+                    row[x * 3u + 0u] = src[x * 4u + 0u];
+                    row[x * 3u + 1u] = src[x * 4u + 1u];
+                    row[x * 3u + 2u] = src[x * 4u + 2u];
+                }
+                std::fwrite(row.data(), 1u, row.size(), ppm);
+            }
+            std::fclose(ppm);
+        }
+    }
+
     std::fill(s_uploadBuffer.begin(), s_uploadBuffer.end(), 0u);
     if (!s_scratch.empty() && width != 0u && height != 0u)
     {

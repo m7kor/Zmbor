@@ -173,7 +173,136 @@ def program_basic():
     return a, ['puts', 'exit']
 
 
-PROGRAMS = {'basic': program_basic}
+EXPECTED['gs_sprite'] = 'E2E gs frame submitted'
+
+# GS registers and packets (GS User's Manual register numbers; GIFtag layout: NLOOP 0-14, EOP 15, FLG 58-59,
+# NREG 60-63, REGS in the high doubleword; PACKED A+D = register descriptor 0xE).
+GS_PRIM, GS_RGBAQ, GS_XYZ2, GS_XYOFFSET_1, GS_PRMODECONT = 0x00, 0x01, 0x05, 0x18, 0x1A
+GS_SCISSOR_1, GS_TEST_1, GS_FRAME_1, GS_ZBUF_1 = 0x40, 0x47, 0x4C, 0x4E
+BACKGROUND = (0x20, 0x40, 0x80)
+SPRITE = (0xFF, 0x00, 0x00)
+SPRITE_RECT = (100, 100, 300, 200)   # x0, y0, x1, y1: pixels x0 <= x < x1, y0 <= y < y1 are covered
+
+
+def gif_ad_packet(regs):
+    import struct
+    tag_lo = len(regs) | (1 << 15) | (0 << 58) | (1 << 60)   # NLOOP, EOP, PACKED, NREG = 1
+    out = struct.pack('<QQ', tag_lo, 0xE)
+    for addr, data in regs:
+        out += struct.pack('<QQ', data & 0xFFFFFFFFFFFFFFFF, addr)
+    return out
+
+
+def rgbaq(r, g, b, a=0x80):
+    return r | (g << 8) | (b << 16) | (a << 24)
+
+
+def xyz2(x, y):
+    return (x << 4) | ((y << 4) << 16)   # 12.4 fixed point, XYOFFSET 0, Z 0
+
+
+def program_gs_sprite():
+    import struct
+    a = Assembler()
+
+    a.function('_start')
+    a.i('lui', 'sp', 'zero', 0x01F0)
+    a.jump('jal', 'main')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.r('or', rd='a0', rs='zero', rt='zero')
+    a.label('hang')
+    a.branch('beq', 'zero', 'zero', 'hang')
+    a.nop()
+
+    a.function('main')
+    a.i('addiu', 'sp', 'sp', -16)
+    a.i('sw', 'ra', 'sp', 12)
+
+    # Display: circuit 1 shows a 640x448 PSMCT32 framebuffer at FBP 0 (PMODE.EN1, CRTMD=1, MMOD with ALP=0xFF).
+    a.li('t0', 0x12000000)
+    a.li64('t1', 0xFF25, 't9')
+    a.i('sd', 't1', 't0', 0x00)                                   # PMODE
+    a.li64('t1', 10 << 9, 't9')
+    a.i('sd', 't1', 't0', 0x70)                                   # DISPFB1: FBW 10 (640), PSMCT32, FBP 0
+    a.li64('t1', (3 << 23) | (2559 << 32) | (447 << 44), 't9')
+    a.i('sd', 't1', 't0', 0x80)                                   # DISPLAY1: MAGH 3, DW 2559, DH 447
+
+    # PATH3: GIF DMA (channel 2, normal mode) with the drawing environment and a full-screen background sprite.
+    a.li('t0', 0x1000A000)
+    a.la('t1', 'gif_packet')
+    a.i('sw', 't1', 't0', 0x10)                                   # D2_MADR
+    a.li('t1', len(GIF_PACKET) // 16)
+    a.i('sw', 't1', 't0', 0x20)                                   # D2_QWC
+    a.li('t1', 0x101)
+    a.i('sw', 't1', 't0', 0x00)                                   # D2_CHCR: STR, from memory
+
+    # PATH2: VIF1 DMA (channel 1) whose DIRECT payload draws the red sprite.
+    a.li('t0', 0x10009000)
+    a.la('t1', 'vif_packet')
+    a.i('sw', 't1', 't0', 0x10)                                   # D1_MADR
+    a.li('t1', len(VIF_PACKET) // 16)
+    a.i('sw', 't1', 't0', 0x20)                                   # D1_QWC
+    a.li('t1', 0x101)
+    a.i('sw', 't1', 't0', 0x00)                                   # D1_CHCR: STR, from memory
+
+    a.la('a0', 's_done')
+    a.jump('jal', 'puts')
+    a.nop()
+
+    # Keep running long enough for the host to present several frames, then return.
+    a.li('t0', 0x02000000)
+    a.label('wait_loop')
+    a.i('addiu', 't0', 't0', -1)
+    a.branch('bne', 't0', 'zero', 'wait_loop')
+    a.nop()
+
+    a.i('lw', 'ra', 'sp', 12)
+    a.r('jr', rs='ra')
+    a.i('addiu', 'sp', 'sp', 16)
+
+    for name in ('puts', 'exit'):
+        a.function(name)
+        a.r('jr', rs='ra')
+        a.nop()
+
+    a.data_block('gif_packet', GIF_PACKET)
+    a.data_block('vif_packet', VIF_PACKET)
+    a.data_block('s_done', EXPECTED['gs_sprite'].encode() + b'\0', align=4)
+    return a, ['puts', 'exit']
+
+
+GIF_PACKET = gif_ad_packet([
+    (GS_FRAME_1, 10 << 16),                                       # FBP 0, FBW 10, PSMCT32
+    (GS_SCISSOR_1, (639 << 16) | (447 << 48)),
+    (GS_XYOFFSET_1, 0),
+    (GS_TEST_1, (1 << 16) | (1 << 17)),                           # ZTE on, ZTST ALWAYS
+    (GS_ZBUF_1, 0x100 | (1 << 32)),                               # ZBP 0x100, depth writes masked
+    (GS_PRMODECONT, 1),
+    (GS_PRIM, 6),                                                 # sprite
+    (GS_RGBAQ, rgbaq(*BACKGROUND)),
+    (GS_XYZ2, xyz2(0, 0)),
+    (GS_XYZ2, xyz2(640, 448)),
+])
+_SPRITE_GIF = gif_ad_packet([
+    (GS_PRIM, 6),
+    (GS_RGBAQ, rgbaq(*SPRITE)),
+    (GS_XYZ2, xyz2(SPRITE_RECT[0], SPRITE_RECT[1])),
+    (GS_XYZ2, xyz2(SPRITE_RECT[2], SPRITE_RECT[3])),
+])
+VIF_PACKET = (__import__('struct').pack('<IIII', 0, 0, 0, (0x50 << 24) | (len(_SPRITE_GIF) // 16)) + _SPRITE_GIF)
+
+# Pixels the presented frame must have (interior points, away from edges whose rasterization rules are not under
+# test here), computed from the geometry above rather than stored in the runtime.
+FRAME_EXPECTATIONS = {
+    'gs_sprite': {
+        'width': 640, 'height': 448,
+        'pixels': [[20, 20, BACKGROUND], [630, 440, BACKGROUND], [99 - 9, 150, BACKGROUND], [310, 150, BACKGROUND],
+                   [110, 110, SPRITE], [200, 150, SPRITE], [290, 190, SPRITE]],
+    },
+}
+
+PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite}
 
 
 def main():
@@ -192,6 +321,9 @@ def main():
         f'stubs = [{stub_list}]\n'
         'skip = []\n', encoding='utf-8')
     (out_dir / f'{name}.expected').write_text(EXPECTED[name] + '\n', encoding='utf-8')
+    if name in FRAME_EXPECTATIONS:
+        import json
+        (out_dir / f'{name}.frame.json').write_text(json.dumps(FRAME_EXPECTATIONS[name]), encoding='utf-8')
     print(f'{elf_path} ({elf_path.stat().st_size} bytes)')
 
 

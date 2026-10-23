@@ -9,6 +9,7 @@ endif()
 set(PS2X_E2E_SCRIPT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 function(ps2x_add_e2e_program name)
+    cmake_parse_arguments(E2E "FRAME" "" "" ${ARGN})
     set(work "${CMAKE_CURRENT_BINARY_DIR}/${name}")
     set(gen "${work}/${name}_generated")
     set(generated
@@ -22,6 +23,7 @@ function(ps2x_add_e2e_program name)
         COMMAND "${Python3_EXECUTABLE}" -I "${PS2X_E2E_SCRIPT_DIR}/e2e_programs.py" ${name} "${work}"
         COMMAND $<TARGET_FILE:ps2_recomp> "${work}/${name}.toml"
         DEPENDS "${PS2X_E2E_SCRIPT_DIR}/e2e_programs.py" "${PS2X_E2E_SCRIPT_DIR}/mips_elf.py" ps2_recomp
+        BYPRODUCTS "${work}/${name}.frame.json"
         COMMENT "e2e: assembling and recompiling ${name}"
         VERBATIM)
 
@@ -39,13 +41,23 @@ function(ps2x_add_e2e_program name)
         ps2x_stage_ffmpeg_runtime_dlls(ps2x_e2e_${name})
     endif()
 
+    set(frame_args "")
+    if(E2E_FRAME)
+        set(frame_args
+            -DFRAME_EXPECTED=${work}/${name}.frame.json
+            -DFRAME_FILE=${work}/${name}.frame.ppm
+            -DPYTHON=${Python3_EXECUTABLE}
+            -DCHECK_FRAME=${PS2X_E2E_SCRIPT_DIR}/check_frame.py)
+    endif()
     add_test(NAME e2e_${name}
         COMMAND "${CMAKE_COMMAND}"
             -DRUNNER=$<TARGET_FILE:ps2x_e2e_${name}>
             -DELF=${work}/${name}.elf
             -DEXPECTED_FILE=${work}/${name}.expected
+            ${frame_args}
             -P "${PS2X_E2E_SCRIPT_DIR}/run_e2e.cmake")
     set_tests_properties(e2e_${name} PROPERTIES TIMEOUT 90 LABELS e2e)
 endfunction()
 
 ps2x_add_e2e_program(basic)
+ps2x_add_e2e_program(gs_sprite FRAME)

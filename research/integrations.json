@@ -204,5 +204,42 @@
   "srwz-06": {
     "status": "SUPERSEDED",
     "note": "Integrated via sotc-20 (c8093ef)."
+  },
+  "gow-01": {
+    "status": "INTEGRATED",
+    "evidence": {
+      "build": "MSVC 14.44 Release OK",
+      "tests_added": [
+        "PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}",
+        "PMADDH/PMSUBH accumulate each product into its own LO/HI word",
+        "PHMADH/PHMSBH store pair sums and the odd product per PCSX2",
+        "PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words",
+        "PMFHI/PMFLO/PMTHI/PMTLO translate as 128-bit moves"
+      ],
+      "regression": "ps2x_tests 485/485, e2e 2/2, ps2xIOP 4/4; mutation (old translator, wrong word map) fails 3 tests",
+      "integration_commit": "eff10b7",
+      "verified_by_lead": "PCSX2 pcsx2/MMI.cpp PMULTH/PMADDH/PMSUBH/PHMADH/PHMSBH/PMFHI/PMFLO/PMTHI/PMTLO/PMFHL/PMTHL read"
+    }
+  },
+  "gow-02": {
+    "note": "Found by our forensic pass; Waffle565 did not fix these four.",
+    "evidence": {
+      "build": "MSVC 14.44 Release OK",
+      "tests_added": [
+        "PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}",
+        "PMADDH/PMSUBH accumulate each product into its own LO/HI word",
+        "PHMADH/PHMSBH store pair sums and the odd product per PCSX2",
+        "PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words",
+        "PMFHI/PMFLO/PMTHI/PMTLO translate as 128-bit moves"
+      ],
+      "regression": "ps2x_tests 485/485, e2e 2/2, ps2xIOP 4/4; mutation (old translator, wrong word map) fails 3 tests",
+      "integration_commit": "eff10b7",
+      "verified_by_lead": "PCSX2 pcsx2/MMI.cpp PMULTH/PMADDH/PMSUBH/PHMADH/PHMSBH/PMFHI/PMFLO/PMTHI/PMTLO/PMFHL/PMTHL read"
+    },
+    "status": "INTEGRATED"
+  },
+  "srwz-01": {
+    "status": "SUPERSEDED",
+    "note": "128-bit HI/LO moves integrated in eff10b7 (gow-01/gow-02)."
   }
 }

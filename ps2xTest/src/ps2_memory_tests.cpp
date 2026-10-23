@@ -3,6 +3,7 @@
 #include "runtime/gs/gs_frontend.h"
 #include "runtime/gs/ps2_gs_psmct32.h"
 #include "ps2_runtime.h"
+#include "runtime/ee_scheduler.h"
 #include "ps2_runtime_macros.h"
 #include "Stubs/DMA.h"
 #include "Stubs/GS.h"
@@ -2302,6 +2303,9 @@ void register_ps2_memory_tests()
                      "guest should be able to configure VIF1 CHCR.TTE before submission");
 
             R5900Context ctx{};
+            // sceDmaSend dispatches DMAC completion handlers through the EE scheduler, which must run on its executor
+            // thread (asserted in Debug builds); in the runtime that is the game thread, here the test thread.
+            runtime.eeScheduler().reset(rdram, ctx);
             setRegU32(ctx, 4, 1u); // sceDmaGetChan(1) / VIF1
             setRegU32(ctx, 5, kTag);
             ps2_stubs::sceDmaSend(rdram, &ctx, &runtime);

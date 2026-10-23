@@ -52,3 +52,24 @@ The same defect fixed independently in several engines is the strongest evidence
 | VU1 EFU sub-opcodes misnumbered (ERSQRT/ESIN/EATAN/EEXP) | DQ8, upstream PR #312 | integrated (3666b1b) |
 | VIF I bit set STAT.INT but raised no INTC interrupt | DQ8, upstream PRs #367/#295 | integrated without the VIF stall (c8093ef) |
 
+## Waffle565/God-Of-War-Native-Port (added in Phase 1)
+
+| Branch | Revision | License | Relation |
+|---|---|---|---|
+| `main` | 514f89186f | none on the branch | docs, tools (zones.py harness), GoW overrides and configs; expects `runtime` in `ext/PS2Recomp-kl/` |
+| `runtime` | ba16c8d70e | GPL-3.0 | history-preserving fork of ran-j/PS2Recomp at c5a9d02, 147 commits ahead; first commits apply KIexster/god-of-war-recomp's 68-patch stack |
+| `switch` | bbf2b4b2be | GPL-3.0 | Nintendo Switch target derived from `runtime` |
+
+Forensics: `research/candidates/waffle565-gow.json` (27 records). Integrated: PMULTH plus the rest of the MMI HI/LO
+family (eff10b7), verified against PCSX2 and 160 real-PS2 result rows (d3765cf). Architecture references (not
+integrated): an AOT R3000A IRX-to-C++ compiler (generator generic, override table game-specific), an AOT VU1
+block recompiler driven by per-game captures, an OpenGL render-target GS backend with GoW-specific assumptions,
+and the zones.py scene harness. Open candidates: MMI permutations/saturation (gow-03/04), VU0 R register (gow-05),
+VIF STMOD 3 (gow-08), PACKED STQ Q latch (gow-09), IOP SIF GetOtherData (gow-11).
+
+## Hardware reference data
+
+unknownbrackets/ps2autotests (ISC): homebrew test programs with `.expected` output printed by a real PS2 for
+EE/FPU/MMI/VU0-macro/IOP/VU instructions. Used for `ps2_float_hw_vectors.inc` and `ps2_mmi_hw_vectors.inc`.
+Running its prebuilt ELFs end to end would validate whole instruction groups at once; that needs a decision about
+running third-party prebuilt binaries (or a PS2SDK toolchain to rebuild them from source).

@@ -68,3 +68,19 @@ After: `ps2x_tests` 480/480, `ps2xIOP` ctest 4/4. Checked against PCSX2 (`Vif_Tr
 - VIFn register reads (STAT, ERR, MARK, CODE, ITOPS, ...) now return the VIF state instead of the raw I/O map, so
   guests see INT/VIS/MRK/DBF; VIF0_FBRST and VIFn_ERR writes take effect; debug-panel ERR offsets fixed.
 - Not modelled: stalls for VU1/PATH waits (FLUSH*, MSCAL while busy), FBK cancelling an in-flight DMA.
+
+## Phase 1 — real execution and the God of War port (2026-10-23)
+
+After: `ps2x_tests` 486/486, end-to-end 2/2, `ps2xIOP` ctest 4/4, research database valid.
+
+- First ELF-to-native tests (`ctest -L e2e`): guest programs assembled from source, recompiled, compiled with the
+  runtime, run, and checked. `basic` prints `E2E sum=5050 fact=3628800 b63=1 lq=1` from guest code; `gs_sprite`
+  draws through GIF DMA (PATH3) and a VIF1 DIRECT (PATH2), and the presented 640x448 frame is checked pixel by
+  pixel. Runtime options added for this: `PS2X_HIDDEN_WINDOW=1`, `PS2X_DUMP_FRAME=<file.ppm>`.
+- MMI HI/LO family: exact PMULTH/PMADDH/PMSUBH/PHMADH/PHMSBH and 128-bit PMFHI/PMFLO/PMTHI/PMTLO/PMFHL/PMTHL
+  (PMULTH from Waffle565/God-Of-War-Native-Port; the rest found by our audit), checked against PCSX2 and 160
+  real-PS2 rows from ps2autotests.
+- Waffle565/God-Of-War-Native-Port analysed: 27 records; IOP/VU1 AOT compilers and the GL backend recorded as
+  architecture references, not integrated.
+- RSQRT.S sign with ft = 0 confirmed against real-PS2 output (sign of fs; PCSX2 differs). No change needed.
+- `BENCHMARKS.md` (first measured baselines) and `TESTING.md` added.

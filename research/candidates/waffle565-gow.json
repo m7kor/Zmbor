@@ -1,0 +1,1327 @@
+[
+  {
+    "id": "gow-01",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "8bf2315027",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "Exact PMULTH semantics",
+    "category": "B",
+    "subsystem": "EE MMI2",
+    "problem": "PMULTH summed products into one int64; LO1/HI1 untouched; rd got the scalar (GoW animation decoders).",
+    "approach": "Eight exact s32 products: LO={p0,p1,p4,p5}, HI={p2,p3,p6,p7}, rd={p0,p2,p4,p6}.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC: ISA semantics, matches PCSX2 MMI.cpp PMULTH",
+    "reference": "PCSX2 pcsx2/MMI.cpp PMULTH",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "build": "MSVC 14.44 Release OK",
+      "tests_added": [
+        "PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}",
+        "PMADDH/PMSUBH accumulate each product into its own LO/HI word",
+        "PHMADH/PHMSBH store pair sums and the odd product per PCSX2",
+        "PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words",
+        "PMFHI/PMFLO/PMTHI/PMTLO translate as 128-bit moves"
+      ],
+      "regression": "ps2x_tests 485/485, e2e 2/2, ps2xIOP 4/4; mutation (old translator, wrong word map) fails 3 tests",
+      "integration_commit": "eff10b7",
+      "verified_by_lead": "PCSX2 pcsx2/MMI.cpp PMULTH/PMADDH/PMSUBH/PHMADH/PHMSBH/PMFHI/PMFLO/PMTHI/PMTLO/PMFHL/PMTHL read"
+    },
+    "agent_report": {
+      "id": "gow-01",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "8bf2315027",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "title": "Exact PMULTH semantics",
+      "category": "B",
+      "subsystem": "EE MMI2",
+      "problem": "PMULTH summed products into one int64; LO1/HI1 untouched; rd got the scalar (GoW animation decoders).",
+      "approach": "Eight exact s32 products: LO={p0,p1,p4,p5}, HI={p2,p3,p6,p7}, rd={p0,p2,p4,p6}.",
+      "general_or_specific": "GENERIC: ISA semantics, matches PCSX2 MMI.cpp PMULTH",
+      "reference": "PCSX2 pcsx2/MMI.cpp PMULTH",
+      "upstream_pr_equivalent": null,
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-02",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp"
+      ]
+    },
+    "title": "PMADDH/PMSUBH/PHMADH/PHMSBH share the PMULTH defect (not fixed in Waffle565)",
+    "category": "B",
+    "subsystem": "EE MMI2/MMI3",
+    "problem": "All four reduce products to one scalar accumulated into lo/hi; rd gets that scalar.",
+    "approach": "Per-word accumulation (PMADDH/PMSUBH) and pair sum/odd product layout (PHMADH/PHMSBH) per PCSX2.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/MMI.cpp PMADDH/PMSUBH/PHMADH/PHMSBH",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here",
+      "build": "MSVC 14.44 Release OK",
+      "tests_added": [
+        "PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}",
+        "PMADDH/PMSUBH accumulate each product into its own LO/HI word",
+        "PHMADH/PHMSBH store pair sums and the odd product per PCSX2",
+        "PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words",
+        "PMFHI/PMFLO/PMTHI/PMTLO translate as 128-bit moves"
+      ],
+      "regression": "ps2x_tests 485/485, e2e 2/2, ps2xIOP 4/4; mutation (old translator, wrong word map) fails 3 tests",
+      "integration_commit": "eff10b7",
+      "verified_by_lead": "PCSX2 pcsx2/MMI.cpp PMULTH/PMADDH/PMSUBH/PHMADH/PHMSBH/PMFHI/PMFLO/PMTHI/PMTLO/PMFHL/PMTHL read"
+    },
+    "agent_report": {
+      "id": "gow-02",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp"
+      ],
+      "title": "PMADDH/PMSUBH/PHMADH/PHMSBH share the PMULTH defect (not fixed in Waffle565)",
+      "category": "B",
+      "subsystem": "EE MMI2/MMI3",
+      "problem": "All four reduce products to one scalar accumulated into lo/hi; rd gets that scalar.",
+      "approach": "Per-word accumulation (PMADDH/PMSUBH) and pair sum/odd product layout (PHMADH/PHMSBH) per PCSX2.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/MMI.cpp PMADDH/PMSUBH/PHMADH/PHMSBH",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    },
+    "limitations": "Found by our forensic pass; Waffle565 did not fix these four."
+  },
+  {
+    "id": "gow-03",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "MMI halfword/word permutations PEXEH, PREVH, PEXCH, PROT3W, PEXCW",
+    "category": "B",
+    "subsystem": "EE MMI2/MMI3",
+    "problem": "Wrong lane orders (PEXEH [1,0,3,2]; PREVH reversed 8 halfwords; PEXCH = PEXEH; PROT3W [1,2,3,0]; PEXCW [2,3,0,1]).",
+    "approach": "Per-half shuffles per PCSX2 (PEXEH (3,0,1,2), PREVH (0,1,2,3), PEXCH (3,1,2,0) per half; PROT3W (3,0,2,1); PEXCW (3,1,2,0)).",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/MMI.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-03",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "MMI halfword/word permutations PEXEH, PREVH, PEXCH, PROT3W, PEXCW",
+      "category": "B",
+      "subsystem": "EE MMI2/MMI3",
+      "problem": "Wrong lane orders (PEXEH [1,0,3,2]; PREVH reversed 8 halfwords; PEXCH = PEXEH; PROT3W [1,2,3,0]; PEXCW [2,3,0,1]).",
+      "approach": "Per-half shuffles per PCSX2 (PEXEH (3,0,1,2), PREVH (0,1,2,3), PEXCH (3,1,2,0) per half; PROT3W (3,0,2,1); PEXCW (3,1,2,0)).",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/MMI.cpp",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-04",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "PABSW/PABSH operand+saturation, PADDUH/PSUBUH saturation, PINTH/PINTEH, PSLLVW/PSRLVW/PSRAVW",
+    "category": "B",
+    "subsystem": "EE MMI",
+    "problem": "PABS read rs and did not clamp; PADDUH/PSUBUH wrapped; PINTH/PINTEH wrong halves; variable word shifts used 4 words without 64-bit sign extension.",
+    "approach": "Per PCSX2: rt operand + clamp, saturating unsigned halfword ops, corrected interleaves, words 0 and 2 shifted and sign-extended.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/MMI.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 1,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-04",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "PABSW/PABSH operand+saturation, PADDUH/PSUBUH saturation, PINTH/PINTEH, PSLLVW/PSRLVW/PSRAVW",
+      "category": "B",
+      "subsystem": "EE MMI",
+      "problem": "PABS read rs and did not clamp; PADDUH/PSUBUH wrapped; PINTH/PINTEH wrong halves; variable word shifts used 4 words without 64-bit sign extension.",
+      "approach": "Per PCSX2: rt operand + clamp, saturating unsigned halfword ops, corrected interleaves, words 0 and 2 shifted and sign-extended.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/MMI.cpp",
+      "risk": "low",
+      "priority": 1,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-05",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ]
+    },
+    "title": "VU0 macro R register (RNEXT/RINIT/RXOR/RGET, CTC2 R)",
+    "category": "A",
+    "subsystem": "VU0 macro",
+    "problem": "Invented LFSR/mixing; RNEXT never writes ft; CTC2 R unmasked.",
+    "approach": "PCSX2 AdvanceLFSR and 0x3F800000|mantissa forms; broadcast R under the dest mask.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/VUops.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-05",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ],
+      "title": "VU0 macro R register (RNEXT/RINIT/RXOR/RGET, CTC2 R)",
+      "category": "A",
+      "subsystem": "VU0 macro",
+      "problem": "Invented LFSR/mixing; RNEXT never writes ft; CTC2 R unmasked.",
+      "approach": "PCSX2 AdvanceLFSR and 0x3F800000|mantissa forms; broadcast R under the dest mask.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/VUops.cpp",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-06",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ]
+    },
+    "title": "VU0 VFTOI saturation, VABS denormal flush, integer ops never write vi0",
+    "category": "A",
+    "subsystem": "VU0 macro",
+    "problem": "VFTOI positive overflow gives 0x80000000; VABS keeps denormals; VIADD etc. write vi0.",
+    "approach": "Saturation mask, andnot zero-exponent lanes, skip vi0 destinations.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/VUops.cpp _vuIADD",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-06",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+        "ps2xRecomp/src/lib/vu_translator.cpp"
+      ],
+      "title": "VU0 VFTOI saturation, VABS denormal flush, integer ops never write vi0",
+      "category": "A",
+      "subsystem": "VU0 macro",
+      "problem": "VFTOI positive overflow gives 0x80000000; VABS keeps denormals; VIADD etc. write vi0.",
+      "approach": "Saturation mask, andnot zero-exponent lanes, skip vi0 destinations.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/VUops.cpp _vuIADD",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-07",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "COP1 C.cond.S without NaN semantics (compare keys)",
+    "category": "A",
+    "subsystem": "EE FPU",
+    "problem": "Host IEEE compares treat exponent-255 as NaN and compare denormals by value.",
+    "approach": "Monotonic key compare; unordered variants collapse; C.UN = 0.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC (differs slightly from PCSX2's exp-255 clamp)",
+    "reference": "PCSX2 pcsx2/FPU.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-07",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "COP1 C.cond.S without NaN semantics (compare keys)",
+      "category": "A",
+      "subsystem": "EE FPU",
+      "problem": "Host IEEE compares treat exponent-255 as NaN and compare denormals by value.",
+      "approach": "Monotonic key compare; unordered variants collapse; C.UN = 0.",
+      "general_or_specific": "GENERIC (differs slightly from PCSX2's exp-255 clamp)",
+      "reference": "PCSX2 pcsx2/FPU.cpp",
+      "risk": "medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-08",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "751b4a2098",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ]
+    },
+    "title": "VIF UNPACK STMOD=3 writes ROW",
+    "category": "A",
+    "subsystem": "VIF1 UNPACK",
+    "problem": "Mode 3 handled like mode 0, ROW never updated.",
+    "approach": "Mode 3: dest = data and row[field] = data; fast path only for mode 0.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 pcsx2/Vif_Unpack.cpp",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-08",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "751b4a2098",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+      ],
+      "title": "VIF UNPACK STMOD=3 writes ROW",
+      "category": "A",
+      "subsystem": "VIF1 UNPACK",
+      "problem": "Mode 3 handled like mode 0, ROW never updated.",
+      "approach": "Mode 3: dest = data and row[field] = data; fast path only for mode 0.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 pcsx2/Vif_Unpack.cpp",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-09",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "c25562ce89",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
+      ]
+    },
+    "title": "GIF PACKED ST latches Q; RGBAQ.Q set at the next PACKED RGBA",
+    "category": "A",
+    "subsystem": "GS front end",
+    "problem": "PACKED STQ wrote vertex Q immediately (texture scatter for ST-only vertices).",
+    "approach": "Latch Q at STQ, apply at PACKED RGBA, reset per GIF tag.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": "PCSX2 GS/GSState.cpp GIFPackedRegHandlerSTQ/RGBA",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-09",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "c25562ce89",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
+      ],
+      "title": "GIF PACKED ST latches Q; RGBAQ.Q set at the next PACKED RGBA",
+      "category": "A",
+      "subsystem": "GS front end",
+      "problem": "PACKED STQ wrote vertex Q immediately (texture scatter for ST-only vertices).",
+      "approach": "Latch Q at STQ, apply at PACKED RGBA, reset per GIF tag.",
+      "general_or_specific": "GENERIC",
+      "reference": "PCSX2 GS/GSState.cpp GIFPackedRegHandlerSTQ/RGBA",
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-10",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "3faee2ba02",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+      ]
+    },
+    "title": "16-bit frame FBMSK compression in the clear path",
+    "category": "D",
+    "subsystem": "GS raster",
+    "problem": "CT16 clears used the low 16 bits of the RGBA8888 FBMSK.",
+    "approach": "Compress FBMSK to 5551.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-10",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "3faee2ba02",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+      ],
+      "title": "16-bit frame FBMSK compression in the clear path",
+      "category": "D",
+      "subsystem": "GS raster",
+      "problem": "CT16 clears used the low 16 bits of the RGBA8888 FBMSK.",
+      "approach": "Compress FBMSK to 5551.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-11",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xIOP/src/emulator/services/iop_rpc.cpp"
+      ]
+    },
+    "title": "IOP sceSifGetOtherData copies EE->IOP; sceSifSetDmaIntr; RPC settle",
+    "category": "C",
+    "subsystem": "IOP SIF/RPC HLE",
+    "problem": "GetOtherData was a no-op (sound banks never reached the IOP); SetDmaIntr missing.",
+    "approach": "Copy and fill SifRpcReceiveData_t; SetDmaIntr as SetDma + callback; bounded thread settle after a server call (heuristic).",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC (settle budget CONDITIONAL)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-11",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/services/iop_rpc.cpp"
+      ],
+      "title": "IOP sceSifGetOtherData copies EE->IOP; sceSifSetDmaIntr; RPC settle",
+      "category": "C",
+      "subsystem": "IOP SIF/RPC HLE",
+      "problem": "GetOtherData was a no-op (sound banks never reached the IOP); SetDmaIntr missing.",
+      "approach": "Copy and fill SifRpcReceiveData_t; SetDmaIntr as SetDma + callback; bounded thread settle after a server call (heuristic).",
+      "general_or_specific": "GENERIC (settle budget CONDITIONAL)",
+      "reference": null,
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-12",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp"
+      ]
+    },
+    "title": "IOP WaitSema/WaitEventFlag outside a thread context block properly",
+    "category": "C",
+    "subsystem": "IOP kernel HLE",
+    "problem": "Returned success without taking the semaphore, or -418 immediately.",
+    "approach": "Run other threads until the condition holds.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-12",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/core/iop_kernel.cpp"
+      ],
+      "title": "IOP WaitSema/WaitEventFlag outside a thread context block properly",
+      "category": "C",
+      "subsystem": "IOP kernel HLE",
+      "problem": "Returned success without taking the semaphore, or -418 immediately.",
+      "approach": "Run other threads until the condition holds.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "medium",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-13",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_format.h"
+      ]
+    },
+    "title": "IOP printf/sprintf/vsprintf real vararg formatting",
+    "category": "C",
+    "subsystem": "IOP imports",
+    "problem": "sprintf copied the format literal; printf ignored arguments.",
+    "approach": "o32 argument fetch formatting.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-13",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/imports/iop_format.h"
+      ],
+      "title": "IOP printf/sprintf/vsprintf real vararg formatting",
+      "category": "C",
+      "subsystem": "IOP imports",
+      "problem": "sprintf copied the format literal; printf ignored arguments.",
+      "approach": "o32 argument fetch formatting.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-14",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "027ce16c3a",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ]
+    },
+    "title": "Backward edges charge the loop body length",
+    "category": "B",
+    "subsystem": "EE timing",
+    "problem": "Flat 32 cycles per backward edge overcharged short loops.",
+    "approach": "eeCheckpointDue(min(32, (src-target)/4+2)).",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC (timing heuristic)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-14",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "027ce16c3a",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+      ],
+      "title": "Backward edges charge the loop body length",
+      "category": "B",
+      "subsystem": "EE timing",
+      "problem": "Flat 32 cycles per backward edge overcharged short loops.",
+      "approach": "eeCheckpointDue(min(32, (src-target)/4+2)).",
+      "general_or_specific": "GENERIC (timing heuristic)",
+      "reference": null,
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-15",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "751b4a2098",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ]
+    },
+    "title": "EE game thread MXCSR round-toward-zero + FTZ + DAZ",
+    "category": "A",
+    "subsystem": "EE FPU",
+    "problem": "Host default rounding differs from PS2/PCSX2.",
+    "approach": "Set MXCSR on the game thread; nearest locally for div/sqrt.",
+    "scope": "unknown",
+    "scope_evidence": "CONDITIONAL (interacts with every host-float helper)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-15",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "751b4a2098",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_runtime.cpp"
+      ],
+      "title": "EE game thread MXCSR round-toward-zero + FTZ + DAZ",
+      "category": "A",
+      "subsystem": "EE FPU",
+      "problem": "Host default rounding differs from PS2/PCSX2.",
+      "approach": "Set MXCSR on the game thread; nearest locally for div/sqrt.",
+      "general_or_specific": "CONDITIONAL (interacts with every host-float helper)",
+      "reference": null,
+      "risk": "medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-16",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ]
+    },
+    "title": "Scratchpad fast path in READ/WRITE macros; scalar low-64 GPR stores",
+    "category": "C",
+    "subsystem": "EE memory macros (performance)",
+    "problem": "Every scratchpad access went through runtime Load/Store calls.",
+    "approach": "Aligned SPR accesses memcpy to the host buffer.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-16",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/include/ps2_runtime_macros.h"
+      ],
+      "title": "Scratchpad fast path in READ/WRITE macros; scalar low-64 GPR stores",
+      "category": "C",
+      "subsystem": "EE memory macros (performance)",
+      "problem": "Every scratchpad access went through runtime Load/Store calls.",
+      "approach": "Aligned SPR accesses memcpy to the host buffer.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-17",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "65fb90eb87",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/ee_ref/*",
+        "ps2xRuntime/src/lib/ee_watch.cpp"
+      ]
+    },
+    "title": "EE differential tester against the PCSX2 interpreter + write watchpoints",
+    "category": "E",
+    "subsystem": "verification",
+    "problem": "No oracle for recompiled functions.",
+    "approach": "PS2X_EE_DIFF snapshots state, re-runs on PCSX2's interpreter, reports differing registers/words.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0 (vendored PCSX2 interpreter)",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-17",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "65fb90eb87",
+      "license": "GPL-3.0 (vendored PCSX2 interpreter)",
+      "files": [
+        "ps2xRuntime/src/lib/ee_ref/*",
+        "ps2xRuntime/src/lib/ee_watch.cpp"
+      ],
+      "title": "EE differential tester against the PCSX2 interpreter + write watchpoints",
+      "category": "E",
+      "subsystem": "verification",
+      "problem": "No oracle for recompiled functions.",
+      "approach": "PS2X_EE_DIFF snapshots state, re-runs on PCSX2's interpreter, reports differing registers/words.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "low",
+      "priority": 2,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-18",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "tools/vu1/vu1n_gen.py",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_native.inl"
+      ]
+    },
+    "title": "AOT VU1 microprogram recompiler with exact-engine fallback",
+    "category": "D",
+    "subsystem": "VU1",
+    "problem": "VU1 interpretation cost.",
+    "approach": "Per-block SSE C++ from captured micro-memory, FNV-keyed registry, flag-latency ring, VERIFY/RECORD/REPLAY modes.",
+    "scope": "unknown",
+    "scope_evidence": "CONDITIONAL: mechanism generic, blocks per game",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 4,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-18",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "tools/vu1/vu1n_gen.py",
+        "ps2xRuntime/src/lib/vu/ps2_vu1_native.inl"
+      ],
+      "title": "AOT VU1 microprogram recompiler with exact-engine fallback",
+      "category": "D",
+      "subsystem": "VU1",
+      "problem": "VU1 interpretation cost.",
+      "approach": "Per-block SSE C++ from captured micro-memory, FNV-keyed registry, flag-latency ring, VERIFY/RECORD/REPLAY modes.",
+      "general_or_specific": "CONDITIONAL: mechanism generic, blocks per game",
+      "reference": null,
+      "risk": "high",
+      "priority": 4,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-19",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "tools/iop/iopn_gen.py",
+        "ps2xIOP/src/native/*"
+      ]
+    },
+    "title": "AOT R3000A IRX-to-C++ compiler with native overrides",
+    "category": "B",
+    "subsystem": "IOP",
+    "problem": "IOP interpretation cost.",
+    "approach": "Per-instruction C++ with load-delay/LWL/LWR/exceptions, returns to the HLE kernel at import stubs, hash-guarded; override table at fixed module offsets.",
+    "scope": "game-specific",
+    "scope_evidence": "Generator GENERIC; override table GAME-SPECIFIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 4,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-19",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "tools/iop/iopn_gen.py",
+        "ps2xIOP/src/native/*"
+      ],
+      "title": "AOT R3000A IRX-to-C++ compiler with native overrides",
+      "category": "B",
+      "subsystem": "IOP",
+      "problem": "IOP interpretation cost.",
+      "approach": "Per-instruction C++ with load-delay/LWL/LWR/exceptions, returns to the HLE kernel at import stubs, hash-guarded; override table at fixed module offsets.",
+      "general_or_specific": "Generator GENERIC; override table GAME-SPECIFIC",
+      "reference": null,
+      "risk": "high",
+      "priority": 4,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-20",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gpu/*"
+      ]
+    },
+    "title": "OpenGL render-target GS backend behind GSRasterBackend",
+    "category": "D",
+    "subsystem": "GS",
+    "problem": "CPU rasterizer too slow.",
+    "approach": "Scaled render targets, texture store without local->host readback, native CRTC merge.",
+    "scope": "game-specific",
+    "scope_evidence": "GAME-SPECIFIC assumptions (no readback, measured GoW usage); interface generic",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 5,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-20",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRuntime/src/lib/gs/gpu/*"
+      ],
+      "title": "OpenGL render-target GS backend behind GSRasterBackend",
+      "category": "D",
+      "subsystem": "GS",
+      "problem": "CPU rasterizer too slow.",
+      "approach": "Scaled render targets, texture store without local->host readback, native CRTC merge.",
+      "general_or_specific": "GAME-SPECIFIC assumptions (no readback, measured GoW usage); interface generic",
+      "reference": null,
+      "risk": "high",
+      "priority": 5,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-21",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xRecomp/src/lib/instruction_translator.cpp"
+      ]
+    },
+    "title": "Recompiler routes timer/DMA/GS display MMIO to native services",
+    "category": "C",
+    "subsystem": "EE MMIO",
+    "problem": "Hardware-model overhead.",
+    "approach": "Direct calls for constant-address MMIO; DMA controller model removed.",
+    "scope": "unknown",
+    "scope_evidence": "CONDITIONAL (drops DMA fidelity)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 5,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-21",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xRecomp/src/lib/instruction_translator.cpp"
+      ],
+      "title": "Recompiler routes timer/DMA/GS display MMIO to native services",
+      "category": "C",
+      "subsystem": "EE MMIO",
+      "problem": "Hardware-model overhead.",
+      "approach": "Direct calls for constant-address MMIO; DMA controller model removed.",
+      "general_or_specific": "CONDITIONAL (drops DMA fidelity)",
+      "reference": null,
+      "risk": "high",
+      "priority": 5,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-22",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xIOP/src/emulator/core/sound_engine.cpp",
+        "ps2xIOP/src/disc_source.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ]
+    },
+    "title": "Host-native services (sound, memory card, pad rumble, CDVD, MPEG, pacing)",
+    "category": "C",
+    "subsystem": "services",
+    "problem": "Replacing hardware models with native services.",
+    "approach": "Mixed: rumble/CDVD/pacing generic or conditional; sound/memory card tied to GoW module offsets.",
+    "scope": "unknown",
+    "scope_evidence": "mixed",
+    "reference": null,
+    "license": "GPL-3.0 (+ libmpeg2 GPL-2+)",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 4,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-22",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0 (+ libmpeg2 GPL-2+)",
+      "files": [
+        "ps2xIOP/src/emulator/core/sound_engine.cpp",
+        "ps2xIOP/src/disc_source.cpp",
+        "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+      ],
+      "title": "Host-native services (sound, memory card, pad rumble, CDVD, MPEG, pacing)",
+      "category": "C",
+      "subsystem": "services",
+      "problem": "Replacing hardware models with native services.",
+      "approach": "Mixed: rumble/CDVD/pacing generic or conditional; sound/memory card tied to GoW module offsets.",
+      "general_or_specific": "mixed",
+      "reference": null,
+      "risk": "high",
+      "priority": 4,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-23",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "514f89186f",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "tools/zones.py",
+        "tools/levels.py",
+        "tools/perf_run.sh"
+      ]
+    },
+    "title": "Zone regression harness (pad scripts, frame captures, fps floor, log regexes, image distance)",
+    "category": "E",
+    "subsystem": "testing",
+    "problem": "No automated scene regression.",
+    "approach": "Per save slot runs with pad script and captures; report.md; exit 1 on failure.",
+    "scope": "unknown",
+    "scope_evidence": "CONDITIONAL: structure generic; frame PC, state 11, scripts GoW-specific",
+    "reference": null,
+    "license": "none on main",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 3,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-23",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "main",
+      "revision": "514f89186f",
+      "license": "none on main",
+      "files": [
+        "tools/zones.py",
+        "tools/levels.py",
+        "tools/perf_run.sh"
+      ],
+      "title": "Zone regression harness (pad scripts, frame captures, fps floor, log regexes, image distance)",
+      "category": "E",
+      "subsystem": "testing",
+      "problem": "No automated scene regression.",
+      "approach": "Per save slot runs with pad script and captures; report.md; exit 1 on failure.",
+      "general_or_specific": "CONDITIONAL: structure generic; frame PC, state 11, scripts GoW-specific",
+      "reference": null,
+      "risk": "low",
+      "priority": 3,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  },
+  {
+    "id": "gow-24",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "65e1d79199",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "ps2xIOP/src/emulator/core/spu2.cpp"
+      ]
+    },
+    "title": "SPU2 NAX reads inside the playing block",
+    "category": "A",
+    "subsystem": "SPU2",
+    "problem": "NAX one block ahead.",
+    "approach": "naxRegister = playBlock + 1 + decoded/4.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "medium",
+    "priority": 3,
+    "status": "CANDIDATE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-24",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "65e1d79199",
+      "license": "GPL-3.0",
+      "files": [
+        "ps2xIOP/src/emulator/core/spu2.cpp"
+      ],
+      "title": "SPU2 NAX reads inside the playing block",
+      "category": "A",
+      "subsystem": "SPU2",
+      "problem": "NAX one block ahead.",
+      "approach": "naxRegister = playBlock + 1 + decoded/4.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "medium",
+      "priority": 3,
+      "recommended_status": "CANDIDATE"
+    }
+  },
+  {
+    "id": "gow-25",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "ba16c8d70e",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "control_flow_emitter.cpp",
+        "fpu_translator.cpp",
+        "vu_translation_helpers.cpp",
+        "ps2_runtime_macros.h"
+      ]
+    },
+    "title": "Fixes already in our fork (64-bit branches, SQRT.S, VU0 Q-unit and memory, LQ/SQ align, CVT.W.S)",
+    "category": "B",
+    "subsystem": "EE/VU0",
+    "problem": "Same defects already fixed here.",
+    "approach": "Taken via KIexster from the SotC fork.",
+    "scope": "unknown",
+    "scope_evidence": "GENERIC",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "SUPERSEDED",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-25",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "runtime",
+      "revision": "ba16c8d70e",
+      "license": "GPL-3.0",
+      "files": [
+        "control_flow_emitter.cpp",
+        "fpu_translator.cpp",
+        "vu_translation_helpers.cpp",
+        "ps2_runtime_macros.h"
+      ],
+      "title": "Fixes already in our fork (64-bit branches, SQRT.S, VU0 Q-unit and memory, LQ/SQ align, CVT.W.S)",
+      "category": "B",
+      "subsystem": "EE/VU0",
+      "problem": "Same defects already fixed here.",
+      "approach": "Taken via KIexster from the SotC fork.",
+      "general_or_specific": "GENERIC",
+      "reference": null,
+      "risk": "low",
+      "priority": 5,
+      "recommended_status": "SUPERSEDED"
+    }
+  },
+  {
+    "id": "gow-26",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "514f89186f",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "port/overrides-usa/gow_overrides.cpp",
+        "port/gow.toml"
+      ]
+    },
+    "title": "GoW overrides, configs, stub RPC services, widescreen, language packs",
+    "category": "F",
+    "subsystem": "game",
+    "problem": "Game hooks.",
+    "approach": "Function overrides at fixed addresses.",
+    "scope": "game-specific",
+    "scope_evidence": "GAME-SPECIFIC",
+    "reference": null,
+    "license": "none on main",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 5,
+    "status": "GAME_SPECIFIC",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-26",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "main",
+      "revision": "514f89186f",
+      "license": "none on main",
+      "files": [
+        "port/overrides-usa/gow_overrides.cpp",
+        "port/gow.toml"
+      ],
+      "title": "GoW overrides, configs, stub RPC services, widescreen, language packs",
+      "category": "F",
+      "subsystem": "game",
+      "problem": "Game hooks.",
+      "approach": "Function overrides at fixed addresses.",
+      "general_or_specific": "GAME-SPECIFIC",
+      "reference": null,
+      "risk": "low",
+      "priority": 5,
+      "recommended_status": "GAME_SPECIFIC"
+    }
+  },
+  {
+    "id": "gow-27",
+    "source": {
+      "repository": "Waffle565/God-Of-War-Native-Port",
+      "revision": "bbf2b4b2be",
+      "involved": "Waffle565/God-Of-War-Native-Port",
+      "files": [
+        "port/switch/*"
+      ]
+    },
+    "title": "Nintendo Switch (AArch64) target",
+    "category": "C",
+    "subsystem": "platform",
+    "problem": "Console port.",
+    "approach": "EGL sharing, shader variants.",
+    "scope": "unknown",
+    "scope_evidence": "CONDITIONAL (platform)",
+    "reference": null,
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "high",
+    "priority": 5,
+    "status": "ARCHITECTURE_REFERENCE",
+    "evidence": {
+      "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
+    },
+    "agent_report": {
+      "id": "gow-27",
+      "repo": "Waffle565/God-Of-War-Native-Port",
+      "branch": "switch",
+      "revision": "bbf2b4b2be",
+      "license": "GPL-3.0",
+      "files": [
+        "port/switch/*"
+      ],
+      "title": "Nintendo Switch (AArch64) target",
+      "category": "C",
+      "subsystem": "platform",
+      "problem": "Console port.",
+      "approach": "EGL sharing, shader variants.",
+      "general_or_specific": "CONDITIONAL (platform)",
+      "reference": null,
+      "risk": "high",
+      "priority": 5,
+      "recommended_status": "ARCHITECTURE_REFERENCE"
+    }
+  }
+]

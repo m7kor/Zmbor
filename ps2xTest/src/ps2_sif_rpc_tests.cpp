@@ -111,6 +111,9 @@ namespace
         {
             ps2_stubs::resetSifState();
             std::memset(&ctx, 0, sizeof(ctx));
+            // Stubs reach the EE scheduler, which runs on its executor thread (asserted in Debug); in the runtime
+            // that is the game thread, here the test thread. Tests that run the scheduler elsewhere reset it there.
+            runtime.eeScheduler().reset(rdram.data(), ctx);
         }
     };
 

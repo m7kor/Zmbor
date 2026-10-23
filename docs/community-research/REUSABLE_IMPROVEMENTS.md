@@ -9,12 +9,12 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | Status | Records |
 |---|---|
 | ANALYZED | 22 |
-| ARCHITECTURE_REFERENCE | 10 |
-| CANDIDATE | 101 |
-| GAME_SPECIFIC | 4 |
-| INTEGRATED | 19 |
+| ARCHITECTURE_REFERENCE | 17 |
+| CANDIDATE | 116 |
+| GAME_SPECIFIC | 5 |
+| INTEGRATED | 21 |
 | REJECTED | 7 |
-| SUPERSEDED | 25 |
+| SUPERSEDED | 27 |
 
 ## Integrated
 
@@ -39,6 +39,8 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | upstream-05 | ran-j/PS2Recomp | SetupThread(-1) records the stack base like CreateThread (issue #259) | 257c5c5 | 1 |
 | upstream-06 | ran-j/PS2Recomp | D_ENABLEW is visible at D_ENABLER; both reset to 0x1201 (PR #284, issue #257) | 591e56e | 3 |
 | upstream-07 | ran-j/PS2Recomp | VIF stall after the I bit (VSS/VFS/VIS) with FBRST.STC/STP/FBK/RST (PR #295, adapted) | 5201b65 | 9 |
+| gow-01 | Waffle565/God-Of-War-Native-Port | Exact PMULTH semantics | eff10b7 | 5 |
+| gow-02 | Waffle565/God-Of-War-Native-Port | PMADDH/PMSUBH/PHMADH/PHMSBH share the PMULTH defect (not fixed in Waffle565) | eff10b7 | 5 |
 
 ## Queue: general candidates, priority 1-2
 
@@ -47,7 +49,6 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 | Id | Cat | Subsystem | Title | Risk | Upstream equivalent |
 |---|---|---|---|---|---|
 | roadtrip-10 | D | runtime context + recompiler COP2 | VF0 hard-wired to (0,0,0,1) in every R5900Context; writes to VF0 dropped | low | #187, #320, #201, #292 |
-| srwz-01 | B | recompiler MMI + runtime macros | MMI HI/LO family moves all 128 bits (PMFHI/PMFLO/PMTHI/PMTLO) and PMFHL.LW/UW/SLW/LH/SH, PMTHL.LW use LO1/HI1 | low | #322 (give MMI HI/LO family both pipelines' registers) |
 | srwz-05 | A | DMAC chain mode (ps2_memory.cpp) | DMA chain walk: no 4096-tag cutoff (1<<20 loop guard plus 64 MiB data bound, logged) | low | #297 (raise DMA chain tag limit and warn) |
 | vendored-05 | A | EE MMI | MMI lane fixes: PEXEW/PEXEH/PEXCH/PEXCW/PREVH, PMULTH 128-bit LO/HI, PMFHL.SH | low |  |
 | vendored-08 | A | VIF | VIF UNPACK V4-5 scales channels to 8 bits | low |  |
@@ -108,6 +109,13 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 | vendored-39 | sal063/Ace-Combat-5-Static-recompilation | Prioritized hooks (before/replace/after/redirect) and owned byte patches |
 | vendored-41 | z3xox/BT3-Recomp | Versioned, size-prefixed mod ABI table (replaceFunction/lookupFunction chaining) |
 | vendored-42 | sal063/Ace-Combat-5-Static-recompilation | Independent C runtime: musttail codegen, Vulkan GS, VU recompiler, native VU1-replacement renderer |
+| gow-18 | Waffle565/God-Of-War-Native-Port | AOT VU1 microprogram recompiler with exact-engine fallback |
+| gow-19 | Waffle565/God-Of-War-Native-Port | AOT R3000A IRX-to-C++ compiler with native overrides |
+| gow-20 | Waffle565/God-Of-War-Native-Port | OpenGL render-target GS backend behind GSRasterBackend |
+| gow-21 | Waffle565/God-Of-War-Native-Port | Recompiler routes timer/DMA/GS display MMIO to native services |
+| gow-22 | Waffle565/God-Of-War-Native-Port | Host-native services (sound, memory card, pad rumble, CDVD, MPEG, pacing) |
+| gow-23 | Waffle565/God-Of-War-Native-Port | Zone regression harness (pad scripts, frame captures, fps floor, log regexes, image distance) |
+| gow-27 | Waffle565/God-Of-War-Native-Port | Nintendo Switch (AArch64) target |
 
 ## Rejected or game-specific
 
@@ -124,3 +132,4 @@ Ordered by priority, then risk. The agent's scope judgement is in each record's 
 | roadtrip-24 | GAME_SPECIFIC | 16:9 widescreen layout, town dialogue window, map second screen, UI mask | game-specific (commit titles name Road Trip screens: town dialogue, map) |
 | dq8-09 | REJECTED | return true after queueing syscall override (reverted) | n/a |
 | dq8-33 | GAME_SPECIFIC | DQ8_MC_TRACE, DQ8_PAD_SCRIPT, DQ8_SKIP_MOVIES, DQ8_GFX_SCREENSHOT_DIR, PS2X_KERNEL_TRACE_MS debug h… | Title-named env vars (DQ8_*); PS2X_KERNEL_TRACE_MS is generic |
+| gow-26 | GAME_SPECIFIC | GoW overrides, configs, stub RPC services, widescreen, language packs | GAME-SPECIFIC |

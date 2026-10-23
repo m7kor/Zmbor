@@ -14,3 +14,12 @@ rebuilt, and covered by the test suite in this tree. Upstream base: `ran-j/PS2Re
 | Issue #259 | Runtime, SetupThread | `GuestThread::stack` holds a top after SetupThread(-1) but a base after CreateThread | Open | Related: for `SetupThread(gp, -1, size)` the runtime returns `sp = 0x02000000 - size`; Play!'s HLE kernel (`PS2OS.cpp`, `sc_SetupThread`) uses `RAM size - 4 KiB`. Needs checking against `EndOfHeap`/`SetupHeap` before any change. |
 | PR #284, PR #372 | Runtime, DMAC | `D_ENABLEW` not mirrored to `D_ENABLER` (#257) | Pending review | Overlapping PRs; #372 also adds MFIFO. |
 | CodeGenerator `m_sections` | Recompiler | Member was `const std::vector<Section>&`; tests construct `CodeGenerator({}, {})`, leaving a dangling reference read by control-flow analysis | **Fixed in this fork** | Now an owned copy (sections hold only metadata + a data pointer). |
+
+## Phase 1 audit results
+
+| Item | Question | Evidence | Outcome |
+|---|---|---|---|
+| RSQRT.S, ft = +-0 | Sign of fs (ours, #272) or of ft (PCSX2, DJ engine)? | ps2autotests `tests/cpu/ee_fpu/sqrt.expected` (real PS2): `rsqrt -0, +0 -> ffffffff`, `rsqrt +0, -0 -> 7fffffff` | Ours matches hardware; already covered by `ps2_float_hw_vectors.inc` rows. No change; PCSX2 is the outlier here. |
+| VU0 macro DIV/RSQRT +-max | 0x7FFFFFFF (ours) vs PCSX2's 0x7F7FFFFF | No VU0 hardware row for these yet (ps2autotests vu0_macro covers integer/transfer only) | Kept 0x7FFFFFFF for consistency with the hardware-checked FPU; marked unresolved until a hardware row exists. |
+| PMULTH family | Exact products and LO/HI layout | PCSX2 MMI.cpp and 160 rows of `tests/cpu/ee_simd/muldiv.expected` | Integrated (eff10b7, d3765cf). |
+| DMA chain limit | Is 1<<20 tags safe? | A looping chain stops after 1M tags with a warning instead of hanging; finite chains are never cut below that | Kept; cycle detection (dq8-21) remains a candidate. |

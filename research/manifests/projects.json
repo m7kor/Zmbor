@@ -257,5 +257,20 @@
       "files_changed": 0
     },
     "note": "no commits beyond upstream on the default branch; nothing to extract there"
+  },
+  {
+    "repository": "Waffle565/God-Of-War-Native-Port",
+    "license": "GPL-3.0 (runtime branch); none on main",
+    "default_branch": "main",
+    "relationship": "runtime branch is a history-preserving fork of ran-j/PS2Recomp",
+    "engine_repository": "Waffle565/God-Of-War-Native-Port",
+    "engine_branch": "runtime",
+    "engine_vs_upstream": {
+      "compared_to": "ran-j/PS2Recomp c5a9d02",
+      "ahead_by": 147,
+      "behind_by": 0,
+      "head": "ba16c8d70e"
+    },
+    "status": "ANALYZED"
   }
 ]

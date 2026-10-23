@@ -9,6 +9,14 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{VITASDK})
     endif()
 endif()
 
+# MSVC + Ninja Debug builds failed with C1041 (several cl.exe processes writing one target PDB). Embed debug info
+# in the objects (/Z7) instead; must be set before project() so it also applies to fetched dependencies.
+if(POLICY CMP0141)
+    cmake_policy(SET CMP0141 NEW)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>" CACHE STRING
+        "MSVC debug information format")
+endif()
+
 project(PS2RetroX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

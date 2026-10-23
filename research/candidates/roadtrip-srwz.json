@@ -1424,7 +1424,7 @@
     "upstream_equivalent": "#322 (give MMI HI/LO family both pipelines' registers)",
     "risk": "low",
     "priority": 1,
-    "status": "CANDIDATE",
+    "status": "SUPERSEDED",
     "evidence": {
       "analysis": "read-only source inspection by a forensic pass (2026-10-23); not built or tested here"
     },
@@ -1452,7 +1452,8 @@
       "upstream_pr_equivalent": "#322 (give MMI HI/LO family both pipelines' registers)",
       "priority": 1,
       "recommended_status": "CANDIDATE"
-    }
+    },
+    "limitations": "128-bit HI/LO moves integrated in eff10b7 (gow-01/gow-02)."
   },
   {
     "id": "srwz-02",

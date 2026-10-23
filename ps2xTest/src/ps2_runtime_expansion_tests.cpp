@@ -21,6 +21,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 #include <exception>
 #include <string>
 #include <vector>
@@ -312,11 +313,70 @@ namespace
 
 }
 
+namespace
+{
+    struct MmiHardwareVector
+    {
+        const char *op;
+        uint32_t rdBefore[4];
+        uint32_t rs[4];
+        uint32_t rt[4];
+        uint32_t rd[4];
+        uint64_t hi, hi1, lo, lo1;
+    };
+
+    const MmiHardwareVector kMmiHardwareVectors[] = {
+#include "ps2_mmi_hw_vectors.inc"
+    };
+}
+
 void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
         // MMI HI/LO family against PCSX2 MMI.cpp, with expectations computed from scalar products here.
+        tc.Run("MMI halfword multiplies match real-PS2 results (ps2autotests ee_simd/muldiv)", [](TestCase &t)
+        {
+            uint32_t mismatches = 0u;
+            for (const MmiHardwareVector &v : kMmiHardwareVectors)
+            {
+                R5900Context ctx{};
+                // muldiv.cpp C_HILO, set before every case
+                ctx.hi = 0x0123456789ABCDEFull;
+                ctx.lo = 0x123456789ABCDEF0ull;
+                ctx.hi1 = 0x23456789ABCDEF01ull;
+                ctx.lo1 = 0x456789ABCDEF0123ull;
+                __m128i rs, rt;
+                std::memcpy(&rs, v.rs, 16);
+                std::memcpy(&rt, v.rt, 16);
+                const std::string op = v.op;
+                __m128i rd;
+                if (op == "pmulth")
+                    rd = ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Set);
+                else if (op == "pmaddh")
+                    rd = ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Add);
+                else if (op == "pmsubh")
+                    rd = ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Sub);
+                else if (op == "phmadh")
+                    rd = ps2MmiHorizontalMultiply(&ctx, rs, rt, false);
+                else
+                    rd = ps2MmiHorizontalMultiply(&ctx, rs, rt, true);
+                alignas(16) uint32_t got[4];
+                _mm_store_si128(reinterpret_cast<__m128i *>(got), rd);
+                const bool ok = std::memcmp(got, v.rd, sizeof(got)) == 0 && ctx.hi == v.hi && ctx.hi1 == v.hi1 &&
+                                ctx.lo == v.lo && ctx.lo1 == v.lo1;
+                if (!ok && mismatches++ < 5u)
+                {
+                    std::printf("    hw mismatch %s rs=%08x_%08x_%08x_%08x: rd %08x_%08x_%08x_%08x vs %08x_%08x_%08x_%08x\n",
+                                v.op, v.rs[3], v.rs[2], v.rs[1], v.rs[0], got[3], got[2], got[1], got[0],
+                                v.rd[3], v.rd[2], v.rd[1], v.rd[0]);
+                }
+            }
+            t.Equals(mismatches, 0u, "every hardware row should match rd, HI, HI1, LO and LO1");
+            t.Equals(static_cast<uint32_t>(sizeof(kMmiHardwareVectors) / sizeof(kMmiHardwareVectors[0])), 160u,
+                     "all 160 hardware rows (5 ops x 32 cases) should be checked");
+        });
+
         tc.Run("PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}", [](TestCase &t)
         {
             const int16_t a[8] = {3, -4, 300, -32768, 7, 32767, -2, 1000};

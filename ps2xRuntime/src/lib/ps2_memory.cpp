@@ -1351,6 +1351,13 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
 
     if (address >= 0x10008000 && address < 0x1000F000)
     {
+        // Scratchpad channels keep SADR as a 16-byte offset inside the 16 KB scratchpad and have no SPR bit in
+        // MADR (ps2autotests dma/spr/normal.expected: SADR 0x81234028 reads 0x20; MADR bit 31 is dropped).
+        if (address == 0x1000D080u || address == 0x1000D480u)
+            m_ioRegisters[address] = value & 0x3FF0u;
+        else if (address == 0x1000D010u || address == 0x1000D410u)
+            m_ioRegisters[address] = value & 0x7FFFFFF0u;
+
         if ((address & 0xFF) == 0x00 && (value & 0x100))
         {
             const auto dctrlIt = m_ioRegisters.find(0x1000E000u);
@@ -1392,9 +1399,14 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                 uint32_t chcr = value;
                 uint32_t mode = (chcr >> 2) & 0x3;
 
+                // A normal-mode transfer leaves MADR just past the data (dma/dmasend.cpp checks
+                // madr == start + size; QWC reaches 0 when the transfer completes).
+                const auto advanceMadr = [&]()
+                { m_ioRegisters[channelBase + 0x10] = (madr & 0x80000000u) | ((madr + (qwc & 0xFFFFu) * 16u) & 0x7FFFFFF0u); };
                 if (mode == 0 && qwc > 0)
                 {
                     enqueueTransfer(madr, qwc);
+                    advanceMadr();
                 }
                 else if (mode == 1)
                 {
@@ -1623,6 +1635,7 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                 else if (qwc > 0)
                 {
                     enqueueTransfer(madr, qwc);
+                    advanceMadr();
                 }
 
                 const bool autoProcessTransfers =

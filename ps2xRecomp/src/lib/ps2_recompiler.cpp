@@ -1578,7 +1578,9 @@ namespace ps2recomp
                             }
 
                             std::lock_guard<std::mutex> finalLock(outputMutex);
-                            if (outstandingWork == 0 && nextFunction >= outputFunctions.size() && completedCode.empty())
+                            // A worker may have finished after the unlock above; its code then waits in readyCode.
+                            if (outstandingWork == 0 && nextFunction >= outputFunctions.size() && completedCode.empty() &&
+                                readyCode.empty())
                             {
                                 throw std::runtime_error("Internal error: combined output completion queue is missing index " + std::to_string(nextOutputIndex));
                             }

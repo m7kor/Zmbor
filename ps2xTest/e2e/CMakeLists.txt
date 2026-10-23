@@ -61,3 +61,40 @@ endfunction()
 
 ps2x_add_e2e_program(basic)
 ps2x_add_e2e_program(gs_sprite FRAME)
+
+# Hardware result tests: ELFs recompiled by tools/hwtest/hwtest.py prepare (for example ps2autotests, whose
+# .expected files were printed by a real PS2). Configure with -DPS2X_HWTEST_GENERATED=<prepared dir>.
+set(PS2X_HWTEST_GENERATED "" CACHE PATH "Directory prepared by tools/hwtest/hwtest.py prepare")
+# Optimizing the multi-megabyte recompiled sources costs minutes per test (MSVC /O2), against seconds unoptimized;
+# the generated code's semantics do not depend on it (x64 SSE math, /fp:precise either way). The runtime keeps the
+# build type's optimization. Turn this on for a run that matches shipped builds.
+option(PS2X_HWTEST_OPTIMIZE "Optimize recompiled code of hardware result tests" OFF)
+if(PS2X_HWTEST_GENERATED)
+    file(GLOB ps2x_hw_manifests "${PS2X_HWTEST_GENERATED}/*/hwtest.cmake")
+    foreach(ps2x_hw_manifest IN LISTS ps2x_hw_manifests)
+        include("${ps2x_hw_manifest}") # HW_NAME, HW_ELF, HW_EXPECTED, HW_CONFIG, HW_GEN, HW_RESULT
+        # Recompiled at build time, so a recompiler change regenerates every hardware test.
+        set(ps2x_hw_sources "${HW_GEN}/ps2_recompiled_functions.cpp" "${HW_GEN}/register_functions.cpp")
+        add_custom_command(
+            OUTPUT ${ps2x_hw_sources} "${HW_GEN}/ps2_recompiled_functions.h" "${HW_GEN}/ps2_recompiled_stubs.h"
+            COMMAND $<TARGET_FILE:ps2_recomp> "${HW_CONFIG}"
+            DEPENDS ps2_recomp "${HW_ELF}" "${HW_CONFIG}"
+            COMMENT "hwtest: recompiling ${HW_NAME}"
+            VERBATIM)
+        add_executable(ps2x_hw_${HW_NAME} "${CMAKE_SOURCE_DIR}/ps2xRuntime/src/main.cpp" ${ps2x_hw_sources})
+        target_include_directories(ps2x_hw_${HW_NAME} PRIVATE "${HW_GEN}")
+        target_link_libraries(ps2x_hw_${HW_NAME} PRIVATE ps2_runtime)
+        if(NOT PS2X_HWTEST_OPTIMIZE)
+            set_source_files_properties(${ps2x_hw_sources} PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/Od,-O0>")
+        endif()
+        if(MSVC)
+            target_link_options(ps2x_hw_${HW_NAME} PRIVATE "/FORCE:MULTIPLE")
+            target_compile_options(ps2x_hw_${HW_NAME} PRIVATE /bigobj)
+        endif()
+        add_test(NAME hw_${HW_NAME}
+            COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/hwtest/hwtest.py" run
+                --runner $<TARGET_FILE:ps2x_hw_${HW_NAME}> --elf "${HW_ELF}" --expected "${HW_EXPECTED}"
+                --result "${HW_RESULT}")
+        set_tests_properties(hw_${HW_NAME} PROPERTIES TIMEOUT 120 LABELS hwtest)
+    endforeach()
+endif()

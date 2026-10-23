@@ -14,6 +14,7 @@ namespace ps2_syscalls
     void CreateThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void DeleteThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void StartThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+    void Exit(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void ExitThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void ExitDeleteThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void TerminateThread(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);

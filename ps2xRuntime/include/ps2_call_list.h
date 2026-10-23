@@ -14,6 +14,7 @@
     X(CreateThread)            \
     X(DeleteThread)            \
     X(StartThread)             \
+    X(Exit)                    \
     X(ExitThread)              \
     X(ExitDeleteThread)        \
     X(TerminateThread)         \

@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstring>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 
 namespace
@@ -168,6 +169,7 @@ void EeScheduler::run()
             break;
         }
 
+        dropCancelledInvocations();
         if (m_currentThreadId == 0)
         {
             GuestThread *next = selectReady();
@@ -176,6 +178,14 @@ void EeScheduler::run()
                 copyMainContextToRuntime();
                 publishIdleDebugContext();
                 publishSnapshot();
+                if (allThreadsDormant())
+                {
+                    // Nothing can run again: only StartThread leaves Dormant, and interrupt or alarm handlers
+                    // cannot call it. ps2sdk's _exit ends this way (ExitDeleteThread, which hands control back
+                    // to a loader such as ps2link) before it would reach Exit.
+                    requestStop();
+                    break;
+                }
                 waitForEvent();
                 continue;
             }
@@ -648,7 +658,8 @@ void EeScheduler::sleepCurrent()
     if (self->wakeupCount != 0u)
     {
         --self->wakeupCount;
-        setReturnS32(&self->activeContext(), KE_OK);
+        // SleepThread returns the caller's thread id (ps2autotests kernel/ee/thread/sleep.expected).
+        setReturnS32(&self->activeContext(), self->id);
         return;
     }
     blockCurrent(EeWaitState{EeWaitReason::Sleep, std::monostate{}});
@@ -673,7 +684,7 @@ int EeScheduler::wakeupThread(int id, bool interruptSafe)
     if ((target->status == EeThreadStatus::Waiting || target->status == EeThreadStatus::WaitingSuspended) &&
         target->wait.reason == EeWaitReason::Sleep)
     {
-        makeReady(*target, KE_OK, interruptSafe);
+        makeReady(*target, target->id, interruptSafe); // the woken SleepThread returns its thread id
     }
     else
     {
@@ -1218,6 +1229,17 @@ int EeScheduler::addIrqHandler(bool dmac,
                                uint32_t gp,
                                uint32_t sp)
 {
+    return addIrqHandlerAt(dmac, cause, handler, append ? -1 : 0, argument, gp, sp);
+}
+
+int EeScheduler::addIrqHandlerAt(bool dmac,
+                                 uint32_t cause,
+                                 uint32_t handler,
+                                 int32_t next,
+                                 uint32_t argument,
+                                 uint32_t gp,
+                                 uint32_t sp)
+{
     assertExecutor();
     auto &handlers = dmac ? m_dmacHandlers : m_intcHandlers;
     int &nextId = dmac ? m_nextDmacHandlerId : m_nextIntcHandlerId;
@@ -1228,15 +1250,32 @@ int EeScheduler::addIrqHandler(bool dmac,
     }
     int &head = dmac ? m_dmacHeadOrder : m_intcHeadOrder;
     int &tail = dmac ? m_dmacTailOrder : m_intcTailOrder;
-    handlers.emplace(id,
-                     EeIrqHandler{id,
-                                  cause,
-                                  handler,
-                                  argument,
-                                  gp,
-                                  sp,
-                                  true,
-                                  append ? ++tail : --head});
+    int order = 0;
+    const auto before = next > 0 ? handlers.find(next) : handlers.end();
+    if (next == 0)
+    {
+        order = --head;
+    }
+    else if (before != handlers.end() && before->second.cause == cause)
+    {
+        // Take the place of the named handler and move it, and everything after it, one step back
+        // (ps2autotests kernel/ee/interrupt/dmac_order "relative": 1, 4, 2, 3).
+        order = before->second.order;
+        for (auto &[otherId, other] : handlers)
+        {
+            (void)otherId;
+            if (other.order >= order)
+            {
+                ++other.order;
+            }
+        }
+        ++tail;
+    }
+    else
+    {
+        order = ++tail;
+    }
+    handlers.emplace(id, EeIrqHandler{id, cause, handler, argument, gp, sp, true, order});
     return id;
 }
 
@@ -1284,11 +1323,16 @@ int EeScheduler::setIrqCauseEnabled(bool dmac, uint32_t cause, bool enabled)
 
 void EeScheduler::dispatchIrq(bool dmac, uint32_t cause)
 {
+    (void)dispatchIrq(dmac, cause, nullptr);
+}
+
+bool EeScheduler::dispatchIrq(bool dmac, uint32_t cause, std::function<void()> afterLast)
+{
     assertExecutor();
     const uint32_t mask = dmac ? m_enabledDmacMask : m_enabledIntcMask;
     if (cause < 32u && (mask & (1u << cause)) == 0u)
     {
-        return;
+        return false;
     }
     const auto &handlers = dmac ? m_dmacHandlers : m_intcHandlers;
     std::vector<EeIrqHandler> matching;
@@ -1303,8 +1347,12 @@ void EeScheduler::dispatchIrq(bool dmac, uint32_t cause)
     }
     std::sort(matching.begin(), matching.end(), [](const EeIrqHandler &left, const EeIrqHandler &right)
               { return left.order < right.order; });
-    for (const EeIrqHandler &handler : matching)
+    // A handler returning a negative value ends the chain: later handlers for this interrupt do not run
+    // (ps2autotests kernel/ee/interrupt/dmac_order "cancel": 1, 2 with handler 2 returning -1).
+    auto cancelled = std::make_shared<bool>(false);
+    for (size_t i = 0; i < matching.size(); ++i)
     {
+        const EeIrqHandler &handler = matching[i];
         GuestInvocation invocation{};
         invocation.kind = GuestInvocationKind::Interrupt;
         invocation.context.pc = handler.handler;
@@ -1313,8 +1361,23 @@ void EeScheduler::dispatchIrq(bool dmac, uint32_t cause)
         SET_GPR_U32(&invocation.context, 28, handler.gp);
         SET_GPR_U32(&invocation.context, 29, 0u);
         SET_GPR_U32(&invocation.context, 31, 0u);
+        const bool last = i + 1u == matching.size();
+        invocation.shouldRun = [cancelled]()
+        { return !*cancelled; };
+        invocation.onComplete = [cancelled, last, afterLast](const R5900Context &completed, R5900Context &)
+        {
+            if (static_cast<int32_t>(getRegU32(&completed, 2)) < 0)
+            {
+                *cancelled = true;
+            }
+            if ((*cancelled || last) && afterLast)
+            {
+                afterLast();
+            }
+        };
         queueInvocation(std::move(invocation));
     }
+    return !matching.empty();
 }
 
 void EeScheduler::setVSyncFlag(uint32_t flagAddress, uint32_t tickAddress)
@@ -1668,11 +1731,29 @@ void EeScheduler::makeRunning(GuestThread &item)
     renewTimeSlice();
 }
 
+void EeScheduler::dropCancelledInvocations()
+{
+    while (!m_pendingInvocations.empty() && m_pendingInvocations.front().shouldRun &&
+           !m_pendingInvocations.front().shouldRun())
+    {
+        m_pendingInvocations.pop_front();
+    }
+}
+
+bool EeScheduler::allThreadsDormant() const
+{
+    return std::none_of(m_threads.begin(), m_threads.end(), [](const auto &entry)
+                        { return entry.first > 0 && entry.second.status != EeThreadStatus::Dormant; });
+}
+
 void EeScheduler::makeDormant(GuestThread &item)
 {
     removeReady(item);
     removeFromWaitObject(item);
     item.status = EeThreadStatus::Dormant;
+    // A dormant thread is back at its initial priority (kernel/ee/thread/terminate.expected: terminated after a
+    // change to 60, it reads "current prio: 50"; exit.expected likewise).
+    item.currentPriority = item.initialPriority;
     item.wait = {};
     item.resumeCompletion = {};
     item.suspendCount = 0;

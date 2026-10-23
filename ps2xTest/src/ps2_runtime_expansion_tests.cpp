@@ -19,6 +19,8 @@
 
 #include <atomic>
 #include <bit>
+#include <chrono>
+#include <thread>
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
@@ -224,6 +226,22 @@ namespace
         runtime->requestStop();
     }
 
+    constexpr uint32_t kAllDormantMainPc = 0x00182000u;
+    constexpr uint32_t kAllDormantOtherPc = 0x00182100u;
+    std::atomic<uint32_t> gAllDormantMainRuns{0u};
+
+    // Returns from the thread entry: the thread exits, as ps2sdk's _exit does with ExitDeleteThread.
+    void testAllDormantMain(uint8_t *, R5900Context *ctx, PS2Runtime *)
+    {
+        gAllDormantMainRuns.fetch_add(1u, std::memory_order_acq_rel);
+        ctx->pc = 0u;
+    }
+
+    void testAllDormantOther(uint8_t *, R5900Context *ctx, PS2Runtime *)
+    {
+        ctx->pc = 0u;
+    }
+
     void testMpegWaitMain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         gMpegWaitStage.store(1u, std::memory_order_release);
@@ -328,6 +346,58 @@ namespace
     const MmiHardwareVector kMmiHardwareVectors[] = {
 #include "ps2_mmi_hw_vectors.inc"
     };
+
+    struct SimdHardwareVector
+    {
+        const char *op;
+        uint32_t a[4]; // first assembler operand: rs, or rt for one-operand forms and variable-shift values
+        uint32_t b[4]; // second: rt, or rs for variable-shift amounts
+        uint32_t result[4];
+    };
+
+    const SimdHardwareVector kSimdHardwareVectors[] = {
+#include "ps2_simd_hw_vectors.inc"
+    };
+
+    struct DivideHardwareVector
+    {
+        const char *op;
+        uint32_t rs[4];
+        uint32_t rt[4];
+        uint64_t hi, hi1, lo, lo1;
+    };
+
+    const DivideHardwareVector kDivideHardwareVectors[] = {
+#include "ps2_pdiv_hw_vectors.inc"
+    };
+
+    __m128i simdWords(const uint32_t (&w)[4])
+    {
+        return _mm_set_epi32(static_cast<int32_t>(w[3]), static_cast<int32_t>(w[2]), static_cast<int32_t>(w[1]),
+                             static_cast<int32_t>(w[0]));
+    }
+
+    // The runtime helpers the code generator emits for each instruction.
+    bool applySimdOp(const std::string &op, __m128i a, __m128i b, __m128i &out)
+    {
+        if (op == "pexch") out = PS2_PEXCH(a);
+        else if (op == "pexcw") out = PS2_PEXCW(a);
+        else if (op == "pexeh") out = PS2_PEXEH(a);
+        else if (op == "pexew") out = PS2_PEXEW(a);
+        else if (op == "prevh") out = PS2_PREVH(a);
+        else if (op == "prot3w") out = PS2_PROT3W(a);
+        else if (op == "pabsh") out = PS2_PABSH(a);
+        else if (op == "pabsw") out = PS2_PABSW(a);
+        else if (op == "pinth") out = PS2_PINTH(a, b);
+        else if (op == "pinteh") out = PS2_PINTEH(a, b);
+        else if (op == "padduh") out = PS2_PADDUH(a, b);
+        else if (op == "psubuh") out = PS2_PSUBUH(a, b);
+        else if (op == "psllvw") out = PS2_PSLLVW(a, b);
+        else if (op == "psrlvw") out = PS2_PSRLVW(a, b);
+        else if (op == "psravw") out = PS2_PSRAVW(a, b);
+        else return false;
+        return true;
+    }
 }
 
 void register_ps2_runtime_expansion_tests()
@@ -375,6 +445,86 @@ void register_ps2_runtime_expansion_tests()
             t.Equals(mismatches, 0u, "every hardware row should match rd, HI, HI1, LO and LO1");
             t.Equals(static_cast<uint32_t>(sizeof(kMmiHardwareVectors) / sizeof(kMmiHardwareVectors[0])), 160u,
                      "all 160 hardware rows (5 ops x 32 cases) should be checked");
+        });
+
+        tc.Run("MMI shuffles, absolutes, saturating adds and variable shifts match real-PS2 results", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_simd/{shuffle,arithmetic,logic}.expected, rows with shared.h constant operands.
+            uint32_t mismatches = 0u;
+            for (const SimdHardwareVector &v : kSimdHardwareVectors)
+            {
+                __m128i out{};
+                if (!applySimdOp(v.op, simdWords(v.a), simdWords(v.b), out))
+                {
+                    t.IsTrue(false, std::string("no runtime helper for ") + v.op);
+                    continue;
+                }
+                alignas(16) uint32_t got[4];
+                _mm_store_si128(reinterpret_cast<__m128i *>(got), out);
+                if (std::memcmp(got, v.result, sizeof(got)) != 0 && ++mismatches <= 8u)
+                {
+                    char line[160];
+                    std::snprintf(line, sizeof(line), "%s a=%08x.. got %08x %08x %08x %08x, hardware %08x %08x %08x %08x",
+                                  v.op, v.a[0], got[3], got[2], got[1], got[0],
+                                  v.result[3], v.result[2], v.result[1], v.result[0]);
+                    t.IsTrue(false, line);
+                }
+            }
+            t.Equals(mismatches, 0u, "every hardware row should match");
+            t.Equals(static_cast<uint32_t>(sizeof(kSimdHardwareVectors) / sizeof(kSimdHardwareVectors[0])), 268u,
+                     "all 268 hardware rows (15 ops) should be checked");
+        });
+
+        tc.Run("PDIVW, PDIVUW and PDIVBW match real-PS2 results, including x/0 and INT_MIN/-1", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_simd/muldiv.expected; on the host INT_MIN / -1 traps (it crashed this test ELF).
+            uint32_t mismatches = 0u;
+            for (const DivideHardwareVector &v : kDivideHardwareVectors)
+            {
+                R5900Context ctx{};
+                const std::string op = v.op;
+                const Ps2PackedDivide kind = op == "pdivbw"   ? Ps2PackedDivide::WordsByHalfword
+                                             : op == "pdivuw" ? Ps2PackedDivide::UnsignedWords
+                                                              : Ps2PackedDivide::Words;
+                ps2PackedDivideToHiLo(&ctx, simdWords(v.rs), simdWords(v.rt), kind);
+                if ((ctx.hi != v.hi || ctx.hi1 != v.hi1 || ctx.lo != v.lo || ctx.lo1 != v.lo1) && ++mismatches <= 8u)
+                {
+                    char line[200];
+                    std::snprintf(line, sizeof(line), "%s %08x / %08x: HI %016llx %016llx LO %016llx %016llx, hardware HI %016llx %016llx LO %016llx %016llx",
+                                  v.op, v.rs[0], v.rt[0],
+                                  static_cast<unsigned long long>(ctx.hi), static_cast<unsigned long long>(ctx.hi1),
+                                  static_cast<unsigned long long>(ctx.lo), static_cast<unsigned long long>(ctx.lo1),
+                                  static_cast<unsigned long long>(v.hi), static_cast<unsigned long long>(v.hi1),
+                                  static_cast<unsigned long long>(v.lo), static_cast<unsigned long long>(v.lo1));
+                    t.IsTrue(false, line);
+                }
+            }
+            t.Equals(mismatches, 0u, "every hardware row should match HI, HI1, LO and LO1");
+            t.Equals(static_cast<uint32_t>(sizeof(kDivideHardwareVectors) / sizeof(kDivideHardwareVectors[0])), 45u,
+                     "all 45 hardware rows should be checked");
+        });
+
+        tc.Run("FCR31 starts at the hardware reset value", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_fpu/fcr.expected "Initial: ... fcr31: 01000001".
+            const R5900Context reset;
+            t.Equals(reset.fcr31, 0x01000001u, "FCR31 reset value");
+        });
+
+        tc.Run("CVT.S.W rounds toward zero like the EE", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_fpu/convert.expected: "cvt.s.w <input bits>/...: <result bits>".
+            const struct { uint32_t in, out; } rows[] = {
+                {0x7FFFFFFFu, 0x4EFFFFFFu}, {0x4EFFFFFFu, 0x4E9DFFFFu}, {0x3FC147AEu, 0x4E7F051Eu},
+                {0xBFC147AEu, 0xCE807D70u}, {0x40400000u, 0x4E808000u}, {0xCF000000u, 0xCE440000u},
+                {0xFFFFFFFFu, 0xBF800000u}, {0x00000000u, 0x00000000u}};
+            for (const auto &row : rows)
+            {
+                const float f = ps2_cvt_s_w(static_cast<int32_t>(row.in));
+                uint32_t bits = 0;
+                std::memcpy(&bits, &f, sizeof(bits));
+                t.Equals(bits, row.out, "cvt.s.w result bits");
+            }
         });
 
         tc.Run("PMULTH writes eight exact products to LO/HI words and rd = {LO0,HI0,LO2,HI2}", [](TestCase &t)
@@ -1045,6 +1195,36 @@ void register_ps2_runtime_expansion_tests()
                      "new MPEG create should allow callbacks for the next stream");
 
             runtime.requestStop();
+        });
+
+        tc.Run("EE scheduler ends the run once every thread is dormant", [](TestCase &t)
+        {
+            // ps2autotests programs end with ExitDeleteThread on main (ps2sdk _exit) while their test thread has
+            // already exited; with no thread left to start, the run must end instead of idling forever.
+            PS2Runtime runtime;
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
+            runtime.registerFunction(kAllDormantMainPc, testAllDormantMain);
+            runtime.registerFunction(kAllDormantOtherPc, testAllDormantOther);
+            gAllDormantMainRuns.store(0u, std::memory_order_release);
+            std::atomic<bool> finished{false};
+            std::thread executor([&]()
+                                 {
+                R5900Context mainContext{};
+                mainContext.pc = kAllDormantMainPc;
+                EeScheduler &ee = runtime.eeScheduler();
+                ee.reset(rdram.data(), mainContext);
+                (void)ee.createThread(EeThreadCreateParams{0u, kAllDormantOtherPc, 0u, 0u, 0u, 10, 0u}); // never started
+                ee.run();
+                finished.store(true, std::memory_order_release); });
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (!finished.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            const bool ended = finished.load(std::memory_order_acquire);
+            if (!ended)
+                runtime.requestStop();
+            executor.join();
+            t.IsTrue(ended, "run() must return when no thread can run again");
+            t.Equals(gAllDormantMainRuns.load(std::memory_order_acquire), 1u, "main ran once before exiting");
         });
 
         tc.Run("sceMpegGetPicture blocks as a typed scheduler wait and resumes on EOF", [](TestCase &t)

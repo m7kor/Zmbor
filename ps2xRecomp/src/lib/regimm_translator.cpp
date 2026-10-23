@@ -34,9 +34,9 @@ namespace ps2recomp
             return fmt::format("// REGIMM branch instruction to 0x{:X} - Handled by branch logic", target);
         }
         case REGIMM_MTSAB:
-            return fmt::format("ctx->sa = ((GPR_U32(ctx, {}) ^ (uint32_t){}) & 0xF) << 3;", inst.rs, inst.simmediate);
+            return fmt::format("ctx->sa = (GPR_U32(ctx, {}) ^ (uint32_t){}) & 0xF;", inst.rs, inst.simmediate); // bytes
         case REGIMM_MTSAH:
-            return fmt::format("ctx->sa = ((GPR_U32(ctx, {}) ^ (uint32_t){}) & 0x7) << 4;", inst.rs, inst.simmediate);
+            return fmt::format("ctx->sa = ((GPR_U32(ctx, {}) ^ (uint32_t){}) & 0x7) * 2;", inst.rs, inst.simmediate); // halfwords as bytes
         case REGIMM_TGEI:
             return fmt::format("if (GPR_S64(ctx, {}) >= (int64_t)(int32_t){}) {{ runtime->handleTrap(rdram, ctx); }}", inst.rs, inst.simmediate);
         case REGIMM_TGEIU:

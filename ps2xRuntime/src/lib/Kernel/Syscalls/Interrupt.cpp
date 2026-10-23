@@ -29,13 +29,13 @@ namespace ps2_syscalls
                         bool dmac)
         {
             const int id = scheduler(rdram, ctx, runtime)
-                               .addIrqHandler(dmac,
-                                              getRegU32(ctx, 4),
-                                              getRegU32(ctx, 5),
-                                              getRegU32(ctx, 6) != 0u,
-                                              getRegU32(ctx, 7),
-                                              getRegU32(ctx, 28),
-                                              getRegU32(ctx, 29));
+                               .addIrqHandlerAt(dmac,
+                                                getRegU32(ctx, 4),
+                                                getRegU32(ctx, 5),
+                                                static_cast<int32_t>(getRegU32(ctx, 6)), // next
+                                                getRegU32(ctx, 7),
+                                                getRegU32(ctx, 28),
+                                                getRegU32(ctx, 29));
             setReturnS32(ctx, id);
         }
 

@@ -486,5 +486,101 @@ void register_ps2_sif_dma_tests()
             t.Equals(readGuestU32(env.rdram.data(), kRdAddr + 0x10u), 0x11111111u,
                      "failed sceSifGetOtherData should not overwrite rd metadata");
         });
+
+        // Packet-level IOP SIFCMD/SIFRPC, as driven by recompiled ps2sdk EE libraries (layouts: ps2sdk
+        // common/include/sifcmd-common.h and sifrpc-common.h; IOP behaviour: iop/system/sifcmd).
+        constexpr uint32_t kEeReceiveBuffer = 0x00031000u;
+        constexpr uint32_t kCmdDescAddr = 0x00020000u;
+        const auto sendCommand = [](TestEnv &env, uint32_t iopCmdBuffer, uint32_t packetAddr, uint32_t packetSize,
+                                    uint32_t extraSrc, uint32_t extraDest, uint32_t extraSize)
+        {
+            std::vector<Ps2SifDmaTransfer> descs;
+            if (extraSize != 0u)
+                descs.push_back({extraSrc, extraDest, static_cast<int32_t>(extraSize), 0});
+            descs.push_back({packetAddr, iopCmdBuffer, static_cast<int32_t>(packetSize), 0x44});
+            std::memcpy(env.rdram.data() + kCmdDescAddr, descs.data(), descs.size() * sizeof(Ps2SifDmaTransfer));
+            setRegU32(env.ctx, 4, kCmdDescAddr);
+            setRegU32(env.ctx, 5, static_cast<uint32_t>(descs.size()));
+            ps2_stubs::sceSifSetDma(env.rdram.data(), &env.ctx, &env.runtime);
+        };
+        const auto initCmd = [sendCommand](TestEnv &env)
+        {
+            setRegU32(env.ctx, 4, 0x2u); // SIF_REG_SUBADDR
+            ps2_stubs::sceSifGetReg(env.rdram.data(), &env.ctx, &env.runtime);
+            const uint32_t iopCmdBuffer = ::getRegU32(&env.ctx, 2);
+            constexpr uint32_t kInitPacket = 0x00030000u;
+            writeGuestU32(env.rdram.data(), kInitPacket + 0x0u, 0x14u);       // psize
+            writeGuestU32(env.rdram.data(), kInitPacket + 0x8u, 0x80000002u); // SIF_CMD_INIT_CMD
+            writeGuestU32(env.rdram.data(), kInitPacket + 0xCu, 0u);          // opt 0: EE receive buffer follows
+            writeGuestU32(env.rdram.data(), kInitPacket + 0x10u, kEeReceiveBuffer);
+            sendCommand(env, iopCmdBuffer, kInitPacket, 0x14u, 0u, 0u, 0u);
+            return iopCmdBuffer;
+        };
+
+        tc.Run("IOP SIFCMD publishes a command buffer and answers INIT_CMD with SET_SREG(RPCINIT, 1)", [initCmd](TestCase &t)
+        {
+            TestEnv env;
+            const uint32_t iopCmdBuffer = initCmd(env);
+            t.IsTrue(iopCmdBuffer != 0u && env.runtime.isIopMemoryRange(iopCmdBuffer, 0x80u),
+                     "SIF_REG_SUBADDR must name an IOP command buffer the EE can DMA to");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x0u) & 0xFFu, 24u, "SET_SREG packet size");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x8u), 0x80000001u, "SIF_CMD_SET_SREG");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x10u), 0u, "SIF_SREG_RPCINIT");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x14u), 1u,
+                     "sceSifInitRpc spins until this soft register becomes 1");
+        });
+
+        tc.Run("IOP SIFRPC binds the ROM FILEIO server and answers a tty write call", [initCmd, sendCommand](TestCase &t)
+        {
+            TestEnv env;
+            const uint32_t iopCmdBuffer = initCmd(env);
+            constexpr uint32_t kClient = 0x00032000u;
+
+            constexpr uint32_t kBind = 0x00030100u;
+            writeGuestU32(env.rdram.data(), kBind + 0x0u, 64u);
+            writeGuestU32(env.rdram.data(), kBind + 0x8u, 0x80000009u); // SIF_CMD_RPC_BIND
+            writeGuestU32(env.rdram.data(), kBind + 0x14u, kBind);      // pkt_addr
+            writeGuestU32(env.rdram.data(), kBind + 0x1Cu, kClient);    // cd
+            writeGuestU32(env.rdram.data(), kBind + 0x20u, 0x80000001u); // sid: FILEIO
+            sendCommand(env, iopCmdBuffer, kBind, 64u, 0u, 0u, 0u);
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x8u), 0x80000008u, "bind answer is RPC_END");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x1Cu), kClient, "RPC_END names the client");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x20u), 0x80000009u, "RPC_END answers a bind");
+            const uint32_t server = readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x24u);
+            const uint32_t serverBuffer = readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x28u);
+            t.IsTrue(server != 0u, "fioInit rebinds until cd->server is non-null");
+            t.IsTrue(env.runtime.isIopMemoryRange(serverBuffer, 32u), "call arguments are DMAed to the server buffer");
+
+            // fioWrite(1, ptr, 6) with ptr 4 bytes below a quadword boundary: those 4 bytes travel in the argument.
+            constexpr uint32_t kArgs = 0x00033000u;
+            constexpr uint32_t kText = 0x0003400Cu;
+            constexpr uint32_t kReceive = 0x00035000u;
+            std::memcpy(env.rdram.data() + kText, "abcdef", 6u);
+            writeGuestU32(env.rdram.data(), kArgs + 0x0u, 1u);
+            writeGuestU32(env.rdram.data(), kArgs + 0x4u, kText);
+            writeGuestU32(env.rdram.data(), kArgs + 0x8u, 6u);
+            writeGuestU32(env.rdram.data(), kArgs + 0xCu, 4u);
+            std::memcpy(env.rdram.data() + kArgs + 0x10u, "abcd", 4u);
+            writeGuestU32(env.rdram.data(), kReceive, 0xDEADBEEFu);
+
+            constexpr uint32_t kCall = 0x00030200u;
+            writeGuestU32(env.rdram.data(), kCall + 0x0u, 64u | (32u << 8));
+            writeGuestU32(env.rdram.data(), kCall + 0x4u, serverBuffer);
+            writeGuestU32(env.rdram.data(), kCall + 0x8u, 0x8000000Au); // SIF_CMD_RPC_CALL
+            writeGuestU32(env.rdram.data(), kCall + 0x14u, kCall);
+            writeGuestU32(env.rdram.data(), kCall + 0x1Cu, kClient);
+            writeGuestU32(env.rdram.data(), kCall + 0x20u, 3u);  // FIO_F_WRITE
+            writeGuestU32(env.rdram.data(), kCall + 0x24u, 32u); // send_size
+            writeGuestU32(env.rdram.data(), kCall + 0x28u, kReceive);
+            writeGuestU32(env.rdram.data(), kCall + 0x2Cu, 4u);  // recv_size
+            writeGuestU32(env.rdram.data(), kCall + 0x30u, 1u);  // rmode: answer with RPC_END
+            writeGuestU32(env.rdram.data(), kCall + 0x34u, server);
+            sendCommand(env, iopCmdBuffer, kCall, 64u, kArgs, serverBuffer, 32u);
+            t.Equals(readGuestU32(env.rdram.data(), kReceive), 6u, "the write result reaches the receive buffer");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x8u), 0x80000008u, "call answer is RPC_END");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x20u), 0x8000000Au, "RPC_END answers a call");
+            t.Equals(readGuestU32(env.rdram.data(), kEeReceiveBuffer + 0x1Cu), kClient,
+                     "_request_end signals the client named here");
+        });
     });
 }

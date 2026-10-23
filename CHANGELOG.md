@@ -84,3 +84,33 @@ After: `ps2x_tests` 486/486, end-to-end 2/2, `ps2xIOP` ctest 4/4, research datab
   architecture references, not integrated.
 - RSQRT.S sign with ft = 0 confirmed against real-PS2 output (sign of fs; PCSX2 differs). No change needed.
 - `BENCHMARKS.md` (first measured baselines) and `TESTING.md` added.
+
+## Phase 2 — hardware result pipeline (2026-10-23)
+
+After: `ps2x_tests` 502/502, end-to-end 2/2, research database valid; hardware result tests (55 ps2autotests
+ELFs, outputs captured on a real PS2): first run 6/54 exact matches (5346/8240 lines), now 25/54 (6360/8240 lines),
+no regressions between runs. Every fix below cites the `.expected` lines it was derived from; none was edited.
+
+- `tools/hwtest/hwtest.py` + `ctest -L hwtest`: recompile each test ELF at build time, run it natively, compare the
+  guest's text with the hardware output, and aggregate a dashboard (PASS / MISMATCH / CRASH / TIMEOUT / NO_OUTPUT /
+  NOT_BUILT / RECOMPILE_FAIL, with regressions against a baseline). `PS2X_HWTEST_OPTIMIZE` (default OFF) compiles
+  the generated code unoptimized: seconds instead of minutes per test.
+- Packet-level IOP side of SIFCMD/SIFRPC (INIT_CMD -> SET_SREG, BIND/CALL/RDATA -> RPC_END, one packet per SIF0
+  interrupt) and the ROM FILEIO tty write, so recompiled ps2sdk libraries (stripped ELFs, no named stubs) reach
+  the IOP; `PS2X_TTY_LOG=<file>` collects the guest tty alone. Protocol from ps2sdk's EE and IOP sifcmd/sifrpc.
+- Kernel: syscall 4 `Exit` ends the run; the run also ends once every thread is Dormant (ps2sdk `_exit` uses
+  ExitDeleteThread); thread calls return the thread id or -1 and ReferThreadStatus the status (EE kernel, not IOP
+  KE_* codes); SleepThread returns the thread id; Dormant threads return to their initial priority;
+  AddIntc/DmacHandler honour `next` (front / before a handler / back) and a negative handler result ends the chain.
+- EE: MOVZ/MOVN move only the low doubleword; BGEZALL/BLTZALL link when not taken; SA counts bytes
+  (MTSA/MTSAB/MTSAH/MFSA, QFSRV); PSLLH/PSRLH/PSRAH use sa & 15; PSLLVW/PSRLVW/PSRAVW operand order and 64-bit
+  sign extension; PABSH/PABSW read rt and saturate; PADDUH/PSUBUH saturate; PEXCH/PEXCW/PEXEH/PREVH/PROT3W/PINTH/
+  PINTEH lanes; PDIVW/PDIVUW/PDIVBW write LO/HI only, divide PDIVBW by rt.h0, and no longer trap on INT_MIN/-1
+  (this crashed the host); CVT.S.W rounds toward zero; CFC1/CTC1 follow FCR0 = 0x2E30, FCR16-31 = FCR31 and the
+  FCR31 write mask, FCR31 resets to 0x01000001; VU0 macro VI ops discard writes to vi0. Checked by 268 + 45 new
+  real-PS2 vectors (`ps2xTest/tools/gen_simd_hw_vectors.py`).
+- DMA: normal-mode GIF/VIF transfers leave MADR past the data; scratchpad SADR keeps bits 0x3FF0 and SPR MADR
+  has no bit 31.
+- Recompiler: a race in single-file output could abort with "combined output completion queue is missing index".
+- `gs_sprite` now compares the whole frame (286,720 pixels, tolerance 0) and prints its SHA-256.
+- Tests confirmed to fail with their fix reverted: MOVN, PEXCH, all-dormant stop, handler cancel, MADR, FILEIO bind.

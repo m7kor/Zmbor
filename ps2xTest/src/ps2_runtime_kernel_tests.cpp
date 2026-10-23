@@ -1050,15 +1050,17 @@ void register_ps2_runtime_kernel_tests()
 
             setRegU32(env.ctx, 4, 0u);
             DeleteThread(env.rdram.data(), &env.ctx, &env.runtime);
-            t.Equals(getRegS32(env.ctx, 2), KE_ILLEGAL_THID, "DeleteThread(0) should be KE_ILLEGAL_THID");
+            // The EE kernel answers failed thread calls with -1, not IOP-style KE_* codes (ps2autotests
+            // kernel/ee/thread/delete.expected: "delete (with current tid): failed -> result: -1").
+            t.Equals(getRegS32(env.ctx, 2), -1, "DeleteThread(0) should fail with -1");
 
             setRegU32(env.ctx, 4, 0x7FFFu);
             StartThread(env.rdram.data(), &env.ctx, &env.runtime);
-            t.Equals(getRegS32(env.ctx, 2), KE_UNKNOWN_THID, "StartThread should reject unknown thread ids");
+            t.Equals(getRegS32(env.ctx, 2), -1, "StartThread should reject unknown thread ids with -1");
 
             setRegU32(env.ctx, 4, 0x7FFFu);
             WakeupThread(env.rdram.data(), &env.ctx, &env.runtime);
-            t.Equals(getRegS32(env.ctx, 2), KE_UNKNOWN_THID, "WakeupThread should reject unknown thread ids");
+            t.Equals(getRegS32(env.ctx, 2), -1, "WakeupThread should reject unknown thread ids with -1 (wakeup.expected)");
 
             setRegU32(env.ctx, 4, 0x7FFFu);
             PollSema(env.rdram.data(), &env.ctx, &env.runtime);
@@ -1108,7 +1110,9 @@ void register_ps2_runtime_kernel_tests()
             setRegU32(env.ctx, 5, K_STATUS_ADDR);
             t.IsTrue(callSyscall(0x30u, env.rdram.data(), &env.ctx, &env.runtime),
                      "ReferThreadStatus syscall should dispatch");
-            t.Equals(getRegS32(env.ctx, 2), KE_OK, "ReferThreadStatus should accept the current-thread id alias");
+            // ReferThreadStatus returns the status itself; the caller is running (stat.expected "stat (with tid 0):
+            // succeeded -> result: 01").
+            t.Equals(getRegS32(env.ctx, 2), 1, "ReferThreadStatus should accept the current-thread id alias");
 
             EeThreadStatusAbi status{};
             std::memcpy(&status, env.rdram.data() + K_STATUS_ADDR, sizeof(status));

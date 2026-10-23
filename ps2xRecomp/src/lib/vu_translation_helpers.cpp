@@ -149,27 +149,37 @@ namespace ps2recomp
 
     std::string CodeGenerator::translateVU_VIADD(const Instruction &inst)
     {
+        if (inst.sa == 0)
+            return "/* VIADD to vi0: discarded */";
         return fmt::format("ctx->vi[{}] = ctx->vi[{}] + ctx->vi[{}];", inst.sa, inst.rd, inst.rt); // vid, vis, vit
     }
 
     std::string CodeGenerator::translateVU_VISUB(const Instruction &inst)
     {
+        if (inst.sa == 0)
+            return "/* VISUB to vi0: discarded */";
         return fmt::format("ctx->vi[{}] = ctx->vi[{}] - ctx->vi[{}];", inst.sa, inst.rd, inst.rt); // vid, vis, vit
     }
 
     std::string CodeGenerator::translateVU_VIADDI(const Instruction &inst)
     {
         int32_t imm5 = (inst.sa & 0x10) ? static_cast<int32_t>(inst.sa | ~0x1F) : static_cast<int32_t>(inst.sa);
+        if (inst.rt == 0)
+            return "/* VIADDI to vi0: discarded */";
         return fmt::format("ctx->vi[{}] = ctx->vi[{}] + {};", inst.rt, inst.rd, imm5); // vit, vis, imm5
     }
 
     std::string CodeGenerator::translateVU_VIAND(const Instruction &inst)
     {
+        if (inst.sa == 0)
+            return "/* VIAND to vi0: discarded */";
         return fmt::format("ctx->vi[{}] = ctx->vi[{}] & ctx->vi[{}];", inst.sa, inst.rd, inst.rt); // vid, vis, vit
     }
 
     std::string CodeGenerator::translateVU_VIOR(const Instruction &inst)
     {
+        if (inst.sa == 0)
+            return "/* VIOR to vi0: discarded */";
         return fmt::format("ctx->vi[{}] = ctx->vi[{}] | ctx->vi[{}];", inst.sa, inst.rd, inst.rt); // vid, vis, vit
     }
 

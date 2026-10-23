@@ -13,9 +13,26 @@
    is assembled into a guest ELF (`mips_elf.py`, no PS2 toolchain), recompiled by `ps2_recomp`, compiled with the
    runtime into `ps2x_e2e_<name>`, run with `PS2X_HIDDEN_WINDOW=1`, and checked:
    - `basic`: exit code 0 and the exact line the guest prints with its own `puts`.
-   - `gs_sprite`: additionally, `PS2X_DUMP_FRAME` writes every presented frame and `check_frame.py` checks the size
-     and pixel colours computed from the program's geometry.
-5. **Research database** — `ctest --test-dir build/ps2xTest -R research` validates `research/` (provenance,
+   - `gs_sprite`: additionally, `PS2X_DUMP_FRAME` writes every presented frame and `check_frame.py` compares the
+     whole last frame (640x448, every pixel, tolerance 0) with the image painted from the program's geometry and
+     prints its SHA-256. Zero tolerance is justified because the frame is flat-coloured sprites at integer
+     coordinates (no texture, blending, dither or AA), which the GS fill rule covers exactly.
+5. **Hardware result tests** — real PS2 programs whose output was captured on hardware: the 55 prebuilt ELFs of
+   [ps2autotests](https://github.com/unknownbrackets/ps2autotests) (ISC; clone it anywhere, nothing is vendored).
+   ```
+   python tools/hwtest/hwtest.py prepare --tests <ps2autotests>/tests --recompiler build/ps2xRecomp/ps2_recomp \
+       --out <work>
+   cmake -B build -DPS2X_HWTEST_GENERATED=<work>   # one ps2x_hw_<id> executable per recompilable ELF
+   cmake --build build
+   ctest --test-dir build/ps2xTest -L hwtest
+   python tools/hwtest/hwtest.py report --out <work> --json <dashboard.json> --md <dashboard.md> [--baseline <old.json>]
+   ```
+   Each ELF is recompiled at build time (so recompiler changes regenerate it), compiled with the runtime and run
+   with `PS2X_TTY_LOG`; the guest's own `printf` reaches the host through the packet-level IOP SIFCMD/SIFRPC/FILEIO
+   responder, and the text between `-- TEST BEGIN` and `-- TEST END` must equal the `.expected` file exactly.
+   Statuses: PASS, MISMATCH, CRASH, TIMEOUT, NO_OUTPUT, NOT_BUILT, RECOMPILE_FAIL; with `--baseline`, a test that
+   passed there and fails now is flagged as a regression. The `.expected` files are never edited.
+6. **Research database** — `ctest --test-dir build/ps2xTest -R research` validates `research/` (provenance,
    honest statuses).
 
 ## Rules
@@ -28,5 +45,5 @@
 ## Adding an end-to-end program
 
 Add a `program_<name>()` to `e2e_programs.py` returning the assembler and the stub list, add its expected stdout
-line to `EXPECTED` (and pixels to `FRAME_EXPECTATIONS` for graphics), then `ps2x_add_e2e_program(<name> [FRAME])`
+line to `EXPECTED` (and the frame's rectangles to `FRAME_EXPECTATIONS` for graphics), then `ps2x_add_e2e_program(<name> [FRAME])`
 in `ps2xTest/e2e/CMakeLists.txt`.

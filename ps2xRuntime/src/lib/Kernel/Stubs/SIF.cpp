@@ -6,8 +6,12 @@
 #include "runtime/ee_scheduler.h"
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <limits>
+#include <unordered_set>
 #include <vector>
 
 namespace ps2_stubs
@@ -80,6 +84,46 @@ namespace ps2_stubs
         uint32_t g_sifGetRegLogCount = 0u;
         uint32_t g_sifSetRegLogCount = 0u;
 
+        // IOP side of the SIF command protocol, as implemented by the IOP SIFCMD/SIFRPC modules (ps2sdk
+        // iop/system/sifcmd). EE code that is recompiled rather than replaced by named stubs (stripped ELFs) reaches
+        // the IOP only through these packets: sceSifSetDma to the command buffer the IOP publishes in SIF_REG_SUBADDR,
+        // answered by packets written to the EE receive buffer, each followed by a DMAC SIF0 interrupt.
+        struct IopToEePacket
+        {
+            std::vector<uint8_t> packet;
+            uint32_t extraDest = 0u;
+            std::vector<uint8_t> extra;
+        };
+
+        struct IopRpcServer
+        {
+            uint32_t sid = 0u;
+            uint32_t buffer = 0u;
+        };
+
+        std::deque<IopToEePacket> g_iopOutbound;
+        bool g_iopDeliveryInFlight = false;
+        uint32_t g_eeCmdReceiveBuffer = 0u;
+        uint32_t g_iopCmdBuffer = 0u;
+        std::unordered_map<uint32_t, IopRpcServer> g_iopRpcServers; // keyed by the server descriptor address
+        std::unordered_map<uint32_t, uint32_t> g_iopRpcServerBySid;
+
+        constexpr uint32_t kSifRegIopCmdBuffer = 0x2u; // SIF_REG_SUBADDR
+        constexpr uint32_t kSifCmdChangeSaddr = 0x80000000u;
+        constexpr uint32_t kSifCmdSetSreg = 0x80000001u;
+        constexpr uint32_t kSifCmdInitCmd = 0x80000002u;
+        constexpr uint32_t kSifCmdRpcEnd = 0x80000008u;
+        constexpr uint32_t kSifCmdRpcBind = 0x80000009u;
+        constexpr uint32_t kSifCmdRpcCall = 0x8000000Au;
+        constexpr uint32_t kSifCmdRpcRdata = 0x8000000Cu;
+        constexpr uint32_t kSifRpcPacketSize = 64u;
+        constexpr uint32_t kIopCmdBufferSize = 0x200u;
+        constexpr uint32_t kIopRpcServerDescriptorSize = 0x80u;
+        constexpr uint32_t kIopRpcServerBufferSize = 0x10000u;
+        constexpr uint32_t kDmacSif0 = 5u;
+        constexpr uint32_t kFileIoSid = 0x80000001u; // ROM FILEIO server
+        constexpr uint32_t kFileIoWrite = 3u;
+
         constexpr uint32_t kSifRegBootStatus = 0x4u;
         constexpr uint32_t kSifRegMainAddr = 0x80000000u;
         constexpr uint32_t kSifRegSubAddr = 0x80000001u;
@@ -96,6 +140,12 @@ namespace ps2_stubs
             g_sifCmdInitialized = false;
             g_sifGetRegLogCount = 0u;
             g_sifSetRegLogCount = 0u;
+            g_iopOutbound.clear();
+            g_iopDeliveryInFlight = false;
+            g_eeCmdReceiveBuffer = 0u;
+            g_iopCmdBuffer = 0u;
+            g_iopRpcServers.clear();
+            g_iopRpcServerBySid.clear();
 
             g_sifRegs[kSifRegBootStatus] = kSifBootReadyMask;
             g_sifRegs[kSifRegMainAddr] = 0u;
@@ -217,6 +267,267 @@ namespace ps2_stubs
                 *destination = bytes[i];
             }
             return true;
+        }
+
+        uint32_t packetWord(const std::vector<uint8_t> &packet, size_t offset)
+        {
+            uint32_t value = 0u;
+            if (offset + sizeof(value) <= packet.size())
+                std::memcpy(&value, packet.data() + offset, sizeof(value));
+            return value;
+        }
+
+        void setPacketWord(std::vector<uint8_t> &packet, size_t offset, uint32_t value)
+        {
+            if (packet.size() < offset + sizeof(value))
+                packet.resize(offset + sizeof(value), 0u);
+            std::memcpy(packet.data() + offset, &value, sizeof(value));
+        }
+
+        // Header: psize:8 dsize:24, dest, cid, opt.
+        void queueIopToEeLocked(std::vector<uint8_t> packet, uint32_t cid, uint32_t extraDest, std::vector<uint8_t> extra)
+        {
+            const uint32_t extraSize = extraDest != 0u ? static_cast<uint32_t>(extra.size()) : 0u;
+            setPacketWord(packet, 0u, (static_cast<uint32_t>(packet.size()) & 0xFFu) | (extraSize << 8));
+            setPacketWord(packet, 4u, extraSize != 0u ? extraDest : 0u);
+            setPacketWord(packet, 8u, cid);
+            g_iopOutbound.push_back(IopToEePacket{std::move(packet), extraDest, extraSize != 0u ? std::move(extra) : std::vector<uint8_t>{}});
+        }
+
+        // The EE has one receive slot (its handler copies the packet out and clears psize), so packets go one at a
+        // time: the next is written only after the SIF0 handler for the previous one has returned.
+        void deliverIopPackets(uint8_t *rdram, PS2Runtime *runtime)
+        {
+            IopToEePacket next;
+            uint32_t receiveBuffer = 0u;
+            {
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                if (g_iopDeliveryInFlight || g_iopOutbound.empty() || g_eeCmdReceiveBuffer == 0u)
+                    return;
+                next = std::move(g_iopOutbound.front());
+                g_iopOutbound.pop_front();
+                g_iopDeliveryInFlight = true;
+                receiveBuffer = g_eeCmdReceiveBuffer;
+            }
+            if (!next.extra.empty())
+                (void)writeEeRange(rdram, next.extraDest, next.extra.data(), static_cast<uint32_t>(next.extra.size()));
+            (void)writeEeRange(rdram, receiveBuffer, next.packet.data(), static_cast<uint32_t>(next.packet.size()));
+            const bool dispatched = runtime->eeScheduler().dispatchIrq(true, kDmacSif0, [rdram, runtime]()
+                                                                       {
+                {
+                    std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                    g_iopDeliveryInFlight = false;
+                }
+                deliverIopPackets(rdram, runtime); });
+            if (!dispatched)
+            {
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                g_iopDeliveryInFlight = false;
+            }
+        }
+
+        uint32_t iopRpcServerForSidLocked(PS2Runtime *runtime, uint32_t sid)
+        {
+            const auto existing = g_iopRpcServerBySid.find(sid);
+            if (existing != g_iopRpcServerBySid.end())
+                return existing->second;
+            const uint32_t descriptor = runtime->allocateIopMemory(kIopRpcServerDescriptorSize, 64u);
+            const uint32_t buffer = runtime->allocateIopMemory(kIopRpcServerBufferSize, 64u);
+            if (descriptor == 0u || buffer == 0u)
+                return 0u;
+            g_iopRpcServers[descriptor] = IopRpcServer{sid, buffer};
+            g_iopRpcServerBySid[sid] = descriptor;
+            return descriptor;
+        }
+
+        void logIopProtocolOnce(const char *what, uint32_t a, uint32_t b)
+        {
+            static std::mutex logMutex;
+            static std::unordered_set<uint64_t> logged;
+            std::lock_guard<std::mutex> lock(logMutex);
+            if (logged.size() < 64u && logged.insert((static_cast<uint64_t>(a) << 32) | b).second)
+                std::cerr << "[SIF/IOP] " << what << " 0x" << std::hex << a << " 0x" << b << std::dec << std::endl;
+        }
+
+        // FILEIO write (ROM FILEIO protocol, as sent by ps2sdk's fioWrite): {fd, ptr, size, mis, aligned[16]}; the
+        // first mis bytes travel in the packet because the IOP DMAs only the 16-byte aligned rest from EE memory.
+        // fd 1 and 2 are the IOP's tty, which this host shows as stdout and stderr.
+        bool serveFileIoWrite(const uint8_t *rdram, uint32_t sendAddress, uint32_t sendSize, int32_t &result)
+        {
+            uint32_t argument[8] = {};
+            if (sendSize < 32u || !readEeRange(rdram, sendAddress, argument, sizeof(argument)))
+                return false;
+            const int32_t fd = static_cast<int32_t>(argument[0]);
+            const uint32_t pointer = argument[1];
+            const int32_t size = static_cast<int32_t>(argument[2]);
+            const uint32_t misaligned = std::min<uint32_t>(argument[3], 16u);
+            if ((fd != 1 && fd != 2) || size < 0 || static_cast<uint32_t>(size) > PS2_RAM_SIZE || misaligned > static_cast<uint32_t>(size))
+                return false;
+            std::vector<uint8_t> text(static_cast<size_t>(size));
+            std::memcpy(text.data(), reinterpret_cast<const uint8_t *>(argument) + 16u, misaligned);
+            if (!readEeRange(rdram, pointer + misaligned, text.data() + misaligned, static_cast<uint32_t>(size) - misaligned))
+                return false;
+            FILE *stream = fd == 1 ? stdout : stderr;
+            std::fwrite(text.data(), 1u, text.size(), stream);
+            std::fflush(stream);
+            // PS2X_TTY_LOG=<file> also collects the guest's tty output alone, apart from the runtime's own logging.
+            static std::mutex ttyLogMutex;
+            static FILE *ttyLog = []() -> FILE *
+            {
+                const char *path = std::getenv("PS2X_TTY_LOG");
+                return path && *path ? std::fopen(path, "wb") : nullptr;
+            }();
+            if (ttyLog)
+            {
+                std::lock_guard<std::mutex> lock(ttyLogMutex);
+                std::fwrite(text.data(), 1u, text.size(), ttyLog);
+                std::fflush(ttyLog);
+            }
+            result = size;
+            return true;
+        }
+
+        std::vector<uint8_t> serveIopRpc(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, uint32_t sid,
+                                         uint32_t function, uint32_t sendAddress, uint32_t sendSize,
+                                         uint32_t receiveAddress, uint32_t receiveSize)
+        {
+            std::vector<uint8_t> result(receiveSize, 0u);
+            if (sid == kFileIoSid && function == kFileIoWrite)
+            {
+                int32_t written = -1;
+                if (serveFileIoWrite(rdram, sendAddress, sendSize, written) && receiveSize >= 4u)
+                {
+                    std::memcpy(result.data(), &written, sizeof(written));
+                    return result;
+                }
+            }
+
+            ps2x::iop::RpcRequest request{};
+            request.sid = sid;
+            request.function = function;
+            request.send = {sendAddress, sendSize};
+            request.receive = {receiveAddress, receiveSize};
+            const ps2x::iop::RpcResult handled = PS2IopTransport::handleRpc(runtime, rdram, ctx, request);
+            if (!handled.handled)
+            {
+                logIopProtocolOnce("unhandled RPC sid/function", sid, function);
+                return result;
+            }
+            const uint32_t source = handled.resultAddress != 0u ? handled.resultAddress : receiveAddress;
+            if (source != 0u && receiveSize != 0u)
+                (void)readEeRange(rdram, source, result.data(), receiveSize);
+            return result;
+        }
+
+        // One EE-to-IOP command packet; extraSource is the EE address of the data sent with it (0 when none).
+        void handleIopCommand(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime,
+                              const std::vector<uint8_t> &packet, uint32_t extraSource)
+        {
+            const uint32_t cid = packetWord(packet, 8u);
+            const auto rpcEnd = [&](uint32_t client, uint32_t requestCid)
+            {
+                std::vector<uint8_t> rend(kSifRpcPacketSize, 0u);
+                setPacketWord(rend, 16u, packetWord(packet, 16u)); // rec_id
+                setPacketWord(rend, 20u, packetWord(packet, 20u)); // pkt_addr
+                setPacketWord(rend, 24u, packetWord(packet, 24u)); // rpc_id
+                setPacketWord(rend, 28u, client);
+                setPacketWord(rend, 32u, requestCid);
+                return rend;
+            };
+
+            switch (cid)
+            {
+            case kSifCmdChangeSaddr:
+            {
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                g_eeCmdReceiveBuffer = packetWord(packet, 16u);
+                break;
+            }
+            case kSifCmdInitCmd:
+            {
+                // opt 0 carries the EE receive buffer; the IOP's SIFRPC then reports itself ready with
+                // SET_SREG(SIF_SREG_RPCINIT, 1), which the EE's sceSifInitRpc waits for. opt 1 needs no answer.
+                if (packetWord(packet, 12u) != 0u)
+                    break;
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                g_eeCmdReceiveBuffer = packetWord(packet, 16u);
+                std::vector<uint8_t> setSreg(24u, 0u);
+                setPacketWord(setSreg, 16u, 0u); // SIF_SREG_RPCINIT
+                setPacketWord(setSreg, 20u, 1u);
+                queueIopToEeLocked(std::move(setSreg), kSifCmdSetSreg, 0u, {});
+                break;
+            }
+            case kSifCmdSetSreg:
+            case kSifCmdRpcEnd:
+                break; // IOP soft registers and answers to IOP-initiated calls: nothing on this side reads them.
+            case kSifCmdRpcBind:
+            {
+                const uint32_t sid = packetWord(packet, 32u);
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                // FILEIO is resident in the IOP ROM and served here; other servers exist once the IOP side has them.
+                const bool bindable = sid == kFileIoSid || PS2IopTransport::canBindRpc(runtime, sid);
+                const uint32_t server = bindable ? iopRpcServerForSidLocked(runtime, sid) : 0u;
+                std::vector<uint8_t> rend = rpcEnd(packetWord(packet, 28u), kSifCmdRpcBind);
+                setPacketWord(rend, 36u, server);
+                setPacketWord(rend, 40u, server != 0u ? g_iopRpcServers[server].buffer : 0u);
+                queueIopToEeLocked(std::move(rend), kSifCmdRpcEnd, 0u, {});
+                break;
+            }
+            case kSifCmdRpcCall:
+            {
+                const uint32_t client = packetWord(packet, 28u);
+                const uint32_t function = packetWord(packet, 32u);
+                const uint32_t sendSize = packetWord(packet, 36u);
+                const uint32_t receiveAddress = packetWord(packet, 40u);
+                const uint32_t receiveSize = std::min<uint32_t>(packetWord(packet, 44u), PS2_RAM_SIZE);
+                const uint32_t replyMode = packetWord(packet, 48u);
+                uint32_t sid = 0u;
+                {
+                    std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                    const auto server = g_iopRpcServers.find(packetWord(packet, 52u));
+                    if (server != g_iopRpcServers.end())
+                        sid = server->second.sid;
+                }
+                if (sid == 0u)
+                    logIopProtocolOnce("RPC call to unknown server/function", packetWord(packet, 52u), function);
+                std::vector<uint8_t> result = serveIopRpc(rdram, ctx, runtime, sid, function, extraSource,
+                                                          extraSource != 0u ? sendSize : 0u, receiveAddress, receiveSize);
+                if (replyMode != 0u)
+                {
+                    std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                    queueIopToEeLocked(rpcEnd(client, kSifCmdRpcCall), kSifCmdRpcEnd,
+                                       receiveSize != 0u ? receiveAddress : 0u, std::move(result));
+                }
+                else if (receiveSize != 0u && receiveAddress != 0u)
+                {
+                    (void)writeEeRange(rdram, receiveAddress, result.data(), receiveSize);
+                }
+                else
+                {
+                    // No reply packet: the IOP frees the caller's packet by overwriting it with a cleared one.
+                    std::vector<uint8_t> cleared = rpcEnd(client, kSifCmdRpcCall);
+                    setPacketWord(cleared, 16u, 0u);
+                    setPacketWord(cleared, 24u, 0u);
+                    (void)writeEeRange(rdram, packetWord(packet, 20u), cleared.data(), kSifRpcPacketSize);
+                }
+                break;
+            }
+            case kSifCmdRpcRdata:
+            {
+                const uint32_t source = packetWord(packet, 32u);
+                const uint32_t dest = packetWord(packet, 36u);
+                const uint32_t size = std::min<uint32_t>(packetWord(packet, 40u), PS2_RAM_SIZE);
+                std::vector<uint8_t> data(size, 0u);
+                if (size != 0u && !runtime->readIopMemory(source, data.data(), data.size()))
+                    logIopProtocolOnce("RPC rdata from invalid IOP range", source, size);
+                std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+                queueIopToEeLocked(rpcEnd(packetWord(packet, 28u), kSifCmdRpcRdata), kSifCmdRpcEnd, dest, std::move(data));
+                break;
+            }
+            default:
+                logIopProtocolOnce("unhandled SIF command", cid, packetWord(packet, 12u));
+                break;
+            }
         }
     }
 
@@ -466,6 +777,14 @@ namespace ps2_stubs
         const uint32_t reg = getRegU32(ctx, 4);
         uint32_t value = 0u;
         bool shouldLog = false;
+        if (reg == kSifRegIopCmdBuffer && runtime)
+        {
+            // The IOP's SIFCMD publishes its command receive buffer here once it is running.
+            std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+            if (g_iopCmdBuffer == 0u)
+                g_iopCmdBuffer = runtime->allocateIopMemory(kIopCmdBufferSize, 64u);
+            g_sifRegs[reg] = g_iopCmdBuffer;
+        }
         {
             std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
             auto it = g_sifRegs.find(reg);
@@ -749,6 +1068,32 @@ namespace ps2_stubs
             setReturnS32(ctx, 0);
             return;
         }
+
+        uint32_t iopCmdBuffer = 0u;
+        {
+            std::lock_guard<std::mutex> lock(g_sifCmdStateMutex);
+            iopCmdBuffer = g_iopCmdBuffer;
+        }
+        for (uint32_t i = 0; iopCmdBuffer != 0u && i < pendingCount; ++i)
+        {
+            const Ps2SifDmaTransfer &xfer = pending[i];
+            if (xfer.dest != iopCmdBuffer || xfer.size < 16)
+                continue;
+            std::vector<uint8_t> packet(static_cast<size_t>(xfer.size));
+            if (!readEeRange(rdram, xfer.src, packet.data(), static_cast<uint32_t>(packet.size())))
+                continue;
+            // sceSifSendCmd queues the packet's extra data as the transfer to header.dest just before it.
+            uint32_t extraSource = 0u;
+            const uint32_t extraDest = packetWord(packet, 4u);
+            for (uint32_t j = 0; extraDest != 0u && j < i; ++j)
+            {
+                if (pending[j].dest == extraDest)
+                    extraSource = pending[j].src;
+            }
+            handleIopCommand(rdram, ctx, runtime, packet, extraSource);
+        }
+        if (runtime)
+            deliverIopPackets(rdram, runtime);
 
         ps2_syscalls::dispatchDmacHandlersForCause(rdram, runtime, 5u);
 

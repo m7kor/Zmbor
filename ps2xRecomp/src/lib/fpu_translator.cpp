@@ -29,18 +29,17 @@ namespace ps2recomp
             return fmt::format("{{ uint32_t bits; std::memcpy(&bits, &ctx->f[{}], sizeof(bits)); SET_GPR_U32(ctx, {}, bits); }}", fs, ft);
         case COP1_MT:
             return fmt::format("{{ uint32_t bits = GPR_U32(ctx, {}); std::memcpy(&ctx->f[{}], &bits, sizeof(bits)); }}", ft, fs);
+        // Hardware (ps2autotests cpu/ee_fpu/fcr): FCR0-15 read the implementation/revision value 0x2E30 and
+        // FCR16-31 read FCR31; FCR31 keeps bits 0 and 24 set and only 0x0083C078 (C, cause I/D/O/U, sticky flags)
+        // is writable, so ctc1 0xFFFFFFFF reads back 0x0183C079.
         case COP1_CF:
-            if (fs == 31)
-                return fmt::format("SET_GPR_U32(ctx, {}, ctx->fcr31);", ft); // FCR31 contains status/control
-            if (fs == 0)
-                return fmt::format("SET_GPR_U32(ctx, {}, 0x00000000);", ft); // FCR0 is the FPU implementation register
-            return fmt::format("SET_GPR_U32(ctx, {}, 0); // Unimplemented FCR{}", ft, fs);
+            if (fs >= 16)
+                return fmt::format("SET_GPR_U32(ctx, {}, ctx->fcr31);", ft);
+            return fmt::format("SET_GPR_U32(ctx, {}, 0x00002E30);", ft);
         case COP1_CT:
             if (fs == 31)
-                return fmt::format("ctx->fcr31 = GPR_U32(ctx, {}) & 0x0183FFFF;", ft);
-            else
-                return fmt::format("// CTC1 to FCR{} ignored", fs);
-            return "";
+                return fmt::format("ctx->fcr31 = (GPR_U32(ctx, {}) & 0x0083C078u) | 0x01000001u;", ft);
+            return fmt::format("// CTC1 to FCR{} ignored", fs);
         case COP1_BC:
             return "// FPU branch instruction - handled elsewhere";
         case COP1_S:

@@ -465,17 +465,15 @@ namespace ps2recomp
         const bool likely = isLikelyBranch();
         const std::string branchTakenVar = fmt::format("branch_taken_0x{:x}", m_branchInst.address);
         std::string unconditionalLinkCode;
-        std::string conditionalLinkCode;
 
         if (m_branchInst.opcode == OPCODE_REGIMM)
         {
-            if (m_branchInst.rt == REGIMM_BLTZAL || m_branchInst.rt == REGIMM_BGEZAL)
+            // The likely forms link even when not taken (ps2autotests cpu/ee/branch: "bgezall -1: skipped, set ra";
+            // PCSX2 BGEZALL/BLTZALL also call _SetLink before testing the condition).
+            if (m_branchInst.rt == REGIMM_BLTZAL || m_branchInst.rt == REGIMM_BGEZAL ||
+                m_branchInst.rt == REGIMM_BLTZALL || m_branchInst.rt == REGIMM_BGEZALL)
             {
                 unconditionalLinkCode = fmt::format("SET_GPR_U32(ctx, 31, 0x{:X}u);", fallthroughPc());
-            }
-            else if (m_branchInst.rt == REGIMM_BLTZALL || m_branchInst.rt == REGIMM_BGEZALL)
-            {
-                conditionalLinkCode = fmt::format("SET_GPR_U32(ctx, 31, 0x{:X}u);", fallthroughPc());
             }
         }
 
@@ -490,10 +488,6 @@ namespace ps2recomp
         if (likely)
         {
             m_ss << "        if (" << branchTakenVar << ") {\n";
-            if (!conditionalLinkCode.empty())
-            {
-                m_ss << "            " << conditionalLinkCode << "\n";
-            }
             emitDelaySlot("            ");
 
             if (isInternalTarget(target))
@@ -509,11 +503,6 @@ namespace ps2recomp
         }
         else
         {
-            if (!conditionalLinkCode.empty())
-            {
-                m_ss << "        if (" << branchTakenVar << ") { " << conditionalLinkCode << " }\n";
-            }
-
             emitDelaySlot("        ");
 
             m_ss << "        if (" << branchTakenVar << ") {\n";

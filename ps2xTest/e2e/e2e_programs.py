@@ -297,8 +297,10 @@ VIF_PACKET = (__import__('struct').pack('<IIII', 0, 0, 0, (0x50 << 24) | (len(_S
 FRAME_EXPECTATIONS = {
     'gs_sprite': {
         'width': 640, 'height': 448,
-        'pixels': [[20, 20, BACKGROUND], [630, 440, BACKGROUND], [99 - 9, 150, BACKGROUND], [310, 150, BACKGROUND],
-                   [110, 110, SPRITE], [200, 150, SPRITE], [290, 190, SPRITE]],
+        # The whole frame, exactly: flat-coloured sprites at integer coordinates (no texture, blending, dither or
+        # AA) cover precisely x0 <= x < x1, y0 <= y < y1 under the GS fill rule, so no tolerance is justified.
+        'rects': [[0, 0, 640, 448, BACKGROUND], [*SPRITE_RECT, SPRITE]],
+        'tolerance': 0,
     },
 }
 

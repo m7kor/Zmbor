@@ -100,6 +100,8 @@ struct GuestInvocation
     uint64_t tag = 0;
     R5900Context context{};
     std::function<void(const R5900Context &, R5900Context &)> onComplete;
+    // Checked when the invocation would start; false drops it unrun (an earlier handler cancelled the chain).
+    std::function<bool()> shouldRun;
 };
 
 struct GuestThread
@@ -328,10 +330,22 @@ public:
                       uint32_t argument,
                       uint32_t gp,
                       uint32_t sp);
+    // AddIntcHandler/AddDmacHandler placement: next == 0 puts the handler first, a handler id puts it just before
+    // that handler, anything else (ps2sdk passes -1) appends.
+    int addIrqHandlerAt(bool dmac,
+                        uint32_t cause,
+                        uint32_t handler,
+                        int32_t next,
+                        uint32_t argument,
+                        uint32_t gp,
+                        uint32_t sp);
     int removeIrqHandler(bool dmac, uint32_t cause, int id);
     int setIrqHandlerEnabled(bool dmac, int id, bool enabled);
     int setIrqCauseEnabled(bool dmac, uint32_t cause, bool enabled);
     void dispatchIrq(bool dmac, uint32_t cause);
+    // Same, then runs afterLast once the last queued handler has returned. Returns false (and never runs afterLast)
+    // when the cause is disabled or has no handler.
+    bool dispatchIrq(bool dmac, uint32_t cause, std::function<void()> afterLast);
     void setVSyncFlag(uint32_t flagAddress, uint32_t tickAddress);
     [[nodiscard]] uint64_t currentVSyncTick() const noexcept;
     uint32_t setGsVSyncCallback(uint32_t callback, uint32_t gp, uint32_t sp);
@@ -377,6 +391,8 @@ private:
     [[nodiscard]] GuestThread *selectReady();
     void makeRunning(GuestThread &thread);
     void makeDormant(GuestThread &thread);
+    [[nodiscard]] bool allThreadsDormant() const;
+    void dropCancelledInvocations();
     void releaseInvocationStacks(int threadId);
     void removeFromWaitObject(GuestThread &thread);
     [[noreturn]] void blockCurrent(EeWaitState wait);

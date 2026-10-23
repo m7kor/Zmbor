@@ -176,6 +176,64 @@ namespace
         runtime->requestStop();
     }
 
+    // Handler chains as in ps2autotests kernel/ee/interrupt/dmac_order: handler n records n and returns
+    // g_chainReturn[n].
+    constexpr uint32_t kChainMainPc = 0x00160600u;
+    constexpr uint32_t kChainResumePc = 0x00160610u;
+    constexpr uint32_t kChainHandlerPc[5] = {0u, 0x00160620u, 0x00160630u, 0x00160640u, 0x00160650u};
+    constexpr uint32_t kChainCause = 9u; // DMAC toSPR
+    int32_t g_chainReturn[5] = {};
+    std::vector<int32_t> g_chainNext; // AddDmacHandler "next" per handler 1..4 (index 0 unused)
+
+    template <int N>
+    void chainHandler(uint8_t *, R5900Context *ctx, PS2Runtime *)
+    {
+        g_dispatchTrace.push_back(N);
+        setReturnS32(ctx, g_chainReturn[N]);
+        ctx->pc = 0u;
+    }
+
+    void chainMain(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        EeScheduler &scheduler = runtime->eeScheduler();
+        std::vector<int> ids(5, 0);
+        for (size_t n = 1; n < g_chainNext.size(); ++n)
+        {
+            int32_t next = g_chainNext[n];
+            if (next > 0)
+                next = ids[static_cast<size_t>(next)]; // "next" given as the handler number it goes before
+            ids[n] = scheduler.addIrqHandlerAt(true, kChainCause, kChainHandlerPc[n], next, 0u, 0u, 0u);
+        }
+        scheduler.dispatchIrq(true, kChainCause);
+        ctx->pc = kChainResumePc;
+    }
+
+    void chainResume(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        ctx->pc = 0u;
+        runtime->requestStop();
+    }
+
+    std::vector<int> runHandlerChain(std::vector<int32_t> next, std::vector<int32_t> returns)
+    {
+        TestEnv env;
+        env.runtime.registerFunction(kChainMainPc, chainMain);
+        env.runtime.registerFunction(kChainResumePc, chainResume);
+        env.runtime.registerFunction(kChainHandlerPc[1], chainHandler<1>);
+        env.runtime.registerFunction(kChainHandlerPc[2], chainHandler<2>);
+        env.runtime.registerFunction(kChainHandlerPc[3], chainHandler<3>);
+        env.runtime.registerFunction(kChainHandlerPc[4], chainHandler<4>);
+        g_chainNext = std::move(next);
+        for (size_t n = 0; n < 5; ++n)
+            g_chainReturn[n] = n < returns.size() ? returns[n] : 0;
+        g_dispatchTrace.clear();
+        R5900Context mainContext{};
+        mainContext.pc = kChainMainPc;
+        env.runtime.eeScheduler().reset(env.rdram.data(), mainContext);
+        env.runtime.eeScheduler().run();
+        return g_dispatchTrace;
+    }
+
     void schedulerIntcHandler(uint8_t *, R5900Context *ctx, PS2Runtime *)
     {
         g_dispatchTrace.push_back(2);
@@ -670,6 +728,26 @@ void register_ps2_runtime_interrupt_tests()
             t.Equals(g_resumedResult, 0, "the first VBlank field should return even-field parity");
             t.Equals(g_vsyncCsr & 0x2000ull, 0x2000ull,
                      "the first VBlank should publish GS CSR.FIELD before resuming guest code");
+        });
+
+        tc.Run("interrupt handlers are ordered by AddDmacHandler's next argument like the EE kernel", [](TestCase &t)
+        {
+            // ps2autotests kernel/ee/interrupt/dmac_order.expected, one interrupt's worth of each scenario.
+            t.IsTrue(runHandlerChain({0, -1, -1, -1}, {}) == std::vector<int>{1, 2, 3}, "push back: 1, 2, 3");
+            t.IsTrue(runHandlerChain({0, 0, 0, 0}, {}) == std::vector<int>{3, 2, 1}, "push front: 3, 2, 1");
+            t.IsTrue(runHandlerChain({0, -1, 0, -1, 0}, {}) == std::vector<int>{4, 2, 1, 3}, "mixed: 4, 2, 1, 3");
+            t.IsTrue(runHandlerChain({0, -1, -1, -1, 2}, {}) == std::vector<int>{1, 4, 2, 3},
+                     "relative: a handler id as next inserts before that handler");
+        });
+
+        tc.Run("a negative handler result ends the interrupt's handler chain", [](TestCase &t)
+        {
+            // dmac_order.expected "cancel: 1, 2" and "return value: 1, 2, 3" (0x89ABCDEF is negative).
+            t.IsTrue(runHandlerChain({0, -1, -1, -1}, {0, 0, -1, 0}) == std::vector<int>{1, 2}, "cancel");
+            t.IsTrue(runHandlerChain({0, -1, -1, -1, -1},
+                                     {0, 0x01234567, 0x76543210, static_cast<int32_t>(0x89ABCDEFu),
+                                      static_cast<int32_t>(0xDEADBEEFu)}) == std::vector<int>{1, 2, 3},
+                     "return value");
         });
 
         tc.Run("VBlank IRQ invocation completes before the resumed base context", [](TestCase &t)

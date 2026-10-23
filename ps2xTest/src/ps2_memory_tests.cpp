@@ -1263,6 +1263,40 @@ void register_ps2_memory_tests()
             t.IsTrue(contentOk, "scratchpad GIF DMA packet bytes should match scratchpad source");
         });
 
+        tc.Run("normal-mode GIF and VIF1 DMA leave MADR past the data and QWC at zero", [](TestCase &t)
+        {
+            // ps2autotests dma/dmasend.cpp warns "MADR did not increase as expected" unless madr == start + size.
+            for (const uint32_t channel : {0x1000A000u, 0x10009000u})
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                mem.setGifPacketCallback([](const uint8_t *, uint32_t) {});
+                constexpr uint32_t kMadr = 0x00030000u;
+                constexpr uint32_t kQwc = 3u;
+                t.IsTrue(mem.writeIORegister(channel + 0x10u, kMadr), "write MADR");
+                t.IsTrue(mem.writeIORegister(channel + 0x20u, kQwc), "write QWC");
+                t.IsTrue(mem.writeIORegister(channel + 0x00u, 0x101u), "start (from memory)");
+                mem.processPendingTransfers();
+                t.Equals(mem.readIORegister(channel + 0x10u), kMadr + kQwc * 16u, "MADR should advance by QWC * 16");
+                t.Equals(mem.readIORegister(channel + 0x20u), 0u, "QWC should reach zero");
+            }
+        });
+
+        tc.Run("scratchpad DMA SADR and MADR keep only the bits hardware stores", [](TestCase &t)
+        {
+            // ps2autotests dma/spr/normal.expected: SADR 0x14 reads 0x10, 0x81234028 reads 0x20; MADR drops bit 31.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            mem.writeIORegister(0x1000D480u, 0x14u);
+            t.Equals(mem.readIORegister(0x1000D480u), 0x10u, "toSPR SADR low bits");
+            mem.writeIORegister(0x1000D480u, 0x81234028u);
+            t.Equals(mem.readIORegister(0x1000D480u), 0x20u, "toSPR SADR high bits");
+            mem.writeIORegister(0x1000D080u, 0x81234028u);
+            t.Equals(mem.readIORegister(0x1000D080u), 0x20u, "fromSPR SADR high bits");
+            mem.writeIORegister(0x1000D010u, 0x80030000u);
+            t.Equals(mem.readIORegister(0x1000D010u), 0x00030000u, "fromSPR MADR has no SPR bit");
+        });
+
         tc.Run("GIF DMA chain can source tags and payload from 0xF000 scratchpad alias", [](TestCase &t)
         {
             PS2Memory mem;

@@ -2472,6 +2472,16 @@ void PS2Runtime::run()
                                                << " gsw=" << curGs
                                                << " vif=" << curVif
                                                << std::endl);
+                for (const EeThreadSnapshot &thread : eeSnapshot.threads)
+                {
+                    RUNTIME_LOG("[run:tick]   thread " << thread.id
+                                                       << " status=" << static_cast<int>(thread.status)
+                                                       << " wait=" << static_cast<int>(thread.waitReason) << "/" << thread.waitId
+                                                       << " prio=" << thread.currentPriority
+                                                       << std::hex << " pc=0x" << thread.pc << " ra=0x" << thread.ra
+                                                       << " entry=0x" << thread.entry << std::dec
+                                                       << " invocations=" << thread.invocationDepth << std::endl);
+                }
 
             }
         });

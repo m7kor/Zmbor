@@ -121,13 +121,14 @@ namespace ps2recomp
         case SPECIAL_SLTU:
             return fmt::format("SET_GPR_U64(ctx, {}, ((uint64_t)GPR_U64(ctx, {}) < (uint64_t)GPR_U64(ctx, {})) ? 1 : 0);", inst.rd, inst.rs, inst.rt);
         case SPECIAL_MOVZ:
-            return fmt::format("if (GPR_U64(ctx, {}) == 0) SET_GPR_VEC(ctx, {}, GPR_VEC(ctx, {}));", inst.rt, inst.rd, inst.rs);
+            // Only the low doubleword moves; bits 64..127 of rd are kept (ps2autotests cpu/ee/alu on hardware).
+            return fmt::format("if (GPR_U64(ctx, {}) == 0) SET_GPR_U64(ctx, {}, GPR_U64(ctx, {}));", inst.rt, inst.rd, inst.rs);
         case SPECIAL_MOVN:
-            return fmt::format("if (GPR_U64(ctx, {}) != 0) SET_GPR_VEC(ctx, {}, GPR_VEC(ctx, {}));", inst.rt, inst.rd, inst.rs);
+            return fmt::format("if (GPR_U64(ctx, {}) != 0) SET_GPR_U64(ctx, {}, GPR_U64(ctx, {}));", inst.rt, inst.rd, inst.rs);
         case SPECIAL_MFSA:
             return fmt::format("SET_GPR_U32(ctx, {}, ctx->sa);", inst.rd);
         case SPECIAL_MTSA:
-            return fmt::format("ctx->sa = GPR_U32(ctx, {}) & 0x7F;", inst.rs);
+            return fmt::format("ctx->sa = GPR_U32(ctx, {}) & 0xF;", inst.rs); // SA counts bytes
         case SPECIAL_DADD:
             return fmt::format(
                 "{{ int64_t a = (int64_t)GPR_S64(ctx, {}); "

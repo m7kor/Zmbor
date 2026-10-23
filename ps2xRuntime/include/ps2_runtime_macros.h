@@ -717,8 +717,9 @@ inline __m128i ps2_psubsw(__m128i a, __m128i b)
 #define PS2_PCEQB(a, b) _mm_cmpeq_epi8((__m128i)(a), (__m128i)(b))
 
 // Packed Absolute (PABS)
-#define PS2_PABSW(a) _mm_abs_epi32((__m128i)(a))
-#define PS2_PABSH(a) _mm_abs_epi16((__m128i)(a))
+// The most negative lane saturates to the most positive (ps2autotests cpu/ee_simd/arithmetic: pabsh 8000 -> 7fff).
+#define PS2_PABSW(a) _mm_xor_si128(_mm_abs_epi32((__m128i)(a)), _mm_cmpeq_epi32((__m128i)(a), _mm_set1_epi32(INT32_MIN)))
+#define PS2_PABSH(a) _mm_xor_si128(_mm_abs_epi16((__m128i)(a)), _mm_cmpeq_epi16((__m128i)(a), _mm_set1_epi16(INT16_MIN)))
 #define PS2_PABSB(a) _mm_abs_epi8((__m128i)(a))
 
 // Packed Pack (PPAC) - Packs larger elements into smaller ones
@@ -768,16 +769,56 @@ inline __m128i ps2_ppacb(__m128i rs, __m128i rt)
 #define PS2_PPACB(a, b) ps2_ppacb((__m128i)(a), (__m128i)(b))
 
 // Packed Interleave (PINT)
-#define PS2_PINTH(a, b) _mm_unpacklo_epi16(_mm_shuffle_epi32((__m128i)(b), _MM_SHUFFLE(3, 2, 1, 0)), _mm_shuffle_epi32((__m128i)(a), _MM_SHUFFLE(3, 2, 1, 0)))
-#define PS2_PINTEH(a, b) _mm_unpackhi_epi16(_mm_shuffle_epi32((__m128i)(b), _MM_SHUFFLE(3, 2, 1, 0)), _mm_shuffle_epi32((__m128i)(a), _MM_SHUFFLE(3, 2, 1, 0)))
+// PINTH rd, rs, rt: rd.h[2i] = rt.h[i], rd.h[2i+1] = rs.h[4+i] (the upper doubleword of rs).
+// PINTEH: every word becomes (rs.h_even << 16) | rt.h_even. Both checked against ps2autotests cpu/ee_simd/shuffle.
+#define PS2_PINTH(a, b) _mm_unpacklo_epi16((__m128i)(b), _mm_srli_si128((__m128i)(a), 8))
+#define PS2_PINTEH(a, b) _mm_or_si128(_mm_and_si128((__m128i)(b), _mm_set1_epi32(0xFFFF)), _mm_slli_epi32((__m128i)(a), 16))
 
 // Packed Multiply-Add (PMADD)
 #define PS2_PMADDW(a, b) _mm_add_epi32(_mm_mullo_epi32(_mm_shuffle_epi32((__m128i)(a), _MM_SHUFFLE(1, 0, 3, 2)), _mm_shuffle_epi32((__m128i)(b), _MM_SHUFFLE(1, 0, 3, 2))), _mm_mullo_epi32(_mm_shuffle_epi32((__m128i)(a), _MM_SHUFFLE(3, 2, 1, 0)), _mm_shuffle_epi32((__m128i)(b), _MM_SHUFFLE(3, 2, 1, 0))))
 
 // Packed Variable Shifts
-#define PS2_PSLLVW(a, b) _mm_custom_sllv_epi32((__m128i)(a), (__m128i)(b))
-#define PS2_PSRLVW(a, b) _mm_custom_srlv_epi32((__m128i)(a), (__m128i)(b))
-#define PS2_PSRAVW(a, b) _mm_custom_srav_epi32((__m128i)(a), (__m128i)(b))
+// PSLLVW/PSRLVW/PSRAVW rd, rt, rs: only words 0 and 2 shift, by rs.w & 31, and each 32-bit result is
+// sign-extended into its doubleword (ps2autotests cpu/ee_simd/logic: "psllvw -1, 1: ffffffff fffffffe ...").
+enum class Ps2VariableShift
+{
+    Left,
+    RightLogical,
+    RightArithmetic,
+};
+
+inline __m128i ps2PackedVariableShift(__m128i rt, __m128i rs, Ps2VariableShift kind)
+{
+    alignas(16) uint32_t value[4];
+    alignas(16) uint32_t count[4];
+    _mm_store_si128(reinterpret_cast<__m128i *>(value), rt);
+    _mm_store_si128(reinterpret_cast<__m128i *>(count), rs);
+    int64_t out[2];
+    for (int i = 0; i < 2; ++i)
+    {
+        const uint32_t v = value[2 * i];
+        const uint32_t n = count[2 * i] & 31u;
+        uint32_t r = 0;
+        switch (kind)
+        {
+        case Ps2VariableShift::Left:
+            r = v << n;
+            break;
+        case Ps2VariableShift::RightLogical:
+            r = v >> n;
+            break;
+        case Ps2VariableShift::RightArithmetic:
+            r = static_cast<uint32_t>(static_cast<int32_t>(v) >> n);
+            break;
+        }
+        out[i] = static_cast<int32_t>(r);
+    }
+    return _mm_set_epi64x(out[1], out[0]);
+}
+
+#define PS2_PSLLVW(rt, rs) ps2PackedVariableShift((__m128i)(rt), (__m128i)(rs), Ps2VariableShift::Left)
+#define PS2_PSRLVW(rt, rs) ps2PackedVariableShift((__m128i)(rt), (__m128i)(rs), Ps2VariableShift::RightLogical)
+#define PS2_PSRAVW(rt, rs) ps2PackedVariableShift((__m128i)(rt), (__m128i)(rs), Ps2VariableShift::RightArithmetic)
 
 inline __m128i _mm_custom_sllv_epi32(__m128i a, __m128i count)
 {
@@ -822,6 +863,36 @@ inline __m128i _mm_custom_srav_epi32(__m128i a, __m128i count)
     return _mm_loadu_si128((__m128i *)result);
 }
 
+// R5900 32-bit divide results, including the cases the host would trap on: x / 0 gives a quotient of -1 for x >= 0
+// and 1 for x < 0 with remainder x; INT32_MIN / -1 gives INT32_MIN remainder 0 (EE DIV/DIVU semantics).
+inline void ps2DivideS32(int32_t dividend, int32_t divisor, int32_t &quotient, int32_t &remainder)
+{
+    if (divisor == 0)
+    {
+        quotient = dividend < 0 ? 1 : -1;
+        remainder = dividend;
+    }
+    else if (divisor == -1 && dividend == INT32_MIN)
+    {
+        quotient = INT32_MIN;
+        remainder = 0;
+    }
+    else
+    {
+        quotient = dividend / divisor;
+        remainder = dividend % divisor;
+    }
+}
+
+// PDIVW / PDIVUW: words 0 and 2 of rs divided by the same words of rt; LO/HI doubleword i gets the sign-extended
+// quotient/remainder. PDIVBW: every word of rs divided by the halfword rt.h0; LO/HI word i gets quotient/remainder.
+enum class Ps2PackedDivide
+{
+    Words,
+    UnsignedWords,
+    WordsByHalfword,
+};
+
 // PMFHL function implementations
 inline __m128i ps2_u64_to_epi64_pair(uint64_t value)
 {
@@ -853,7 +924,20 @@ inline __m128i ps2_u64_to_epi64_pair(uint64_t value)
 #define FPU_TRUNC_W_S(a) ((int32_t)(float)(a))
 #define FPU_CEIL_W_S(a) ((int32_t)ceilf((float)(a)))
 #define FPU_FLOOR_W_S(a) ((int32_t)floorf((float)(a)))
-#define FPU_CVT_S_W(a) ((float)(int32_t)(a))
+// CVT.S.W rounds toward zero on the EE (ps2autotests cpu/ee_fpu/convert: 0x7FFFFFFF -> 0x4EFFFFFF, where the host's
+// round-to-nearest gives 0x4F000000): drop the bits below the 24-bit significand before the exact conversion.
+inline float ps2_cvt_s_w(int32_t value)
+{
+    uint32_t magnitude = value < 0 ? 0u - static_cast<uint32_t>(value) : static_cast<uint32_t>(value);
+    int width = 0;
+    for (uint32_t m = magnitude; m != 0u; m >>= 1)
+        ++width;
+    if (width > 24)
+        magnitude &= ~((1u << (width - 24)) - 1u);
+    const float result = static_cast<float>(magnitude);
+    return value < 0 ? -result : result;
+}
+#define FPU_CVT_S_W(a) ps2_cvt_s_w((int32_t)(a))
 #define FPU_CVT_S_L(a) ((float)(int64_t)(a))
 // CVT.W.S truncates toward zero; a magnitude of 2^31 or more saturates by sign (PCSX2 FPU.cpp CVT_W).
 inline int32_t ps2_fcvt_w_s(float a)
@@ -1029,10 +1113,17 @@ inline __m128i ps2_qfsrv(__m128i rs, __m128i rt, uint32_t sa)
 }
 #define PS2_QFSRV(rs, rt, sa) ps2_qfsrv((__m128i)(rs), (__m128i)(rt), (uint32_t)(sa))
 #define PS2_PCPYLD(rs, rt) _mm_unpacklo_epi64(rt, rs)
-#define PS2_PEXEH(rs) _mm_shufflelo_epi16(_mm_shufflehi_epi16(rs, _MM_SHUFFLE(2, 3, 0, 1)), _MM_SHUFFLE(2, 3, 0, 1))
+// Halfword/word exchanges within each doubleword, checked against ps2autotests cpu/ee_simd/shuffle.expected.
+#define PS2_HALFWORDS_PER_DOUBLEWORD(rt, order) _mm_shufflelo_epi16(_mm_shufflehi_epi16((__m128i)(rt), order), order)
+#define PS2_PEXEH(rt) PS2_HALFWORDS_PER_DOUBLEWORD(rt, _MM_SHUFFLE(3, 0, 1, 2)) // h0 <-> h2
+#define PS2_PEXCH(rt) PS2_HALFWORDS_PER_DOUBLEWORD(rt, _MM_SHUFFLE(3, 1, 2, 0)) // h1 <-> h2
+#define PS2_PREVH(rt) PS2_HALFWORDS_PER_DOUBLEWORD(rt, _MM_SHUFFLE(0, 1, 2, 3)) // h0..h3 reversed
+#define PS2_PEXCW(rt) _mm_shuffle_epi32((__m128i)(rt), _MM_SHUFFLE(3, 1, 2, 0))  // w1 <-> w2
+#define PS2_PADDUH(rs, rt) _mm_adds_epu16((__m128i)(rs), (__m128i)(rt))
+#define PS2_PSUBUH(rs, rt) _mm_subs_epu16((__m128i)(rs), (__m128i)(rt))
 // PEXEW swaps words 0 and 2: rd = {rt2, rt1, rt0, rt3} (PCSX2 MMI.cpp PEXEW).
 #define PS2_PEXEW(rs) _mm_shuffle_epi32(rs, _MM_SHUFFLE(3, 0, 1, 2))
-#define PS2_PROT3W(rs) _mm_shuffle_epi32(rs, _MM_SHUFFLE(0, 3, 2, 1))
+#define PS2_PROT3W(rt) _mm_shuffle_epi32((__m128i)(rt), _MM_SHUFFLE(3, 0, 2, 1)) // {w1, w2, w0, w3}
 
 // Additional VU0 operations
 #define PS2_VSQRT(x) sqrtf(x)
@@ -1085,6 +1176,52 @@ static inline void ps2StoreHiLo(R5900Context *ctx, const Ps2HiLoWords &w)
 static inline __m128i ps2Words128(uint32_t w0, uint32_t w1, uint32_t w2, uint32_t w3)
 {
     return _mm_set_epi32(static_cast<int32_t>(w3), static_cast<int32_t>(w2), static_cast<int32_t>(w1), static_cast<int32_t>(w0));
+}
+
+static inline void ps2PackedDivideToHiLo(R5900Context *ctx, __m128i rs, __m128i rt, Ps2PackedDivide kind)
+{
+    alignas(16) uint32_t a[4];
+    alignas(16) uint32_t b[4];
+    _mm_store_si128(reinterpret_cast<__m128i *>(a), rs);
+    _mm_store_si128(reinterpret_cast<__m128i *>(b), rt);
+    Ps2HiLoWords w{};
+    if (kind == Ps2PackedDivide::WordsByHalfword)
+    {
+        const int32_t divisor = static_cast<int16_t>(b[0] & 0xFFFFu);
+        for (int i = 0; i < 4; ++i)
+        {
+            int32_t q = 0, r = 0;
+            ps2DivideS32(static_cast<int32_t>(a[i]), divisor, q, r);
+            w.lo[i] = static_cast<uint32_t>(q);
+            w.hi[i] = static_cast<uint32_t>(r);
+        }
+        ps2StoreHiLo(ctx, w);
+        return;
+    }
+    for (int i = 0; i < 2; ++i)
+    {
+        uint32_t q = 0, r = 0;
+        if (kind == Ps2PackedDivide::UnsignedWords)
+        {
+            const uint32_t n = a[2 * i], d = b[2 * i];
+            q = d != 0u ? n / d : 0xFFFFFFFFu;
+            r = d != 0u ? n % d : n;
+        }
+        else
+        {
+            int32_t sq = 0, sr = 0;
+            ps2DivideS32(static_cast<int32_t>(a[2 * i]), static_cast<int32_t>(b[2 * i]), sq, sr);
+            q = static_cast<uint32_t>(sq);
+            r = static_cast<uint32_t>(sr);
+        }
+        const uint32_t qHigh = (q & 0x80000000u) ? 0xFFFFFFFFu : 0u;
+        const uint32_t rHigh = (r & 0x80000000u) ? 0xFFFFFFFFu : 0u;
+        w.lo[2 * i] = q;
+        w.lo[2 * i + 1] = qHigh;
+        w.hi[2 * i] = r;
+        w.hi[2 * i + 1] = rHigh;
+    }
+    ps2StoreHiLo(ctx, w);
 }
 
 enum class Ps2MmiAccumulate

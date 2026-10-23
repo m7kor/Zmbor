@@ -20,7 +20,7 @@ namespace ps2_syscalls
             GsSetCrt(rdram, ctx, runtime);
             return true;
         case 0x04:
-            ExitThread(rdram, ctx, runtime);
+            Exit(rdram, ctx, runtime);
             return true;
         case 0x10:
             AddIntcHandler(rdram, ctx, runtime);

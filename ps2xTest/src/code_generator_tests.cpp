@@ -205,6 +205,114 @@ void register_code_generator_tests()
                  "LWU must not sign-extend bit 31 into the allocator bitmap value");
     });
 
+    tc.Run("MOVZ and MOVN move only the low doubleword", [](TestCase &t) {
+        // Real PS2 (ps2autotests cpu/ee/alu.expected): "movn C_ONE, C_ONE: 0000133a 00001339 00000000 00000001"
+        // keeps bits 64..127 of rd; PCSX2 also writes UD[0] only.
+        CodeGenerator gen({}, {});
+        for (const uint32_t function : {SPECIAL_MOVZ, SPECIAL_MOVN})
+        {
+            Instruction inst{};
+            inst.address = 0x8F20;
+            inst.opcode = OPCODE_SPECIAL;
+            inst.function = function;
+            inst.rs = 5;
+            inst.rt = 6;
+            inst.rd = 7;
+            const std::string generated = gen.translateInstruction(inst);
+            t.IsTrue(generated.find("SET_GPR_U64(ctx, 7, GPR_U64(ctx, 5))") != std::string::npos,
+                     "the move must write only the low 64 bits of rd: " + generated);
+            t.IsTrue(generated.find("SET_GPR_VEC") == std::string::npos,
+                     "the move must not replace the whole 128-bit register: " + generated);
+        }
+    });
+
+    tc.Run("BGEZALL and BLTZALL link even when the branch is not taken", [](TestCase &t) {
+        // ps2autotests cpu/ee/branch.expected: "bgezall -1: skipped, set ra, skipped delay slot".
+        for (const uint32_t rt : {static_cast<uint32_t>(REGIMM_BGEZALL), static_cast<uint32_t>(REGIMM_BLTZALL)})
+        {
+            Function func;
+            func.name = "likely_link";
+            func.start = 0x2000;
+            func.end = 0x2010;
+            func.isRecompiled = true;
+            Instruction branch{};
+            branch.address = 0x2000;
+            branch.opcode = OPCODE_REGIMM;
+            branch.rs = 4;
+            branch.rt = rt;
+            branch.simmediate = 2;
+            branch.isBranch = true;
+            branch.hasDelaySlot = true;
+            CodeGenerator gen({}, {});
+            const std::string generated =
+                gen.generateFunction(func, {branch, makeNop(0x2004), makeNop(0x2008), makeNop(0x200C)}, false);
+            const size_t link = generated.find("SET_GPR_U32(ctx, 31, 0x2008u);");
+            const size_t taken = generated.find("if (branch_taken_0x2000)");
+            t.IsTrue(link != std::string::npos && taken != std::string::npos && link < taken,
+                     "the link must be written before (and outside) the taken test: " + generated);
+        }
+    });
+
+    tc.Run("SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA", [](TestCase &t) {
+        // ps2autotests cpu/ee_simd/funnel.expected: mtsa 0xFFFF -> mfsa 0xf, mtsab 15 -> 0xf, mtsah 7 -> 0xe.
+        CodeGenerator gen({}, {});
+        Instruction mtsa{};
+        mtsa.opcode = OPCODE_SPECIAL;
+        mtsa.function = SPECIAL_MTSA;
+        mtsa.rs = 4;
+        t.IsTrue(gen.translateInstruction(mtsa).find("ctx->sa = GPR_U32(ctx, 4) & 0xF;") != std::string::npos,
+                 "MTSA keeps the low four bits");
+        Instruction mtsab{};
+        mtsab.opcode = OPCODE_REGIMM;
+        mtsab.rt = REGIMM_MTSAB;
+        mtsab.rs = 4;
+        mtsab.simmediate = 1;
+        t.IsTrue(gen.translateInstruction(mtsab).find("ctx->sa = (GPR_U32(ctx, 4) ^ (uint32_t)1) & 0xF;") != std::string::npos,
+                 "MTSAB stores bytes, not bits");
+        Instruction mtsah = mtsab;
+        mtsah.rt = REGIMM_MTSAH;
+        t.IsTrue(gen.translateInstruction(mtsah).find("ctx->sa = ((GPR_U32(ctx, 4) ^ (uint32_t)1) & 0x7) * 2;") != std::string::npos,
+                 "MTSAH stores two bytes per halfword");
+    });
+
+    tc.Run("CFC1 and CTC1 follow the EE FPU control registers", [](TestCase &t) {
+        // ps2autotests cpu/ee_fpu/fcr.expected: fcr0-15 read 00002e30, fcr16-31 read fcr31, ctc1 -1 -> 0183c079.
+        CodeGenerator gen({}, {});
+        Instruction cfc1{};
+        cfc1.opcode = OPCODE_COP1;
+        cfc1.rs = COP1_CF;
+        cfc1.rt = 8;
+        cfc1.rd = 0;
+        t.IsTrue(gen.translateInstruction(cfc1).find("SET_GPR_U32(ctx, 8, 0x00002E30);") != std::string::npos,
+                 "FCR0 reads the implementation/revision value");
+        cfc1.rd = 20;
+        t.IsTrue(gen.translateInstruction(cfc1).find("SET_GPR_U32(ctx, 8, ctx->fcr31);") != std::string::npos,
+                 "FCR16-31 alias FCR31");
+        Instruction ctc1 = cfc1;
+        ctc1.rs = COP1_CT;
+        ctc1.rd = 31;
+        t.IsTrue(gen.translateInstruction(ctc1).find("ctx->fcr31 = (GPR_U32(ctx, 8) & 0x0083C078u) | 0x01000001u;") != std::string::npos,
+                 "only the writable FCR31 bits change");
+    });
+
+    tc.Run("VU0 macro integer ops discard writes to vi0", [](TestCase &t) {
+        // ps2autotests cpu/vu0_macro/integer.expected: "viadd -> $0: 0000".
+        CodeGenerator gen({}, {});
+        Instruction viadd{};
+        viadd.sa = 0; // vid
+        viadd.rd = 1;
+        viadd.rt = 2;
+        t.IsTrue(gen.translateVU_VIADD(viadd).find("ctx->vi[0] =") == std::string::npos, "VIADD must not write vi0");
+        viadd.sa = 3;
+        t.IsTrue(gen.translateVU_VIADD(viadd).find("ctx->vi[3] = ctx->vi[1] + ctx->vi[2];") != std::string::npos,
+                 "VIADD still writes other registers");
+        Instruction viaddi{};
+        viaddi.rt = 0;
+        viaddi.rd = 1;
+        viaddi.sa = 3;
+        t.IsTrue(gen.translateVU_VIADDI(viaddi).find("ctx->vi[0] =") == std::string::npos, "VIADDI must not write vi0");
+    });
+
     tc.Run("SYSCALL publishes its continuation before entering the runtime", [](TestCase &t) {
         Function func;
         func.name = "syscall_resume";
@@ -1015,7 +1123,8 @@ void register_code_generator_tests()
 
             std::string ctc1Code = gen.translateInstruction(ctc1);
             printGeneratedCode("FCR access uses CFC1/CTC1 (CTC1)", ctc1Code);
-            t.IsTrue(ctc1Code.find("ctx->fcr31 = GPR_U32(ctx, 4) & 0x0183FFFF") != std::string::npos,
+            // ps2autotests cpu/ee_fpu/fcr.expected: only 0x0083C078 is writable, bits 0 and 24 stay set.
+            t.IsTrue(ctc1Code.find("ctx->fcr31 = (GPR_U32(ctx, 4) & 0x0083C078u) | 0x01000001u") != std::string::npos,
                      "CTC1 FCR31 should mask and write fcr31");
             t.IsTrue(ctc1Code.find("ignored") == std::string::npos, "CTC1 FCR31 should not be ignored");
         });
@@ -1206,8 +1315,9 @@ void register_code_generator_tests()
             qfsrv.rt = 5;
 
             std::string out = gen.translateInstruction(qfsrv);
-            t.IsTrue(out.find("PS2_QFSRV(GPR_VEC(ctx, 4), GPR_VEC(ctx, 5), ctx->sa & 0x7F)") != std::string::npos,
-                     "QFSRV should map to PS2_QFSRV with rs/rt ordering");
+            // SA holds a byte count (ps2autotests cpu/ee_simd/funnel: mtsah 7 reads back as mfsa 0xe).
+            t.IsTrue(out.find("PS2_QFSRV(GPR_VEC(ctx, 4), GPR_VEC(ctx, 5), (ctx->sa & 0xF) * 8)") != std::string::npos,
+                     "QFSRV should map to PS2_QFSRV with rs/rt ordering and shift by SA bytes");
         });
 
         tc.Run("PCPYLD uses runtime helper macro", [](TestCase &t) {

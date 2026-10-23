@@ -8,6 +8,17 @@ endif()
 
 set(PS2X_E2E_SCRIPT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# Release builds compile ps2_runtime with IPO (ReleaseMode.cmake). With Clang its archive then holds LLVM bitcode,
+# which GNU ld cannot read unless the executable links with LTO too ("libps2_runtime.a: error adding symbols: file
+# format not recognized" on CI linux-clang). GCC loads its LTO plugin on every link, and MSVC links /GL libraries
+# without /LTCG, so only non-MSVC executables need it.
+function(ps2x_link_like_runtime target)
+    get_target_property(runtime_ipo ps2_runtime INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+    if(runtime_ipo AND NOT MSVC)
+        set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    endif()
+endfunction()
+
 function(ps2x_add_e2e_program name)
     cmake_parse_arguments(E2E "FRAME" "" "" ${ARGN})
     set(work "${CMAKE_CURRENT_BINARY_DIR}/${name}")
@@ -33,6 +44,7 @@ function(ps2x_add_e2e_program name)
         "${gen}/register_functions.cpp")
     target_include_directories(ps2x_e2e_${name} PRIVATE "${gen}")
     target_link_libraries(ps2x_e2e_${name} PRIVATE ps2_runtime)
+    ps2x_link_like_runtime(ps2x_e2e_${name})
     if(MSVC)
         # Same WinAPI/raylib CloseWindow clash workaround as ps2EntryRunner.
         target_link_options(ps2x_e2e_${name} PRIVATE "/FORCE:MULTIPLE")
@@ -84,6 +96,7 @@ if(PS2X_HWTEST_GENERATED)
         add_executable(ps2x_hw_${HW_NAME} "${CMAKE_SOURCE_DIR}/ps2xRuntime/src/main.cpp" ${ps2x_hw_sources})
         target_include_directories(ps2x_hw_${HW_NAME} PRIVATE "${HW_GEN}")
         target_link_libraries(ps2x_hw_${HW_NAME} PRIVATE ps2_runtime)
+        ps2x_link_like_runtime(ps2x_hw_${HW_NAME})
         if(NOT PS2X_HWTEST_OPTIMIZE)
             set_source_files_properties(${ps2x_hw_sources} PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/Od,-O0>")
         endif()

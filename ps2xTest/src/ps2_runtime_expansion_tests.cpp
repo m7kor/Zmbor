@@ -1203,6 +1203,40 @@ void register_ps2_runtime_expansion_tests()
             runtime.requestStop();
         });
 
+        tc.Run("EE accesses reach VU0 micro memory and VU1 data memory, and VCALLMS runs what was written", [](TestCase &t)
+        {
+            // ps2autotests vu/test_runner.cpp writes microcode at 0x11000000 (VU0) and reads VU1 results from
+            // 0x1100C000; both used to bypass the VU window and land in RDRAM at 0x01000000 / 0x0100C000.
+            for (const uint32_t address : {0x11000000u, 0x11000FF0u, 0x1100C000u, 0x1100FFF0u})
+                t.IsTrue(PS2Runtime::isSpecialAddress(address), "the whole VU window takes the slow path");
+            t.IsTrue(!PS2Runtime::isSpecialAddress(0x01000000u), "plain RDRAM stays on the fast path");
+
+            PS2Runtime runtime;
+            PS2Memory &memory = runtime.memory();
+            t.IsTrue(memory.initialize(), "memory initializes");
+            t.IsTrue(memory.getVU0Code() != nullptr && memory.getVU0Data() != nullptr, "VU0 memories exist");
+            if (!memory.getVU0Code() || !memory.getVU0Data())
+                return;
+            constexpr uint32_t kUpperNop = 0x000002FFu;
+            constexpr uint32_t kEBit = 1u << 30;
+            constexpr uint32_t kLowerNop = 0x8000033Cu;
+            const uint32_t program[] = {
+                0x10410234u, kUpperNop,         // IADDIU vi1, vi0, 0x1234
+                0x0B010010u, kUpperNop | kEBit, // ISW.x vi1, 0x10(vi0), E bit
+                kLowerNop, kUpperNop,           // the instruction after E still runs
+            };
+            for (uint32_t i = 0; i < sizeof(program) / sizeof(program[0]); ++i)
+                memory.write32(0x11000000u + i * 4u, program[i]);
+            uint32_t firstWord = 0;
+            std::memcpy(&firstWord, memory.getVU0Code(), sizeof(firstWord));
+            t.Equals(firstWord, program[0], "a store to 0x11000000 lands in VU0 micro memory");
+
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
+            R5900Context ctx{};
+            runtime.executeVU0Microprogram(rdram.data(), &ctx, 0u);
+            t.Equals(memory.read32(0x11004000u + 0x10u * 16u), 0x1234u, "ISW stored vi1 to VU0 data qword 0x10");
+        });
+
         tc.Run("SuspendThread does not nest", [](TestCase &t)
         {
             // ps2autotests kernel/ee/thread/suspend.expected: "suspend after suspend: failed -> result: -1".

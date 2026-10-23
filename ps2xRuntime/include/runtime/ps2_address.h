@@ -47,7 +47,10 @@ static inline constexpr bool Ps2IsPhysicalSpecialAddress(uint32_t physAddr)
            Ps2AddressInRange(physAddr, PS2_SCRATCHPAD_BASE, PS2_SCRATCHPAD_SIZE) ||
            Ps2AddressInRange(physAddr, PS2_IO_BASE, PS2_IO_SIZE) ||
            Ps2AddressInRange(physAddr, PS2_GS_PRIV_REG_BASE, PS2_GS_PRIV_REG_SIZE) ||
-           (physAddr >= PS2_VU0_DATA_BASE && physAddr < (PS2_VU1_CODE_BASE + PS2_VU1_CODE_SIZE));
+           // The whole VU window: VU0 micro/data and VU1 micro/data. It used to start at VU0 data and stop at the
+           // end of VU1 micro memory, so EE stores to VU0 micro memory (0x11000000) and VU1 data (0x1100C000) went
+           // to RDRAM at 0x01000000/0x0100C000 instead (ps2autotests vu/*: results read back as the 0xCC fill).
+           (physAddr >= PS2_VU0_CODE_BASE && physAddr < (PS2_VU1_DATA_BASE + PS2_VU1_DATA_SIZE));
 }
 
 static inline constexpr bool Ps2IsSpecialAddress(uint32_t addr)

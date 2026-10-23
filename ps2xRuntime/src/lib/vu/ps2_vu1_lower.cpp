@@ -4,65 +4,130 @@
 #include "runtime/ps2_memory.h"
 #include "ps2_vu1_detail.h"
 
+#include <bit>
+#include <cfenv>
 #include <cmath>
 #include <cstring>
 #include <limits>
 
 namespace
 {
-    float vuEatan(float value)
+    // EFU arithmetic on PS2 floats, fitted to ps2autotests vu/lower/efu.expected (real-PS2 results; 167 of the 208
+    // rows match exactly, the rest are last-bit differences in the EATAN/ESIN/EEXP series). As on the rest of the VU:
+    // exponent 0 is zero, exponent 255 is an ordinary exponent, results saturate to +-0x7FFFFFFF at 2^129 and flush
+    // below 2^-126. Each multiply/add stage truncates like the FMACs (ESUM/ESADD match only that way); the divider
+    // and square root round to nearest. A zero divisor gives +-max. EATAN takes t = (x - 1) / (x + 1) first
+    // (EATAN(1) reads pi/4, EATAN(0) ~0); the series are sums of truncated powers.
+    // The interpreter runs with FE_TOWARDZERO (FMAC truncation, ps2_vu1_core.cpp). The EFU model rounds each stage
+    // itself and needs exact-then-rounded double arithmetic, so it runs to-nearest for its duration.
+    struct EfuRoundingScope
     {
-        constexpr float coefficients[] = {
-            0.999999344348907f,
-            -0.333298563957214f,
-            0.199465364217758f,
-            -0.139085337519646f, // PCSX2 VUops.cpp _vuCalculateEATAN (was -0.13085337519646)
-            0.096420042216778f,
-            -0.055909886956215f,
-            0.021861229091883f,
-            -0.004054057877511f};
-        constexpr float quarterPi = 0.785398185253143f;
+        int previous = std::fegetround();
+        EfuRoundingScope() { std::fesetround(FE_TONEAREST); }
+        ~EfuRoundingScope() { std::fesetround(previous); }
+        EfuRoundingScope(const EfuRoundingScope &) = delete;
+        EfuRoundingScope &operator=(const EfuRoundingScope &) = delete;
+    };
 
-        const float squared = value * value;
-        float polynomial = coefficients[7];
-        for (int index = 6; index >= 0; --index)
-            polynomial = coefficients[index] + squared * polynomial;
-        return quarterPi + value * polynomial;
+    double efuValue(uint32_t bits)
+    {
+        const uint32_t exponent = (bits >> 23) & 0xFFu;
+        if (exponent == 0u) // signed zero built from bits: MSVC folded `sign ? -0.0 : 0.0` to one constant
+            return std::bit_cast<double>(static_cast<uint64_t>(bits & 0x80000000u) << 32);
+        const double mantissa = 1.0 + static_cast<double>(bits & 0x007FFFFFu) / 8388608.0;
+        const double magnitude = std::ldexp(mantissa, static_cast<int>(exponent) - 127);
+        return (bits & 0x80000000u) ? -magnitude : magnitude;
     }
 
-    float vuEsin(float value)
+    double efuBitsValue(float value)
     {
-        constexpr float coefficients[] = {
-            1.0f,
-            -0.166666567325592f,
-            0.008333025500178f,
-            -0.000198074136279f,
-            0.000002601886990f};
-
-        const float squared = value * value;
-        float polynomial = coefficients[4];
-        for (int index = 3; index >= 0; --index)
-            polynomial = coefficients[index] + squared * polynomial;
-        return value * polynomial;
+        uint32_t bits = 0u;
+        std::memcpy(&bits, &value, sizeof(bits));
+        return efuValue(bits);
     }
 
-    float vuEexp(float value)
+    uint32_t efuBits(double d, bool nearest)
     {
-        constexpr float coefficients[] = {
-            0.249998688697815f,
-            0.031257584691048f,
-            0.002591371303424f,
-            0.000171562001924f,
-            0.000005430199963f,
-            0.000000690600018f};
+        const uint32_t sign = std::signbit(d) ? 0x80000000u : 0u;
+        const double magnitude = std::fabs(d);
+        if (magnitude < 0x1p-126)
+            return sign;
+        if (magnitude >= 0x1p129)
+            return sign | 0x7FFFFFFFu;
+        int exponent = 0;
+        const double fraction = std::frexp(magnitude, &exponent); // [0.5, 1)
+        double scaled = std::ldexp(fraction, 24);                  // [2^23, 2^24)
+        scaled = nearest ? std::nearbyint(scaled) : std::floor(scaled);
+        uint64_t q = static_cast<uint64_t>(scaled);
+        int biased = exponent - 1 + 127;
+        if (q >= (1ull << 24))
+        {
+            q >>= 1;
+            ++biased;
+        }
+        if (biased > 255)
+            return sign | 0x7FFFFFFFu;
+        return sign | (static_cast<uint32_t>(biased) << 23) | static_cast<uint32_t>(q & 0x007FFFFFu);
+    }
 
-        float polynomial = coefficients[5];
-        for (int index = 4; index >= 0; --index)
-            polynomial = coefficients[index] + value * polynomial;
-        polynomial = 1.0f + value * polynomial;
-        polynomial *= polynomial;
-        polynomial *= polynomial;
-        return polynomial != 0.0f ? 1.0f / polynomial : std::numeric_limits<float>::max();
+    double efuTrunc(double d) { return efuValue(efuBits(d, false)); }
+    double efuNearest(double d) { return efuValue(efuBits(d, true)); }
+
+    double efuDivide(double numerator, double denominator)
+    {
+        if (denominator == 0.0)
+        {
+            const double signs = (numerator != 0.0 ? std::copysign(1.0, numerator) : 1.0) * std::copysign(1.0, denominator);
+            return std::copysign(0x1p130, signs);
+        }
+        return efuNearest(numerator / denominator);
+    }
+
+    double efuSqrt(double d) { return efuNearest(std::sqrt(std::fabs(d))); }
+
+    double efuSumOfSquares(double x, double y, double z)
+    {
+        return efuTrunc(efuTrunc(efuTrunc(x * x) + efuTrunc(y * y)) + efuTrunc(z * z));
+    }
+
+    // sum of c[k] * t^(first + 2k), each product and partial sum truncated.
+    template <size_t N>
+    double efuSeries(double t, const double (&coefficients)[N], double step)
+    {
+        double accumulator = 0.0;
+        double power = t;
+        for (const double c : coefficients)
+        {
+            accumulator = efuTrunc(accumulator + efuTrunc(c * power));
+            power = efuTrunc(power * step);
+        }
+        return accumulator;
+    }
+
+    double efuAtan(double a, double b) // atan(b / a) through t = (b - a) / (b + a)
+    {
+        constexpr double coefficients[] = {0.999999344348907, -0.333298563957214, 0.199465364217758,
+                                           -0.139085337519646, 0.096420042216778, -0.055909886956215,
+                                           0.021861229091883, -0.004054057877511};
+        const double t = efuDivide(efuTrunc(b - a), efuTrunc(b + a));
+        return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + 0.785398185253143);
+    }
+
+    double efuSin(double x)
+    {
+        constexpr double coefficients[] = {1.0, -0.166666567325592, 0.008333025500178, -0.000198074136279,
+                                           0.000002601886990};
+        return efuSeries(x, coefficients, efuTrunc(x * x));
+    }
+
+    double efuExp(double x) // e^-x
+    {
+        constexpr double coefficients[] = {0.249998688697815, 0.031257584691048, 0.002591371303424,
+                                           0.000171562001924, 0.000005430199963, 0.000000690600018};
+        double p = efuTrunc(1.0 + efuSeries(x, coefficients, x));
+        p = efuTrunc(p * p);
+        p = efuTrunc(p * p);
+        return efuDivide(1.0, p);
     }
 }
 
@@ -671,109 +736,101 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
             case 0x6C: // XGKICK - send GIF packet from VU1 data memory
                 startXgkick(static_cast<uint32_t>(static_cast<uint16_t>(m_state.vi[viS])));
                 return;
+            // EFU: see efuValue/efuBits above. Inputs are the raw register bits (no host IEEE clamping).
             case 0x70: // ESADD
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float y = normalizeOperand(m_state.vf[vfS][1]);
-                const float z = normalizeOperand(m_state.vf[vfS][2]);
-                queueP(x * x + y * y + z * z, 11u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                queuePBits(efuBits(efuSumOfSquares(efuBitsValue(v[0]), efuBitsValue(v[1]), efuBitsValue(v[2])), true), 11u);
                 return;
             }
             case 0x71: // ERSADD
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float y = normalizeOperand(m_state.vf[vfS][1]);
-                const float z = normalizeOperand(m_state.vf[vfS][2]);
-                const float sum = x * x + y * y + z * z;
-                queueP(sum != 0.0f ? 1.0f / sum : sum, 18u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                const double sum = efuSumOfSquares(efuBitsValue(v[0]), efuBitsValue(v[1]), efuBitsValue(v[2]));
+                queuePBits(efuBits(efuDivide(1.0, sum), true), 18u);
                 return;
             }
             case 0x72: // ELENG
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float y = normalizeOperand(m_state.vf[vfS][1]);
-                const float z = normalizeOperand(m_state.vf[vfS][2]);
-                queueP(std::sqrt(x * x + y * y + z * z), 18u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                queuePBits(efuBits(efuSqrt(efuSumOfSquares(efuBitsValue(v[0]), efuBitsValue(v[1]), efuBitsValue(v[2]))), true), 18u);
                 return;
             }
             case 0x73: // ERLENG
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float y = normalizeOperand(m_state.vf[vfS][1]);
-                const float z = normalizeOperand(m_state.vf[vfS][2]);
-                const float len = std::sqrt(x * x + y * y + z * z);
-                queueP(len != 0.0f ? 1.0f / len : len, 24u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                const double length = efuSqrt(efuSumOfSquares(efuBitsValue(v[0]), efuBitsValue(v[1]), efuBitsValue(v[2])));
+                queuePBits(efuBits(efuDivide(1.0, length), true), 24u);
                 return;
             }
             case 0x74: // EATANxy
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float y = normalizeOperand(m_state.vf[vfS][1]);
-                queueP(x != 0.0f ? vuEatan(y / x) : 0.0f, 54u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                queuePBits(efuBits(efuAtan(efuBitsValue(v[0]), efuBitsValue(v[1])), true), 54u);
                 return;
             }
             case 0x75: // EATANxz
             {
-                const float x = normalizeOperand(m_state.vf[vfS][0]);
-                const float z = normalizeOperand(m_state.vf[vfS][2]);
-                queueP(x != 0.0f ? vuEatan(z / x) : 0.0f, 54u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                queuePBits(efuBits(efuAtan(efuBitsValue(v[0]), efuBitsValue(v[2])), true), 54u);
                 return;
             }
             case 0x76: // ESUM
             {
-                float sum = 0.0f;
-                for (uint32_t component = 0; component < 4u; ++component)
-                    sum += normalizeOperand(m_state.vf[vfS][component]);
-                queueP(sum, 12u);
+                const EfuRoundingScope rounding;
+                const auto &v = m_state.vf[vfS];
+                const double sum = efuTrunc(efuTrunc(efuTrunc(efuBitsValue(v[0]) + efuBitsValue(v[1])) + efuBitsValue(v[2])) + efuBitsValue(v[3]));
+                queuePBits(efuBits(sum, true), 12u);
                 return;
             }
             case 0x79: // ERSQRT (0x77 is reserved: PCSX2 VUops.cpp LowerOP_T3_11 row 0x1D)
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                const float value = normalizeOperand(m_state.vf[vfS][component]);
-                float result = value;
-                if (result >= 0.0f)
-                {
-                    result = std::sqrt(result);
-                    if (result != 0.0f)
-                        result = 1.0f / result;
-                }
-                queueP(result, 18u);
+                queuePBits(efuBits(efuDivide(1.0, efuSqrt(efuBitsValue(m_state.vf[vfS][component]))), true), 18u);
                 return;
             }
             case 0x78: // ESQRT
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                const float value = normalizeOperand(m_state.vf[vfS][component]);
-                queueP(value >= 0.0f ? std::sqrt(value) : value, 12u);
+                queuePBits(efuBits(efuSqrt(efuBitsValue(m_state.vf[vfS][component])), true), 12u);
                 return;
             }
             case 0x7C: // ESIN
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                const float value = normalizeOperand(m_state.vf[vfS][component]);
-                queueP(vuEsin(value), 29u);
+                queuePBits(efuBits(efuSin(efuBitsValue(m_state.vf[vfS][component])), true), 29u);
                 return;
             }
             case 0x7A: // ERCPR
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                const float value = normalizeOperand(m_state.vf[vfS][component]);
-                queueP(value != 0.0f ? 1.0f / value : value, 12u);
+                queuePBits(efuBits(efuDivide(1.0, efuBitsValue(m_state.vf[vfS][component])), true), 12u);
                 return;
             }
             case 0x7B: // WAITP
                 return;
-            case 0x7D: // EATAN
+            case 0x7D: // EATAN: atan(x) through t = (x - 1) / (x + 1)
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                queueP(vuEatan(normalizeOperand(m_state.vf[vfS][component])), 54u);
+                queuePBits(efuBits(efuAtan(1.0, efuBitsValue(m_state.vf[vfS][component])), true), 54u);
                 return;
             }
             case 0x7E: // EEXP (0x7F is reserved)
             {
+                const EfuRoundingScope rounding;
                 const uint32_t component = (instr >> 21) & 3u;
-                queueP(vuEexp(normalizeOperand(m_state.vf[vfS][component])), 44u);
+                queuePBits(efuBits(efuExp(efuBitsValue(m_state.vf[vfS][component])), true), 44u);
                 return;
             }
             default:

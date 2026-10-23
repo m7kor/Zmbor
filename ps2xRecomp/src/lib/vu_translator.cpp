@@ -109,8 +109,8 @@ namespace ps2recomp
                 return fmt::format("{{ const uint32_t v = GPR_U32(ctx, {}); uint32_t keep = v & 0x00000C0Cu; "
                                    "if (v & 0x003u) keep &= ~0x00Cu; if (v & 0x300u) keep &= ~0xC00u; ctx->vu0_fbrst = keep; }}",
                                    rt);
-            case VU0_CR_CMSAR1: // "ctc2 -> vi31: 0000ffff"
-                return fmt::format("ctx->vu0_cmsar1 = GPR_U32(ctx, {}) & 0xFFFFu;", rt);
+            case VU0_CR_CMSAR1: // "ctc2 -> vi31: 0000ffff"; the write starts VU1 there (vu/test_runner.cpp)
+                return fmt::format("runtime->vu1StartMicroProgram(ctx, GPR_U32(ctx, {}));", rt);
             default:
                 return fmt::format("// Unimplemented CTC2 VU control register: {}", rd);
             }

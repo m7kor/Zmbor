@@ -132,3 +132,22 @@ regressions. State and remaining failures by cause: `docs/hwtest/README.md`, `do
 - VU0: LQC2/QMTC2 leave VF0 alone; CTC2 write masks for STATUS (sticky flags), R (23 bits), CMSAR0/1 (16 bits)
   and FBRST (reset bits clear DE/TE); CFC2 of vi19/vi23/vi25 read the hardware values.
 - Mutation-checked: RZ addition, PMADDW accumulator, delay-slot LUI discovery.
+
+## Phase 3 — VU microcode execution (2026-10-23)
+
+After: `ps2x_tests` 510/510, end-to-end 2/2; hardware result tests 38/55 exact (7394/8250 lines, was 6627),
+no crashes, no regressions. Root causes, each found separately:
+
+- Memory window (5 of 7 VU tests): EE accesses to VU0 micro memory (0x11000000) and VU1 data (0x1100C000) were
+  outside the "special address" range and went to RDRAM at 0x01000000 / 0x0100C000, so microcode written by the
+  EE never reached VU0 and VU1 results never reached the EE. Fixed in `Ps2IsPhysicalSpecialAddress`.
+- VU1 start: CTC2 to CMSAR1 starts VU1 at that instruction (the tests' `ctc2 $0, $31`); before, only VIF1 MSCAL did.
+- EFU crash: not VU emulation. Unoptimized hardware-test builds have ~0.7 MB host frames, so nested guest calls
+  overflowed the 1 MB thread stack; those executables now reserve 64 MB.
+- EFU arithmetic, rebuilt from 208 real-PS2 rows (167 exact; the rest differ in the last bits of the EATAN/ESIN/EEXP
+  series): PS2 float decoding (exponent 255 is a number, +-max saturation), truncating multiply/add stages, divider
+  and root to nearest, x/0 = +-max, roots of |x|, EATAN through t = (x - 1) / (x + 1) (an earlier change here had
+  assumed the input was already t; hardware shows EATAN(1) = pi/4). EFU math runs to-nearest inside the
+  interpreter's round-toward-zero mode, and its P result keeps exponent 255.
+- VU FMAC addition drops an operand shifted out entirely (25+ exponent steps), whatever its sign (triace).
+- Mutation-checked: VU window, vuAdd, EFU rounding scope.

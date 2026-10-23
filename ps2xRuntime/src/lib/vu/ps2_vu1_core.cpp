@@ -637,6 +637,15 @@ void VU1Interpreter::queueP(float value, uint32_t latency)
 {
     uint32_t ignoredFlags = 0u;
     value = normalizeResult(value, ignoredFlags);
+    uint32_t bits = 0u;
+    std::memcpy(&bits, &value, sizeof(bits));
+    queuePBits(bits, latency);
+}
+
+void VU1Interpreter::queuePBits(uint32_t bits, uint32_t latency)
+{
+    float value = 0.0f;
+    std::memcpy(&value, &bits, sizeof(value));
     for (ScalarPipelineEntry &entry : m_efu)
     {
         if (!entry.valid)

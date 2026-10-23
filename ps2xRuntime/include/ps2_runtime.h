@@ -366,6 +366,9 @@ public:
 
     void executeVU0Microprogram(uint8_t *rdram, R5900Context *ctx, uint32_t address);
     void vu0StartMicroProgram(uint8_t *rdram, R5900Context *ctx, uint32_t address);
+    // CTC2 to CMSAR1: start VU1 at that instruction index.
+    void vu1StartMicroProgram(R5900Context *ctx, uint32_t cmsar1);
+    void runVu1Microprogram(R5900Context *ctx, uint32_t startPC, uint32_t top, uint32_t itop);
 
 public:
     void handleSyscall(uint8_t *rdram, R5900Context *ctx);

@@ -88,6 +88,10 @@ if(PS2X_HWTEST_GENERATED)
             set_source_files_properties(${ps2x_hw_sources} PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/Od,-O0>")
         endif()
         if(MSVC)
+            # Unoptimized recompiled functions keep every local in its own stack slot (frames up to ~700 KB were
+            # measured in vu/lower/efu), so a few nested guest calls overflowed the 1 MB default. Threads take the
+            # image's reserve; 64 MB is reserved, not committed.
+            target_link_options(ps2x_hw_${HW_NAME} PRIVATE "/STACK:67108864")
             target_link_options(ps2x_hw_${HW_NAME} PRIVATE "/FORCE:MULTIPLE")
             target_compile_options(ps2x_hw_${HW_NAME} PRIVATE /bigobj)
         endif()

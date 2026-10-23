@@ -702,21 +702,7 @@ bool PS2Runtime::syncCoreSubsystems()
     m_memory.setVu1MscalCallback([this](uint32_t startPC, uint32_t top, uint32_t itop)
                                  {
                                      R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
-                                     if (!cpuContext)
-                                     {
-                                         cpuContext = &m_cpuContext;
-                                     }
-                                     m_vu1.state().dBitEnabled =
-                                         (cpuContext->vu0_fbrst & (1u << 10)) != 0u;
-                                     m_vu1.state().tBitEnabled =
-                                         (cpuContext->vu0_fbrst & (1u << 11)) != 0u;
-                                     m_vu1.execute(m_memory.getVU1Code(), PS2_VU1_CODE_SIZE,
-                                                   m_memory.getVU1Data(), PS2_VU1_DATA_SIZE,
-                                                   m_gs, &m_memory, startPC, top, itop, 65536);
-                                     cpuContext->vu0_vpu_stat =
-                                         (cpuContext->vu0_vpu_stat & ~0x0600u) |
-                                         (m_vu1.state().stoppedByD ? 0x0200u : 0u) |
-                                         (m_vu1.state().stoppedByT ? 0x0400u : 0u); });
+                                     runVu1Microprogram(cpuContext ? cpuContext : &m_cpuContext, startPC, top, itop); });
     m_memory.setVu1MscntCallback([this](uint32_t top, uint32_t itop)
                                  {
                                      R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
@@ -1485,6 +1471,27 @@ void PS2Runtime::executeVU0Microprogram(uint8_t *rdram, R5900Context *ctx, uint3
                   m_gs, &m_memory,
                   startPC, 0u, ctx->vu0_itop, 4096);
     copyVu0StateToContext(m_vu0.state(), ctx);
+}
+
+void PS2Runtime::runVu1Microprogram(R5900Context *ctx, uint32_t startPC, uint32_t top, uint32_t itop)
+{
+    m_vu1.state().dBitEnabled = (ctx->vu0_fbrst & (1u << 10)) != 0u;
+    m_vu1.state().tBitEnabled = (ctx->vu0_fbrst & (1u << 11)) != 0u;
+    m_vu1.execute(m_memory.getVU1Code(), PS2_VU1_CODE_SIZE,
+                  m_memory.getVU1Data(), PS2_VU1_DATA_SIZE,
+                  m_gs, &m_memory, startPC, top, itop, 65536);
+    ctx->vu0_vpu_stat = (ctx->vu0_vpu_stat & ~0x0600u) |
+                        (m_vu1.state().stoppedByD ? 0x0200u : 0u) |
+                        (m_vu1.state().stoppedByT ? 0x0400u : 0u);
+}
+
+void PS2Runtime::vu1StartMicroProgram(R5900Context *ctx, uint32_t cmsar1)
+{
+    // CTC2 to CMSAR1 starts VU1 at that instruction (ps2autotests vu/test_runner.cpp: "ctc2 $0, $31" runs the VU1
+    // program at 0, then polls VPU-STAT.VBS1). VU1 runs to its E bit here, so VBS1 already reads clear afterwards.
+    ctx->vu0_cmsar1 = cmsar1 & 0xFFFFu;
+    const VIFRegisters &vif1 = m_memory.vifRegs(1u);
+    runVu1Microprogram(ctx, (cmsar1 & 0x7FFu) * 8u, vif1.top, vif1.itop);
 }
 
 void PS2Runtime::vu0StartMicroProgram(uint8_t *rdram, R5900Context *ctx, uint32_t address)

@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string>
 #include <vector>
 
 namespace
@@ -781,7 +782,9 @@ void register_ps2_vu1_tests()
                 {0x79u, 4.0f, 0.5f, "0x79 is ERSQRT"},
                 {0x7Au, 4.0f, 0.25f, "0x7A is ERCPR"},
                 {0x7Cu, 1.57079633f, 1.0f, "0x7C is ESIN"},
-                {0x7Du, 1.0f, 1.570796317f, "0x7D is EATAN: pi/4 + series(t), the series summing to pi/4 at t = 1"},
+                // Real PS2 (ps2autotests vu/lower/efu.expected "EATAN CVF_ONE: 3f490fda"): atan(1) = pi/4; the unit
+                // forms t = (x - 1) / (x + 1) itself.
+                {0x7Du, 1.0f, 0.785398185f, "0x7D is EATAN: atan(x) via t = (x - 1) / (x + 1)"},
                 {0x7Eu, 1.0f, 0.367879441f, "0x7E is EEXP (e^-x)"},
             };
             for (const EfuCase &efu : cases)
@@ -810,6 +813,70 @@ void register_ps2_vu1_tests()
                         fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem,
                         0u, 0u, 0u, 80u);
             t.Equals(vu1.state().p, 7.0f, "0x77 is reserved and must not compute an EFU result");
+        });
+
+        tc.Run("VU ADD drops an operand that is shifted out entirely, whatever its sign", [](TestCase &t)
+        {
+            // ps2autotests vu/games/triace.expected: ADDi.x of 0xB3E2A618 (-1.05e-7) and I = 0x42546666 reads back
+            // 0x42546666; a truncated exact sum would be 0x42546665.
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, makeVuUpper(0x22u, 0x8u, 0u, 2u, 3u) | (1u << 30)); // ADDi.x vf3, vf2, I; E
+            writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, kVuUpperNop);
+            VU1Interpreter vu1;
+            const uint32_t i = 0x42546666u, x = 0xB3E2A618u;
+            std::memcpy(&vu1.state().i, &i, sizeof(i));
+            std::memcpy(&vu1.state().vf[2][0], &x, sizeof(x));
+            vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 32u);
+            uint32_t got = 0u;
+            std::memcpy(&got, &vu1.state().vf[3][0], sizeof(got));
+            t.Equals(got, 0x42546666u, "the tiny addend must not move the result");
+        });
+
+        tc.Run("EFU results match real-PS2 results (ps2autotests vu/lower/efu)", [](TestCase &t)
+        {
+            struct EfuHardwareVector
+            {
+                const char *what;
+                uint32_t opcode;
+                uint32_t input[4];
+                uint32_t result;
+            };
+            static const EfuHardwareVector vectors[] = {
+#include "ps2_efu_hw_vectors.inc"
+            };
+            uint32_t exact = 0u;
+            uint32_t total = 0u;
+            std::string differences;
+            for (const EfuHardwareVector &v : vectors)
+            {
+                Vu1Fixture fx;
+                if (!fx.initialize())
+                    continue;
+                // op P, vf1 (scalar forms on field z, as efu.cpp runs them); WAITP.
+                writeVuInstructionPair(fx.code, 0u, makeVuLowerSpecial(static_cast<uint8_t>(v.opcode), 1u, 0u, 0u, 2u), kVuUpperNop);
+                writeVuInstructionPair(fx.code, 8u, makeVuLowerSpecial(0x7Bu, 0u), kVuUpperNop);
+                VU1Interpreter vu1;
+                std::memcpy(vu1.state().vf[1], v.input, sizeof(v.input));
+                vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 80u);
+                uint32_t got = 0u;
+                std::memcpy(&got, &vu1.state().p, sizeof(got));
+                ++total;
+                if (got == v.result)
+                    ++exact;
+                else
+                {
+                    char line[96];
+                    std::snprintf(line, sizeof(line), "    efu %s: hardware %08x, got %08x\n", v.what, v.result, got);
+                    differences += line;
+                }
+            }
+            if (exact < 167u)
+                std::printf("%s", differences.c_str());
+            t.Equals(total, 208u, "all 13 ops x 16 inputs should run");
+            // The model reproduces 167 rows bit for bit; the others differ in the last bits of the EATAN/ESIN/EEXP
+            // series. This is a floor: a change that loses a hardware-exact row fails here.
+            t.IsTrue(exact >= 167u, "at least 167 of 208 EFU rows should match the hardware exactly, got " + std::to_string(exact));
         });
 
         tc.Run("EFU resource observes throughput separately from P visibility", [](TestCase &t)

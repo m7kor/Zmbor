@@ -1,8 +1,90 @@
-## PS2Recomp: PlayStation 2 Static Recompiler (Experimental)
+# Zmbor
+
+**The Next Generation PlayStation 2 Recompilation Framework**
+
+Zmbor is a framework for PlayStation 2 static recompilation, hardware runtime and native game reconstruction. It
+turns PS2 ELF binaries into C++ and runs them natively against a runtime that models the Emotion Engine, VU0/VU1,
+VIF, GIF/GS, DMAC and IOP.
+
+> [!IMPORTANT]
+> Compatibility with commercial PS2 games has **not** been verified. The accuracy figures below come from hardware
+> test programs, unit tests and synthetic end-to-end programs, not from retail games. Zmbor ships no game data or
+> BIOS, and you must supply your own legally obtained software.
+
+### Relationship to PS2Recomp
+
+Zmbor is built on [ran-j/PS2Recomp](https://github.com/ran-j/PS2Recomp), forked at `eb8688b`, with upstream #384
+merged, and keeps its full Git history, module layout, target names and GPL-3.0 license. It adds a long engineering
+effort on accuracy, testing and integration: the "PS2Recomp Ultimate" work, described in `CHANGELOG.md` and
+`HANDOFF.md`. The upstream PS2Recomp documentation follows below and still applies.
+
+### Verified hardware accuracy
+
+The [ps2autotests](https://github.com/unknownbrackets/ps2autotests) suite (ISC) provides 55 ELFs whose expected
+output was printed by a real PS2. Zmbor recompiles each one to native code and compares its output line by line
+(`tools/hwtest/hwtest.py`, dashboard in `docs/hwtest/`):
+
+| | exact tests | matching lines |
+|---|---|---|
+| upstream base | 6 / 54 | 5346 / 8240 (65%) |
+| Zmbor | **47 / 55** | **8172 / 8250 (99.1%)** |
+
+Fully matching areas are `kernel/ee` 10/10, `dma` (VIF, SPR, DMAC) 11/11, `cpu/ee_simd` 6/6, `gs` 2/2 and `vu` 6/7.
+There are no crashes or timeouts. These numbers were measured just before upstream #384 was merged; after the merge,
+the unit, ctest and IOP suites were rerun, but the hardware suite was not. The 8 remaining failures, with their causes,
+are listed in `HANDOFF.md`.
+
+### What Zmbor adds
+
+* **Recompiler:** exact 64-bit branch conditions, branch-likely links, the COP0 DMAC condition (BC0), delay-slot-safe
+  function discovery, MMI multiplies and 128-bit HI/LO, SA semantics.
+* **EE runtime:** PS2 float semantics, rounding and flags; kernel thread and interrupt fixes.
+* **VU0/VU1:** microprogram start from VIF and COP2; correct EE-visible VU memory; EFU and FMAC arithmetic fitted to
+  real-PS2 vectors.
+* **VIF / GIF / DMA:** full UNPACK (all formats, CL/WL, STMOD, masks, split transfers), I-bit stalls, scratchpad
+  chain and interleave DMA, tag interrupts.
+* **Testing:** automated hardware result pipeline, end-to-end ELF → C++ → native tests with GS frame checks, a GS
+  cache regression suite and IOP tests.
+* **Community research:** findings from 15 PS2Recomp game projects and 205 forks, collected in a validated database
+  (`research/`, `docs/community-research/`); 12 fixes integrated.
+
+### Build and test
+
+```bash
+git clone https://github.com/m7kor/Zmbor.git
+cd Zmbor
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPS2X_BUILD_STUDIO=OFF -DPS2X_ENABLE_FFMPEG=OFF -DPS2X_IOP_BUILD_TESTS=ON
+cmake --build build
+build/ps2xTest/ps2x_tests                      # unit tests (run from the repository root)
+ctest --test-dir build/ps2xTest -LE hwtest     # research DB, GS cache, end-to-end
+ctest --test-dir build/ps2xIOP
+```
+
+See `TESTING.md` for every test level, including the hardware result tests. The build has been tested on Windows 11
+with MSVC 14.44 and Ninja; other platforms are untested.
+
+### Limitations
+
+* No commercial game has been run end to end or verified.
+* The EFU series (EATAN/ESIN/EEXP) and the FPU MUL.S/RSQRT.S are not bit-exact. Branches inside delay slots, COP0
+  performance counters and the guest heap limit are not modelled correctly yet.
+* VU and GS performance is still low.
+
+The roadmap is in [ROADMAP.md](ROADMAP.md).
+
+### Credits
+
+Zmbor builds on PS2Recomp by ran-j and its contributors (see the upstream acknowledgments below). Hardware reference
+results come from ps2autotests by unknownbrackets and contributors (ISC). PCSX2 was consulted as a reference only, and
+no PCSX2 code was copied.
+
+---
+
+## PS2Recomp: PlayStation 2 Static Recompiler (Experimental) — upstream documentation
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.gg/JQ8mawxUEf)
 
-Also check our [WIKI](https://github.com/ran-j/PS2Recomp/wiki)
+Also check the upstream [WIKI](https://github.com/ran-j/PS2Recomp/wiki)
 
 
 This project statically recompiles PS2 ELF binaries into C++ and provides a runtime to execute the generated code.

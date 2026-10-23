@@ -16,7 +16,7 @@ namespace
             0.999999344348907f,
             -0.333298563957214f,
             0.199465364217758f,
-            -0.13085337519646f,
+            -0.139085337519646f, // PCSX2 VUops.cpp _vuCalculateEATAN (was -0.13085337519646)
             0.096420042216778f,
             -0.055909886956215f,
             0.021861229091883f,
@@ -284,7 +284,9 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
     case 0x24: // JR
     {
         uint8_t is = VIS(instr);
-        uint32_t target = ((uint32_t)(uint16_t)readBranchVi(is) * 8u) & pcMask;
+        // Register jumps read the current VI: the delayed-VI rule is for conditional branches only
+        // (PCSX2 VUops.cpp _vuJR/_vuJALR read VI[_Is_]; microVU mVUanalyzeJump has no analyzeBranchVI).
+        uint32_t target = ((uint32_t)(uint16_t)m_state.vi[is] * 8u) & pcMask;
         m_state.branchPending = true;
         m_state.branchTarget = target;
         m_state.branchDelay = 1;
@@ -294,7 +296,9 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
     {
         uint8_t it = VIT(instr);
         uint8_t is = VIS(instr);
-        uint32_t target = ((uint32_t)(uint16_t)readBranchVi(is) * 8u) & pcMask;
+        // Register jumps read the current VI: the delayed-VI rule is for conditional branches only
+        // (PCSX2 VUops.cpp _vuJR/_vuJALR read VI[_Is_]; microVU mVUanalyzeJump has no analyzeBranchVI).
+        uint32_t target = ((uint32_t)(uint16_t)m_state.vi[is] * 8u) & pcMask;
         if (it != 0)
             m_state.vi[it] = (int32_t)((m_state.pc + 16) / 8);
         m_state.branchPending = true;
@@ -723,7 +727,7 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
                 queueP(sum, 12u);
                 return;
             }
-            case 0x77: // ERSQRT
+            case 0x79: // ERSQRT (0x77 is reserved: PCSX2 VUops.cpp LowerOP_T3_11 row 0x1D)
             {
                 const uint32_t component = (instr >> 21) & 3u;
                 const float value = normalizeOperand(m_state.vf[vfS][component]);
@@ -744,7 +748,7 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
                 queueP(value >= 0.0f ? std::sqrt(value) : value, 12u);
                 return;
             }
-            case 0x79: // ESIN
+            case 0x7C: // ESIN
             {
                 const uint32_t component = (instr >> 21) & 3u;
                 const float value = normalizeOperand(m_state.vf[vfS][component]);
@@ -760,13 +764,13 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
             }
             case 0x7B: // WAITP
                 return;
-            case 0x7C: // EATAN
+            case 0x7D: // EATAN
             {
                 const uint32_t component = (instr >> 21) & 3u;
                 queueP(vuEatan(normalizeOperand(m_state.vf[vfS][component])), 54u);
                 return;
             }
-            case 0x7D: // EEXP
+            case 0x7E: // EEXP (0x7F is reserved)
             {
                 const uint32_t component = (instr >> 21) & 3u;
                 queueP(vuEexp(normalizeOperand(m_state.vf[vfS][component])), 44u);

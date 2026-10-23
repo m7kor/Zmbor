@@ -765,6 +765,53 @@ void register_ps2_vu1_tests()
                       "RNEXT should advance the 23-bit R LFSR and write a 1.x value");
         });
 
+        tc.Run("EFU sub-opcodes follow the PCSX2 lower-op tables", [](TestCase &t)
+        {
+            // funct2 = ((instr >> 6) & 0x1F) << 2 | (instr & 3). PCSX2 VUops.cpp LowerOP_T3_00..T3_11:
+            // row 0x1E = ESQRT, ERSQRT, ERCPR, WAITP (0x78-0x7B); row 0x1F = ESIN, EATAN, EEXP, - (0x7C-0x7F).
+            struct EfuCase
+            {
+                uint8_t op;
+                float input;
+                float expected;
+                const char *what;
+            };
+            const EfuCase cases[] = {
+                {0x78u, 4.0f, 2.0f, "0x78 is ESQRT"},
+                {0x79u, 4.0f, 0.5f, "0x79 is ERSQRT"},
+                {0x7Au, 4.0f, 0.25f, "0x7A is ERCPR"},
+                {0x7Cu, 1.57079633f, 1.0f, "0x7C is ESIN"},
+                {0x7Du, 1.0f, 1.570796317f, "0x7D is EATAN: pi/4 + series(t), the series summing to pi/4 at t = 1"},
+                {0x7Eu, 1.0f, 0.367879441f, "0x7E is EEXP (e^-x)"},
+            };
+            for (const EfuCase &efu : cases)
+            {
+                Vu1Fixture fx;
+                t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+                writeVuInstructionPair(fx.code, 0u, makeVuLowerSpecial(efu.op, 1u), kVuUpperNop); // op P, vf1.x
+                writeVuInstructionPair(fx.code, 8u, makeVuLowerSpecial(0x7Bu, 0u), kVuUpperNop);  // WAITP
+
+                VU1Interpreter vu1;
+                vu1.state().vf[1][0] = efu.input;
+                vu1.execute(fx.code, PS2_VU1_CODE_SIZE,
+                            fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem,
+                            0u, 0u, 0u, 80u);
+                t.IsTrue(std::fabs(vu1.state().p - efu.expected) < 1e-4f, efu.what);
+            }
+
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            writeVuInstructionPair(fx.code, 0u, makeVuLowerSpecial(0x77u, 1u), kVuUpperNop); // reserved
+            writeVuInstructionPair(fx.code, 8u, makeVuLowerSpecial(0x7Bu, 0u), kVuUpperNop);  // WAITP
+            VU1Interpreter vu1;
+            vu1.state().vf[1][0] = 4.0f;
+            vu1.state().p = 7.0f;
+            vu1.execute(fx.code, PS2_VU1_CODE_SIZE,
+                        fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem,
+                        0u, 0u, 0u, 80u);
+            t.Equals(vu1.state().p, 7.0f, "0x77 is reserved and must not compute an EFU result");
+        });
+
         tc.Run("EFU resource observes throughput separately from P visibility", [](TestCase &t)
         {
             Vu1Fixture fx;
@@ -809,9 +856,9 @@ void register_ps2_vu1_tests()
             };
             constexpr EfuCase cases[] = {
                 {0x70u, 11u}, {0x71u, 18u}, {0x72u, 18u}, {0x73u, 24u},
-                {0x74u, 54u}, {0x75u, 54u}, {0x76u, 12u}, {0x77u, 18u},
-                {0x78u, 12u}, {0x79u, 29u}, {0x7Au, 12u}, {0x7Cu, 54u},
-                {0x7Du, 44u}};
+                {0x74u, 54u}, {0x75u, 54u}, {0x76u, 12u},
+                {0x78u, 12u}, {0x79u, 18u}, {0x7Au, 12u}, {0x7Cu, 29u},
+                {0x7Du, 54u}, {0x7Eu, 44u}}; // ESQRT ERSQRT ERCPR ESIN EATAN EEXP (PCSX2 lower-op tables)
 
             for (const EfuCase &efu : cases)
             {
@@ -1053,13 +1100,15 @@ void register_ps2_vu1_tests()
                      "the flag-driven branch should arrive at its target");
         });
 
-        tc.Run("JR shares the one-instruction VI branch visibility rule", [](TestCase &t)
+        // Ported from Sinan-Karakaya/PS2Recomp 7bb6dbde. PCSX2 VUops.cpp _vuJR/_vuJALR read VI[_Is_] directly; only the
+        // conditional branches use the delayed VI value (VIBackupCycles), and microVU's mVUanalyzeJump agrees.
+        tc.Run("JR reads the latest VI value after an integer write", [](TestCase &t)
         {
             Vu1Fixture fx;
             t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
 
             writeVuInstructionPair(
-                fx.code, 0u, makeVuIaddiu(1u, 0u, 2),
+                fx.code, 0u, makeVuIaddiu(1u, 0u, 4),
                 kVuUpperNop);
             writeVuInstructionPair(
                 fx.code, 8u, makeVuJr(1u),
@@ -1075,19 +1124,42 @@ void register_ps2_vu1_tests()
                 kVuUpperNop);
 
             VU1Interpreter vu1;
-            vu1.state().vi[1] = 4;
+            vu1.state().vi[1] = 3;
             vu1.execute(fx.code, PS2_VU1_CODE_SIZE,
                         fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem,
                         0u, 0u, 0u, 4u);
 
-            t.Equals(vu1.state().vi[1], 2,
+            t.Equals(vu1.state().vi[1], 4,
                      "the pending IALU write should still commit normally");
             t.Equals(vu1.state().vi[2], 2,
                      "JR should execute exactly one delay-slot pair");
             t.Equals(vu1.state().vi[3], 0,
                      "JR should skip the sequential instruction after its delay slot");
             t.Equals(vu1.state().vi[4], 4,
-                     "JR immediately after a VI write should branch using the previous VI value");
+                     "JR must use the updated target, unlike a conditional branch");
+        });
+
+        tc.Run("JALR uses the latest target before writing its link register", [](TestCase &t)
+        {
+            for (uint8_t link : {uint8_t{15}, uint8_t{1}})
+            {
+                Vu1Fixture fx;
+                t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+                writeVuInstructionPair(fx.code, 0u, makeVuIaddiu(1u, 0u, 4), kVuUpperNop);
+                const uint32_t jalr = (0x25u << 25u) | (static_cast<uint32_t>(link) << 16u) | (1u << 11u);
+                writeVuInstructionPair(fx.code, 8u, jalr, kVuUpperNop);
+                writeVuInstructionPair(fx.code, 16u, makeVuIaddiu(2u, 0u, 2), kVuUpperNop);
+                writeVuInstructionPair(fx.code, 24u, makeVuIaddiu(3u, 0u, 3), kVuUpperNop);
+                writeVuInstructionPair(fx.code, 32u, makeVuIaddiu(4u, 0u, 4), kVuUpperNop);
+                VU1Interpreter vu1;
+                vu1.state().vi[1] = 3;
+                vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE,
+                            fx.gs, &fx.mem, 0u, 0u, 0u, 4u);
+                t.Equals(vu1.state().vi[link], 3, "JALR links to the instruction after its delay slot");
+                t.Equals(vu1.state().vi[2], 2, "JALR must execute its delay slot");
+                t.Equals(vu1.state().vi[3], 0, "JALR must not use the stale target or newly written link");
+                t.Equals(vu1.state().vi[4], 4, "JALR must reach the updated target");
+            }
         });
 
         tc.Run("MPG upload invalidates cached VU1 decode before MSCAL", [](TestCase &t)

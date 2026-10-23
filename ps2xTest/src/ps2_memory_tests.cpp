@@ -2220,7 +2220,8 @@ void register_ps2_memory_tests()
             t.IsTrue(imageOk, "VIF1 DIRECT image should update GS VRAM through GIF path2");
         });
 
-        tc.Run("VIF1 DIRECT image tag can continue with raw image qwords", [](TestCase &t)
+        // Ported from LightVelox/PS2Recomp 56af7ef3 (also fixed in the DQ8, Killzone and SRWZ engines).
+        tc.Run("VIF1 DIRECT image tag continues in the next DIRECT payload", [](TestCase &t)
         {
             PS2Memory mem;
             t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
@@ -2246,9 +2247,14 @@ void register_ps2_memory_tests()
             gs.writeRegister(GS_REG_TRXDIR, 0ull);
 
             std::vector<uint8_t> packet;
+            for (uint32_t i = 0; i < 3u; ++i)
+                appendU32(packet, makeVifCmd(0x00u, 0u, 0u));
             appendU32(packet, makeVifCmd(0x50u, 0u, 1u)); // DIRECT 1 QW payload: GIF IMAGE tag only.
             appendU64(packet, makeGifTag(1u, GIF_FMT_IMAGE, 0u, true));
             appendU64(packet, 0ull);
+            for (uint32_t i = 0; i < 3u; ++i)
+                appendU32(packet, makeVifCmd(0x00u, 0u, 0u)); // VIFcodes between the DIRECTs are not pixels.
+            appendU32(packet, makeVifCmd(0x50u, 0u, 1u));
             for (uint32_t i = 0; i < 16u; ++i)
             {
                 packet.push_back(static_cast<uint8_t>(0xA0u + i));
@@ -2270,7 +2276,7 @@ void register_ps2_memory_tests()
                     }
                 }
             }
-            t.IsTrue(imageOk, "raw qwords after a DIRECT image tag should continue the PATH2 image upload");
+            t.IsTrue(imageOk, "the next DIRECT payload should continue the PATH2 image upload");
         });
 
         tc.Run("VIF1 DIRECT finds an image continuation after packed setup", [](TestCase &t)
@@ -2295,6 +2301,8 @@ void register_ps2_memory_tests()
             gs.writeRegister(GS_REG_TRXDIR, 0ull);
 
             std::vector<uint8_t> packet;
+            for (uint32_t i = 0; i < 3u; ++i)
+                appendU32(packet, makeVifCmd(0x00u, 0u, 0u));
             appendU32(packet, makeVifCmd(0x50u, 0u, 3u)); // PACKED tag + A+D + IMAGE tag.
             appendU64(packet, makeGifTag(1u, GIF_FMT_PACKED, 1u, false));
             appendU64(packet, 0x0Eull);
@@ -2302,6 +2310,9 @@ void register_ps2_memory_tests()
             appendU64(packet, GS_REG_TEXA);
             appendU64(packet, makeGifTag(1u, GIF_FMT_IMAGE, 0u, true));
             appendU64(packet, 0ull);
+            for (uint32_t i = 0; i < 3u; ++i)
+                appendU32(packet, makeVifCmd(0x00u, 0u, 0u));
+            appendU32(packet, makeVifCmd(0x50u, 0u, 1u));
             for (uint32_t i = 0; i < 16u; ++i)
                 packet.push_back(static_cast<uint8_t>(0xC0u + i));
 
@@ -2321,7 +2332,56 @@ void register_ps2_memory_tests()
                     }
                 }
             }
-            t.IsTrue(imageOk, "raw image continuation after packed setup should not be decoded as VIF/GIF registers");
+            t.IsTrue(imageOk, "image continuation after packed setup should come from the next DIRECT payload");
+        });
+
+        tc.Run("VIF1 DIRECT cut at the end of the data continues in the next transfer", [](TestCase &t)
+        {
+            // PCSX2 keeps an unfinished DIRECT active across DMA transfers: the next data is its payload, not VIFcodes.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            GS gs;
+            gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
+            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            {
+                gs.processGIFPacket(data, sizeBytes);
+            });
+            mem.setGifArbiter(&arbiter);
+
+            gs.writeRegister(GS_REG_BITBLTBUF, (static_cast<uint64_t>(1u) << 16) | (static_cast<uint64_t>(1u) << 48));
+            gs.writeRegister(GS_REG_TRXPOS, 0ull);
+            gs.writeRegister(GS_REG_TRXREG, (4ull << 0) | (1ull << 32));
+            gs.writeRegister(GS_REG_TRXDIR, 0ull);
+
+            std::vector<uint8_t> first;
+            for (uint32_t i = 0; i < 3u; ++i)
+                appendU32(first, makeVifCmd(0x00u, 0u, 0u));
+            appendU32(first, makeVifCmd(0x50u, 0u, 2u)); // DIRECT 2 QW, but only the IMAGE tag is in this transfer.
+            appendU64(first, makeGifTag(1u, GIF_FMT_IMAGE, 0u, true));
+            appendU64(first, 0ull);
+            mem.processVIF1Data(first.data(), static_cast<uint32_t>(first.size()));
+
+            std::vector<uint8_t> second;
+            for (uint32_t i = 0; i < 16u; ++i)
+                second.push_back(static_cast<uint8_t>(0xE0u + i));
+            mem.processVIF1Data(second.data(), static_cast<uint32_t>(second.size()));
+
+            const uint8_t *vramOut = mem.getGSVRAM();
+            bool imageOk = true;
+            for (uint32_t x = 0; x < 4u && imageOk; ++x)
+            {
+                const uint32_t off = GSPSMCT32::addrPSMCT32(0u, 1u, x, 0u);
+                for (uint32_t c = 0; c < 4u; ++c)
+                {
+                    if (vramOut[off + c] != static_cast<uint8_t>(0xE0u + x * 4u + c))
+                    {
+                        imageOk = false;
+                        break;
+                    }
+                }
+            }
+            t.IsTrue(imageOk, "the rest of a cut DIRECT payload should arrive as image data in the next transfer");
         });
 
         tc.Run("unaligned accesses throw", [](TestCase &t)

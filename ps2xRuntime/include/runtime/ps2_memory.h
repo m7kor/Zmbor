@@ -310,6 +310,14 @@ public:
     // EE timers advance from the scheduler's emulated EE-cycle clock. The
     // returned mask uses bits 0..3 for newly raised TIM0..TIM3 interrupts.
     uint32_t advanceEeTimers(uint64_t eeCycles) noexcept;
+
+    // A VIFcode with the I bit raises INTC VIF0 (cause 4) or VIF1 (cause 5) once the code has been taken
+    // (PCSX2 Vif0_Dma.cpp/Vif1_Dma.cpp: hwIntcIrq(VIF0intc/VIF1intc)). The EE scheduler drains these.
+    // The VIF stall that accompanies it on hardware (STAT.VIS until FBRST.STC) is not modelled.
+    void submitPath2DirectPayload(const uint8_t *payload, uint32_t qwCount, bool directHl);
+    void raiseVifInterrupt(uint32_t vif) noexcept { m_pendingVifInterrupts.fetch_or(1u << vif, std::memory_order_acq_rel); }
+    uint32_t takePendingVifInterrupts() noexcept { return m_pendingVifInterrupts.exchange(0u, std::memory_order_acq_rel); }
+    bool hasPendingVifInterrupts() const noexcept { return m_pendingVifInterrupts.load(std::memory_order_acquire) != 0u; }
     [[nodiscard]] uint64_t cyclesUntilNextEeTimerInterrupt() const noexcept;
     void resetEeTimers() noexcept;
 
@@ -404,11 +412,17 @@ public:
 
     uint8_t *m_vu0Code = nullptr;
     uint8_t *m_vu0Data = nullptr;
+    std::atomic<uint32_t> m_pendingVifInterrupts{0u};
     uint8_t *m_vu1Code = nullptr;
     uint8_t *m_vu1Data = nullptr;
     bool m_path3Masked = false;
+    // GIF PATH2 stopped inside an IMAGE packet: the next DIRECT payload continues it (never the VIFcodes between).
     uint32_t m_vif1PendingPath2ImageQwc = 0u;
     bool m_vif1PendingPath2DirectHl = false;
+    // A DIRECT whose payload ran past the end of the DMA data: the command stays active and the next data
+    // continues its payload (PCSX2 keeps vifX.cmd/tag.size across transfers).
+    uint32_t m_vif1PendingDirectQwc = 0u;
+    bool m_vif1PendingDirectHl = false;
     std::vector<std::vector<uint8_t>> m_path3MaskedFifo;
 
     struct PendingTransfer

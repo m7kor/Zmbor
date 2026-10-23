@@ -397,7 +397,7 @@ void EeScheduler::accountCycles(uint32_t cycles) noexcept
     m_eeCycle += elapsed;
     m_pendingEeTimerInterrupts |= m_runtime.memory().advanceEeTimers(elapsed);
     m_runtime.advanceIopEeCycles(elapsed);
-    if (m_pendingEeTimerInterrupts != 0u)
+    if (m_pendingEeTimerInterrupts != 0u || m_runtime.memory().hasPendingVifInterrupts())
     {
         m_checkpointPending.store(true, std::memory_order_release);
     }
@@ -1782,6 +1782,14 @@ void EeScheduler::processPendingEvents()
         if ((timerInterrupts & (1u << timer)) != 0u)
         {
             dispatchIrq(false, 9u + timer);
+        }
+    }
+    const uint32_t vifInterrupts = m_runtime.memory().takePendingVifInterrupts();
+    for (uint32_t vif = 0u; vif < 2u; ++vif)
+    {
+        if ((vifInterrupts & (1u << vif)) != 0u)
+        {
+            dispatchIrq(false, 4u + vif); // INTC_VIF0 = 4, INTC_VIF1 = 5
         }
     }
     std::deque<EeEvent> pending;

@@ -338,6 +338,41 @@ namespace
         runtime->requestStop();
     }
 
+    // VIF1 I-bit interrupt: the main thread waits on a semaphore that only the INTC_VIF1 handler signals.
+    constexpr uint32_t kVifIrqWaitPc = 0x00160700u;
+    constexpr uint32_t kVifIrqResumePc = 0x00160710u;
+    constexpr uint32_t kVifIrqHandlerPc = 0x00160720u;
+    std::atomic<bool> g_vifIrqResumed{false};
+
+    void schedulerVifIrqHandler(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        g_dispatchTrace.push_back(2);
+        runtime->eeScheduler().signalSemaphore(g_testSemaphoreId, true);
+        ctx->pc = 0u;
+    }
+
+    void schedulerVifIrqWait(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        g_dispatchTrace.push_back(1);
+        EeScheduler &scheduler = runtime->eeScheduler();
+        g_testSemaphoreId = scheduler.createSemaphore(0, 1, 0u, 0u);
+        scheduler.addIrqHandler(false, 5u, kVifIrqHandlerPc, true, 0u, 0u, 0u); // INTC_VIF1
+
+        const uint32_t nopWithInterrupt = 0x80000000u; // VIF NOP with the I bit
+        runtime->memory().processVIF1Data(reinterpret_cast<const uint8_t *>(&nopWithInterrupt), 4u);
+
+        ctx->pc = kVifIrqResumePc;
+        scheduler.waitSemaphore(g_testSemaphoreId);
+    }
+
+    void schedulerVifIrqResume(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        g_dispatchTrace.push_back(3);
+        g_vifIrqResumed.store(true, std::memory_order_release);
+        ctx->pc = 0u;
+        runtime->requestStop();
+    }
+
     void schedulerInvocationQueueHandler(uint8_t *, R5900Context *ctx, PS2Runtime *)
     {
         const uint32_t sp = getRegU32(ctx, 29);
@@ -797,6 +832,66 @@ void register_ps2_runtime_interrupt_tests()
             {
                 t.Equals(flag->bits, 0x4u, "WEF_CLEAR should remove only the requested matched bit");
             }
+        });
+
+        tc.Run("a VIFcode with the I bit latches INTC VIF0/VIF1 only for its own VIF", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            const uint32_t plainNop = 0x00000000u;
+            const uint32_t nopWithInterrupt = 0x80000000u;
+
+            mem.processVIF1Data(reinterpret_cast<const uint8_t *>(&plainNop), 4u);
+            t.IsFalse(mem.hasPendingVifInterrupts(), "a VIFcode without the I bit must not raise an interrupt");
+
+            mem.processVIF1Data(reinterpret_cast<const uint8_t *>(&nopWithInterrupt), 4u);
+            t.Equals(mem.takePendingVifInterrupts(), 0x2u, "VIF1 I bit should latch INTC_VIF1");
+            t.IsFalse(mem.hasPendingVifInterrupts(), "taking the interrupts should clear them");
+
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&nopWithInterrupt), 4u);
+            t.Equals(mem.takePendingVifInterrupts(), 0x1u, "VIF0 I bit should latch INTC_VIF0");
+        });
+
+        tc.Run("VIF1 I-bit IRQ runs the INTC_VIF1 handler and wakes its waiter", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.registerFunction(kVifIrqWaitPc, schedulerVifIrqWait);
+            env.runtime.registerFunction(kVifIrqResumePc, schedulerVifIrqResume);
+            env.runtime.registerFunction(kVifIrqHandlerPc, schedulerVifIrqHandler);
+
+            g_dispatchTrace.clear();
+            g_vifIrqResumed.store(false, std::memory_order_release);
+            R5900Context mainContext{};
+            mainContext.pc = kVifIrqWaitPc;
+            std::atomic<bool> schedulerThrew{false};
+            std::thread gameThread([&]()
+            {
+                try
+                {
+                    env.runtime.eeScheduler().reset(env.rdram.data(), mainContext);
+                    env.runtime.eeScheduler().run();
+                }
+                catch (...)
+                {
+                    schedulerThrew.store(true, std::memory_order_release);
+                }
+            });
+
+            const bool resumed = waitUntil([]()
+            {
+                return g_vifIrqResumed.load(std::memory_order_acquire);
+            }, std::chrono::milliseconds(150));
+            if (!resumed)
+            {
+                env.runtime.requestStop();
+            }
+            gameThread.join();
+
+            t.IsTrue(resumed, "the VIF1 I bit should dispatch INTC_VIF1 and wake the semaphore waiter");
+            t.IsFalse(schedulerThrew.load(std::memory_order_acquire), "the VIF IRQ path should not throw");
+            const std::vector<int> expected{1, 2, 3};
+            t.IsTrue(g_dispatchTrace == expected, "wait, INTC_VIF1 handler, then the resumed waiter");
         });
 
         tc.Run("EE Timer2 compare IRQ wakes a DelayThread-style semaphore wait", [](TestCase &t)

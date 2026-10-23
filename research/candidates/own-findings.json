@@ -31,5 +31,39 @@
     "license": "GPL-3.0",
     "approach": "Use PCSX2 _vuCalculateEATAN's constant; the other seven constants already matched it digit for digit.",
     "subsystem": "VU1 EFU"
+  },
+  {
+    "id": "own-02",
+    "source": {
+      "repository": "ran-j/PS2Recomp",
+      "branch": "main",
+      "revision": "eb8688b",
+      "files": [
+        "ps2xRuntime/src/lib/ps2_memory.cpp"
+      ]
+    },
+    "title": "VIFn register reads returned the raw I/O map, not the VIF state",
+    "category": "C",
+    "subsystem": "runtime/VIF registers",
+    "problem": "readIORegister served VIF0/VIF1 STAT, ERR, MARK, CODE, ITOPS... from m_ioRegisters, so a guest never saw INT/VIS/MRK/DBF set by the VIF interpreter; VIF0_FBRST/ERR and VIF1_ERR writes were ignored. The debug panel also labelled MARK (0x30) as ERR.",
+    "approach": "Reads come from vif0_regs/vif1_regs; ERR and VIF0_FBRST writes handled; only FDR is writable in VIF1_STAT; debug panel offsets fixed.",
+    "scope": "general",
+    "scope_evidence": "Any guest that polls VIFn_STAT (PCSX2 notes Yakuza does)",
+    "reference": "PCSX2 VIF register layout (Vif.h)",
+    "license": "GPL-3.0",
+    "upstream_equivalent": null,
+    "risk": "low",
+    "priority": 2,
+    "status": "INTEGRATED",
+    "evidence": {
+      "analysis": "found while modelling the VIF stall",
+      "tests_added": [
+        "VIF1 I bit stalls the VIF after its command until FBRST.STC (reads VIF1_STAT)",
+        "VIF1 ERR.MII masks the I bit (reads VIF1_ERR)"
+      ],
+      "integration_commit": "5201b65",
+      "build": "MSVC 14.44 Release OK",
+      "regression": "ps2x_tests 480/480, ps2xIOP 4/4; each stall rule's test fails with the rule reverted"
+    }
   }
 ]

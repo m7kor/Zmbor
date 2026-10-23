@@ -55,3 +55,16 @@ changed test was confirmed to fail with its fix reverted.
   the end of the DMA data continues in the next transfer (SotC fork, also DQ8, Killzone, SRWZ).
 - Two upstream tests encoded the old behaviour (JR's VI timing; raw pixels after a DIRECT) and were replaced with
   the ported community tests.
+
+## Phase 0d — VIF stall (2026-10-23)
+
+After: `ps2x_tests` 480/480, `ps2xIOP` ctest 4/4. Checked against PCSX2 (`Vif_Transfer.cpp`, `Vif0_Dma.cpp`,
+`Vif1_Dma.cpp`, `Vif.cpp`); each rule's test fails with that rule reverted.
+
+- An I-bit VIFcode now stalls VIF0/VIF1 (STAT.VIS) after it finishes, unless it is MARK or ERR.MII is set.
+  FBRST.STP/FBK stall too (VSS/VFS). Data arriving during a stall is kept and runs in order on FBRST.STC;
+  FBRST.RST drops it. A VIF DMA whose data is held stays running (CHCR.STR, no D_STAT/DMAC completion) until STC.
+  Based on upstream PR #295, with PCSX2's MARK exception and the VIF0 side added.
+- VIFn register reads (STAT, ERR, MARK, CODE, ITOPS, ...) now return the VIF state instead of the raw I/O map, so
+  guests see INT/VIS/MRK/DBF; VIF0_FBRST and VIFn_ERR writes take effect; debug-panel ERR offsets fixed.
+- Not modelled: stalls for VU1/PATH waits (FLUSH*, MSCAL while busy), FBK cancelling an in-flight DMA.

@@ -176,7 +176,7 @@
       "build": "MSVC 14.44 Release OK"
     },
     "status": "INTEGRATED",
-    "note": "Interrupt only; the hardware VIF stall (STAT.VIS until FBRST.STC, upstream #295) is not modelled."
+    "note": "Interrupt in c8093ef; the accompanying VIF stall (VIS until FBRST.STC) added in 5201b65 (upstream-07)."
   },
   "sotc-20": {
     "evidence": {

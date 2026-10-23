@@ -12,7 +12,7 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | ARCHITECTURE_REFERENCE | 10 |
 | CANDIDATE | 101 |
 | GAME_SPECIFIC | 4 |
-| INTEGRATED | 17 |
+| INTEGRATED | 19 |
 | REJECTED | 7 |
 | SUPERSEDED | 25 |
 
@@ -28,6 +28,7 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | sotc-10 | LightVelox/PS2Recomp | DMA chain walker no longer stops after 4096 tags | 9ed5b6e | 1 |
 | sotc-20 | LightVelox/PS2Recomp | VIF1 DIRECT continues a pending GIF IMAGE only from the next DIRECT payload | c8093ef | 3 |
 | own-01 | ran-j/PS2Recomp | VU1 EATAN series constant had a dropped digit (-0.13085337519646 vs -0.139085337519646) | 3666b1b | 1 |
+| own-02 | ran-j/PS2Recomp | VIFn register reads returned the raw I/O map, not the VIF state | 5201b65 | 2 |
 | dq8-19 | Sinan-Karakaya/PS2Recomp | VIFcode i-bit raises INTC VIF0(4)/VIF1(5) | c8093ef | 2 |
 | dq8-24 | Sinan-Karakaya/PS2Recomp | VU JR/JALR read current VI, not the branch-delayed VI | 3666b1b | 2 |
 | dq8-25 | Sinan-Karakaya/PS2Recomp | EFU sub-opcodes: ERSQRT 0x79, ESIN 0x7C, EATAN 0x7D, EEXP 0x7E; 0x77/0x7F reserved | 3666b1b | 2 |
@@ -37,6 +38,7 @@ CANDIDATE = source inspection only, nothing built or tested here.
 | upstream-04 | ran-j/PS2Recomp | EE invocation stacks off the main thread's stack, reused per thread (issue #258) | 6460dd7 | 2 |
 | upstream-05 | ran-j/PS2Recomp | SetupThread(-1) records the stack base like CreateThread (issue #259) | 257c5c5 | 1 |
 | upstream-06 | ran-j/PS2Recomp | D_ENABLEW is visible at D_ENABLER; both reset to 0x1201 (PR #284, issue #257) | 591e56e | 3 |
+| upstream-07 | ran-j/PS2Recomp | VIF stall after the I bit (VSS/VFS/VIS) with FBRST.STC/STP/FBK/RST (PR #295, adapted) | 5201b65 | 9 |
 
 ## Queue: general candidates, priority 1-2
 

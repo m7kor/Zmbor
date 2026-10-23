@@ -1063,7 +1063,7 @@
       "priority": 1,
       "recommended_status": "CANDIDATE"
     },
-    "limitations": "Interrupt only; the hardware VIF stall (STAT.VIS until FBRST.STC, upstream #295) is not modelled."
+    "limitations": "Interrupt in c8093ef; the accompanying VIF stall (VIS until FBRST.STC) added in 5201b65 (upstream-07)."
   },
   {
     "id": "dq8-20",

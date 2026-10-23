@@ -604,6 +604,184 @@ void register_ps2_memory_tests()
             t.Equals(v3x, 0xAAAAAAAAu, "second vector should write at addr CL (addr 3)");
         });
 
+        tc.Run("VIF UNPACK cut between two transfers continues with the next data", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::memset(mem.getVU1Data(), 0, PS2_VU1_DATA_SIZE);
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, makeVifCmd(0x6Cu, 2u, 0u)); // UNPACK V4-32, NUM=2, ADDR=0
+            for (uint32_t i = 1u; i <= 8u; ++i)
+                appendU32(packet, 0x10101010u * i);
+
+            // The first transfer ends in the middle of the second vector.
+            mem.processVIF1Data(packet.data(), 4u + 24u);
+            t.Equals(mem.vif1_regs.stat & 3u, 1u, "a cut UNPACK should leave VPS waiting for data");
+            mem.processVIF1Data(packet.data() + 28u, static_cast<uint32_t>(packet.size() - 28u));
+            t.Equals(mem.vif1_regs.stat & 3u, 0u, "the completed UNPACK should return VPS to idle");
+
+            const uint8_t *vu = mem.getVU1Data();
+            for (uint32_t i = 0; i < 8u; ++i)
+            {
+                uint32_t v = 0;
+                std::memcpy(&v, vu + i * 4u, 4u);
+                t.Equals(v, 0x10101010u * (i + 1u), "both vectors should hold the data of both transfers");
+            }
+        });
+
+        tc.Run("VIF STMOD mode 3 writes data unchanged and saves it into readable ROW registers", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::memset(mem.getVU1Data(), 0, PS2_VU1_DATA_SIZE);
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, makeVifCmd(0x30u, 0u, 0u)); // STROW 0x1000 x4
+            for (uint32_t i = 0; i < 4u; ++i)
+                appendU32(packet, 0x1000u);
+            appendU32(packet, makeVifCmd(0x20u, 0u, 0u)); // STMASK: cycle 1 y from ROW
+            appendU32(packet, 0x00000400u);
+            appendU32(packet, makeVifCmd(0x05u, 0u, 3u)); // STMOD 3
+            appendU32(packet, makeVifCmd(0x01u, 0u, static_cast<uint16_t>((4u << 8) | 4u))); // STCYCL 4,4
+            appendU32(packet, makeVifCmd(0x7Cu, 2u, 0u)); // masked UNPACK V4-32, NUM=2
+            for (uint32_t i = 0; i < 8u; ++i)
+                appendU32(packet, i);
+            mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            const uint8_t *vu = mem.getVU1Data();
+            uint32_t x0 = 0, y1 = 0;
+            std::memcpy(&x0, vu + 0u, 4u);
+            std::memcpy(&y1, vu + 16u + 4u, 4u);
+            t.Equals(x0, 0u, "mode 3 should not add ROW to the data");
+            t.Equals(y1, 1u, "a ROW-masked field should read the ROW saved from the previous vector");
+            t.Equals(mem.read32(0x10003D00u), 4u, "VIF1_R0 should read the saved x");
+            t.Equals(mem.read32(0x10003D10u), 1u, "VIF1_R1 keeps y because the last y was masked");
+            t.Equals(mem.read32(0x10003D30u), 7u, "VIF1_R3 should read the saved w");
+        });
+
+        tc.Run("VIF1_NUM reads 256 while a NUM=0 UNPACK waits for data", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<uint8_t> packet;
+            appendU32(packet, makeVifCmd(0x62u, 0u, 0u)); // UNPACK S-8, NUM=0 (256), no data
+            mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+            t.Equals(mem.read32(0x10003C60u), 256u, "VIF1_NUM");
+            t.Equals(mem.read32(0x10003C00u) & 3u, 1u, "VPS should wait for data");
+        });
+
+        tc.Run("COP0 condition follows D_PCR.CPC and D_STAT.CIS", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(mem.dmacCpcond(), "no channel selected: true");
+            t.IsTrue(mem.writeIORegister(0x1000E020u, 1u << 9), "D_PCR.CPC9 write should succeed");
+            t.IsFalse(mem.dmacCpcond(), "CPC9 with CIS9 clear: false");
+
+            constexpr uint32_t kToSpr = 0x1000D400u;
+            t.IsTrue(mem.writeIORegister(kToSpr + 0x10u, 0x00024000u), "MADR");
+            t.IsTrue(mem.writeIORegister(kToSpr + 0x20u, 1u), "QWC");
+            t.IsTrue(mem.writeIORegister(kToSpr + 0x00u, 0x101u), "CHCR STR");
+            t.IsTrue(mem.dmacCpcond(), "the ch9 DMA sets CIS9: true");
+            t.IsTrue(mem.writeIORegister(0x1000E010u, 1u << 9), "D_STAT.CIS9 clear should succeed");
+            t.IsFalse(mem.dmacCpcond(), "CIS9 cleared: false");
+        });
+
+        tc.Run("toSPR chain stops at a tag IRQ under TIE and still raises CIS9", [](TestCase &t)
+        {
+            // ps2autotests dma/dmac/tagintr and dma/spr/chain (real PS2).
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kToSpr = 0x1000D400u;
+            constexpr uint32_t kTags = 0x00030000u;
+            constexpr uint32_t kData = 0x00031000u;
+            const uint32_t data[4] = {0x01234567u, 0x89ABCDEFu, 0xDEADBEEFu, 0x1337C0DEu};
+            std::memcpy(mem.getRDRAM() + kData, data, sizeof(data));
+
+            const auto runChain = [&](bool tie, bool irq)
+            {
+                const uint32_t tags[12] = {0x30000001u | (irq ? 0x80000000u : 0u), kData, 0u, 0u, // REF 1
+                                           0x30000001u, kData, 0u, 0u,                             // REF 1
+                                           0x70000000u, 0u, 0u, 0u};                               // END 0
+                std::memcpy(mem.getRDRAM() + kTags, tags, sizeof(tags));
+                mem.writeIORegister(0x1000E010u, mem.readIORegister(0x1000E010u) & (1u << 9));
+                mem.writeIORegister(kToSpr + 0x80u, 0x20u);
+                mem.writeIORegister(kToSpr + 0x10u, 0u);
+                mem.writeIORegister(kToSpr + 0x20u, 0u);
+                mem.writeIORegister(kToSpr + 0x30u, kTags);
+                mem.writeIORegister(kToSpr + 0x00u, 0x104u | (tie ? 0x80u : 0u));
+            };
+
+            runChain(true, true);
+            t.Equals(mem.readIORegister(kToSpr + 0x00u) >> 16, 0xB000u, "CHCR[31:16] holds the IRQ REF tag");
+            t.Equals(mem.readIORegister(kToSpr + 0x30u), kTags + 0x10u, "TADR points at the next tag");
+            t.Equals(mem.readIORegister(kToSpr + 0x80u), 0x30u, "one qword reached the scratchpad");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 9)) != 0u, "CIS9 is raised");
+
+            runChain(true, false);
+            t.Equals(mem.readIORegister(kToSpr + 0x00u) >> 16, 0x7000u, "CHCR[31:16] holds the END tag");
+            t.Equals(mem.readIORegister(kToSpr + 0x30u), kTags + 0x20u, "END leaves TADR at the END tag");
+            t.Equals(mem.readIORegister(kToSpr + 0x80u), 0x40u, "two qwords reached the scratchpad");
+            t.Equals(mem.readIORegister(kToSpr + 0x10u), kTags + 0x30u, "MADR is past the END tag's (empty) data");
+            uint32_t first = 0u;
+            std::memcpy(&first, mem.getScratchpad() + 0x20u, 4u);
+            t.Equals(first, 0x01234567u, "the data lands at SADR");
+        });
+
+        tc.Run("toSPR interleave skips SQWC memory qwords after every TQWC", [](TestCase &t)
+        {
+            // ps2autotests dma/spr/interleave (real PS2): transfer 2, skip 1, count 4 copies memory qwords 0 1 3 4,
+            // SADR ends at 0x40 and MADR at +0x60; D_SQWC fields are 8 bits.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kToSpr = 0x1000D400u;
+            constexpr uint32_t kSrc = 0x00040000u;
+            for (uint32_t q = 0u; q < 8u; ++q)
+                std::memset(mem.getRDRAM() + kSrc + q * 16u, static_cast<int>(q + 1u), 16u);
+
+            const auto upload = [&](uint32_t sqwc)
+            {
+                std::memset(mem.getScratchpad(), 0, 0x100u);
+                mem.writeIORegister(0x1000E030u, sqwc);
+                mem.writeIORegister(kToSpr + 0x80u, 0u);
+                mem.writeIORegister(kToSpr + 0x10u, kSrc);
+                mem.writeIORegister(kToSpr + 0x20u, 4u);
+                mem.writeIORegister(kToSpr + 0x00u, 0x108u); // MOD interleave, STR
+            };
+
+            upload((2u << 16) | 1u);
+            const uint8_t expected[4] = {1u, 2u, 4u, 5u};
+            for (uint32_t q = 0u; q < 4u; ++q)
+                t.Equals(static_cast<uint32_t>(mem.getScratchpad()[q * 16u]), static_cast<uint32_t>(expected[q]),
+                         "scratchpad qword " + std::to_string(q));
+            t.Equals(mem.readIORegister(kToSpr + 0x80u), 0x40u, "SADR");
+            t.Equals(mem.readIORegister(kToSpr + 0x10u), kSrc + 0x60u, "MADR moves past the last skip");
+
+            upload((1u << 16) | 0x100u); // skip 256 reads as 0
+            t.Equals(mem.readIORegister(kToSpr + 0x10u), kSrc + 0x40u, "SQWC 256 behaves as 0");
+        });
+
+        tc.Run("VIF UNPACK V2 repeats x and y into z and w", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::memset(mem.getVU1Data(), 0, PS2_VU1_DATA_SIZE);
+
+            std::vector<uint8_t> packet;
+            appendU32(packet, makeVifCmd(0x64u, 1u, 0u)); // UNPACK V2-32, NUM=1, ADDR=0
+            appendU32(packet, 0x11111111u);
+            appendU32(packet, 0x22222222u);
+            mem.processVIF1Data(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            const uint8_t *vu = mem.getVU1Data();
+            uint32_t z = 0, w = 0;
+            std::memcpy(&z, vu + 8u, 4u);
+            std::memcpy(&w, vu + 12u, 4u);
+            t.Equals(z, 0x11111111u, "V2 z should repeat x");
+            t.Equals(w, 0x22222222u, "V2 w should repeat y");
+        });
+
         tc.Run("VIF masked UNPACK uses data row col and protect selectors", [](TestCase &t)
         {
             PS2Memory mem;
@@ -832,6 +1010,33 @@ void register_ps2_memory_tests()
             t.Equals(mem.vif1_regs.mark, 0x4321u, "and does not stall");
         });
 
+        tc.Run("VIF1 DMA stalled by an I bit completes when the held data fits the FIFO", [](TestCase &t)
+        {
+            // ps2autotests dma/vif/intstall (real PS2): 3 qwords, I-bit NOP after STMASK AAAAAAAA; the DMA finishes,
+            // MASK stays AAAAAAAA and STAT reads 00000c02.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            constexpr uint32_t kVif1Ch = 0x10009000u;
+            constexpr uint32_t kSrc = 0x00024000u;
+            const uint32_t words[12] = {makeVifCmd(0x20u, 0u, 0u), 0xAAAAAAAAu, 0x80000000u, makeVifCmd(0x20u, 0u, 0u),
+                                        0xBBBBBBBBu, 0u, 0u, makeVifCmd(0x20u, 0u, 0u), 0xCCCCCCCCu, 0u, 0u, 0u};
+            std::memcpy(mem.getRDRAM() + kSrc, words, sizeof(words));
+
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 3u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
+            mem.processPendingTransfers();
+
+            t.IsTrue((mem.readIORegister(kVif1Ch + 0x00u) & 0x100u) == 0u, "the DMA completes");
+            t.Equals(mem.readIORegister(0x10003C70u), 0xAAAAAAAAu, "MASK stops before the held codes");
+            t.Equals(mem.readIORegister(0x10003C00u), 0x00000C02u, "STAT reads VIS | INT | VPS=2");
+
+            t.IsTrue(mem.writeIORegister(0x10003C10u, 0x8u), "FBRST.STC write should succeed");
+            t.Equals(mem.readIORegister(0x10003C70u), 0xCCCCCCCCu, "the held codes run on STC");
+            t.Equals(mem.readIORegister(0x10003C00u) & 3u, 0u, "VPS returns to idle");
+        });
+
         tc.Run("VIF1 DMA behind an I-bit stall completes only after FBRST.STC", [](TestCase &t)
         {
             PS2Memory mem;
@@ -840,12 +1045,15 @@ void register_ps2_memory_tests()
             constexpr uint32_t kVif1Ch = 0x10009000u;
             constexpr uint32_t kDStat = 0x1000E010u;
             constexpr uint32_t kSrc = 0x00024000u;
+            constexpr uint32_t kQwc = 18u; // more held data than the 16-qword VIF1 FIFO takes
             uint8_t *rdram = mem.getRDRAM();
-            const uint32_t words[4] = {0x80000000u, makeVifCmd(0x07u, 0u, 0x0ABCu), 0u, 0u};
-            std::memcpy(rdram + kSrc, words, sizeof(words));
+            std::vector<uint32_t> words(kQwc * 4u, 0u);
+            words[0] = 0x80000000u;
+            words[kQwc * 4u - 1u] = makeVifCmd(0x07u, 0u, 0x0ABCu);
+            std::memcpy(rdram + kSrc, words.data(), words.size() * sizeof(uint32_t));
 
             t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
-            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 1u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, kQwc), "write VIF1 QWC should succeed");
             t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
             mem.processPendingTransfers();
 
@@ -887,10 +1095,13 @@ void register_ps2_memory_tests()
 
             constexpr uint32_t kVif1Ch = 0x10009000u;
             constexpr uint32_t kSrc = 0x00024000u;
-            const uint32_t words[4] = {0x80000000u, makeVifCmd(0x07u, 0u, 0x0DEFu), 0u, 0u};
-            std::memcpy(mem.getRDRAM() + kSrc, words, sizeof(words));
+            constexpr uint32_t kQwc = 18u; // more held data than the 16-qword VIF1 FIFO takes, so the DMA is held
+            std::vector<uint32_t> words(kQwc * 4u, 0u);
+            words[0] = 0x80000000u;
+            words[1] = makeVifCmd(0x07u, 0u, 0x0DEFu);
+            std::memcpy(mem.getRDRAM() + kSrc, words.data(), words.size() * sizeof(uint32_t));
             t.IsTrue(mem.writeIORegister(kVif1Ch + 0x10u, kSrc), "write VIF1 MADR should succeed");
-            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, 1u), "write VIF1 QWC should succeed");
+            t.IsTrue(mem.writeIORegister(kVif1Ch + 0x20u, kQwc), "write VIF1 QWC should succeed");
             t.IsTrue(mem.writeIORegister(kVif1Ch + 0x00u, 0x100u), "write VIF1 CHCR STR should succeed");
             mem.processPendingTransfers();
 

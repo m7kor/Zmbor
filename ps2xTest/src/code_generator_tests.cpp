@@ -253,6 +253,32 @@ void register_code_generator_tests()
         }
     });
 
+    tc.Run("BC0T and BC0F test the DMAC CPCOND0", [](TestCase &t) {
+        // ps2autotests dma/dmac/cpcond.expected: bc0t follows D_PCR.CPC / D_STAT.CIS (the branch was never taken).
+        for (const uint32_t rt : {static_cast<uint32_t>(COP0_BC_BCT), static_cast<uint32_t>(COP0_BC_BCF)})
+        {
+            Function func;
+            func.name = "cpcond";
+            func.start = 0x2000;
+            func.end = 0x2010;
+            func.isRecompiled = true;
+            Instruction branch{};
+            branch.address = 0x2000;
+            branch.opcode = OPCODE_COP0;
+            branch.rs = COP0_BC;
+            branch.rt = rt;
+            branch.simmediate = 2;
+            branch.isBranch = true;
+            branch.hasDelaySlot = true;
+            CodeGenerator gen({}, {});
+            const std::string generated =
+                gen.generateFunction(func, {branch, makeNop(0x2004), makeNop(0x2008), makeNop(0x200C)}, false);
+            const std::string expected = rt == COP0_BC_BCT ? "= (runtime->memory().dmacCpcond());"
+                                                           : "= (!runtime->memory().dmacCpcond());";
+            t.IsTrue(generated.find(expected) != std::string::npos, "condition " + expected + ": " + generated);
+        }
+    });
+
     tc.Run("SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA", [](TestCase &t) {
         // ps2autotests cpu/ee_simd/funnel.expected: mtsa 0xFFFF -> mfsa 0xf, mtsab 15 -> 0xf, mtsah 7 -> 0xe.
         CodeGenerator gen({}, {});

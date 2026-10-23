@@ -355,10 +355,15 @@ public:
     bool tryProcessNativeGifPackedChain(GS &gs, uint32_t tadr, uint32_t chcr);
     void processVIF0Data(uint32_t srcPhysAddr, uint32_t sizeBytes);
     void processVIF0Data(const uint8_t *data, uint32_t sizeBytes);
+    uint32_t unpackVif(uint32_t vif, uint8_t opcode, uint8_t num, uint16_t imm, const uint8_t *data, uint32_t pos, uint32_t sizeBytes);
+    bool continuePartialVifCommand(uint32_t vif, const uint8_t *&data, uint32_t &sizeBytes, std::vector<uint8_t> &joined);
+    void keepPartialVifCommand(uint32_t vif, const uint8_t *data, uint32_t cmdStart, uint32_t sizeBytes);
     void processVIF1Data(uint32_t srcPhysAddr, uint32_t sizeBytes);
     void processVIF1Data(const uint8_t *data, uint32_t sizeBytes);
     void processPendingTransfers();
     std::vector<uint32_t> consumeCompletedDmacCauses();
+    // COP0 condition (BC0T/BC0F): every channel selected by D_PCR.CPC has D_STAT.CIS set.
+    bool dmacCpcond() const;
 
     int pollDmaRegisters();
 
@@ -420,6 +425,9 @@ public:
     uint8_t *m_vu0Data = nullptr;
     std::atomic<uint32_t> m_pendingVifInterrupts{0u};
     std::vector<uint8_t> m_vifStalledData[2];
+    // A VIFcode whose data has not all arrived yet (VPS = waiting for data), kept with leading zero (NOP) words
+    // that put it at its original offset within a quadword; the next transfer continues it.
+    std::vector<uint8_t> m_vifPartialCommand[2];
     bool m_vifIrqStallPending[2] = {false, false};
     bool m_vifDmaHeld[2] = {false, false};
     VIFRegisters &vifRegs(uint32_t vif) noexcept { return (vif & 1u) ? vif1_regs : vif0_regs; }
@@ -432,6 +440,7 @@ public:
     void finishVifDma(uint32_t vif);
     void completeVifDma(uint32_t vif);
     uint32_t readVifRegister(uint32_t vif, uint32_t offset) const;
+    void walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transferTagData, std::vector<uint8_t> &chainBuf);
     uint8_t *m_vu1Code = nullptr;
     uint8_t *m_vu1Data = nullptr;
     bool m_path3Masked = false;

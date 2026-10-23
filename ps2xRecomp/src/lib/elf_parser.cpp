@@ -1660,6 +1660,22 @@ namespace
         ScanDataFunctionPointerTables(sections, starts);
         ScanAdjacentLeafThunkRuns(sections, starts);
 
+        // A delay slot belongs to the jump or branch before it and is never a function start. A heuristic that
+        // proposes one (a data word that happens to equal the address, ps2autotests dma/vif/stcycl.elf: 0x100400,
+        // the delay slot of `jal 0x100930`) would end the caller at the jump and leave its return address with no
+        // entry, so the thread could not resume there.
+        for (auto it = starts.begin(); it != starts.end();)
+        {
+            const ps2recomp::Section *sec = FindCodeSectionByAddress(sections, *it);
+            uint32_t previous = 0;
+            const bool isDelaySlot =
+                sec && *it >= sec->address + MIPS_INSTRUCTION_SIZE &&
+                ReadSectionWord(*sec, *it - sec->address - MIPS_INSTRUCTION_SIZE, previous) &&
+                IsControlTransfer(previous) &&
+                !(OPCODE(previous) == OPCODE_REGIMM && RT(previous) >= REGIMM_MTSAB); // MTSAB/MTSAH have no delay slot
+            it = isDelaySlot ? starts.erase(it) : std::next(it);
+        }
+
         std::vector<uint32_t> sortedStarts(starts.begin(), starts.end());
         std::sort(sortedStarts.begin(), sortedStarts.end());
 

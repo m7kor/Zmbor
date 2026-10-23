@@ -65,6 +65,8 @@ namespace ps2recomp
                 (m_branchInst.opcode == OPCODE_REGIMM &&
                  (m_branchInst.rt == REGIMM_BLTZL || m_branchInst.rt == REGIMM_BGEZL ||
                   m_branchInst.rt == REGIMM_BLTZALL || m_branchInst.rt == REGIMM_BGEZALL)) ||
+                (m_branchInst.opcode == OPCODE_COP0 && m_branchInst.rs == COP0_BC &&
+                 (m_branchInst.rt == COP0_BC_BCFL || m_branchInst.rt == COP0_BC_BCTL)) ||
                 (m_branchInst.opcode == OPCODE_COP1 && m_branchInst.rs == COP1_BC &&
                  (m_branchInst.rt == COP1_BC_BCFL || m_branchInst.rt == COP1_BC_BCTL)) ||
                 (m_branchInst.opcode == OPCODE_COP2 && m_branchInst.rs == COP2_BC &&
@@ -427,6 +429,16 @@ namespace ps2recomp
             default:
                 return "false";
             }
+        case OPCODE_COP0:
+            if (m_branchInst.rs == COP0_BC)
+            {
+                // CPCOND0 is the DMAC's D_PCR.CPC / D_STAT.CIS condition (ps2autotests dma/dmac/cpcond).
+                const uint8_t bcCond = static_cast<uint8_t>(m_branchInst.rt);
+                return (bcCond == COP0_BC_BCF || bcCond == COP0_BC_BCFL)
+                           ? "!runtime->memory().dmacCpcond()"
+                           : "runtime->memory().dmacCpcond()";
+            }
+            break;
         case OPCODE_COP1:
             if (m_branchInst.rs == COP1_BC)
             {

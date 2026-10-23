@@ -151,3 +151,28 @@ no crashes, no regressions. Root causes, each found separately:
   interpreter's round-toward-zero mode, and its P result keeps exponent 255.
 - VU FMAC addition drops an operand shifted out entirely (25+ exponent steps), whatever its sign (triace).
 - Mutation-checked: VU window, vuAdd, EFU rounding scope.
+
+## Phase 3 — VIF, SPR and DMAC (2026-10-23)
+
+After: `ps2x_tests` 519/519, ctest 48/48 (research, GS cache, end-to-end), `ps2xIOP` 4/4; hardware result tests
+47/55 exact (8172/8250 lines, was 38/55 and 7394), all 11 `dma/*` tests exact, no crashes, no timeouts, no
+regressions. Root causes, by subsystem:
+
+- Recompiler (dma/vif/stcycl timeout): a word that follows a branch was taken as a function start when a pointer
+  table named it, so a delay slot became its own function. Starts in a delay slot are dropped.
+- VIF UNPACK: VIF0 used a reduced unpacker (32-bit formats only, no S replication); both VIFs now share one.
+  V2 writes x y x y, V3 takes w from the next element, V4-5 widens 5-bit channels to 8 bits, WL = 0 is 256 and CL = 0
+  behaves as CL = WL. STMOD mode 3 writes the data unchanged and saves it into ROW.
+- VIF commands split across transfers (STMASK/STROW/STCOL/MPG/UNPACK) were dropped; they now wait for the rest of
+  their data with VPS = 1, and VIF1_NUM reads 256 for a pending NUM = 0 UNPACK (VIF0_NUM, 8 bits, reads 0).
+- VIF registers: R0-R3 and C0-C3 were not readable.
+- VIF I-bit stall: the DMA now completes when the held data fits the FIFO (VIF0 8, VIF1 16 qwords) and STAT reads
+  VPS = 2. Before, any held data kept the DMA active (PCSX2's behaviour), which hardware contradicts
+  (dma/vif/intstall); the unit tests that held a 1-qword DMA now use more data than the FIFO takes.
+- SPR DMA: toSPR chain mode and interleave mode (TQWC/SQWC, 8-bit fields, MADR past the last skip) were not
+  implemented. The source-chain walker shared by GIF/VIF is now one function, which also leaves MADR past the last
+  tag's data.
+- DMAC: BC0T/BC0F now test CPCOND0 (every channel selected by D_PCR.CPC has D_STAT.CIS); before, the branch was
+  never taken.
+- Mutation-checked: CL = 0, split UNPACK, VIF1_NUM, STMOD mode 3, R0-R3 reads, FIFO completion, VPS = 2, V2 lanes,
+  toSPR chain, chain MADR, CPCOND0, interleave skip, BC0 emission, delay-slot starts.

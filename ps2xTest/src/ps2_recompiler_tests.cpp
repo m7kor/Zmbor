@@ -664,7 +664,7 @@ static bool writeMinimalMipsElfWithAddressTakenCallbacks(const std::filesystem::
     rodata->set_addr_align(4);
     rodata->set_address(0x00200000u);
 
-    std::array<uint32_t, 32> tableWords{};
+    std::array<uint32_t, 48> tableWords{};
     tableWords[1] = 0x00100060u;
     tableWords[3] = 0x00100068u;
     // Retail class descriptor: name pointer, ordinary method, two reserved
@@ -675,6 +675,10 @@ static bool writeMinimalMipsElfWithAddressTakenCallbacks(const std::filesystem::
     tableWords[8] = 0;
     tableWords[9] = 0x00100120u;
     tableWords[16] = 0x00100300u; // plausible entry, but not part of a pointer cluster
+    // A pointer-shaped data word naming the delay slot of `jal` at 0x00100008 (as in ps2autotests
+    // dma/vif/stcycl.elf), clustered with a real leaf so the table heuristic would accept it.
+    tableWords[42] = 0x0010000Cu; // far from tableWords[16], which must stay an isolated pointer
+    tableWords[44] = 0x00100068u;
     tableWords[28] = 0x00100080u; // ordinary function, followed by a numeric id
     tableWords[29] = 0x0000000Du;
     tableWords[30] = 0x00100380u; // long leaf, followed by a numeric id
@@ -1826,6 +1830,8 @@ void register_ps2_recompiler_tests()
                      "a callback passed as the fifth register argument should be discovered");
             t.IsTrue(hasStart(0x001004F0u),
                      "a code address whose LUI sits in a JAL delay slot of a callee-saved register should be discovered");
+            t.IsTrue(!hasStart(0x0010000Cu),
+                     "a delay slot must never become a function start, whatever proposes it");
             t.IsTrue(hasStart(0x00100400u),
                      "a long callback passed as the fifth register argument should be discovered");
             t.IsFalse(hasStart(0x00100548u),

@@ -1270,7 +1270,14 @@ namespace
                         {
                             // The LUI ran in a call/jump delay slot. An incomplete
                             // address cannot survive through an unknown callee or
-                            // indirect target in a caller-saved register.
+                            // indirect target in a caller-saved register, but a
+                            // callee-saved one is still there when the call returns
+                            // (ps2autotests kernel/ee/thread/delete.elf: lui $s0 in a
+                            // jal delay slot, addiu $s0 after it, then a thread entry).
+                            if (IsCallInstruction(predecessorRaw) && (kCalleePreservedGprMask & initialAliases) != 0)
+                            {
+                                enqueue(offset + MIPS_INSTRUCTION_SIZE, initialAliases);
+                            }
                             startsAfterPredecessorTransfer = true;
                         }
                     }

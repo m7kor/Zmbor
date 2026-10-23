@@ -271,6 +271,12 @@ namespace ps2_syscalls
         const int id = static_cast<int>(getRegU32(ctx, 4));
         const uint32_t arg = getRegU32(ctx, 5);
         GuestThread *target = ee.thread(id);
+        if (target && target->status == EeThreadStatus::Dormant && !runtime->hasFunction(target->entry))
+        {
+            // The thread cannot run: its entry was not recompiled (a function only reached through a pointer).
+            std::cerr << "[StartThread] thread " << id << " entry 0x" << std::hex << target->entry << std::dec
+                      << " has no recompiled function; add it to the recompiler's entry_points" << std::endl;
+        }
         if (!target || target->status != EeThreadStatus::Dormant || !runtime->hasFunction(target->entry))
         {
             setReturnS32(ctx, -1);
@@ -363,7 +369,9 @@ namespace ps2_syscalls
             return;
         }
         *status = {};
-        status->status = rawThreadStatus(thread->status);
+        status->status = thread->selfSuspendShown && thread->status == EeThreadStatus::Running
+                             ? rawThreadStatus(EeThreadStatus::Suspended)
+                             : rawThreadStatus(thread->status);
         status->func = thread->entry;
         status->stack = thread->stack;
         status->stack_size = static_cast<int>(thread->stackSize);

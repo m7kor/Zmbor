@@ -120,6 +120,9 @@ struct GuestThread
     EeThreadStatus status = EeThreadStatus::Dormant;
     int suspendCount = 0;
     uint32_t wakeupCount = 0;
+    // SuspendThread on the running thread: it keeps running but reads back as suspended until it is next
+    // rescheduled (ps2autotests kernel/ee/thread/suspend.expected).
+    bool selfSuspendShown = false;
     bool ownsStack = false;
     uint32_t tlsBase = 0;
     EeWaitState wait{};

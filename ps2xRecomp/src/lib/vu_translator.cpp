@@ -44,7 +44,8 @@ namespace ps2recomp
             case VU0_CR_CLIP:
                 return fmt::format("SET_GPR_U32(ctx, {}, ctx->vu0_clip_flags & 0x00FFFFFFu);", rt);
             case VU0_CR_R:
-                return fmt::format("SET_GPR_U32(ctx, {}, static_cast<uint32_t>(_mm_cvtsi128_si32(_mm_castps_si128(ctx->vu0_r))));", rt);
+                // R reads back its 23 mantissa bits (cpu/vu0_macro/transfer.expected: "ctc2 -> vi20: 007fffff").
+                return fmt::format("SET_GPR_U32(ctx, {}, static_cast<uint32_t>(_mm_cvtsi128_si32(_mm_castps_si128(ctx->vu0_r))) & 0x007FFFFFu);", rt);
             case VU0_CR_I:
                 return fmt::format("{{ uint32_t bits; std::memcpy(&bits, &ctx->vu0_i, sizeof(bits)); SET_GPR_U32(ctx, {}, bits); }}", rt);
             case VU0_CR_Q:
@@ -59,11 +60,18 @@ namespace ps2recomp
                 return fmt::format("SET_GPR_U32(ctx, {}, ctx->vu0_vpu_stat);", rt);
             case VU0_CR_CMSAR1:
                 return fmt::format("SET_GPR_U32(ctx, {}, ctx->vu0_cmsar1);", rt);
+            case 19: // reserved: reads the revision value (transfer.expected "ctc2 -> vi19: 00002e30")
+                return fmt::format("SET_GPR_U32(ctx, {}, 0x00002E30u);", rt);
+            case 23: // reserved, reads 0
+            case 25:
+                return fmt::format("SET_GPR_U32(ctx, {}, 0u);", rt);
             default:
                 return fmt::format("// Unimplemented CFC2 VU control register: {}", rd);
             }
         }
         case COP2_QMTC2:
+            if (rd == 0)
+                return "// QMTC2 to VF0 ignored: VF0 is hardwired to (0, 0, 0, 1)";
             return fmt::format("ctx->vu0_vf[{}] = _mm_castsi128_ps(GPR_VEC(ctx, {}));", rd, rt);
         case COP2_CTC2:
         {
@@ -78,26 +86,31 @@ namespace ps2recomp
 
             switch (rd)
             {
-            case VU0_CR_STATUS:
-                return fmt::format("ctx->vu0_status = static_cast<uint16_t>(GPR_U32(ctx, {}) & 0xFFFFu);", rt);
+            // Write masks read back on hardware after ctc2 -1 (cpu/vu0_macro/transfer.expected).
+            case VU0_CR_STATUS: // only the sticky flags are writable: "ctc2 -> vi16: 00000fc0"
+                return fmt::format("ctx->vu0_status = static_cast<uint16_t>((ctx->vu0_status & ~0x0FC0u) | (GPR_U32(ctx, {}) & 0x0FC0u));", rt);
             case VU0_CR_MAC:
             case VU0_CR_TPC:
             case VU0_CR_VPU_STAT:
                 return fmt::format("// CTC2 write to read-only VU control register {} ignored", rd);
             case VU0_CR_CLIP:
                 return fmt::format("ctx->vu0_clip_flags = GPR_U32(ctx, {}) & 0x00FFFFFFu;", rt);
-            case VU0_CR_R:
-                return fmt::format("ctx->vu0_r = _mm_castsi128_ps(_mm_set1_epi32(static_cast<int32_t>(GPR_U32(ctx, {}))));", rt);
+            case VU0_CR_R: // a 23-bit mantissa under the fixed exponent of 1.0
+                return fmt::format("ctx->vu0_r = _mm_castsi128_ps(_mm_set1_epi32(static_cast<int32_t>(0x3F800000u | (GPR_U32(ctx, {}) & 0x007FFFFFu))));", rt);
             case VU0_CR_I:
                 return fmt::format("{{ uint32_t tmp = GPR_U32(ctx, {}); std::memcpy(&ctx->vu0_i, &tmp, sizeof(tmp)); }}", rt);
             case VU0_CR_Q:
                 return fmt::format("{{ uint32_t tmp = GPR_U32(ctx, {}); std::memcpy(&ctx->vu0_q, &tmp, sizeof(tmp)); }}", rt);
-            case VU0_CR_CMSAR0:
-                return fmt::format("ctx->vu0_cmsar0 = GPR_U32(ctx, {});", rt);
+            case VU0_CR_CMSAR0: // "ctc2 -> vi27: 0000ffff"
+                return fmt::format("ctx->vu0_cmsar0 = GPR_U32(ctx, {}) & 0xFFFFu;", rt);
             case VU0_CR_FBRST:
-                return fmt::format("ctx->vu0_fbrst = GPR_U32(ctx, {}) & 0x00000C0Cu;", rt);
-            case VU0_CR_CMSAR1:
-                return fmt::format("ctx->vu0_cmsar1 = GPR_U32(ctx, {});", rt);
+                // DE/TE stay set unless the same write resets that VU (FB/RS bits act and read 0), so ctc2 -1 reads
+                // back 0 ("ctc2 -> vi28: 00000000").
+                return fmt::format("{{ const uint32_t v = GPR_U32(ctx, {}); uint32_t keep = v & 0x00000C0Cu; "
+                                   "if (v & 0x003u) keep &= ~0x00Cu; if (v & 0x300u) keep &= ~0xC00u; ctx->vu0_fbrst = keep; }}",
+                                   rt);
+            case VU0_CR_CMSAR1: // "ctc2 -> vi31: 0000ffff"
+                return fmt::format("ctx->vu0_cmsar1 = GPR_U32(ctx, {}) & 0xFFFFu;", rt);
             default:
                 return fmt::format("// Unimplemented CTC2 VU control register: {}", rd);
             }

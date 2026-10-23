@@ -683,13 +683,12 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(ee.startThread(id, 0xCAFEu, env.ctx, false), KE_OK, "StartThread should make a dormant thread ready");
             t.IsTrue(ee.thread(id)->status == EeThreadStatus::Ready, "started thread should be in one ready queue");
             t.Equals(ee.suspendThread(id, false), KE_OK, "first suspend should remove the ready thread");
-            t.Equals(ee.suspendThread(id, false), KE_OK, "nested suspend should increment suspendCount");
-            t.IsTrue(ee.thread(id)->status == EeThreadStatus::Suspended && ee.thread(id)->suspendCount == 2,
-                     "nested suspension should have one suspended membership and count two");
-            t.Equals(ee.resumeThread(id, false), KE_OK, "first resume should only decrement the nested count");
+            // Suspends do not nest on the EE (ps2autotests kernel/ee/thread/suspend.expected: "suspend after
+            // suspend: failed -> result: -1"), so one resume restores the thread.
+            t.IsTrue(ee.suspendThread(id, false) < 0, "a second suspend should fail");
             t.IsTrue(ee.thread(id)->status == EeThreadStatus::Suspended && ee.thread(id)->suspendCount == 1,
-                     "one outstanding suspend keeps the thread suspended");
-            t.Equals(ee.resumeThread(id, false), KE_OK, "final resume should restore readiness");
+                     "the failed suspend leaves one suspended membership");
+            t.Equals(ee.resumeThread(id, false), KE_OK, "resume should restore readiness");
             t.IsTrue(ee.thread(id)->status == EeThreadStatus::Ready && ee.thread(id)->suspendCount == 0,
                      "final resume should enqueue the thread exactly once");
 

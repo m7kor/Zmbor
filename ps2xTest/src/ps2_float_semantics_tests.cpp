@@ -60,10 +60,11 @@ namespace
         uint32_t ft;
         uint32_t result;
         // 0: must match exactly.
-        // 1: the hardware does not round to nearest (ADD.S and MUL.S drop the low bits, the divide unit has its
-        //    own rule); rounding is not emulated, so the row differs in the last mantissa bit.
+        // 1: the hardware does not round to nearest (MUL.S drops the low bits, the divide unit has its own rule);
+        //    that rounding is not emulated, so the row differs in the last mantissa bit. ADD.S/SUB.S round toward
+        //    zero and are emulated, so their rows are 0.
         // 2: an ADD.S/SUB.S/MUL.S operand has exponent 0 and a non-zero mantissa. The hardware reads it as
-        //    zero; the fast path does not look for it. Not checked.
+        //    zero, and so does the fast path now (it checks operands as well as the result): must match exactly.
         int known;
     };
 
@@ -105,8 +106,6 @@ void register_ps2_float_semantics_tests()
         {
             for (const HardwareVector &v : kHardwareVectors)
             {
-                if (v.known == 2)
-                    continue;
                 const uint32_t got = runHardwareOp(v);
                 if (v.known == 1)
                 {
@@ -117,6 +116,85 @@ void register_ps2_float_semantics_tests()
                 {
                     t.Equals(got, v.result, describe(v, got));
                 }
+            }
+        });
+
+        tc.Run("COP1 arithmetic sets the FCR31 flags real hardware sets", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_fpu/fcr.expected "Flag situations", each from FCR31 = 0x01000001.
+            uint32_t fcr31 = 0x01000001u;
+            ps2_cop1_sqrt_flags(fcr31, floatOf(0xBF800000u));
+            t.Equals(fcr31, 0x01020041u, "sqrt(-1)");
+            fcr31 = 0x01000001u;
+            ps2_cop1_div_flags(fcr31, 0.0f, 0.0f);
+            t.Equals(fcr31, 0x01020041u, "0 / 0");
+            fcr31 = 0x01000001u;
+            ps2_cop1_div_flags(fcr31, 1.0f, 0.0f);
+            t.Equals(fcr31, 0x01010021u, "1 / 0");
+            fcr31 = 0x01000001u;
+            (void)ps2_cop1_add(fcr31, floatOf(0x7F800001u), floatOf(0x7F800001u));
+            t.Equals(fcr31, 0x01008011u, "NAN math (exponent-255 add)");
+            fcr31 = 0x01000001u;
+            (void)ps2_cop1_mul(fcr31, floatOf(0x7F7FFFFFu), floatOf(0x7F7FFFFFu));
+            t.Equals(fcr31, 0x01008011u, "overflow (FLT_MAX * FLT_MAX)");
+            fcr31 = 0x01000001u;
+            ps2_cop1_div_flags(fcr31, floatOf(0x00800000u), 3.0f);
+            t.Equals(fcr31, 0x01000001u, "underflow (FLT_MIN / 3) sets nothing");
+            fcr31 = 0x01000001u;
+            ps2_cop1_div_flags(fcr31, 1.0f, 3.0f);
+            (void)ps2_cop1_add(fcr31, 1.0f, 2.0f);
+            t.Equals(fcr31, 0x01000001u, "inexact sets nothing");
+        });
+
+        tc.Run("MADD/MSUB let an overflowing product outweigh the accumulator", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_fpu/muldiv.expected: "madd (acc) fs, ft: result".
+            const struct { uint32_t acc, fs, ft, result; bool subtract; } rows[] = {
+                {0xFFFFFFFFu, 0x7FFFFFFFu, 0x7FFFFFFFu, 0x7FFFFFFFu, false},
+                {0x7FFFFFFFu, 0x7FFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, false},
+                {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0x7FFFFFFFu, false},
+                {0x7FFFFFFFu, 0x7FFFFFFFu, 0x7FFFFFFFu, 0xFFFFFFFFu, true},
+                {0x7F800000u, 0x7F800000u, 0x7F800000u, 0xFFFFFFFFu, true},
+                {0xFF800000u, 0xFF800000u, 0x7F800000u, 0x7FFFFFFFu, true},
+                {0x00000000u, 0x00001337u, 0xDEADBEEFu, 0x00000000u, false}, // denormal fs is zero
+            };
+            for (const auto &row : rows)
+            {
+                const uint32_t got = bitsOf(ps2_fmadd(floatOf(row.acc), floatOf(row.fs), floatOf(row.ft), row.subtract));
+                t.Equals(got, row.result, row.subtract ? "msub row" : "madd row");
+            }
+        });
+
+        tc.Run("C.EQ/C.LT/C.LE and MAX/MIN compare encodings like the EE", [](TestCase &t)
+        {
+            // cpu/ee_fpu/compare.expected and arithmetic.expected rows.
+            const struct { uint32_t a, b; bool eq, lt, le; } compares[] = {
+                {0x7FFFFFFFu, 0x7FFFFFFFu, true, false, true},
+                {0x7FFFFFFFu, 0xFFFFFFFFu, false, false, false},
+                {0xFFFFFFFFu, 0x7FFFFFFFu, false, true, true},
+                {0x00000000u, 0x00000001u, true, false, true},
+                {0x00000001u, 0x00000000u, true, false, true},
+                {0x7F800000u, 0x7F800001u, false, true, true},
+            };
+            for (const auto &c : compares)
+            {
+                t.Equals(FPU_C_EQ_S(floatOf(c.a), floatOf(c.b)), c.eq, "eq");
+                t.Equals(FPU_C_OLT_S(floatOf(c.a), floatOf(c.b)), c.lt, "lt");
+                t.Equals(FPU_C_OLE_S(floatOf(c.a), floatOf(c.b)), c.le, "le");
+            }
+            const struct { bool max; uint32_t a, b, result; const char *what; } minmax[] = {
+                {true, 0x80000000u, 0x00000000u, 0x00000000u, "max(-0, +0)"},
+                {true, 0x7FFFFFFFu, 0xFFFFFFFFu, 0x7FFFFFFFu, "max(+max, -max)"},
+                {true, 0x7F800001u, 0x3F800000u, 0x7F800001u, "max(exp 255, 1)"},
+                {false, 0x00000000u, 0x80000000u, 0x80000000u, "min(+0, -0)"},
+                {false, 0xFFFFFFFFu, 0x3F800000u, 0xFFFFFFFFu, "min(-max, 1)"},
+            };
+            for (const auto &m : minmax)
+            {
+                const uint32_t got = bitsOf(m.max ? ps2FpuMax(floatOf(m.a), floatOf(m.b)) : ps2FpuMin(floatOf(m.a), floatOf(m.b)));
+                char text[96];
+                std::snprintf(text, sizeof(text), "%s: got %08x, hardware %08x", m.what, got, m.result);
+                t.Equals(got, m.result, text);
             }
         });
 

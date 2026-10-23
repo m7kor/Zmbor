@@ -46,19 +46,19 @@ namespace ps2recomp
             switch (function)
             {
             case COP1_S_ADD:
-                return fmt::format("ctx->f[{}] = FPU_ADD_S(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2_cop1_add(ctx->fcr31, ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_SUB:
-                return fmt::format("ctx->f[{}] = FPU_SUB_S(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2_cop1_sub(ctx->fcr31, ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_MUL:
-                return fmt::format("ctx->f[{}] = FPU_MUL_S(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2_cop1_mul(ctx->fcr31, ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_DIV:
-                // The EE has no Inf/NaN: x/0 gives +-max (sign of fs xor ft), see ps2_fdiv.
-                return fmt::format("{{ if (ctx->f[{}] == 0.0f) ctx->fcr31 |= 0x100000; /* DZ flag */ "
+                // The EE has no Inf/NaN: x/0 gives +-max (sign of fs xor ft), see ps2_fdiv; flags see ps2_cop1_div_flags.
+                return fmt::format("{{ ps2_cop1_div_flags(ctx->fcr31, ctx->f[{}], ctx->f[{}]); "
                                    "ctx->f[{}] = FPU_DIV_S(ctx->f[{}], ctx->f[{}]); }}",
-                                   ft, fd, fs, ft);
+                                   fs, ft, fd, fs, ft);
             case COP1_S_SQRT:
                 // SQRT.S fd, ft: the EE encodes the operand in ft (bits 20-16); fs is unused (PCSX2 FPU.cpp SQRT_S).
-                return fmt::format("ctx->f[{}] = FPU_SQRT_S(ctx->f[{}]);", fd, ft);
+                return fmt::format("{{ ps2_cop1_sqrt_flags(ctx->fcr31, ctx->f[{}]); ctx->f[{}] = FPU_SQRT_S(ctx->f[{}]); }}", ft, fd, ft);
             case COP1_S_ABS:
                 return fmt::format("ctx->f[{}] = FPU_ABS_S(ctx->f[{}]);", fd, fs);
             case COP1_S_MOV:
@@ -79,23 +79,23 @@ namespace ps2recomp
                 // RSQRT.S fd, fs, ft computes fs / sqrt(ft), not 1 / sqrt(fs).
                 return fmt::format("ctx->f[{}] = FPU_RSQRT_S(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_ADDA:
-                return fmt::format("FPU_SET_ACC(ctx, FPU_ADD_S(ctx->f[{}], ctx->f[{}]));", fs, ft);
+                return fmt::format("FPU_SET_ACC(ctx, ps2_cop1_add(ctx->fcr31, ctx->f[{}], ctx->f[{}]));", fs, ft);
             case COP1_S_SUBA:
-                return fmt::format("FPU_SET_ACC(ctx, FPU_SUB_S(ctx->f[{}], ctx->f[{}]));", fs, ft);
+                return fmt::format("FPU_SET_ACC(ctx, ps2_cop1_sub(ctx->fcr31, ctx->f[{}], ctx->f[{}]));", fs, ft);
             case COP1_S_MULA:
-                return fmt::format("FPU_SET_ACC(ctx, FPU_MUL_S(ctx->f[{}], ctx->f[{}]));", fs, ft);
+                return fmt::format("FPU_SET_ACC(ctx, ps2_cop1_mul(ctx->fcr31, ctx->f[{}], ctx->f[{}]));", fs, ft);
             case COP1_S_MADD:
-                return fmt::format("ctx->f[{}] = FPU_ADD_S(ctx->f_acc, FPU_MUL_S(ctx->f[{}], ctx->f[{}]));", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2_fmadd(ctx->f_acc, ctx->f[{}], ctx->f[{}], false);", fd, fs, ft);
             case COP1_S_MSUB:
-                return fmt::format("ctx->f[{}] = FPU_SUB_S(ctx->f_acc, FPU_MUL_S(ctx->f[{}], ctx->f[{}]));", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2_fmadd(ctx->f_acc, ctx->f[{}], ctx->f[{}], true);", fd, fs, ft);
             case COP1_S_MADDA:
-                return fmt::format("FPU_SET_ACC(ctx, FPU_ADD_S(ctx->f_acc, FPU_MUL_S(ctx->f[{}], ctx->f[{}])));", fs, ft);
+                return fmt::format("FPU_SET_ACC(ctx, ps2_fmadd(ctx->f_acc, ctx->f[{}], ctx->f[{}], false));", fs, ft);
             case COP1_S_MSUBA:
-                return fmt::format("FPU_SET_ACC(ctx, FPU_SUB_S(ctx->f_acc, FPU_MUL_S(ctx->f[{}], ctx->f[{}])));", fs, ft);
+                return fmt::format("FPU_SET_ACC(ctx, ps2_fmadd(ctx->f_acc, ctx->f[{}], ctx->f[{}], true));", fs, ft);
             case COP1_S_MAX:
-                return fmt::format("ctx->f[{}] = std::max(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2FpuMax(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_MIN:
-                return fmt::format("ctx->f[{}] = std::min(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
+                return fmt::format("ctx->f[{}] = ps2FpuMin(ctx->f[{}], ctx->f[{}]);", fd, fs, ft);
             case COP1_S_C_F:
                 return fmt::format("ctx->fcr31 &= ~0x800000;");
             case COP1_S_C_UN:

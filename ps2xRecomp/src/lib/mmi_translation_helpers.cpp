@@ -303,61 +303,33 @@ namespace ps2recomp
 
     std::string CodeGenerator::translatePMADDW(const Instruction &inst)
     {
-        return fmt::format("{{ __m128i p01 = _mm_mul_epu32(GPR_VEC(ctx, {}), GPR_VEC(ctx, {})); \n"
-                           "   __m128i p23 = _mm_mul_epu32(_mm_srli_si128(GPR_VEC(ctx, {}), 8), _mm_srli_si128(GPR_VEC(ctx, {}), 8)); \n"
-                           "   uint64_t acc = Ps2HiLoToU64(ctx->hi, ctx->lo); \n"
-                           "   acc += _mm_cvtsi128_si64(p01); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p01, 8)); \n"
-                           "   acc += _mm_cvtsi128_si64(p23); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p23, 8)); \n"
-                           "   ctx->lo = (uint32_t)acc; ctx->hi = (uint32_t)(acc >> 32); \n"
-                           "   SET_GPR_U64(ctx, {}, acc); }}",
-                           inst.rs, inst.rt, inst.rs, inst.rt, inst.rd);
+        // Words 0 and 2 into 64-bit results in rd and HI/LO (ps2MmiWordMultiply; ps2autotests ee_simd/muldiv).
+        return fmt::format("SET_GPR_VEC(ctx, {}, ps2MmiWordMultiply(ctx, GPR_VEC(ctx, {}), GPR_VEC(ctx, {}), Ps2MmiAccumulate::Add, false));",
+                           inst.rd, inst.rs, inst.rt);
     }
 
 
     std::string CodeGenerator::translatePMSUBW(const Instruction &inst)
     {
-        return fmt::format("{{ __m128i p01 = _mm_mul_epu32(GPR_VEC(ctx, {}), GPR_VEC(ctx, {})); \n"
-                           "   __m128i p23 = _mm_mul_epu32(_mm_srli_si128(GPR_VEC(ctx, {}), 8), _mm_srli_si128(GPR_VEC(ctx, {}), 8)); \n"
-                           "   uint64_t acc = Ps2HiLoToU64(ctx->hi, ctx->lo); \n"
-                           "   acc -= _mm_cvtsi128_si64(p01); \n"
-                           "   acc -= _mm_cvtsi128_si64(_mm_srli_si128(p01, 8)); \n"
-                           "   acc -= _mm_cvtsi128_si64(p23); \n"
-                           "   acc -= _mm_cvtsi128_si64(_mm_srli_si128(p23, 8)); \n"
-                           "   ctx->lo = (uint32_t)acc; ctx->hi = (uint32_t)(acc >> 32); \n"
-                           "   SET_GPR_U64(ctx, {}, acc); }}",
-                           inst.rs, inst.rt, inst.rs, inst.rt, inst.rd);
+        // Words 0 and 2 into 64-bit results in rd and HI/LO (ps2MmiWordMultiply; ps2autotests ee_simd/muldiv).
+        return fmt::format("SET_GPR_VEC(ctx, {}, ps2MmiWordMultiply(ctx, GPR_VEC(ctx, {}), GPR_VEC(ctx, {}), Ps2MmiAccumulate::Sub, false));",
+                           inst.rd, inst.rs, inst.rt);
     }
 
 
     std::string CodeGenerator::translatePMULTW(const Instruction &inst)
     {
-        return fmt::format("{{ __m128i p01 = _mm_mul_epu32(GPR_VEC(ctx, {}), GPR_VEC(ctx, {})); \n"
-                           "   __m128i p23 = _mm_mul_epu32(_mm_srli_si128(GPR_VEC(ctx, {}), 8), _mm_srli_si128(GPR_VEC(ctx, {}), 8)); \n"
-                           "   uint64_t acc = 0; \n"
-                           "   acc += _mm_cvtsi128_si64(p01); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p01, 8)); \n"
-                           "   acc += _mm_cvtsi128_si64(p23); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p23, 8)); \n"
-                           "   ctx->lo = (uint32_t)acc; ctx->hi = (uint32_t)(acc >> 32); \n"
-                           "   SET_GPR_U64(ctx, {}, acc); }}",
-                           inst.rs, inst.rt, inst.rs, inst.rt, inst.rd);
+        // Words 0 and 2 into 64-bit results in rd and HI/LO (ps2MmiWordMultiply; ps2autotests ee_simd/muldiv).
+        return fmt::format("SET_GPR_VEC(ctx, {}, ps2MmiWordMultiply(ctx, GPR_VEC(ctx, {}), GPR_VEC(ctx, {}), Ps2MmiAccumulate::Set, false));",
+                           inst.rd, inst.rs, inst.rt);
     }
 
 
     std::string CodeGenerator::translatePMADDUW(const Instruction &inst)
     {
-        return fmt::format("{{ __m128i p01 = _mm_mul_epu32(GPR_VEC(ctx, {}), GPR_VEC(ctx, {})); \n"
-                           "   __m128i p23 = _mm_mul_epu32(_mm_srli_si128(GPR_VEC(ctx, {}), 8), _mm_srli_si128(GPR_VEC(ctx, {}), 8)); \n"
-                           "   uint64_t acc = Ps2HiLoToU64(ctx->hi, ctx->lo); \n"
-                           "   acc += _mm_cvtsi128_si64(p01); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p01, 8)); \n"
-                           "   acc += _mm_cvtsi128_si64(p23); \n"
-                           "   acc += _mm_cvtsi128_si64(_mm_srli_si128(p23, 8)); \n"
-                           "   ctx->lo = (uint32_t)acc; ctx->hi = (uint32_t)(acc >> 32); \n"
-                           "   SET_GPR_U64(ctx, {}, acc); }}",
-                           inst.rs, inst.rt, inst.rs, inst.rt, inst.rd);
+        // Words 0 and 2 into 64-bit results in rd and HI/LO (ps2MmiWordMultiply; ps2autotests ee_simd/muldiv).
+        return fmt::format("SET_GPR_VEC(ctx, {}, ps2MmiWordMultiply(ctx, GPR_VEC(ctx, {}), GPR_VEC(ctx, {}), Ps2MmiAccumulate::Add, true));",
+                           inst.rd, inst.rs, inst.rt);
     }
 
 
@@ -458,14 +430,9 @@ namespace ps2recomp
 
     std::string CodeGenerator::translatePMULTUW(const Instruction &inst)
     {
-        // Parallel multiply unsigned word -> results to HI/LO and rd (lower 32 bits)
-        return fmt::format("{{ __m128i p01 = _mm_mul_epu32(GPR_VEC(ctx, {}), GPR_VEC(ctx, {})); \n"
-                           "   __m128i p23 = _mm_mul_epu32(_mm_srli_si128(GPR_VEC(ctx, {}), 8), _mm_srli_si128(GPR_VEC(ctx, {}), 8)); \n"
-                           "   uint64_t res0 = _mm_cvtsi128_si64(p01); uint64_t res1 = _mm_cvtsi128_si64(_mm_srli_si128(p01, 8)); \n"
-                           "   uint64_t res2 = _mm_cvtsi128_si64(p23); uint64_t res3 = _mm_cvtsi128_si64(_mm_srli_si128(p23, 8)); \n"
-                           "   ctx->lo = (uint32_t)res0; ctx->hi = (uint32_t)(res0 >> 32); \n" // HI/LO from first product only
-                           "   SET_GPR_VEC(ctx, {}, _mm_set_epi32((uint32_t)res3, (uint32_t)res2, (uint32_t)res1, (uint32_t)res0)); }}",
-                           inst.rs, inst.rt, inst.rs, inst.rt, inst.rd);
+        // Words 0 and 2 into 64-bit results in rd and HI/LO (ps2MmiWordMultiply; ps2autotests ee_simd/muldiv).
+        return fmt::format("SET_GPR_VEC(ctx, {}, ps2MmiWordMultiply(ctx, GPR_VEC(ctx, {}), GPR_VEC(ctx, {}), Ps2MmiAccumulate::Set, true));",
+                           inst.rd, inst.rs, inst.rt);
     }
 
 

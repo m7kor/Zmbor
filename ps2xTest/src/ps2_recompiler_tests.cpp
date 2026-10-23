@@ -633,6 +633,28 @@ static bool writeMinimalMipsElfWithAddressTakenCallbacks(const std::filesystem::
     textWords[373] = 0x03E00008u; // jr ra
     textWords[374] = 0x27BD0010u; // addiu sp,sp,0x10 (delay slot)
 
+    // As in ps2autotests kernel/ee/thread/delete.elf: the LUI of a thread entry sits in a JAL delay slot, the
+    // ADDIU completes it in callee-saved s0 after the call, and s0 is later passed as an argument. The entry is a
+    // `jr ra` leaf placed right after a `syscall; nop` with no return of its own before it.
+    textWords[300] = 0x27BDFFF0u; // caller at 0x001004B0: addiu sp,sp,-0x10
+    textWords[301] = 0xFFBF0000u; // sd ra,0(sp)
+    textWords[302] = 0x0C040008u; // jal 0x00100020
+    textWords[303] = 0x3C100010u; // lui s0,0x10 (delay slot)
+    textWords[304] = 0x261004F0u; // addiu s0,s0,0x4F0 -> 0x001004F0
+    textWords[305] = 0x0C040008u; // jal 0x00100020
+    textWords[306] = 0x00000000u; // nop (delay slot)
+    textWords[307] = 0x0200202Du; // daddu a0,s0,zero
+    textWords[308] = 0x0C040008u; // jal 0x00100020
+    textWords[309] = 0x00000000u; // nop (delay slot)
+    textWords[310] = 0xDFBF0000u; // ld ra,0(sp)
+    textWords[311] = 0x03E00008u; // jr ra
+    textWords[312] = 0x27BD0010u; // addiu sp,sp,0x10 (delay slot)
+    textWords[313] = 0x24030023u; // addiu v1,zero,0x23
+    textWords[314] = 0x0000000Cu; // syscall (ExitThread, does not return)
+    textWords[315] = 0x00000000u; // nop
+    textWords[316] = 0x03E00008u; // thread entry at 0x001004F0: jr ra
+    textWords[317] = 0x00000000u; // nop (delay slot)
+
     text->set_data(reinterpret_cast<const char *>(textWords.data()),
                    static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
 
@@ -1802,6 +1824,8 @@ void register_ps2_recompiler_tests()
                      "an adjacent two-instruction leaf thunk should be split from a known thunk");
             t.IsTrue(hasStart(0x001003E0u),
                      "a callback passed as the fifth register argument should be discovered");
+            t.IsTrue(hasStart(0x001004F0u),
+                     "a code address whose LUI sits in a JAL delay slot of a callee-saved register should be discovered");
             t.IsTrue(hasStart(0x00100400u),
                      "a long callback passed as the fifth register argument should be discovered");
             t.IsFalse(hasStart(0x00100548u),

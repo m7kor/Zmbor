@@ -405,7 +405,7 @@ void register_ps2_runtime_expansion_tests()
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
         // MMI HI/LO family against PCSX2 MMI.cpp, with expectations computed from scalar products here.
-        tc.Run("MMI halfword multiplies match real-PS2 results (ps2autotests ee_simd/muldiv)", [](TestCase &t)
+        tc.Run("MMI halfword and word multiplies match real-PS2 results (ps2autotests ee_simd/muldiv)", [](TestCase &t)
         {
             uint32_t mismatches = 0u;
             for (const MmiHardwareVector &v : kMmiHardwareVectors)
@@ -429,8 +429,14 @@ void register_ps2_runtime_expansion_tests()
                     rd = ps2MmiHalfwordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Sub);
                 else if (op == "phmadh")
                     rd = ps2MmiHorizontalMultiply(&ctx, rs, rt, false);
-                else
+                else if (op == "phmsbh")
                     rd = ps2MmiHorizontalMultiply(&ctx, rs, rt, true);
+                else if (op == "pmultw" || op == "pmultuw")
+                    rd = ps2MmiWordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Set, op == "pmultuw");
+                else if (op == "pmaddw" || op == "pmadduw")
+                    rd = ps2MmiWordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Add, op == "pmadduw");
+                else
+                    rd = ps2MmiWordMultiply(&ctx, rs, rt, Ps2MmiAccumulate::Sub, false); // pmsubw
                 alignas(16) uint32_t got[4];
                 _mm_store_si128(reinterpret_cast<__m128i *>(got), rd);
                 const bool ok = std::memcmp(got, v.rd, sizeof(got)) == 0 && ctx.hi == v.hi && ctx.hi1 == v.hi1 &&
@@ -443,8 +449,8 @@ void register_ps2_runtime_expansion_tests()
                 }
             }
             t.Equals(mismatches, 0u, "every hardware row should match rd, HI, HI1, LO and LO1");
-            t.Equals(static_cast<uint32_t>(sizeof(kMmiHardwareVectors) / sizeof(kMmiHardwareVectors[0])), 160u,
-                     "all 160 hardware rows (5 ops x 32 cases) should be checked");
+            t.Equals(static_cast<uint32_t>(sizeof(kMmiHardwareVectors) / sizeof(kMmiHardwareVectors[0])), 320u,
+                     "all 320 hardware rows (10 ops x 32 cases) should be checked");
         });
 
         tc.Run("MMI shuffles, absolutes, saturating adds and variable shifts match real-PS2 results", [](TestCase &t)
@@ -1195,6 +1201,23 @@ void register_ps2_runtime_expansion_tests()
                      "new MPEG create should allow callbacks for the next stream");
 
             runtime.requestStop();
+        });
+
+        tc.Run("SuspendThread does not nest", [](TestCase &t)
+        {
+            // ps2autotests kernel/ee/thread/suspend.expected: "suspend after suspend: failed -> result: -1".
+            PS2Runtime runtime;
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
+            runtime.registerFunction(kAllDormantOtherPc, testAllDormantOther);
+            R5900Context mainContext{};
+            mainContext.pc = kAllDormantMainPc;
+            EeScheduler &ee = runtime.eeScheduler();
+            ee.reset(rdram.data(), mainContext);
+            const int id = ee.createThread(EeThreadCreateParams{0u, kAllDormantOtherPc, 0u, 0u, 0u, 50, 0u});
+            t.Equals(ee.startThread(id, 0u, mainContext, false), 0, "start");
+            t.IsTrue(ee.suspendThread(id, false) >= 0, "the first suspend succeeds");
+            t.IsTrue(ee.suspendThread(id, false) < 0, "a second suspend fails");
+            t.IsTrue(ee.resumeThread(id, false) >= 0, "one resume undoes it");
         });
 
         tc.Run("EE scheduler ends the run once every thread is dormant", [](TestCase &t)

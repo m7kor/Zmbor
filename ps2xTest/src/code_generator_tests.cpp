@@ -295,6 +295,26 @@ void register_code_generator_tests()
                  "only the writable FCR31 bits change");
     });
 
+    tc.Run("VF0 stays hardwired for LQC2 and QMTC2; CTC2 uses the hardware write masks", [](TestCase &t) {
+        // ps2autotests cpu/vu0_macro/transfer.expected: "lqc2 -> $vf0: 3f800000 00000000 00000000 00000000",
+        // "ctc2 -> vi16: 00000fc0", "vi27: 0000ffff", "vi28: 00000000".
+        CodeGenerator gen({}, {});
+        const std::string lqc2 = gen.translateInstruction(makeIType(0x9000, OPCODE_LQC2, 4, 0, 0x10));
+        t.IsTrue(lqc2.find("vu0_vf[0] =") == std::string::npos, "LQC2 must not write VF0: " + lqc2);
+        Instruction cop2{};
+        cop2.opcode = OPCODE_COP2;
+        cop2.rs = COP2_QMTC2;
+        cop2.rt = 8;
+        cop2.rd = 0;
+        t.IsTrue(gen.translateInstruction(cop2).find("vu0_vf[0] =") == std::string::npos, "QMTC2 must not write VF0");
+        cop2.rs = COP2_CTC2;
+        cop2.rd = 16;
+        t.IsTrue(gen.translateInstruction(cop2).find("0x0FC0u") != std::string::npos, "STATUS keeps only sticky flags");
+        cop2.rd = 27;
+        t.IsTrue(gen.translateInstruction(cop2).find("ctx->vu0_cmsar0 = GPR_U32(ctx, 8) & 0xFFFFu;") != std::string::npos,
+                 "CMSAR0 is 16 bits");
+    });
+
     tc.Run("VU0 macro integer ops discard writes to vi0", [](TestCase &t) {
         // ps2autotests cpu/vu0_macro/integer.expected: "viadd -> $0: 0000".
         CodeGenerator gen({}, {});

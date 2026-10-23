@@ -247,6 +247,12 @@ void EeScheduler::run()
             {
                 GuestInvocation completed = std::move(running->invocations.back());
                 running->invocations.pop_back();
+                if (completed.kind == GuestInvocationKind::Interrupt)
+                {
+                    // Leaving an interrupt is a rescheduling point; a self-suspended thread reads as running again
+                    // (suspend.expected: "self thread status after rescheduling: ... status: 01").
+                    running->selfSuspendShown = false;
+                }
                 if (completed.onComplete)
                 {
                     try
@@ -587,14 +593,21 @@ int EeScheduler::suspendThread(int id, bool interruptSafe)
         return KE_DORMANT;
     }
 
+    if (target->status == EeThreadStatus::Running)
+    {
+        // The EE kernel does not stop the caller: "suspend (with current tid): succeeded ... status: 08", then
+        // "self thread status after rescheduling: ... status: 01".
+        target->selfSuspendShown = true;
+        return KE_OK;
+    }
+    if (target->status == EeThreadStatus::Suspended || target->status == EeThreadStatus::WaitingSuspended)
+    {
+        // Suspends do not nest on the EE (suspend.expected: "suspend after suspend: failed -> result: -1").
+        return KE_ERROR;
+    }
     ++target->suspendCount;
     switch (target->status)
     {
-    case EeThreadStatus::Running:
-        target->status = EeThreadStatus::Suspended;
-        m_currentThreadId = 0;
-        m_rescheduleRequested = true;
-        break;
     case EeThreadStatus::Ready:
         removeReady(*target);
         target->status = EeThreadStatus::Suspended;
@@ -1727,6 +1740,7 @@ void EeScheduler::makeRunning(GuestThread &item)
     assert(m_currentThreadId == 0);
     assert(item.status == EeThreadStatus::Ready);
     item.status = EeThreadStatus::Running;
+    item.selfSuspendShown = false;
     m_currentThreadId = item.id;
     renewTimeSlice();
 }

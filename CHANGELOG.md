@@ -114,3 +114,21 @@ no regressions between runs. Every fix below cites the `.expected` lines it was 
 - Recompiler: a race in single-file output could abort with "combined output completion queue is missing index".
 - `gs_sprite` now compares the whole frame (286,720 pixels, tolerance 0) and prints its SHA-256.
 - Tests confirmed to fail with their fix reverted: MOVN, PEXCH, all-dormant stop, handler cancel, MADR, FILEIO bind.
+
+### Phase 2, second batch
+
+After: `ps2x_tests` 507/507, end-to-end 2/2, hardware result tests 32/55 exact (6627/8250 lines), no
+regressions. State and remaining failures by cause: `docs/hwtest/README.md`, `docs/hwtest/dashboard.json`.
+
+- FPU: ADD.S/SUB.S (and the ACC/MADD/MSUB additions) round toward zero (an exact-rational model reproduces all 76
+  hex-operand rows); denormal operands count as zero on the fast path too; C.EQ/C.LT/C.LE and MAX.S/MIN.S compare
+  encodings (no NaN, denormal = 0, -0 < +0 for MAX/MIN); MADD/MSUB do not saturate an overflowing product before
+  accumulating; FCR31 gets O/SO on saturating ADD/SUB/MUL, I/SI on 0/0 and SQRT of a negative, D/SD on x/0.
+- MMI: PMULTW/PMULTUW/PMADDW/PMADDUW/PMSUBW (words 0 and 2, 64-bit HI:LO accumulators); 160 more real-PS2 vectors.
+- Kernel: suspends do not nest; SuspendThread on the caller keeps it running and reads back as suspended until the
+  next rescheduling point; StartThread warns when the entry was never recompiled.
+- Recompiler: a code address whose LUI sits in a JAL delay slot of a callee-saved register is now found as an
+  entry point (a thread entry in ps2autotests' delete.elf was missing, so StartThread failed).
+- VU0: LQC2/QMTC2 leave VF0 alone; CTC2 write masks for STATUS (sticky flags), R (23 bits), CMSAR0/1 (16 bits)
+  and FBRST (reset bits clear DE/TE); CFC2 of vi19/vi23/vi25 read the hardware values.
+- Mutation-checked: RZ addition, PMADDW accumulator, delay-slot LUI discovery.

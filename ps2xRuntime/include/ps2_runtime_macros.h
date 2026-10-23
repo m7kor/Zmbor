@@ -198,13 +198,29 @@ inline float ps2_from_double(double d)
     return static_cast<float>(d);
 }
 
+// The slow-path counterpart: round a double toward zero to a PS2 float (saturating, flushing like ps2_from_double).
+inline float ps2_from_double_toward_zero(double d)
+{
+    float f = ps2_from_double(d);
+    const uint32_t bits = std::bit_cast<uint32_t>(f);
+    if ((bits & PS2_FLOAT_EXP_MASK) == 0u || (bits & 0x7FFFFFFFu) == PS2_FLOAT_MAX_BITS)
+        return f; // zero or saturated: already toward zero
+    if (std::fabs(ps2_to_double(f)) > std::fabs(d))
+    {
+        const uint32_t stepped = bits - 1u;
+        f = (stepped & PS2_FLOAT_EXP_MASK) == 0u ? std::bit_cast<float>(stepped & PS2_FLOAT_SIGN_MASK)
+                                                 : std::bit_cast<float>(stepped);
+    }
+    return f;
+}
+
 PS2_FLOAT_NOINLINE inline float ps2_fadd_slow(float a, float b)
 {
     // Zero operands and results end up here too; the host result is right for them.
     const float r = a + b;
     if (!(ps2_fspecial(a) | ps2_fspecial(b) | ps2_fspecial(r)))
         return r;
-    return ps2_from_double(ps2_to_double(a) + ps2_to_double(b));
+    return ps2_from_double_toward_zero(ps2_to_double(a) + ps2_to_double(b));
 }
 
 PS2_FLOAT_NOINLINE inline float ps2_fsub_slow(float a, float b)
@@ -213,7 +229,7 @@ PS2_FLOAT_NOINLINE inline float ps2_fsub_slow(float a, float b)
     const float r = a - b;
     if (!(ps2_fspecial(a) | ps2_fspecial(b) | ps2_fspecial(r)))
         return r;
-    return ps2_from_double(ps2_to_double(a) - ps2_to_double(b));
+    return ps2_from_double_toward_zero(ps2_to_double(a) - ps2_to_double(b));
 }
 
 PS2_FLOAT_NOINLINE inline float ps2_fmul_slow(float a, float b)
@@ -275,22 +291,107 @@ inline bool ps2_fnormal(float r)
     return (std::bit_cast<uint32_t>(r) * 2u + 0x01000000u) >= 0x02000000u;
 }
 
+// ADD.S/SUB.S round toward zero (ps2autotests cpu/ee_fpu/arithmetic.expected: "add CF_MAX_MANTISSA, CF_ONE:
+// 403fffff" where round-to-nearest gives 40400000; an exact-rational round-toward-zero model reproduces all 76
+// hex-operand ADD/SUB rows). The host sum r rounds to nearest; when it went away from zero, step one unit back.
+// The exact sum comes from double arithmetic (exact for exponent gaps up to 29 bits; past 53 the direction can be
+// lost, an accepted corner). A float TwoSum is not used: MSVC folds it at higher precision for constant operands.
+// Only for normal a, b and r (the fast path); 'b' is already negated for SUB.
+inline float ps2_fadd_toward_zero(float a, float b, float r)
+{
+    const double exact = static_cast<double>(a) + static_cast<double>(b);
+    if (r == 0.0f || !(std::fabs(static_cast<double>(r)) > std::fabs(exact)))
+        return r;
+    const uint32_t stepped = std::bit_cast<uint32_t>(r) - 1u; // one unit toward zero in sign-magnitude
+    return (stepped & PS2_FLOAT_EXP_MASK) == 0u ? std::bit_cast<float>(stepped & PS2_FLOAT_SIGN_MASK)
+                                                 : std::bit_cast<float>(stepped);
+}
+
+// The operands are checked too: a denormal operand is zero on the EE but can still give the host a normal result
+// (ps2autotests cpu/ee_fpu/muldiv.expected: "mul CF_GARBAGE1, CF_GARBAGE2: 80000000" with a denormal fs).
 inline float ps2_fadd(float a, float b)
 {
     const float r = a + b;
-    return ps2_fnormal(r) ? r : ps2_fadd_slow(a, b);
+    return ps2_fall_normal(a, b, r) ? ps2_fadd_toward_zero(a, b, r) : ps2_fadd_slow(a, b);
 }
 
 inline float ps2_fsub(float a, float b)
 {
     const float r = a - b;
-    return ps2_fnormal(r) ? r : ps2_fsub_slow(a, b);
+    return ps2_fall_normal(a, b, r) ? ps2_fadd_toward_zero(a, -b, r) : ps2_fsub_slow(a, b);
 }
 
 inline float ps2_fmul(float a, float b)
 {
     const float r = a * b;
-    return ps2_fnormal(r) ? r : ps2_fmul_slow(a, b);
+    return ps2_fall_normal(a, b, r) ? r : ps2_fmul_slow(a, b);
+}
+
+// COP1 forms that also update FCR31, with the flags real hardware showed (ps2autotests cpu/ee_fpu/fcr.expected,
+// each starting from FCR31 = 0x01000001): a saturating ADD/SUB/MUL sets O and SO (0x8010; "NAN math" add,
+// "Overflow" mul); DIV 0/0 sets I and SI (0x20040), x/0 sets D and SD (0x10020); SQRT of a negative sets I and SI.
+// A DIV result flushed to zero sets nothing ("Underflow": 01000001). Only these cases are modelled.
+constexpr uint32_t PS2_FCR31_OVERFLOW = 0x00008010u;
+constexpr uint32_t PS2_FCR31_INVALID = 0x00020040u;
+constexpr uint32_t PS2_FCR31_DIVIDE_BY_ZERO = 0x00010020u;
+
+inline void ps2_cop1_overflow_flag(uint32_t &fcr31, double exact)
+{
+    if (std::fabs(exact) >= 0x1p129)
+        fcr31 |= PS2_FCR31_OVERFLOW;
+}
+
+inline float ps2_cop1_add(uint32_t &fcr31, float a, float b)
+{
+    const float r = a + b;
+    if (ps2_fall_normal(a, b, r))
+        return ps2_fadd_toward_zero(a, b, r);
+    ps2_cop1_overflow_flag(fcr31, ps2_to_double(a) + ps2_to_double(b));
+    return ps2_fadd_slow(a, b);
+}
+
+inline float ps2_cop1_sub(uint32_t &fcr31, float a, float b)
+{
+    const float r = a - b;
+    if (ps2_fall_normal(a, b, r))
+        return ps2_fadd_toward_zero(a, -b, r);
+    ps2_cop1_overflow_flag(fcr31, ps2_to_double(a) - ps2_to_double(b));
+    return ps2_fsub_slow(a, b);
+}
+
+inline float ps2_cop1_mul(uint32_t &fcr31, float a, float b)
+{
+    const float r = a * b;
+    if (ps2_fall_normal(a, b, r))
+        return r;
+    ps2_cop1_overflow_flag(fcr31, ps2_to_double(a) * ps2_to_double(b));
+    return ps2_fmul_slow(a, b);
+}
+
+inline void ps2_cop1_div_flags(uint32_t &fcr31, float a, float b)
+{
+    if ((std::bit_cast<uint32_t>(b) & PS2_FLOAT_EXP_MASK) != 0u)
+        return;
+    fcr31 |= (std::bit_cast<uint32_t>(a) & PS2_FLOAT_EXP_MASK) == 0u ? PS2_FCR31_INVALID : PS2_FCR31_DIVIDE_BY_ZERO;
+}
+
+inline void ps2_cop1_sqrt_flags(uint32_t &fcr31, float a)
+{
+    const uint32_t bits = std::bit_cast<uint32_t>(a);
+    if ((bits & PS2_FLOAT_SIGN_MASK) != 0u && (bits & PS2_FLOAT_EXP_MASK) != 0u)
+        fcr31 |= PS2_FCR31_INVALID;
+}
+
+// MADD/MSUB (and the ACC forms): the product is rounded like MUL.S, except that a product past the float range is
+// not saturated before the accumulation, so it outweighs the accumulator (muldiv.expected: "madd (ffffffff)
+// 7fffffff, 7fffffff: 7fffffff", "msub (7f800000) 7f800000, 7f800000: ffffffff").
+inline float ps2_fmadd(float acc, float a, float b, bool subtract)
+{
+    const double product = ps2_to_double(a) * ps2_to_double(b);
+    if (std::fabs(product) >= 0x1p129)
+        return ps2_from_double(subtract ? ps2_to_double(acc) - product : ps2_to_double(acc) + product);
+    const float p = ps2_fmul(a, b);
+    return subtract ? ps2_fsub(acc, p) : ps2_fadd(acc, p);
 }
 
 inline float ps2_fdiv(float a, float b)
@@ -1015,11 +1116,42 @@ inline float ps2_vu_rsqrt(uint16_t &status, float fs, float ft)
 #define FPU_CVT_L_S(a) ((int64_t)(float)(a))
 #define FPU_C_F_S(a, b) (0)
 #define FPU_C_UN_S(a, b) (isnan((float)(a)) || isnan((float)(b)))
-#define FPU_C_EQ_S(a, b) ((float)(a) == (float)(b))
+// The EE FPU has no NaN or infinity and treats denormals as zero, so it compares encodings, not IEEE values
+// (ps2autotests cpu/ee_fpu/compare.expected: "eq 7fffffff, 7fffffff: true", "eq 00000000, 00000001: true",
+// "lt ffffffff, 7fffffff: true"). Zero and denormal of either sign compare equal; the rest is sign-magnitude.
+inline uint32_t ps2FloatBits(float value)
+{
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits;
+}
+
+inline int32_t ps2FpuCompareKey(float value)
+{
+    const uint32_t bits = ps2FloatBits(value);
+    if ((bits & 0x7F800000u) == 0u)
+        return 0;
+    const int32_t magnitude = static_cast<int32_t>(bits & 0x7FFFFFFFu);
+    return (bits & 0x80000000u) ? -magnitude : magnitude;
+}
+
+// MAX.S/MIN.S order encodings the same way but keep -0 below +0 (cpu/ee_fpu/arithmetic.expected:
+// "max 80000000, 00000000: 00000000", "max 7fffffff, ffffffff: 7fffffff").
+inline int64_t ps2FpuMinMaxKey(float value)
+{
+    const uint32_t bits = ps2FloatBits(value);
+    const int64_t magnitude = static_cast<int64_t>(bits & 0x7FFFFFFFu);
+    return (bits & 0x80000000u) ? -magnitude - 1 : magnitude;
+}
+
+inline float ps2FpuMax(float a, float b) { return ps2FpuMinMaxKey(a) >= ps2FpuMinMaxKey(b) ? a : b; }
+inline float ps2FpuMin(float a, float b) { return ps2FpuMinMaxKey(a) <= ps2FpuMinMaxKey(b) ? a : b; }
+
+#define FPU_C_EQ_S(a, b) (ps2FpuCompareKey((float)(a)) == ps2FpuCompareKey((float)(b)))
 #define FPU_C_UEQ_S(a, b) ((float)(a) == (float)(b) || isnan((float)(a)) || isnan((float)(b)))
-#define FPU_C_OLT_S(a, b) ((float)(a) < (float)(b))
+#define FPU_C_OLT_S(a, b) (ps2FpuCompareKey((float)(a)) < ps2FpuCompareKey((float)(b))) // R5900 C.LT
 #define FPU_C_ULT_S(a, b) ((float)(a) < (float)(b) || isnan((float)(a)) || isnan((float)(b)))
-#define FPU_C_OLE_S(a, b) ((float)(a) <= (float)(b))
+#define FPU_C_OLE_S(a, b) (ps2FpuCompareKey((float)(a)) <= ps2FpuCompareKey((float)(b))) // R5900 C.LE
 #define FPU_C_ULE_S(a, b) ((float)(a) <= (float)(b) || isnan((float)(a)) || isnan((float)(b)))
 #define FPU_C_SF_S(a, b) (0)
 #define FPU_C_NGLE_S(a, b) (isnan((float)(a)) || isnan((float)(b)))
@@ -1233,6 +1365,39 @@ enum class Ps2MmiAccumulate
 
 // PMULTH / PMADDH / PMSUBH: product i of the eight halfword pairs goes to LO word {0,1,_,_,2,3,_,_}[i] or
 // HI word {_,_,0,1,_,_,2,3}[i]; rd = {LO0, HI0, LO2, HI2}.
+// PMULTW/PMULTUW/PMADDW/PMADDUW/PMSUBW: words 0 and 2 of rs and rt multiply into 64-bit products. Doubleword i of
+// HI:LO (HI.w[2i] above LO.w[2i]) is the accumulator; the 64-bit result r goes to rd.d[i], and LO/HI doubleword i
+// get the sign-extended low/high words of r (ps2autotests cpu/ee_simd/muldiv.expected, "pmaddw 1, 1": rd
+// abcdef01 cdef0124 89abcdef 9abcdef1 from C_HILO).
+static inline __m128i ps2MmiWordMultiply(R5900Context *ctx, __m128i rs, __m128i rt, Ps2MmiAccumulate mode, bool isUnsigned)
+{
+    alignas(16) uint32_t a[4];
+    alignas(16) uint32_t b[4];
+    _mm_store_si128(reinterpret_cast<__m128i *>(a), rs);
+    _mm_store_si128(reinterpret_cast<__m128i *>(b), rt);
+    Ps2HiLoWords w = ps2LoadHiLo(ctx);
+    uint64_t out[2];
+    for (int i = 0; i < 2; ++i)
+    {
+        const int k = 2 * i;
+        const uint64_t product = isUnsigned
+                                     ? static_cast<uint64_t>(a[k]) * static_cast<uint64_t>(b[k])
+                                     : static_cast<uint64_t>(static_cast<int64_t>(static_cast<int32_t>(a[k])) *
+                                                             static_cast<int64_t>(static_cast<int32_t>(b[k])));
+        const uint64_t acc = (static_cast<uint64_t>(w.hi[k]) << 32) | w.lo[k];
+        const uint64_t r = mode == Ps2MmiAccumulate::Set ? product : mode == Ps2MmiAccumulate::Add ? acc + product : acc - product;
+        out[i] = r;
+        const uint32_t low = static_cast<uint32_t>(r);
+        const uint32_t high = static_cast<uint32_t>(r >> 32);
+        w.lo[k] = low;
+        w.lo[k + 1] = (low & 0x80000000u) ? 0xFFFFFFFFu : 0u;
+        w.hi[k] = high;
+        w.hi[k + 1] = (high & 0x80000000u) ? 0xFFFFFFFFu : 0u;
+    }
+    ps2StoreHiLo(ctx, w);
+    return _mm_set_epi64x(static_cast<int64_t>(out[1]), static_cast<int64_t>(out[0]));
+}
+
 static inline __m128i ps2MmiHalfwordMultiply(R5900Context *ctx, __m128i rs, __m128i rt, Ps2MmiAccumulate mode)
 {
     alignas(16) int16_t a[8];

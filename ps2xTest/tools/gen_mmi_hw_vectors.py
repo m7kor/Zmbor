@@ -10,7 +10,7 @@ Usage: gen_mmi_hw_vectors.py <muldiv.expected> <out.inc>
 import re
 import sys
 
-OPS = ('phmadh', 'phmsbh', 'pmaddh', 'pmsubh', 'pmulth')
+OPS = ('phmadh', 'phmsbh', 'pmaddh', 'pmsubh', 'pmulth', 'pmaddw', 'pmadduw', 'pmsubw', 'pmultw', 'pmultuw')
 
 CONST = {  # tests/cpu/ee_simd/shared.h and muldiv.cpp
     'C_ZERO': [0, 0, 0, 0], 'C_ONE': [1, 0, 0, 0], 'C_NEGONE': [0xFFFFFFFF] * 4,

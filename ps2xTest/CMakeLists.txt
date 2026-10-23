@@ -15,6 +15,11 @@ if(BUILD_TESTING)
         add_test(NAME research_database_valid
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/research/validate_research.py)
     endif()
+
+    option(PS2X_BUILD_E2E_TESTS "Build the ELF-to-native end-to-end tests" ON)
+    if(PS2X_BUILD_E2E_TESTS)
+        add_subdirectory(e2e)
+    endif()
 endif()
 
 # Static library with test logic (no main), used by ps2xStudio

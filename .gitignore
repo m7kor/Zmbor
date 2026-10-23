@@ -24,3 +24,6 @@ android/local.properties
 android/.gradle/ 
 .idea/
 build-*/
+
+# Python bytecode caches
+__pycache__/

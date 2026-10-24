@@ -3,6 +3,7 @@
 #include "ps2recomp/control_flow_utils.h"
 #include "ps2recomp/instructions.h"
 #include "ps2recomp/r5900_decoder.h"
+#include "ps2recomp/recompiler_reporter.h"
 #include "ps2_runtime_calls.h"
 
 #include <algorithm>
@@ -533,6 +534,159 @@ namespace ps2recomp
         m_ss << "    }\n";
     }
 
+    bool ControlFlowEmitter::delaySlotIsOwnTransfer() const
+    {
+        return m_delaySlotOverride.empty() && m_delaySlot.hasDelaySlot && isInternalTarget(delayPc());
+    }
+
+    // The outcome is known when the branch is decoded: jumps, branch-likely (predicted taken), and conditional
+    // branches whose encoding fixes the outcome (beq rs,rs; b/bal as bgez/bgezal $0; blez $0).
+    bool ControlFlowEmitter::resolvesEarly() const
+    {
+        const Instruction &b = m_branchInst;
+        if (b.opcode == OPCODE_J || b.opcode == OPCODE_JAL || isLikelyBranch())
+            return true;
+        if (b.opcode == OPCODE_BEQ && b.rs == b.rt)
+            return true;
+        if (b.opcode == OPCODE_BLEZ && b.rs == 0u)
+            return true;
+        return b.opcode == OPCODE_REGIMM && b.rs == 0u && (b.rt == REGIMM_BGEZ || b.rt == REGIMM_BGEZAL);
+    }
+
+    bool ControlFlowEmitter::linksUnconditionally() const
+    {
+        return m_branchInst.opcode == OPCODE_REGIMM &&
+               (m_branchInst.rt == REGIMM_BLTZAL || m_branchInst.rt == REGIMM_BGEZAL ||
+                m_branchInst.rt == REGIMM_BLTZALL || m_branchInst.rt == REGIMM_BGEZALL);
+    }
+
+    const Instruction *ControlFlowEmitter::findFunctionInstruction(uint32_t address) const
+    {
+        const std::vector<Instruction> *instructions = m_gen.m_currentFunctionInstructions;
+        if (!instructions)
+            return nullptr;
+        const auto it = std::lower_bound(instructions->begin(), instructions->end(), address,
+                                         [](const Instruction &inst, uint32_t a) { return inst.address < a; });
+        return (it != instructions->end() && it->address == address) ? &*it : nullptr;
+    }
+
+    void ControlFlowEmitter::emitTransferTo(uint32_t target, std::string_view indent)
+    {
+        if (isInternalTarget(target))
+        {
+            emitInternalTarget(target, branchPc(), indent);
+            return;
+        }
+        m_ss << fmt::format("{}ctx->pc = 0x{:X}u;\n", indent, target);
+        m_ss << indent << "return;\n";
+    }
+
+    void ControlFlowEmitter::warnDelaySlotTransfer(const std::string &message) const
+    {
+        if (m_gen.m_reporter)
+        {
+            m_gen.m_reporter->warningAt("codegen", m_function.name, delayPc(), message);
+        }
+    }
+
+    // A control transfer (inner, at delayPc) in this branch's (outer) delay slot. MIPS leaves it undefined; the
+    // EE's results (ps2autotests cpu/ee/branchdelay, cpu/ee_fpu/branchdelay, all branches taken) fit two cases:
+    // - the outer outcome is known early (resolvesEarly: `beq $t0,$t0` x4 -> 2, `bc1tl` x4 -> 2): the outer
+    //   transfer happens, so the inner branch's delay slot is the instruction at the outer target T1, and the
+    //   inner branch then goes to its own target (or continues past T1's instruction when it is not taken);
+    // - otherwise (`bc1t` x4 -> 4): a taken inner branch replaces the outer transfer and runs as an ordinary
+    //   branch at delayPc (its delay slot is the next instruction); a not-taken one leaves the outer transfer.
+    // Not taken, the outer branch runs the inner one as an ordinary branch (likely: annulled, continue at +8).
+    // The early/late split is consistent with the EE's static branch prediction (likely and fixed-outcome
+    // branches are predicted taken) but only those three hardware rows establish it.
+    void ControlFlowEmitter::emitTransferInDelaySlot()
+    {
+        const Instruction &inner = m_delaySlot;
+        const bool outerIsJump = m_branchInst.opcode == OPCODE_J || m_branchInst.opcode == OPCODE_JAL;
+        const uint32_t outerTarget = outerIsJump ? buildAbsoluteJumpTarget(m_branchInst.address, m_branchInst.target)
+                                                 : conditionalBranchTarget();
+
+        ControlFlowEmitter innerBranch(m_gen, inner, inner, m_function, m_analysisResult);
+        const bool innerIsJump = inner.opcode == OPCODE_J || inner.opcode == OPCODE_JAL;
+        const bool innerIsConditional = inner.isBranch && !innerIsJump && inner.opcode != OPCODE_SPECIAL;
+        const uint32_t innerLink = inner.address + 8u;
+
+        bool early = resolvesEarly();
+        const Instruction *targetInst = findFunctionInstruction(outerTarget);
+        if (early && (!innerIsConditional && inner.opcode != OPCODE_J))
+        {
+            warnDelaySlotTransfer("call or register jump in the delay slot of an early-resolved branch; modelled as "
+                                  "replacing the outer transfer (no hardware evidence for this case)");
+            early = false;
+        }
+        if (early && (!targetInst || targetInst->hasDelaySlot || !isInternalTarget(outerTarget)))
+        {
+            warnDelaySlotTransfer("branch in a delay slot whose outer target is outside the function or is itself a "
+                                  "branch; modelled as replacing the outer transfer");
+            early = false;
+        }
+
+        const std::string outerTaken = fmt::format("outer_taken_0x{:x}", branchPc());
+        const std::string innerTaken = fmt::format("inner_taken_0x{:x}", inner.address);
+        m_ss << "    {\n";
+        m_ss << "        const bool " << outerTaken << " = ("
+             << (outerIsJump ? std::string("true") : conditionalBranchExpression()) << ");\n";
+        if (m_branchInst.opcode == OPCODE_JAL || linksUnconditionally())
+        {
+            m_ss << fmt::format("        SET_GPR_U32(ctx, 31, 0x{:X}u);\n", fallthroughPc());
+        }
+
+        m_ss << "        if (!" << outerTaken << ") {\n";
+        if (isLikelyBranch())
+        {
+            emitTransferTo(fallthroughPc(), "            "); // annulled delay slot
+        }
+        else
+        {
+            emitInternalTarget(delayPc(), branchPc(), "            ");
+        }
+        m_ss << "        }\n";
+
+        // Outer branch taken: the inner transfer executes in its delay slot.
+        m_ss << fmt::format("        ctx->pc = 0x{:X}u;\n", delayPc());
+        m_ss << "        const bool " << innerTaken << " = ("
+             << (innerIsConditional ? innerBranch.conditionalBranchExpression() : std::string("true")) << ");\n";
+        if (innerBranch.linksUnconditionally())
+        {
+            m_ss << fmt::format("        SET_GPR_U32(ctx, 31, 0x{:X}u);\n", innerLink);
+        }
+
+        if (early)
+        {
+            const uint32_t innerTarget = innerIsJump ? buildAbsoluteJumpTarget(inner.address, inner.target)
+                                                     : innerBranch.conditionalBranchTarget();
+            m_ss << "        if (" << innerTaken << ") {\n";
+            m_ss << fmt::format("            ctx->pc = 0x{:X}u;\n", outerTarget);
+            m_ss << "            ctx->in_delay_slot = true;\n";
+            m_ss << fmt::format("            ctx->branch_pc = 0x{:X}u;\n", inner.address);
+            std::istringstream lines(m_gen.translateInstruction(*targetInst));
+            for (std::string line; std::getline(lines, line);)
+            {
+                if (!line.empty())
+                    m_ss << "            " << line << "\n";
+            }
+            m_ss << "            ctx->in_delay_slot = false;\n";
+            emitTransferTo(innerTarget, "            ");
+            m_ss << "        }\n";
+            // Not taken: the instruction at the outer target runs as the inner branch's delay slot (or is annulled
+            // for a likely inner branch), then execution continues after it.
+            emitTransferTo(innerBranch.isLikelyBranch() ? outerTarget + 4u : outerTarget, "        ");
+        }
+        else
+        {
+            m_ss << "        if (" << innerTaken << ") {\n";
+            emitInternalTarget(delayPc(), branchPc(), "            ");
+            m_ss << "        }\n";
+            emitTransferTo(outerTarget, "        ");
+        }
+        m_ss << "    }\n";
+    }
+
     void ControlFlowEmitter::emitFallbackInstruction()
     {
         m_ss << "    " << m_gen.translateInstruction(m_branchInst) << "\n";
@@ -554,7 +708,24 @@ namespace ps2recomp
 
     std::string ControlFlowEmitter::emit()
     {
-        (void)m_function;
+        if (delaySlotIsOwnTransfer())
+        {
+            m_ss << fmt::format("    ctx->pc = 0x{:X}u;\n", branchPc());
+            const bool registerJump = m_branchInst.opcode == OPCODE_SPECIAL &&
+                                      (m_branchInst.function == SPECIAL_JR || m_branchInst.function == SPECIAL_JALR);
+            if (!registerJump && (m_branchInst.isBranch || m_branchInst.opcode == OPCODE_J ||
+                                  m_branchInst.opcode == OPCODE_JAL))
+            {
+                emitTransferInDelaySlot();
+                return m_ss.str();
+            }
+            warnDelaySlotTransfer("control transfer in the delay slot of a register jump; the inner transfer is not "
+                                  "executed (no hardware evidence for this case)");
+            emitRegisterJump(m_branchInst.function == SPECIAL_JALR ? RegisterBranchKind::Call : RegisterBranchKind::Jump);
+            emitFinalFallthrough();
+            return m_ss.str();
+        }
+
         emitResumeFromDelaySlotEntry();
         m_ss << fmt::format("    ctx->pc = 0x{:X}u;\n", branchPc());
 

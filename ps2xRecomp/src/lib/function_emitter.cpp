@@ -58,6 +58,12 @@ namespace ps2recomp
         CodeGenerator &cg = m_codeGenerator;
         std::stringstream ss;
         cg.m_currentFunctionName = function.name;
+        struct CurrentInstructionsScope
+        {
+            CodeGenerator &cg;
+            ~CurrentInstructionsScope() { cg.m_currentFunctionInstructions = nullptr; }
+        } currentInstructionsScope{cg};
+        cg.m_currentFunctionInstructions = &instructions;
 
         if (useHeaders)
         {
@@ -180,7 +186,12 @@ namespace ps2recomp
                         }
                     }
 
-                    if (hasDecodedDelaySlot && internalTargets.contains(delaySlot->address))
+                    // A control transfer in the delay slot is emitted as its own instruction (the analyzer made it
+                    // an entry point); ControlFlowEmitter models how the outer branch reaches it.
+                    const bool delaySlotIsOwnTransfer =
+                        hasDecodedDelaySlot && delaySlot->hasDelaySlot && internalTargets.contains(delaySlot->address);
+
+                    if (hasDecodedDelaySlot && !delaySlotIsOwnTransfer && internalTargets.contains(delaySlot->address))
                     {
                         ss << "label_" << std::hex << delaySlot->address << std::dec << ":\n";
                     }
@@ -203,7 +214,7 @@ namespace ps2recomp
                         ss << cg.handleBranchDelaySlots(inst, *delaySlot, function, analysisResult);
                     }
 
-                    if (hasDecodedDelaySlot)
+                    if (hasDecodedDelaySlot && !delaySlotIsOwnTransfer)
                     {
                         ++i; // Skip delay slot instruction (handled inside branch logic)
                     }

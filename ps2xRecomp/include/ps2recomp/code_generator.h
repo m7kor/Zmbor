@@ -71,6 +71,7 @@ namespace ps2recomp
         bool m_emitInstructionComments = true;
         RecompilerReporter *m_reporter = nullptr;
         std::string m_currentFunctionName;
+        const std::vector<Instruction> *m_currentFunctionInstructions = nullptr; // set while FunctionEmitter runs
 
         std::string translateInstruction(const Instruction &inst);
         std::string translateInstruction(const Instruction &inst, const MemoryAccessHint &memoryHint);

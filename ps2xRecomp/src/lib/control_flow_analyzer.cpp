@@ -187,6 +187,37 @@ namespace ps2recomp
             }
         }
 
+        // A control transfer in another one's delay slot is emitted as its own instruction, and the outer branch
+        // may continue at it, past it (likely branch annulled), or past its target's first instruction (the inner
+        // branch's delay slot when it is a likely branch that is not taken). See ControlFlowEmitter.
+        for (size_t i = 0; i + 1 < instructions.size(); ++i)
+        {
+            const Instruction &outer = instructions[i];
+            const Instruction &inner = instructions[i + 1];
+            if (!outer.hasDelaySlot || !inner.hasDelaySlot || inner.address != outer.address + 4u)
+            {
+                continue;
+            }
+            auto addIfInside = [&](uint32_t address)
+            {
+                if (address >= function.start && address < function.end && instructionAddresses.contains(address))
+                {
+                    result.entryPoints.insert(address);
+                }
+            };
+            addIfInside(inner.address);
+            addIfInside(inner.address + 4u);
+            if (outer.isBranch && outer.opcode != OPCODE_J && outer.opcode != OPCODE_JAL)
+            {
+                const int32_t offsetBytes = static_cast<int32_t>(static_cast<int16_t>(outer.simmediate)) << 2;
+                addIfInside(static_cast<uint32_t>(static_cast<int64_t>(outer.address + 4u) + offsetBytes) + 4u);
+            }
+            else if (outer.opcode == OPCODE_J || outer.opcode == OPCODE_JAL)
+            {
+                addIfInside(buildAbsoluteJumpTarget(outer.address, outer.target) + 4u);
+            }
+        }
+
         if (hasIndirectRegisterJump)
         {
             bool needsIndirectFallback = false;

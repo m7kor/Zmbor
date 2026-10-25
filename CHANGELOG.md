@@ -202,3 +202,35 @@ and was mutation-checked.
   distinguish this from wider truncated-array forms. About 1.46x the cost of the host multiply in isolation.
 - VU0 vi24 keeps the written bits 0x0C0C (one hardware row).
 - Not fixed: RSQRT.S (no simple rounding model fits all 39 rows) and the EFU series last bits.
+
+## Phase 5 — architectural correctness (2026-10-25, branch ultimate/phase5-architectural-correctness, local)
+
+Baseline `20f1a97` (Zmbor main after PR #2): 53/55, 8202/8250 lines. After: 53/55 exact, 8203/8250 lines, no crashes, no timeouts, no regressions; `ps2x_tests` 538/538, ctest
+(non-hwtest) 52/52, `ps2xIOP` 4/4 (Windows MSVC; Linux not run locally and not pushed to CI). No physical PS2 or
+ps2sdk was available: no new hardware measurement was made. Every change below has a test that fails when it is
+reverted (mutation-checked).
+
+- VU FMAC contract (`ps2_vu_fmac.h`, `docs/architecture/vu-ee-arithmetic-semantics.md`): one contract for VU0 macro
+  mode and the micro interpreter — exponent-gap rule (triace, E4), truncation (E2), exponent 255 as a value (EFU
+  operand rows), saturation at 2^129. Integer reference + exact-double lowering, compared on boundary pairs, 124,000 structured and 400,000 random operand pairs.
+  - Macro mode (`PS2_VADD/VSUB/VMUL`) used host round-to-nearest without the gap rule (`1d7629d`); e2e program
+    `vu_macro` checks it through the real ELF → recompiler → runtime pipeline (`13b9935`).
+  - Micro mode: all 58 FMAC sites moved to the shared kernels; OPMSUB lacked the gap rule; exponent-255 operands and
+    results were clamped to 0x7F7FFFFF (`d77d5b3`). The upstream overflow test assumed FLT_MAX*2 overflows; under the
+    format it is the value 0x7FFFFFFF, so the test now overflows from 0x7FFFFFFF*2 (no `.expected` file changed).
+- EFU: the EATAN pi/4 literal hid a sub-ulp offset (3.3e-16 below 0x3F490FDB); series sums now use the FMAC adder
+  and the constant is 0x3F490FDA: vu_lower_efu 182 → 183/223, unit vectors 167 → 168/208 (`475c500`, provisional).
+- Performance: macro VADD/VSUB/VMUL use an SSE2 four-lane form of the same lowering (forced inline, CVTPS2PD when no
+  lane has exponent 0/255): 2.9–4.2× faster than the per-lane kernel; MUL faster than the legacy path, ADD/SUB ~4.4×
+  slower than the legacy (wrong) host add (`b4cfa26`, `benchmark-methodology.md`). Bit-identical in all host rounding modes,
+  with and without DAZ/FTZ; the sign of an exact-zero sum is now explicit (round-downward gave -0).
+- FP build policy (`5a6ed54`): ctest `fpenv_flag_independence` builds the arithmetic helpers with `/fp:precise` and
+  `/fp:fast` and compares 1M results; only the legacy macro path was flag-sensitive. No claim that shipped builds
+  corrupt games.
+- Research lab (`f657d46`): Z3 disagreement search for EE ADD models (465 queries, all counterexamples confirmed by
+  independent code), probe manifests with evidence classes and an ingest step that never promotes emulator, model or
+  Zmbor output (`tools/hwprobes/`), RSQRT.S analysis with a train/validation split (SQRT.S-then-DIV.S falsified:
+  29/34; post-hoc reciprocal datapath 34/34, not adopted; probe P3).
+- Not changed (no evidence picks a model): EE ADD guard bits, MUL.S form, RSQRT.S, macro-mode MAC/STATUS flags.
+- Docs: `evidence-register.md`, `hardware-probes.md`, `benchmark-methodology.md`, `control-flow-invariants.md`
+  (no IR change was made), HANDOFF and RESUME_PROMPT for Phase 5.

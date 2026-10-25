@@ -9,6 +9,9 @@ Evidence categories (keep them apart; only A and B are hardware proof):
 - **D** synthetic results derived from a specification or from a model;
 - **E** Zmbor's own output.
 
+Probe tooling uses the names A = HARDWARE_REFERENCE, B = HARDWARE_CONFIRMED, C = EMULATOR_OBSERVED,
+D = MODEL_PREDICTED, E = ZMBOR_OBSERVED, plus UNMEASURED (`tools/hwprobes/probe_lab.py`, `hardware-probes.md`).
+
 Status: **established** (A/B evidence that discriminates the alternatives), **architectural** (follows from
 documented hardware structure, not measured directly), **provisional** (fits the data, but the data does not exclude
 alternatives), **unresolved** (competing models fit; no choice is claimed), **gap** (behaviour not modelled).
@@ -124,7 +127,7 @@ Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test a
   (cpu/vu0_macro/transfer `ctc2 -1` rows) — each mask is the readback of an all-ones write, so other bit patterns
   are a prediction (safe for plain masks).
 - vi24 keeps the written bits 0x0C0C: **provisional, one row**; whether it is a latch, a mirror of FBRST's DE/TE, or
-  has side effects is unknown (probe P6).
+  has side effects is unknown (no probe generated yet).
 - vi19 reads 0x2E30 (revision) whatever is written: one row.
 
 ## 3. Control flow
@@ -136,7 +139,7 @@ Ordinary delay slots, likely annulment, BGEZALL/BLTZALL linking when not taken (
 `beq` x4 -> 2, `bc1t` x4 -> 4, `bc1tl` x4 -> 2, all branches taken (A). Modelled as early-resolved (jumps, likely,
 fixed-outcome encodings: the inner branch's delay slot is the instruction at the outer target) versus late (a taken
 inner branch replaces the outer transfer). Alternatives not excluded: the split may depend on the BTB state or on
-the unit (BC1 vs GPR) rather than the encoding. No row has a not-taken branch in this position. Probes P7.
+the unit (BC1 vs GPR) rather than the encoding. No row has a not-taken branch in this position (no probe generated yet; invariants: `control-flow-invariants.md`).
 Register jumps and calls in this position fall back with a warning (gap).
 
 ### 3.3 Scheduling and exceptions — gap

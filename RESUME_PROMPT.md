@@ -1,6 +1,6 @@
 # Resume prompt for the next session
 
-Paste the text below into a new Claude Code session opened at `D:\Project\Zmbor\wt-integration`.
+Paste the text below into a new Claude Code session opened at `D:\Project\Zmbor\wt-phase5`.
 
 ---
 
@@ -9,39 +9,27 @@ principal-engineer work on a PlayStation 2 static recompiler and runtime built o
 ran-j/PS2Recomp.
 
 - Communicate with me in Arabic; keep technical identifiers and code in English.
-- Evidence only: never claim a result you did not measure.
-- Never edit hardware `.expected` files to make tests pass.
+- Evidence only: never claim a result you did not measure. Emulator output, model predictions and Zmbor output are
+  never hardware evidence (`docs/architecture/evidence-register.md`).
+- Never edit hardware `.expected` files to make tests pass; no fitted 1-ulp corrections or tuned constants.
 - Never represent unit or hardware tests as proof that a commercial game works.
 - Never download or commit commercial games, BIOS files or unrelated binaries.
 - Commit locally with `git -c user.name=m7kor -c user.email=alshariefk@gmail.com commit ...`.
-- Zmbor `main` is protected: work on a new branch and open a pull request.
-- Push only when I ask; never force-push.
-- Never modify m7kor/PS2Recomp or ran-j/PS2Recomp.
+- Zmbor `main` is protected: work on a branch and open a pull request only when I ask.
+- Push only when I ask; never force-push; never rewrite history.
+- Never modify m7kor/PS2Recomp or ran-j/PS2Recomp, other worktrees, or the read-only RE4 locations
+  (`D:\Project\compatbilty`, `C:\Project\PS2redmption`).
 
-Read `HANDOFF.md` first: it has the state, branches, build/test commands, architecture notes and the remaining 8
-failing hardware tests. `CHANGELOG.md` has every change with its root cause, and `docs/hwtest/README.md` the
-hardware dashboard. Do not repeat the community research (`research/`, `docs/community-research/`) or the
-Phase 2/3 investigations.
+Read `HANDOFF.md` first (Phase 5 section), then the architecture documents it lists. `CHANGELOG.md` has every change
+with its root cause and measurements.
 
-Work in `D:\Project\Zmbor\wt-integration` on branch `ultimate/phase3-integration`, which matches Zmbor `main`; start
-each piece of work on a new branch from it. `D:\Project\Zmbor\wt` (`ultimate/phase0-recomp-correctness`, `ae1c119`)
-is the pre-integration history only.
+Work in `D:\Project\Zmbor\wt-phase5` on branch `ultimate/phase5-architectural-correctness` (local, unpushed).
 
 Before changing anything:
 
-1. Run `git status` and `git log --oneline -5`. Compare HEAD with
-   `git ls-remote https://github.com/m7kor/Zmbor.git main`.
-2. Build the project.
-3. Run `build\ps2xTest\ps2x_tests.exe` (from the repo root; expect 520/520), `ctest --test-dir build\ps2xTest -LE
-   hwtest` (48/48) and `ctest --test-dir build\ps2xIOP` (4/4).
-4. The hardware matrix (47/55) was measured before the #384 merge and has not been rerun since. Rerun it on this tree
-   first (`hwtest.py prepare` → configure with `PS2X_HWTEST_GENERATED` → build → `ctest -L hwtest` → `hwtest.py
-   report` with `--baseline D:\Project\Zmbor\hwtest_work\run9.json`), and report any difference.
+1. Run `git status` and `git log --oneline -10`; compare with `git ls-remote https://github.com/m7kor/Zmbor.git`.
+2. Build `build-wip` and rerun the full gate (see HANDOFF): expect the numbers in `CHANGELOG.md` Phase 5, and report
+   any difference.
 
-Only when I ask for Phase 4, start with the first priority in `HANDOFF.md`: branch in a delay slot
-(cpu_ee_branchdelay, cpu_ee_fpu_branchdelay).
-
-- Find each root cause before making architectural changes.
-- Add a regression test for each fix and mutation-check it.
-- Keep every currently passing hardware test passing, and rerun all suites including ps2xIOP.
-- Report the exact change in the 55-test matrix.
+Then continue with the next priorities in `HANDOFF.md`. Find each root cause before making architectural changes; add
+a regression test for each change and mutation-check it; keep every passing hardware test passing.

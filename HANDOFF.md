@@ -1,13 +1,34 @@
-# Zmbor — handoff (updated 2026-10-25, Phase 4)
+# Zmbor — handoff (updated 2026-10-25, Phase 5)
 
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
 built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
-## Phase 4 (pushed; draft PR #2 open, not merged)
+## Phase 5 (local only: not pushed, no PR)
 
-- Branch `ultimate/phase4-hardware-accuracy` is on https://github.com/m7kor/Zmbor with draft
-  **PR #2** (https://github.com/m7kor/Zmbor/pull/2) into `main`. Do not merge or mark it ready without the owner's
-  approval. Local worktree: `D:\Project\Zmbor\wt-phase4`.
+- Branch `ultimate/phase5-architectural-correctness`, worktree `D:\Project\Zmbor\wt-phase5`, based on Zmbor `main`
+  `20f1a97` (PR #2 merged). `1d7629d` is the WIP start and is kept unchanged; later commits are listed in
+  `CHANGELOG.md` (Phase 5). Nothing pushed; pushing or opening a PR needs the owner's authorization.
+- Build dirs: `build` (baseline, `20f1a97`) and `build-wip` (branch head); hardware tests use
+  `D:\Project\Zmbor\hwtest_work\gen5`; reports `p5_base`, `p5_wip`, `p5_micro`, `p5_perf` (`.json/.md`) in
+  `hwtest_work`. Full gate script used: scratchpad `gate5.ps1` (build, `ctest -L hwtest`, report against
+  `p5_base.json`, `ps2x_tests`, `ctest -LE hwtest`, IOP ctest).
+- Measured at the branch head (Windows MSVC): hardware tests 53/55 exact, 8203/8250 lines, no regressions vs
+  `20f1a97`; `ps2x_tests` 538/538; ctest (non-hwtest) 52/52; `ps2xIOP` 4/4. No physical PS2 and
+  no ps2sdk toolchain were available: no new hardware measurement exists; every probe is `UNMEASURED`.
+- Architecture documents (start here): `docs/architecture/evidence-register.md` (every model with its evidence),
+  `vu-ee-arithmetic-semantics.md` (VU FMAC contract, lowerings, FP policy in section 4), `hardware-probes.md` (probe
+  pipeline and inventory), `benchmark-methodology.md`, `control-flow-invariants.md`.
+- Tools: `tools/semantics/` (exact models, Z3 search `z3_add_models.py` needs `pip install z3-solver==4.13.0.0`,
+  RSQRT analysis `ee_rsqrt_models.py`), `tools/hwprobes/probe_lab.py` (manifests, ingest), `tools/fpenv/` (FP flag
+  guard, ctest `fpenv_flag_independence`), `tools/bench/` (`ps2x_bench_vu_fmac`).
+- Open questions are listed per entry in the evidence register; the main ones: EE ADD guard bits (P1), MUL.S form
+  (P2), RSQRT.S datapath (P3, best fit post hoc), VU MUL asymmetry (P4), EFU cancellation residual, macro-mode
+  MAC/STATUS flags (gap), FMAC overflow threshold (provisional).
+
+## Phase 4 (merged into main as PR #2)
+
+- Branch `ultimate/phase4-hardware-accuracy` was merged into `main` by the owner as **PR #2**
+  (https://github.com/m7kor/Zmbor/pull/2, merge commit `20f1a97`). Local worktree: `D:\Project\Zmbor\wt-phase4`.
 - Commits on Zmbor `main` `00173a2`:
   - `3d935f4` branch in a delay slot;
   - `a7449bb` heap ownership;
@@ -164,22 +185,20 @@ Phase 4 additions:
   - VIF, SPR and DMAC: all 11 `dma/*` tests exact.
 - Phase 4: branch in a delay slot, heap ownership, COP0 performance counters, MUL.S, VU0 vi24: 53/55.
 
-## Remaining hardware failures (2, after Phase 4)
+## Remaining hardware failures (2, after Phase 5)
 
 | test | lines | cause / lead |
 |---|---|---|
-| vu_lower_efu | 182/223 | 41 rows: EATAN/ESIN/EEXP last-bit differences; exact series term rounding unknown (model matches 167/208 vectors). The MUL.S finding (Booth-recoded ft, lowest negative digit missing its +1) is an untested lead for the series products |
-| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S 1 ulp on 7 rows. Fitted on all 39 rows (scratch scripts `fpu_rsqrt_fit.py`, `fpu_rsqrt_sweep.py`): root to nearest + truncated division fits 38; truncated/extra-bit roots fit fewer; DIV.S itself rounds up at 0.50 ulp where an RSQRT quotient at 0.52 ulp does not, so the two do not share one rounding rule |
+| vu_lower_efu | 183/223 | EATAN/ESIN/EEXP last bits (unit vectors 168/208). Phase 5: FMAC adder in the series + pi/4 = 0x3F490FDA (removed a hidden sub-ulp offset). EATAN(0)-type rows read 0x33E60000 on hardware, a cancellation residual no candidate reproduces (register 2.5) |
+| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S: not SQRT.S-then-DIV.S (that composition predicts 29/34 distinct rows); a post-hoc reciprocal datapath fits 34/34 but is not adopted; probe P3 separates them (register 1.5). Also sqrt(-0) = +0 on hardware |
 
 Fixed in Phase 4: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay, memory_ee_default, cpu_ee_cop0_performance,
 cpu_ee_fpu_muldiv, cpu_vu0_macro_transfer (see `CHANGELOG.md`, Phase 4).
 
 ## Next priorities (suggested)
 
-1. RSQRT.S: try a divider model (e.g. SRT/Newton with a fixed number of quotient bits) against the 39 rows plus the
-   36 DIV rows together.
-2. EFU series last bits (time-box).
-3. MUL.S speed: the integer model costs about 1.46x the host multiply in isolation; a host multiply plus an FMA
-   remainder check gives the same result where FMA is available.
-4. Integrate the queued community items in `docs/community-research/REUSABLE_IMPROVEMENTS.md` that the hardware tests
-   do not cover, then validate on real game ELFs supplied by the user. Never commit game data or BIOS.
+1. Run the generated probes P1-P4 on a real PS2 (needs ps2sdk + a console; `hardware-probes.md`), ingest them with
+   `probe_lab.py`, and only then change the EE ADD/MUL/RSQRT models.
+2. Macro-mode MAC/STATUS flags (register 2.4, gap) and the micro flag path's agreement with the value path.
+3. The EFU cancellation residual (EATAN(0) = 0x33E60000): model the series/constant alignment.
+4. A whole-frame profile on a user-supplied game ELF (never commit game data or BIOS) before further optimisation.

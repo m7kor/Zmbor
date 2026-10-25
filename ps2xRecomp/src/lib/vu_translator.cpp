@@ -62,6 +62,8 @@ namespace ps2recomp
                 return fmt::format("SET_GPR_U32(ctx, {}, ctx->vu0_cmsar1);", rt);
             case 19: // reserved: reads the revision value (transfer.expected "ctc2 -> vi19: 00002e30")
                 return fmt::format("SET_GPR_U32(ctx, {}, 0x00002E30u);", rt);
+            case 24:
+                return fmt::format("SET_GPR_U32(ctx, {}, ctx->vu0_cr24);", rt);
             case 23: // reserved, reads 0
             case 25:
                 return fmt::format("SET_GPR_U32(ctx, {}, 0u);", rt);
@@ -109,6 +111,11 @@ namespace ps2recomp
                 return fmt::format("{{ const uint32_t v = GPR_U32(ctx, {}); uint32_t keep = v & 0x00000C0Cu; "
                                    "if (v & 0x003u) keep &= ~0x00Cu; if (v & 0x300u) keep &= ~0xC00u; ctx->vu0_fbrst = keep; }}",
                                    rt);
+            case 24:
+                // Reserved, but it keeps the written bits 0x0C0C ("ctc2 -> vi24: 00000c0c" after ctc2 -1), the
+                // positions of FBRST's DE/TE bits, without FBRST's reset actions. Derived from that single
+                // hardware row; nothing else about vi24 is known.
+                return fmt::format("ctx->vu0_cr24 = GPR_U32(ctx, {}) & 0x00000C0Cu;", rt);
             case VU0_CR_CMSAR1: // "ctc2 -> vi31: 0000ffff"; the write starts VU1 there (vu/test_runner.cpp)
                 return fmt::format("runtime->vu1StartMicroProgram(ctx, GPR_U32(ctx, {}));", rt);
             default:

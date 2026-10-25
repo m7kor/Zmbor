@@ -300,6 +300,22 @@ void register_code_generator_tests()
         t.IsTrue(perf(COP0_MT, 15u << 1).find("writePerfControl") == std::string::npos, "MTPS 15 is a no-op");
     });
 
+    tc.Run("CTC2/CFC2 vi24 keep the written bits 0x0C0C", [](TestCase &t) {
+        // ps2autotests cpu/vu0_macro/transfer (real PS2): "ctc2 -> vi24: 00000c0c" after ctc2 -1.
+        CodeGenerator gen({}, {});
+        Instruction ctc2{};
+        ctc2.opcode = OPCODE_COP2;
+        ctc2.rs = COP2_CTC2;
+        ctc2.rt = 8;
+        ctc2.rd = 24;
+        Instruction cfc2 = ctc2;
+        cfc2.rs = COP2_CFC2;
+        t.IsTrue(gen.translateInstruction(ctc2).find("ctx->vu0_cr24 = GPR_U32(ctx, 8) & 0x00000C0Cu;") != std::string::npos,
+                 "CTC2 vi24 masks the write");
+        t.IsTrue(gen.translateInstruction(cfc2).find("SET_GPR_U32(ctx, 8, ctx->vu0_cr24);") != std::string::npos,
+                 "CFC2 vi24 reads it back");
+    });
+
     tc.Run("SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA", [](TestCase &t) {
         // ps2autotests cpu/ee_simd/funnel.expected: mtsa 0xFFFF -> mfsa 0xf, mtsab 15 -> 0xf, mtsah 7 -> 0xe.
         CodeGenerator gen({}, {});

@@ -321,10 +321,45 @@ inline float ps2_fsub(float a, float b)
     return ps2_fall_normal(a, b, r) ? ps2_fadd_toward_zero(a, -b, r) : ps2_fsub_slow(a, b);
 }
 
+// MUL.S on the EE FPU (COP1 only; VU multiplies keep their own path). The mantissas are multiplied as integers and
+// the product is truncated, like the other EE FPU results. The multiplier is not commutative: 1.0 * 0x3FFFFFFF
+// gives 0x3FFFFFFE but 0x3FFFFFFF * 1.0 gives 0x3FFFFFFF (ps2autotests cpu/ee_fpu/muldiv.expected, also with
+// CF_MAX/CF_MIN and in MULA/MADD/MSUB). That fits a radix-4 Booth recoding of ft whose lowest digit, when
+// negative (ft mantissa bit 1 set), misses its +1, so the product comes out one unit low; this minimal form and
+// wider truncated-array forms all reproduce the 72 MUL/MULA hardware rows, which do not tell them apart.
+// Exponent 255 is an ordinary exponent, a result past it saturates to +-max, and a zero or denormal operand or a
+// result below exponent 1 gives a signed zero.
+inline uint32_t ps2_ee_fmul_bits(uint32_t ua, uint32_t ub)
+{
+    const uint32_t sign = (ua ^ ub) & PS2_FLOAT_SIGN_MASK;
+    const int32_t ea = static_cast<int32_t>((ua >> 23) & 0xFFu);
+    const int32_t eb = static_cast<int32_t>((ub >> 23) & 0xFFu);
+    if (ea == 0 || eb == 0)
+        return sign;
+    const uint64_t ma = (ua & 0x007FFFFFu) | 0x00800000u;
+    const uint64_t mb = (ub & 0x007FFFFFu) | 0x00800000u;
+    const uint64_t product = ma * mb - ((mb >> 1) & 1u);
+    int32_t exponent = ea + eb - 127;
+    uint32_t mantissa;
+    if ((product >> 47) != 0u)
+    {
+        mantissa = static_cast<uint32_t>(product >> 24);
+        ++exponent;
+    }
+    else
+    {
+        mantissa = static_cast<uint32_t>(product >> 23);
+    }
+    if (exponent >= 256)
+        return sign | PS2_FLOAT_MAX_BITS;
+    if (exponent <= 0)
+        return sign;
+    return sign | (static_cast<uint32_t>(exponent) << 23) | (mantissa & 0x007FFFFFu);
+}
+
 inline float ps2_fmul(float a, float b)
 {
-    const float r = a * b;
-    return ps2_fall_normal(a, b, r) ? r : ps2_fmul_slow(a, b);
+    return std::bit_cast<float>(ps2_ee_fmul_bits(std::bit_cast<uint32_t>(a), std::bit_cast<uint32_t>(b)));
 }
 
 // COP1 forms that also update FCR31, with the flags real hardware showed (ps2autotests cpu/ee_fpu/fcr.expected,
@@ -361,11 +396,10 @@ inline float ps2_cop1_sub(uint32_t &fcr31, float a, float b)
 
 inline float ps2_cop1_mul(uint32_t &fcr31, float a, float b)
 {
-    const float r = a * b;
-    if (ps2_fall_normal(a, b, r))
-        return r;
-    ps2_cop1_overflow_flag(fcr31, ps2_to_double(a) * ps2_to_double(b));
-    return ps2_fmul_slow(a, b);
+    const uint32_t r = ps2_ee_fmul_bits(std::bit_cast<uint32_t>(a), std::bit_cast<uint32_t>(b));
+    if ((r & 0x7FFFFFFFu) == PS2_FLOAT_MAX_BITS)
+        ps2_cop1_overflow_flag(fcr31, ps2_to_double(a) * ps2_to_double(b));
+    return std::bit_cast<float>(r);
 }
 
 inline void ps2_cop1_div_flags(uint32_t &fcr31, float a, float b)

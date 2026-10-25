@@ -96,6 +96,7 @@ struct alignas(16) R5900Context
     uint32_t vu0_fbrst2;    // FBRST2
     uint32_t vu0_fbrst3;    // FBRST3
     uint32_t vu0_fbrst4;    // FBRST4
+    uint32_t vu0_cr24;      // reserved control register vi24 (writable bits 0x0C0C, see vu_translator.cpp)
     uint32_t vu0_itop;
     uint32_t vu0_top;
     uint32_t vu0_info;

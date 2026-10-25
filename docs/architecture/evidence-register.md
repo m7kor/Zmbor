@@ -119,6 +119,14 @@ Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test a
   FMAC adder in the series, 183/223 with no line lost (`ps2x_tests` EFU vectors 167 -> 168 of 208).
 - Adopted: series sums through `ps2_vu_fmac::add`, constant 0x3F490FDA. Provisional: 0x3F490FDA and a wider pi/4
   are not separated by any row; mutants of either part fail the EFU vector floor.
+- **Overfitting audit (release review).** The change removes a hidden fitted offset, but its replacement was still
+  *selected on the same 223 rows* it is scored on, from three structural candidates (0x3F490FDB, 0x3F490FDA, a wider
+  constant), and the gain is one line (EATANxy DECREASING). One row cannot exclude coincidence, and the FMAC adder
+  in the series is architectural (EFU sharing the FMAC adder design), not measured. Status: provisional, weak
+  evidence; no further constants may be tuned against these rows. Independently testable hypothesis H-EFU-1: "the
+  EATAN constant acts as a value below 0x3F490FDB and the series sums drop operands 25+ exponent steps smaller";
+  it predicts different EATAN results from the Phase 3 model on inputs whose series sum plus pi/4 lands exactly on a
+  float boundary. A probe needs an EFU model outside the C++ interpreter (not written yet).
 - Not explained: EATAN(0) etc. read 0x33E60000 on hardware (a cancellation residual with only 7 mantissa bits set);
   no candidate reproduces it, which points at the series/constant alignment, not at rounding. No probe yet.
 

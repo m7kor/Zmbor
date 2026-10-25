@@ -54,7 +54,8 @@ two product roundings). The FMAC overflow threshold, macro-mode MAC/STATUS flags
 ## Z3 results (models only)
 
 `generated/z3_ee_add_disagreement.json` (`z3_add_models.py --gaps 0-30 --models "M1,M2 g=0,M2 g=1,M2 g=2,M2 g=3,M2 g=8"`,
-z3 4.13.0, 4 min 21 s): 465 (gap, pair) queries, 385 `sat`, 80 `unsat`, 0 unknown; all 385 counterexamples were
+z3 4.13.0, 4 min 21 s; the file starts with a provenance header: tool commit, arguments, solver version, SHA-256 of
+the model sources; one result per line, 78 KB): 465 (gap, pair) queries, 385 `sat`, 80 `unsat`, 0 unknown; all 385 counterexamples were
 reproduced by the independent Python models (0 encoding disagreements). Structure found:
 
 - gap 0: every model agrees (no bit is shifted out);

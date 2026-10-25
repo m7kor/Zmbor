@@ -195,10 +195,20 @@ Phase 4 additions:
 Fixed in Phase 4: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay, memory_ee_default, cpu_ee_cop0_performance,
 cpu_ee_fpu_muldiv, cpu_vu0_macro_transfer (see `CHANGELOG.md`, Phase 4).
 
-## Next priorities (suggested)
+## Next fundamental milestone (Phase 6, proposed)
 
-1. Run the generated probes P1-P4 on a real PS2 (needs ps2sdk + a console; `hardware-probes.md`), ingest them with
-   `probe_lab.py`, and only then change the EE ADD/MUL/RSQRT models.
-2. Macro-mode MAC/STATUS flags (register 2.4, gap) and the micro flag path's agreement with the value path.
-3. The EFU cancellation residual (EATAN(0) = 0x33E60000): model the series/constant alignment.
-4. A whole-frame profile on a user-supplied game ELF (never commit game data or BIOS) before further optimisation.
+Rule: nothing below is implemented on assumption. Each item first produces evidence (category A/B) or a falsifiable
+model with a probe; production changes only when the evidence picks one model.
+
+| # | item | needs | first deliverable | blocked on |
+|---|---|---|---|---|
+| 1 | Hardware evidence for P1–P4 | ps2sdk/ps2dev toolchain, a PS2 with ps2link or uLaunchELF, the owner's consent to run homebrew | build the four generated probes in ps2autotests, capture the `fs ft result` lines, `probe_lab.py ingest --source hardware --console <id>` | console + toolchain |
+| 2 | Macro-mode MAC/STATUS flags (register 2.4, gap) | a probe that runs COP2 VADD/VMUL in macro mode, then CFC2 vi16/vi17 (MAC/STATUS), on boundary operands | probe generator + expected-flag candidates (same as micro / not updated / delayed) | item 1's setup |
+| 3 | EE ADD guard bits (register 1.2) | P1 results (gaps 1–24, opposite signs) | pick M1 or M2(g); change `ps2_fadd` only then; keep the Z3 report as the design record | item 1 |
+| 4 | RSQRT.S datapath (register 1.5) | P3 results, more operand pairs from the same generator | decide composed vs reciprocal; a non-post-hoc validation set first | item 1 |
+| 5 | EFU remainder (register 2.5, H-EFU-1, EATAN(0) residual) | a Python EFU model independent of the interpreter, then an EFU probe | reproduce the 0x33E60000 residual from a stated alignment rule, or record its failure | model work; probe needs item 1 |
+| 6 | Native runtime profile | a representative workload: a user-supplied game ELF (never committed) or a homebrew 3D demo; Tracy or Windows ETW | time split per subsystem (EE code, VU interpreter, GS, VIF/DMA) before any further optimisation | workload |
+
+Also open from the Phase 5 review: when a MADD/MSUB product overflows but the final sum does not, micro mode now
+reports O only as sticky (from the product), not as a current flag; hardware behaviour is unmeasured (item 2).
+ctest `e2e` and `hwtest` have never run on Linux.

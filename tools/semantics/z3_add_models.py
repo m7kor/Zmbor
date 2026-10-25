@@ -12,6 +12,7 @@ Requires the optional z3-solver package; without it, use make_probes.py's determ
 usage: z3_add_models.py [--gaps 0-40] [--json out.json]
 """
 import argparse
+import hashlib
 import json
 import pathlib
 import sys
@@ -98,6 +99,26 @@ def minimise(a, b, f1, f2):
     return a, b
 
 
+def provenance(argv):
+    """What produced a report: arguments, solver version, SHA-256 of the model sources (LF-normalised)."""
+    here = pathlib.Path(__file__).resolve().parent
+    sources = {}
+    for name in ('z3_add_models.py', 'ee_fpu_models.py'):
+        data = (here / name).read_bytes().replace(b'\r\n', b'\n')
+        sources[f'tools/semantics/{name}'] = hashlib.sha256(data).hexdigest()
+    return {'tool': 'tools/semantics/z3_add_models.py', 'args': argv, 'z3': z3.get_version_string(),
+            'sources_sha256': sources, 'evidence_class': 'MODEL_PREDICTED',
+            'note': 'sat = the two candidate models differ; unsat = they agree for that gap. Not hardware facts.'}
+
+
+def write_report(path, report, argv):
+    """Compact JSON: a provenance header, then one result per line (diffable, small)."""
+    lines = ['{"provenance": ' + json.dumps(provenance(argv), sort_keys=True) + ',', ' "results": [']
+    lines += ['  ' + json.dumps(e, sort_keys=True) + (',' if i + 1 < len(report) else '') for i, e in enumerate(report)]
+    lines += [' ]}', '']
+    path.write_text('\n'.join(lines), encoding='utf-8')
+
+
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('--gaps', default='0-32')
@@ -128,4 +149,4 @@ if __name__ == '__main__':
     print("legend: D = counterexample found and confirmed by the python models, = = proven equal for this gap (models only), "
           "! = solver counterexample NOT confirmed (encoding error), ? = unknown/timeout")
     if args.json:
-        pathlib.Path(args.json).write_text(json.dumps(report, indent=1), encoding='utf-8')
+        write_report(pathlib.Path(args.json), report, sys.argv[1:])

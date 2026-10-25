@@ -234,3 +234,9 @@ reverted (mutation-checked).
 - Not changed (no evidence picks a model): EE ADD guard bits, MUL.S form, RSQRT.S, macro-mode MAC/STATUS flags.
 - Docs: `evidence-register.md`, `hardware-probes.md`, `benchmark-methodology.md`, `control-flow-invariants.md`
   (no IR change was made), HANDOFF and RESUME_PROMPT for Phase 5.
+- Release review (before the Draft PR): micro-mode flags were computed from the fused exact sum and overwrote the
+  value on overflow/underflow/zero, so MADD could write +max where the contract (and macro mode) gives 0x7F7FFFFF;
+  the product sticky flags still clamped exponent-255 operands. Flags now classify the result at the contract's
+  rounding points and never rewrite the value (2 new tests, both mutation-checked; gate unchanged: 53/55, 8203/8250,
+  ps2x_tests 540/540). CI now also runs the FP build guard and the probe-lab self-test on all three compilers.
+  The Z3 report is stored compactly with a provenance header (469 lines instead of ~7,000; data unchanged).

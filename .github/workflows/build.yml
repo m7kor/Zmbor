@@ -38,6 +38,11 @@ jobs:
       - name: Tests
         run: ./build/ps2xTest/ps2x_tests
 
+      - name: Floating-point build guard and probe lab self-test
+        run: |
+          ctest --test-dir build/ps2xTest -L fpenv --output-on-failure
+          ctest --test-dir build/ps2xTest -R hwprobes_lab_selftest --output-on-failure
+
   windows-msvc:
     strategy:
       fail-fast: false
@@ -70,6 +75,12 @@ jobs:
         shell: cmd
         run: |
           .\build\ps2xTest\Release\ps2x_tests.exe
+
+      - name: Floating-point build guard and probe lab self-test
+        shell: cmd
+        run: |
+          ctest --test-dir build\ps2xTest -C Release -L fpenv --output-on-failure || exit /b 1
+          ctest --test-dir build\ps2xTest -C Release -R hwprobes_lab_selftest --output-on-failure
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:

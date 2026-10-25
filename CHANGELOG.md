@@ -258,3 +258,8 @@ reverted (mutation-checked).
   8202/8250, no regressions; ps2x_tests 541/541; ctest (non-hwtest) 52/52; e2e 4/4; ps2xIOP 4/4. SHA-256:
   ps2_recomp.exe a90e5a8e4bee0d53..., ps2_runtime.lib f163b57da65a9b3d..., ps2x_tests.exe 0fb5d6614ea15944...,
   aggregate of the 55 hardware executables 5ae96557d0238264... (full values in the PR #3 description).
+- MSVC 14.51 lane-w cause: the informational probe (old loop shape in isolation) keeps its lanes on MSVC 14.51
+  (`_MSC_FULL_VER 195136260`), GCC 13.3 and Clang 18.1 (CI on `6af2f16`). The corruption therefore needs the
+  interpreter's context; review found no aliasing or UB. Cause **not identified**; not classified as a compiler defect.
+  The regression test guards the observed pattern; the four-lane implementation is validated against the integer
+  reference independently of it.

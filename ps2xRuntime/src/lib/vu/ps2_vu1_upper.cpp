@@ -13,8 +13,9 @@ namespace
 {
     // Four FMAC lanes at once through ps2_vu_fmac's SSE2 kernels, the code VU0 macro mode runs. With a per-lane loop
     // over the scalar kernel, the MSVC 14.51 CI build wrote lane w's result into every lane (14.44 and GCC/Clang
-    // builds were correct; most likely an optimiser defect, not reproduced locally), and the four-lane form is the
-    // shared lowering anyway.
+    // builds were correct). The cause is not identified: review found no aliasing or UB, and the same loop shape in
+    // isolation (tools/fpenv/lane_loop_probe.cpp) keeps its lanes on 14.51. The four-lane form is the shared lowering
+    // anyway; the "lanes stay independent" unit test guards the observed pattern.
     inline __m128i lanes(const float *v) { return _mm_loadu_si128(reinterpret_cast<const __m128i *>(v)); }
     inline __m128i splat(float v) { return _mm_set1_epi32(std::bit_cast<int32_t>(v)); }
     inline void store(float *result, __m128i v) { _mm_storeu_si128(reinterpret_cast<__m128i *>(result), v); }

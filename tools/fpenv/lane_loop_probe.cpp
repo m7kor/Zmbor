@@ -4,6 +4,8 @@
 // The MSVC 14.51 CI build wrote lane w's result into every lane; MSVC 14.44 and GCC/Clang did not. This program
 // reproduces that loop shape outside the interpreter (register file in a struct, a non-inlined switch, a local result
 // array) and reports whether the lanes stay independent. It is informational: production no longer uses the loop.
+// Result on CI (6af2f16): lanes independent on MSVC 14.51, GCC 13.3 and Clang 18.1, so this shape alone does not
+// reproduce the observation.
 // Exit code 0 = lanes independent, 1 = lanes differ from the per-lane reference (the pattern reproduced).
 #include "ps2_vu_fmac.h"
 

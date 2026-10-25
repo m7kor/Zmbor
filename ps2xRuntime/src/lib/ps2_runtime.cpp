@@ -533,7 +533,6 @@ PS2Runtime::PS2Runtime()
     m_guestHeapConfigured = false;
     m_runtimeArenaBlocks.clear();
     m_runtimeArenaExhaustedWarned = false;
-    m_runtimeArenaDisabled = false;
     m_guestMainStackBase = 0u;
     m_asyncCallbackStackFloor = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     m_asyncCallbackStackTop = PS2_RAM_SIZE;
@@ -841,6 +840,43 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         return false;
     }
 
+    // Validate every loadable segment against the runtime-owned EE kernel area (runtime arena and fixed HLE pools,
+    // 0x00020000-0x00080000) before anything is written: the runtime keeps live state there, so an ELF placed in it
+    // would be overwritten (or overwrite that state). It is kernel memory on a real PS2 as well. The ELF is refused.
+    for (uint16_t i = 0; i < header.phnum; i++)
+    {
+        const uint64_t phOffset =
+            static_cast<uint64_t>(header.phoff) + static_cast<uint64_t>(i) * static_cast<uint64_t>(header.phentsize);
+        ProgramHeader ph{};
+        if (phOffset + sizeof(ProgramHeader) > static_cast<uint64_t>(fileSize))
+            break; // reported by the loading loop
+        file.seekg(static_cast<std::streamoff>(phOffset), std::ios::beg);
+        if (!file.read(reinterpret_cast<char *>(&ph), sizeof(ph)))
+            break;
+        if (ph.type != PT_LOAD || ph.memsz == 0u ||
+            (ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE))
+            continue;
+        uint32_t physAddr = 0u;
+        try
+        {
+            physAddr = m_memory.translateAddress(ph.vaddr);
+        }
+        catch (const std::exception &)
+        {
+            continue; // reported by the loading loop
+        }
+        const uint64_t physEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
+        const std::string overlap = describeRuntimeReservedOverlap(physAddr, physEnd);
+        if (!overlap.empty())
+        {
+            std::cerr << "ELF segment " << i << " (vaddr 0x" << std::hex << ph.vaddr << ", RDRAM 0x" << physAddr
+                      << "-0x" << physEnd << std::dec << ") overlaps the runtime's reserved EE kernel area ("
+                      << overlap << "); the ELF is not loaded." << std::endl;
+            return false;
+        }
+    }
+    file.clear();
+
     m_cpuContext.pc = header.entry;
     m_debugPc.store(m_cpuContext.pc, std::memory_order_relaxed);
 
@@ -948,7 +984,6 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         {
             maxLoadedRdramEnd = std::max(maxLoadedRdramEnd, static_cast<uint32_t>(segmentMemEnd));
             minLoadedRdramStart = std::min(minLoadedRdramStart, physAddr);
-            noteGuestSegment(physAddr, segmentMemEnd);
         }
 
         if (ph.flags & 0x1u) // PF_X
@@ -2050,10 +2085,6 @@ uint32_t PS2Runtime::guestHeapLimit() const
 uint32_t PS2Runtime::runtimeMalloc(uint32_t size, uint32_t alignment)
 {
     std::lock_guard<std::mutex> lock(m_guestHeapMutex);
-    if (m_runtimeArenaDisabled)
-    {
-        return 0u;
-    }
     if (m_runtimeArenaBlocks.empty())
     {
         m_runtimeArenaBlocks.push_back({kRuntimeArenaBase, kRuntimeArenaEnd - kRuntimeArenaBase, true});
@@ -2088,27 +2119,17 @@ void PS2Runtime::runtimeFree(uint32_t guestAddr)
 static_assert(kAsyncCallbackLowStackFloor >= PS2Runtime::kRuntimeReservedEnd,
               "async callback stacks stay above the runtime arena and HLE pools");
 
-void PS2Runtime::noteGuestSegment(uint32_t physStart, uint64_t physEnd)
+std::string PS2Runtime::describeRuntimeReservedOverlap(uint32_t physStart, uint64_t physEnd)
 {
-    if (physEnd <= kRuntimeArenaBase || physStart >= kRuntimeReservedEnd)
+    std::string hit;
+    for (const ReservedRegion &region : kRuntimeReservedRegions)
     {
-        return;
+        if (physEnd > region.start && physStart < region.end)
+        {
+            hit += (hit.empty() ? "" : ", ") + std::string(region.name);
+        }
     }
-    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
-    if (!m_runtimeArenaDisabled)
-    {
-        std::cerr << "[runtime] ELF segment 0x" << std::hex << physStart << "-0x" << physEnd
-                  << " overlaps the runtime's reserved EE kernel area 0x" << kRuntimeArenaBase << "-0x"
-                  << kRuntimeReservedEnd << "; the runtime arena is disabled (HLE calls needing it fail) and the fixed "
-                  << "HLE RPC/TLS pools there may overwrite this segment" << std::dec << std::endl;
-    }
-    m_runtimeArenaDisabled = true;
-}
-
-bool PS2Runtime::runtimeArenaAvailable() const
-{
-    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
-    return !m_runtimeArenaDisabled;
+    return hit;
 }
 
 namespace

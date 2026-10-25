@@ -402,10 +402,23 @@ public:
     // own allocator owns. Callers handle 0 as an allocation failure.
     uint32_t runtimeMalloc(uint32_t size, uint32_t alignment = 16u);
     void runtimeFree(uint32_t guestAddr);
-    // Called for every loaded ELF segment (physical RDRAM range); a segment inside the runtime's reserved range
-    // disables the arena so the runtime never writes over program data.
-    void noteGuestSegment(uint32_t physStart, uint64_t physEnd);
-    bool runtimeArenaAvailable() const;
+    // The runtime-owned EE kernel area, region by region (Syscalls/Helpers/State.h asserts its pools match).
+    struct ReservedRegion
+    {
+        const char *name;
+        uint32_t start;
+        uint32_t end;
+    };
+    static constexpr ReservedRegion kRuntimeReservedRegions[] = {
+        {"runtime arena", kRuntimeArenaBase, kRuntimeArenaEnd},
+        {"HLE RPC packet pool", 0x0004F000u, 0x0005F000u},
+        {"HLE RPC server pool", 0x0005F000u, 0x0006F000u},
+        {"HLE TLS pool", 0x0006F000u, 0x0007F000u},
+        {"HLE boot-mode pool", 0x0007F000u, kRuntimeReservedEnd},
+    };
+    // The reserved regions [physStart, physEnd) intersects, comma-separated; empty when it intersects none.
+    // loadELF rejects an ELF with any such segment before writing guest memory.
+    static std::string describeRuntimeReservedOverlap(uint32_t physStart, uint64_t physEnd);
     // COP0 performance counters (MFPS/MTPS: PCCR, MFPC/MTPC: PCR0/PCR1). One set for the EE, not per thread.
     uint32_t readPerfControl(const R5900Context *ctx);
     void writePerfControl(const R5900Context *ctx, uint32_t value);
@@ -550,7 +563,6 @@ private:
     bool m_guestHeapConfigured = false;
     std::vector<GuestHeapBlock> m_runtimeArenaBlocks; // guarded by m_guestHeapMutex
     bool m_runtimeArenaExhaustedWarned = false;
-    bool m_runtimeArenaDisabled = false;
     uint32_t m_guestMainStackBase = 0u;
     void syncPerfCounters(const R5900Context *ctx);
     std::mutex m_perfMutex;

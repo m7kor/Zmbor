@@ -24,8 +24,9 @@ built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-m
   `-DPS2X_HWTEST_GENERATED=D:/Project/Zmbor/hwtest_work/gen4`); run reports `p4_base.json` and `p4_m1/m2/m4/m5.json`.
 - Runtime arena policy (follow-up to `a7449bb`): `runtimeMalloc` returns 0 when the arena is full; it no longer falls
   back to the guest heap allocator. That fallback placed runtime blocks at the heap base, where the program's own sbrk
-  starts. Every HLE caller handles 0. An ELF segment inside 0x00020000-0x00080000 disables the arena with a warning;
-  none of the 55 hardware programs does.
+  starts. Every HLE caller handles 0. An ELF with a segment in 0x00020000-0x00080000 (arena or any fixed HLE pool)
+  is refused before anything is written, by both `PS2Runtime::loadELF` and the SifLoadElf loader (the guest gets an
+  error); none of the 55 hardware programs loads there.
 - Limited evidence, kept as documented hypotheses:
   - the delay-slot model is fitted to three all-taken hardware rows;
   - vi24 rests on one row;
@@ -139,7 +140,7 @@ Phase 4 additions:
 - Delay-slot control transfers: `ControlFlowEmitter::emitTransferInDelaySlot` (model and evidence in its comment); the
   analyzer adds the entry points, `FunctionEmitter` emits the inner transfer as its own instruction.
 - EE memory ownership: `PS2Runtime::runtimeMalloc/runtimeFree` (arena `kRuntimeArenaBase..kRuntimeArenaEnd`, EE kernel
-  area; 0 on exhaustion, never a guest-heap fallback; disabled by an overlapping ELF segment, `noteGuestSegment`) for
+  area; 0 on exhaustion, never a guest-heap fallback; an ELF overlapping the reserved area is refused, `describeRuntimeReservedOverlap`) for
   runtime-owned memory; `guestMalloc` only for HLE malloc. HLE pools in `Syscalls/Helpers/State.h` sit at
   0x0004F000-0x00080000. SetupHeap(-1) ends at `guestMainStackBase()` (recorded by SetupThread).
 - COP0 PCCR/PCR0/PCR1: `PS2Runtime::read/writePerfControl/Counter`, counted from `EeScheduler::currentEeCycle()`.

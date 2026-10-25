@@ -550,6 +550,16 @@ namespace ps2_syscalls
                   "HLE pools are disjoint and stay inside the reserved area");
     static_assert(kGuestSyscallTablePhysBase + 0x400u <= PS2Runtime::kRuntimeArenaBase,
                   "the syscall table mirror stays below the runtime arena");
+    // The region table loadELF checks against is exactly these pools.
+    static_assert(PS2Runtime::kRuntimeReservedRegions[1].start == kRpcPacketPoolBase &&
+                      PS2Runtime::kRuntimeReservedRegions[1].end == kRpcPacketPoolBase + kRpcPacketPoolBytes &&
+                      PS2Runtime::kRuntimeReservedRegions[2].start == kRpcServerPoolBase &&
+                      PS2Runtime::kRuntimeReservedRegions[2].end == kRpcServerPoolBase + kRpcServerPoolBytes &&
+                      PS2Runtime::kRuntimeReservedRegions[3].start == kTlsPoolBase &&
+                      PS2Runtime::kRuntimeReservedRegions[3].end == kTlsPoolBase + kTlsPoolBytes &&
+                      PS2Runtime::kRuntimeReservedRegions[4].start == kBootModePoolBase &&
+                      PS2Runtime::kRuntimeReservedRegions[4].end == kBootModePoolBase + kBootModePoolBytes,
+                  "PS2Runtime::kRuntimeReservedRegions matches the HLE pools");
 
     // 0x3D SetupHeap: returns heap base/start pointer
     void SetupHeap(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)

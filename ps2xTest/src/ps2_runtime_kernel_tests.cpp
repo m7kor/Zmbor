@@ -1,3 +1,5 @@
+#include <fstream>
+#include <filesystem>
 #include "MiniTest.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -530,6 +532,41 @@ namespace
         create(K_EVENT_FIFO_B, 0x22000u, 5);
         create(K_EVENT_FIFO_SIGNAL, 0x23000u, 10);
         ctx->pc = 0u;
+    }
+
+    // Minimal MIPS ELF32 executable: one PT_LOAD per (vaddr, size), each filled with `fill`.
+    void writeTestElf(const std::filesystem::path &path, const std::vector<std::pair<uint32_t, uint32_t>> &segments,
+                      uint8_t fill)
+    {
+        std::vector<uint8_t> out(52u + 32u * segments.size(), 0u);
+        auto put16 = [&](size_t at, uint16_t v) { std::memcpy(out.data() + at, &v, 2); };
+        auto put32 = [&](size_t at, uint32_t v) { std::memcpy(out.data() + at, &v, 4); };
+        const uint8_t ident[8] = {0x7F, 0x45, 0x4C, 0x46, 1, 1, 1, 0};
+        std::memcpy(out.data(), ident, sizeof(ident));
+        put16(16, 2);  // ET_EXEC
+        put16(18, 8);  // EM_MIPS
+        put32(20, 1);
+        put32(24, segments.empty() ? 0u : segments[0].first);
+        put32(28, 52); // phoff
+        put16(40, 52);
+        put16(42, 32);
+        put16(44, static_cast<uint16_t>(segments.size()));
+        put16(46, 40);
+        for (size_t i = 0; i < segments.size(); ++i)
+        {
+            const size_t ph = 52u + 32u * i;
+            put32(ph + 0, 1); // PT_LOAD
+            put32(ph + 4, static_cast<uint32_t>(out.size()));
+            put32(ph + 8, segments[i].first);
+            put32(ph + 12, segments[i].first);
+            put32(ph + 16, segments[i].second);
+            put32(ph + 20, segments[i].second);
+            put32(ph + 24, 5);
+            put32(ph + 28, 16);
+            out.insert(out.end(), segments[i].second, fill);
+        }
+        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char *>(out.data()),
+                                                     static_cast<std::streamsize>(out.size()));
     }
 
     struct TestEnv
@@ -1078,26 +1115,98 @@ void register_ps2_runtime_kernel_tests()
                      "after freeing everything the fragments coalesce into the whole arena");
         });
 
-        tc.Run("an ELF segment inside the runtime's reserved area disables the arena", [](TestCase &t)
+        tc.Run("ELFs overlapping the runtime-reserved EE kernel area are refused before any write", [](TestCase &t)
         {
+            // Each reserved region (runtime arena and every fixed HLE pool), both exact boundaries, a kseg0 alias,
+            // and a valid segment placed before the conflicting one, which must not be written either.
+            struct Case
             {
-                TestEnv env;
-                env.runtime.noteGuestSegment(0x00100000u, 0x00180000u);
-                env.runtime.noteGuestSegment(0x00000000u, PS2Runtime::kRuntimeArenaBase);    // ends at the arena
-                env.runtime.noteGuestSegment(PS2Runtime::kRuntimeReservedEnd, 0x00090000u); // starts after the pools
-                t.IsTrue(env.runtime.runtimeArenaAvailable(), "segments outside 0x20000-0x80000 leave the arena");
-                t.IsTrue(env.runtime.runtimeMalloc(16u, 16u) != 0u, "and it allocates");
-            }
-            for (const auto &[start, end] : {std::pair<uint32_t, uint64_t>{0x00010000u, 0x00020010u},
-                                             std::pair<uint32_t, uint64_t>{0x0007FFF0u, 0x00100000u},
-                                             std::pair<uint32_t, uint64_t>{0x00030000u, 0x00031000u}})
+                std::string what;
+                uint32_t vaddr;
+                uint32_t size;
+                bool loads;
+            };
+            std::vector<Case> cases = {
+                {"ends exactly at the arena", 0x00010000u, 0x00010000u, true},
+                {"starts exactly after the pools", PS2Runtime::kRuntimeReservedEnd, 0x00001000u, true},
+                {"ordinary user address", 0x00100000u, 0x00001000u, true},
+                {"crosses into the arena", 0x0001FFF0u, 0x00000020u, false},
+                {"crosses out of the boot-mode pool", 0x0007FFF0u, 0x00000020u, false},
+                {"kseg0 alias of the arena", 0x80030000u, 0x00000100u, false},
+            };
+            for (const PS2Runtime::ReservedRegion &region : PS2Runtime::kRuntimeReservedRegions)
             {
-                TestEnv env;
-                env.runtime.noteGuestSegment(start, end);
-                t.IsFalse(env.runtime.runtimeArenaAvailable(), "an overlapping segment disables the arena");
-                t.Equals(env.runtime.runtimeMalloc(16u, 16u), 0u, "and runtime allocations fail");
+                cases.push_back({std::string(region.name) + " (start)", region.start, 0x20u, false});
+                cases.push_back({std::string(region.name) + " (end)", region.end - 0x10u, 0x10u, false});
             }
+
+            const std::filesystem::path dir = std::filesystem::temp_directory_path() / "zmbor_reserved_elf_tests";
+            std::filesystem::create_directories(dir);
+            int index = 0;
+            for (const Case &c : cases)
+            {
+                // Segment 0: a valid block at 0x00180000. Segment 1: the case under test.
+                const std::filesystem::path path = dir / ("case" + std::to_string(index++) + ".elf");
+                writeTestElf(path, {{0x00180000u, 0x40u}, {c.vaddr, c.size}}, 0x5Au);
+
+                PS2Runtime runtime;
+                t.IsTrue(runtime.memory().initialize(), "runtime memory initialize should succeed");
+                const bool loaded = runtime.loadELF(path.string());
+                t.Equals(loaded, c.loads, "loadELF: " + c.what);
+                const uint8_t *rdram = runtime.memory().getRDRAM();
+                const uint32_t phys = c.vaddr & 0x1FFFFFFFu;
+                if (!c.loads)
+                {
+                    bool untouched = rdram[0x00180000u] == 0u && rdram[0x00180000u + 0x3Fu] == 0u;
+                    for (uint32_t i = 0; i < c.size; ++i)
+                        untouched = untouched && rdram[phys + i] == 0u;
+                    t.IsTrue(untouched, "a refused ELF writes nothing: " + c.what);
+                }
+                else
+                {
+                    t.IsTrue(rdram[phys] == 0x5Au && rdram[0x00180000u] == 0x5Au, "loaded: " + c.what);
+                }
+            }
+
+            t.Equals(PS2Runtime::describeRuntimeReservedOverlap(0x0005E000u, 0x00070000u),
+                     std::string("HLE RPC packet pool, HLE RPC server pool, HLE TLS pool"),
+                     "a segment spanning several regions names all of them");
+            t.Equals(PS2Runtime::describeRuntimeReservedOverlap(0x00100000u, 0x00200000u), std::string(),
+                     "no overlap, no description");
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
         });
+
+#if defined(_WIN32)
+        tc.Run("SifLoadElf refuses an ELF overlapping the reserved area and the guest sees -1", [](TestCase &t)
+        {
+            // ELFs loaded by the guest at run time go through the same check (Syscalls/Helpers/Loader.h). An
+            // absolute Windows path is a native-host path for the PS2 path parser.
+            TestEnv env;
+            const std::filesystem::path dir = std::filesystem::temp_directory_path() / "zmbor_sifloadelf_tests";
+            std::filesystem::create_directories(dir);
+            const std::filesystem::path bad = dir / "overlap.elf";
+            const std::filesystem::path good = dir / "ok.elf";
+            writeTestElf(bad, {{0x00200000u, 0x40u}, {0x00060000u, 0x40u}}, 0x5Au);
+            writeTestElf(good, {{0x00200000u, 0x40u}}, 0x5Au);
+
+            auto load = [&](const std::filesystem::path &p) {
+                const std::string guestPath = p.generic_string();
+                std::memcpy(env.rdram.data() + 0x00300000u, guestPath.c_str(), guestPath.size() + 1u);
+                setRegU32(env.ctx, 4, 0x00300000u);
+                setRegU32(env.ctx, 5, 0u);
+                ps2_syscalls::sceSifLoadElf(env.rdram.data(), &env.ctx, &env.runtime);
+                return getRegS32(env.ctx, 2);
+            };
+            t.IsTrue(load(bad) < 0, "the guest gets an error for the overlapping ELF");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00200000u]), 0u, "and nothing of it was written");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00060000u]), 0u, "not even the reserved pool");
+            t.IsTrue(load(good) >= 0, "the same ELF without the conflicting segment loads");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00200000u]), 0x5Au, "and its segment is written");
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
+        });
+#endif
 
         tc.Run("memalign stubs allocate aligned guest memory", [](TestCase &t)
         {

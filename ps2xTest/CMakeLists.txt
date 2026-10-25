@@ -17,6 +17,9 @@ if(BUILD_TESTING)
         # Probe manifests and observation scoring (synthetic data only; no hardware is involved).
         add_test(NAME hwprobes_lab_selftest
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/hwprobes/probe_lab.py selftest)
+        # Compatibility matrix schema: the validator rejects entries that claim more than a run observed.
+        add_test(NAME compat_matrix_selftest
+                 COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/compat/compat.py selftest)
     endif()
 
     option(PS2X_BUILD_E2E_TESTS "Build the ELF-to-native end-to-end tests" ON)

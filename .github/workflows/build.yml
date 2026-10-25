@@ -41,7 +41,7 @@ jobs:
       - name: Floating-point build guard and probe lab self-test
         run: |
           ctest --test-dir build/ps2xTest -L fpenv --output-on-failure
-          ctest --test-dir build/ps2xTest -R hwprobes_lab_selftest --output-on-failure
+          ctest --test-dir build/ps2xTest -R "hwprobes_lab_selftest|compat_matrix_selftest" --output-on-failure
 
       - name: End-to-end (generated ELF -> ps2_recomp -> runtime)
         run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro)$" --output-on-failure
@@ -86,7 +86,7 @@ jobs:
         shell: cmd
         run: |
           ctest --test-dir build\ps2xTest -C Release -L fpenv --output-on-failure || exit /b 1
-          ctest --test-dir build\ps2xTest -C Release -R hwprobes_lab_selftest --output-on-failure
+          ctest --test-dir build\ps2xTest -C Release -R "hwprobes_lab_selftest|compat_matrix_selftest" --output-on-failure
 
       # No end-to-end step here: the hosted Windows runner has no OpenGL driver (WGL), and the runtime opens a window
       # even when hidden. The e2e programs run on the Linux jobs (xvfb + Mesa) and in the local Windows gate.

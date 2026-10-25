@@ -60,6 +60,9 @@ public:
                 uint32_t top = 0, uint32_t itop = 0, uint32_t maxCycles = 65536);
 
     VU1State &state() { return m_state; }
+    // Reference mode for differential tests: commitReadyPipelines() scans every pipeline on every call, as before
+    // the commit index existed, so the indexed path can be compared against it. Not for production use.
+    void setReferenceCommitMode(bool enabled) { m_referenceCommitMode = enabled; }
     const VU1State &state() const { return m_state; }
 
 private:
@@ -189,6 +192,7 @@ private:
         uint64_t issueCycle = 0;
         bool active = false;
         bool currentTagEop = false;
+
     };
 
     static constexpr uint32_t kFmacLatency = 4u;
@@ -208,6 +212,7 @@ private:
     uint32_t m_cachedCodeSize = 0;
     uint64_t m_cachedCodeGeneration = 0;
     bool m_decodedCodeCacheValid = false;
+    DecodedInstructionPair m_uncachedPair{};
 
     std::array<FlagPipelineEntry, kMaxFlagEntries> m_flagPipeline{};
     ScalarPipelineEntry m_fdiv{};
@@ -225,6 +230,13 @@ private:
     std::array<uint64_t, 4> m_accLatestWrite{};
 
     uint64_t m_cycle = 0;
+    // Earliest readyCycle of the pending entries of each pipeline (UINT64_MAX when it has none) and of all of them.
+    // commitReadyPipelines() scans only the pipelines with something due; every queue* site lowers its slot, so a
+    // slot can be too low (an extra scan) but never too high (a missed commit).
+    enum CommitSlot : uint32_t { SlotFlags, SlotQ, SlotP, SlotStores, SlotVf, SlotVi, SlotAcc, SlotCount };
+    std::array<uint64_t, SlotCount> m_nextReady{};
+    uint64_t m_nextCommitCycle = UINT64_MAX;
+    bool m_referenceCommitMode = false;
     uint64_t m_nextWriteSequence = 0;
     uint64_t m_efuResourceReady = 0;
     uint32_t m_workingClip = 0;
@@ -250,7 +262,9 @@ private:
     static void addVfWrite(InstructionUsage &usage, uint8_t reg, uint8_t lanes);
     static uint8_t vfReadLanes(const InstructionUsage &usage, uint8_t reg);
     DecodedInstructionPair decodeInstructionPair(const uint8_t *vuCode, uint32_t pc) const;
-    DecodedInstructionPair getDecodedInstructionPairForPc(const uint8_t *vuCode, uint32_t codeSize, PS2Memory *memory, uint32_t pc);
+    // Returns the cached decode of the pair at pc (or a decode held in m_uncachedPair for untracked code); the
+    // reference stays valid until the next call.
+    const DecodedInstructionPair &getDecodedInstructionPairForPc(const uint8_t *vuCode, uint32_t codeSize, PS2Memory *memory, uint32_t pc);
     void rebuildDecodedCodeCache(const uint8_t *vuCode, uint32_t codeSize, const PS2Memory *memory, uint64_t generation);
 
     void execUpper(uint32_t instr);
@@ -280,6 +294,13 @@ private:
 
     void resetScheduler();
     void commitReadyPipelines();
+    void notePendingReady(CommitSlot slot, uint64_t readyCycle)
+    {
+        if (readyCycle < m_nextReady[slot])
+            m_nextReady[slot] = readyCycle;
+        if (readyCycle < m_nextCommitCycle)
+            m_nextCommitCycle = readyCycle;
+    }
     void advanceOneCycle();
     void advanceTo(uint64_t targetCycle);
     void flushPipelines();

@@ -9,3 +9,13 @@ target_include_directories(ps2x_bench_vu_fmac PRIVATE
 if(NOT MSVC)
     target_compile_options(ps2x_bench_vu_fmac PRIVATE -msse4.1)
 endif()
+
+# VU1 interpreter workload (links the runtime; see vu1_interp_bench.cpp for the program and scenarios).
+add_executable(ps2x_bench_vu1 "${CMAKE_CURRENT_SOURCE_DIR}/vu1_interp_bench.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/sampling_profiler.cpp")
+if(WIN32)
+    target_link_libraries(ps2x_bench_vu1 PRIVATE dbghelp)
+endif()
+target_link_libraries(ps2x_bench_vu1 PRIVATE ps2_runtime)
+if(COMMAND ps2x_link_like_runtime)
+    ps2x_link_like_runtime(ps2x_bench_vu1)
+endif()

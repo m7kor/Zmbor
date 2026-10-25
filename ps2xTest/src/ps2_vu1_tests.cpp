@@ -2107,5 +2107,146 @@ void register_ps2_vu1_tests()
             t.Equals(vu1.state().vi[1], 0,
                      "instruction following a reserved opcode must not execute");
         });
+
+        tc.Run("VU1 commit index matches the full-scan reference on random programs (state, cycles, memory)", [](TestCase &t)
+        {
+            // Differential test of the pipeline commit index (m_nextReady): each random straight-line program (with
+            // forward branches) runs twice from the same state - once indexed, once in reference mode, which scans every
+            // pipeline on every call as the interpreter did before the index - and the complete architectural state,
+            // the cycle count and VU data memory must be identical, both at an interrupted point (cycle budget) and at
+            // the end. The instruction mix covers FMAC (all operand kinds, ACC forms), FDIV/EFU with WAITQ/WAITP,
+            // flag instructions, integer ops, loads/stores (immediate, post-increment, pre-decrement) and I-bit pairs.
+            constexpr uint32_t kLowerNop = 0x8000033Cu;
+            uint64_t s = 0x2545F4914F6CDD1Dull;
+            auto next = [&s]() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return static_cast<uint32_t>(s >> 16); };
+            auto pick = [&next](uint32_t n) { return next() % n; };
+            const auto upperOp = [&]() -> uint32_t {
+                const uint8_t dest = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t ft = static_cast<uint8_t>(pick(32u)), fs = static_cast<uint8_t>(pick(32u));
+                const uint8_t fd = static_cast<uint8_t>(1u + pick(31u));
+                switch (pick(4u))
+                {
+                case 0: return makeVuUpper(static_cast<uint8_t>(pick(0x30u)), dest, ft, fs, fd);            // ADD..MINI
+                case 1:
+                {
+                    static const uint8_t specials[] = {0x00, 0x01, 0x04, 0x05, 0x08, 0x0A, 0x0C, 0x0F, 0x10, 0x11, 0x14,
+                                                       0x15, 0x18, 0x19, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23,
+                                                       0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x2E};
+                    return makeVuUpperSpecial(specials[pick(sizeof(specials))], dest, ft, fs);
+                }
+                default: return kVuUpperNop;
+                }
+            };
+            const auto lowerOp = [&](uint32_t index, uint32_t count) -> uint32_t {
+                const uint8_t dest = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t a = static_cast<uint8_t>(1u + pick(31u)), b = static_cast<uint8_t>(pick(32u));
+                const uint8_t vi = static_cast<uint8_t>(1u + pick(4u)), vj = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t fsf = static_cast<uint8_t>(pick(4u)), ftf = static_cast<uint8_t>(pick(4u));
+                switch (pick(22u))
+                {
+                case 0: return makeVuLq(dest, a, vi, static_cast<int16_t>(pick(48u)));
+                case 1: return makeVuSq(dest, b, vi, static_cast<int16_t>(pick(48u)));
+                case 2: return makeVuIaddiu(vj, static_cast<uint8_t>(pick(16u)), static_cast<int16_t>(pick(32u)));
+                case 3: return makeVuLowerDirect(0x30u + static_cast<uint8_t>(pick(2u)), vj, vi, vj);  // IADD/ISUB
+                case 4: return makeVuLowerDirect(0x34u + static_cast<uint8_t>(pick(2u)), vj, vi, vj);  // IAND/IOR
+                case 5: return makeVuLowerSpecial(0x30u + static_cast<uint8_t>(pick(2u)), b, a, 0u, dest); // MOVE/MR32
+                case 6: return makeVuDiv(b, static_cast<uint8_t>(pick(32u)), fsf, ftf);
+                case 7: return makeVuSqrt(b, ftf);
+                case 8: return makeVuLowerSpecial(0x3Au, b, static_cast<uint8_t>(pick(32u)), 0u, static_cast<uint8_t>((ftf << 2) | fsf)); // RSQRT
+                case 9: return makeVuLowerSpecial(0x3Bu, 0u);                                          // WAITQ
+                case 10: return makeVuLowerSpecial(0x7Bu, 0u);                                         // WAITP
+                case 11: return makeVuLowerSpecial(static_cast<uint8_t>(0x70u + pick(7u)), b, 0u, 0u, 0xEu); // ESADD..ESUM
+                case 12: return makeVuLowerSpecial(static_cast<uint8_t>(0x78u + pick(3u)), b, 0u, 0u, static_cast<uint8_t>(fsf)); // ESQRT/ERSQRT/ERCPR
+                case 13: return makeVuLowerSpecial(0x64u, 0u, a, 0u, dest);                            // MFP
+                case 14: return makeVuFlagImmediate(static_cast<uint8_t>(0x10u + pick(4u)), vj, static_cast<uint16_t>(next() & 0xFFFu)); // FC*
+                case 15: return makeVuFlagImmediate(static_cast<uint8_t>(0x14u + pick(4u)), vj, static_cast<uint16_t>(next() & 0xFFFu)); // FS*
+                case 16: { static const uint8_t fm[] = {0x18u, 0x1Au, 0x1Bu, 0x1Cu}; return makeVuFlagRegister(fm[pick(4u)], vj, vi); } // FMEQ/FMAND/FMOR/FCGET
+                case 17: return makeVuLowerSpecial(static_cast<uint8_t>(0x34u + pick(4u)), vi, a, 0u, dest); // LQI/SQI/LQD/SQD
+                case 18: return makeVuIlw(dest, vj, vi, static_cast<int16_t>(pick(48u)));
+                case 19:
+                {
+                    if (index + 3u >= count)
+                        return kLowerNop;
+                    return makeVuBranch(static_cast<int16_t>(pick(3u))); // forward, lands inside the program
+                }
+                case 20: return makeVuLowerSpecial(static_cast<uint8_t>(0x3Cu + pick(2u)), vj, b, 0u, static_cast<uint8_t>(8u >> pick(4u))); // MTIR/MFIR
+                default: return kLowerNop;
+                }
+            };
+
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            std::vector<uint8_t> dataA(PS2_VU1_DATA_SIZE), dataB(PS2_VU1_DATA_SIZE);
+            uint32_t programs = 0, mismatched = 0, ended = 0;
+            std::string first;
+            const auto compare = [&](const VU1Interpreter &x, const VU1Interpreter &y, const char *where, uint32_t program) {
+                const VU1State &p = x.state(), &q = y.state();
+                const bool same = std::memcmp(p.vf, q.vf, sizeof(p.vf)) == 0 && std::memcmp(p.vi, q.vi, sizeof(p.vi)) == 0 &&
+                                  std::memcmp(p.acc, q.acc, sizeof(p.acc)) == 0 && std::memcmp(&p.q, &q.q, 4) == 0 &&
+                                  std::memcmp(&p.p, &q.p, 4) == 0 && std::memcmp(&p.i, &q.i, 4) == 0 && p.r == q.r &&
+                                  p.pc == q.pc && p.mac == q.mac && p.clip == q.clip && p.status == q.status &&
+                                  p.cycles == q.cycles && p.ebit == q.ebit && p.branchPending == q.branchPending &&
+                                  dataA == dataB;
+                if (!same && mismatched++ == 0)
+                    first = "program " + std::to_string(program) + " at " + where + ": cycles " + std::to_string(p.cycles) +
+                            "/" + std::to_string(q.cycles) + " status " + std::to_string(p.status) + "/" +
+                            std::to_string(q.status) + " mac " + std::to_string(p.mac) + "/" + std::to_string(q.mac);
+            };
+            for (uint32_t program = 0; program < 3000u; ++program)
+            {
+                const uint32_t count = 8u + pick(40u);
+                std::memset(fx.code, 0, PS2_VU1_CODE_SIZE);
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    const bool iBit = pick(16u) == 0u;
+                    const uint32_t upper = upperOp() | (iBit ? 0x80000000u : 0u);
+                    const uint32_t lower = iBit ? ((next() & 0x807FFFFFu) | ((100u + pick(56u)) << 23)) : lowerOp(i, count);
+                    writeVuInstructionPair(fx.code, i * 8u, lower, upper);
+                }
+                writeVuInstructionPair(fx.code, count * 8u, kLowerNop, kVuUpperNop | (1u << 30));
+                writeVuInstructionPair(fx.code, count * 8u + 8u, kLowerNop, kVuUpperNop);
+
+                VU1Interpreter indexed, reference;
+                reference.setReferenceCommitMode(true);
+                for (VU1Interpreter *vu : {&indexed, &reference})
+                {
+                    VU1State &st = vu->state();
+                    uint64_t seed = s;
+                    auto value = [&seed]() { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; return static_cast<uint32_t>(seed >> 16); };
+                    for (int r = 1; r < 32; ++r)
+                        for (int l = 0; l < 4; ++l)
+                        {
+                            const uint32_t bits = (value() & 0x807FFFFFu) | ((value() % 8u == 0u ? value() % 256u : 100u + value() % 56u) << 23);
+                            std::memcpy(&st.vf[r][l], &bits, 4);
+                        }
+                    for (int r = 1; r < 16; ++r)
+                        st.vi[r] = static_cast<int32_t>(value() % 64u);
+                    for (int l = 0; l < 4; ++l)
+                    {
+                        const uint32_t bits = (value() & 0x807FFFFFu) | ((100u + value() % 56u) << 23);
+                        std::memcpy(&st.acc[l], &bits, 4);
+                    }
+                    const uint32_t ib = (value() & 0x807FFFFFu) | (127u << 23);
+                    std::memcpy(&st.i, &ib, 4);
+                }
+                for (size_t i = 0; i < dataA.size(); ++i)
+                    dataA[i] = static_cast<uint8_t>(next());
+                dataB = dataA;
+                next(); // advance the shared stream past the register seed
+                const uint32_t budget = 20u + pick(200u);
+                indexed.execute(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, budget);
+                reference.execute(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, budget);
+                compare(indexed, reference, "budget", program);
+                indexed.resume(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 20000u);
+                reference.resume(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 20000u);
+                compare(indexed, reference, "end", program);
+                ended += indexed.state().cycles < 20000u + budget ? 1u : 0u;
+                ++programs;
+            }
+            std::printf("    commit index vs reference: %u programs, %u finished within budget, %u mismatches\n", programs,
+                        ended, mismatched);
+            t.Equals(mismatched, 0u, "indexed and reference runs must agree (first: " + first + ")");
+            t.IsTrue(ended > programs / 2u, "most random programs must run to their E bit");
+        });
     });
 }

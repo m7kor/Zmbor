@@ -104,9 +104,20 @@ overflow threshold are killed; a host-float product under FE_TOWARDZERO is an eq
 There is no hardware vector for macro-mode arithmetic itself (cpu/vu0_macro covers integer ops and transfers only).
 MAC/STATUS flags in macro mode remain a gap.
 
-### 2.5 EFU — provisional (vu_lower_efu 182/223)
-Stage model fitted to 208 vectors (167 exact); EATAN/ESIN/EEXP series differ in the last bits on 41 rows. The rounding
-of series terms is unknown. Model families and a train/validation split: `hardware-probes.md` P5.
+### 2.5 EFU — provisional (vu_lower_efu 183/223)
+Stage model fitted in Phase 3 to 208 vectors; EATAN/ESIN/EEXP series differ in the last bits on the remaining rows.
+Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test alongside):
+- The established FMAC adder (2.2: gap rule + truncation) in place of "truncated exact sum": series sums only, the
+  sum of squares, EATAN's (x-1)/(x+1) operands, EEXP's 1+series — each alone **neutral** (182/223). The data does not
+  distinguish the two adders at those stages.
+- The Phase 3 EATAN constant `0.785398185253143` is not a float: it lies 3.3e-16 below 0x3F490FDB, a hidden sub-ulp
+  offset that makes exact sums truncate one ulp lower. Replacing it by 0x3F490FDB (float pi/4 rounded to nearest)
+  gives 158/223 (falsified); by 0x3F490FDA (pi/4 truncated to 24 bits) or a double-precision pi/4, together with the
+  FMAC adder in the series, 183/223 with no line lost (`ps2x_tests` EFU vectors 167 -> 168 of 208).
+- Adopted: series sums through `ps2_vu_fmac::add`, constant 0x3F490FDA. Provisional: 0x3F490FDA and a wider pi/4
+  are not separated by any row; mutants of either part fail the EFU vector floor.
+- Not explained: EATAN(0) etc. read 0x33E60000 on hardware (a cancellation residual with only 7 mantissa bits set);
+  no candidate reproduces it, which points at the series/constant alignment, not at rounding. No probe yet.
 
 ### 2.6 COP2 control registers — mixed
 - Write masks of vi16/vi18/vi20/vi27/vi28/vi31 and the read-only registers: established, one row each

@@ -1031,12 +1031,14 @@ void register_ps2_vu1_tests()
                     differences += line;
                 }
             }
-            if (exact < 167u)
+            std::printf("    EFU rows exact: %u of %u\n", exact, total);
+            if (exact < 168u)
                 std::printf("%s", differences.c_str());
             t.Equals(total, 208u, "all 13 ops x 16 inputs should run");
-            // The model reproduces 167 rows bit for bit; the others differ in the last bits of the EATAN/ESIN/EEXP
-            // series. This is a floor: a change that loses a hardware-exact row fails here.
-            t.IsTrue(exact >= 167u, "at least 167 of 208 EFU rows should match the hardware exactly, got " + std::to_string(exact));
+            // The model reproduces 168 rows bit for bit (167 before Phase 5's FMAC-adder series and 24-bit pi/4); the
+            // others differ in the last bits of the EATAN/ESIN/EEXP series. This is a floor: a change that loses a
+            // hardware-exact row fails here.
+            t.IsTrue(exact >= 168u, "at least 168 of 208 EFU rows should match the hardware exactly, got " + std::to_string(exact));
         });
 
         tc.Run("EFU resource observes throughput separately from P visibility", [](TestCase &t)

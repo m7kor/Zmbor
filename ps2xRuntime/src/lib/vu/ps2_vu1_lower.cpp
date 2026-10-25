@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include "ps2_vu_fmac.h"
 
 namespace
 {
@@ -72,6 +73,8 @@ namespace
 
     double efuTrunc(double d) { return efuValue(efuBits(d, false)); }
     double efuNearest(double d) { return efuValue(efuBits(d, true)); }
+    // The VU FMAC adder (ps2_vu_fmac: an operand 25+ exponent steps smaller is dropped, else truncated exact sum).
+    double efuFmacAdd(double a, double b) { return efuValue(ps2_vu_fmac::add(efuBits(a, false), efuBits(b, false))); }
 
     double efuDivide(double numerator, double denominator)
     {
@@ -90,7 +93,7 @@ namespace
         return efuTrunc(efuTrunc(efuTrunc(x * x) + efuTrunc(y * y)) + efuTrunc(z * z));
     }
 
-    // sum of c[k] * t^(first + 2k), each product and partial sum truncated.
+    // sum of c[k] * t^(first + 2k), each product truncated, partial sums through the FMAC adder (evidence register 2.5).
     template <size_t N>
     double efuSeries(double t, const double (&coefficients)[N], double step)
     {
@@ -98,7 +101,7 @@ namespace
         double power = t;
         for (const double c : coefficients)
         {
-            accumulator = efuTrunc(accumulator + efuTrunc(c * power));
+            accumulator = efuFmacAdd(accumulator, efuTrunc(c * power));
             power = efuTrunc(power * step);
         }
         return accumulator;
@@ -109,8 +112,11 @@ namespace
         constexpr double coefficients[] = {0.999999344348907, -0.333298563957214, 0.199465364217758,
                                            -0.139085337519646, 0.096420042216778, -0.055909886956215,
                                            0.021861229091883, -0.004054057877511};
+        // pi/4 truncated to 24 bits (0x3F490FDA). The literal used before (0.785398185253143) sat 3.3e-16 below the
+        // nearest float 0x3F490FDB, a hidden sub-ulp offset. With FMAC-adder series sums: 0x3F490FDB 158/223 lines,
+        // 0x3F490FDA 183/223, a double-precision pi/4 also 183/223 (evidence register 2.5): provisional.
         const double t = efuDivide(efuTrunc(b - a), efuTrunc(b + a));
-        return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + 0.785398185253143);
+        return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + efuValue(0x3F490FDAu));
     }
 
     double efuSin(double x)

@@ -542,7 +542,7 @@ int EeScheduler::startThread(int id, uint32_t arg, const R5900Context &caller, b
     }
     if (ownedStack != 0u)
     {
-        m_runtime.guestFree(ownedStack);
+        m_runtime.runtimeFree(ownedStack);
     }
     publishSnapshot();
     throw EeDispatcherTransfer{};

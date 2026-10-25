@@ -173,6 +173,99 @@ def program_basic():
     return a, ['puts', 'exit']
 
 
+# Branch in a branch delay slot. Each case runs, with t0 = 0 and t1 = 1:
+#   B1 -> T1; B2 -> T2 (B2 in B1's delay slot); A8: +0x100; j done
+#   T1: +0x1; +0x1000; j done      T2: +0x10; j done
+# so v0 records which instructions ran. The all-taken rows follow the real-PS2 results of ps2autotests
+# cpu/ee/branchdelay and cpu/ee_fpu/branchdelay (see ControlFlowEmitter::emitTransferInDelaySlot); the
+# not-taken rows follow ordinary delay-slot semantics.
+BRANCHDELAY_CASES = (
+    # (name, B1, B2, v0)
+    ('early_taken_taken', ('beq', 't0', 't0'), ('beq', 't0', 't0'), 0x11),      # T1's first insn is B2's delay slot
+    ('late_taken_taken', ('bne', 't0', 't1'), ('bne', 't0', 't1'), 0x110),      # B2 replaces B1: A8, then T2
+    ('late_taken_not', ('bne', 't0', 't1'), ('beq', 't0', 't1'), 0x1001),       # B1's transfer stands
+    ('outer_not_taken', ('beq', 't0', 't1'), ('beq', 't0', 't0'), 0x110),       # B2 runs as an ordinary branch
+    ('likely_not_taken', ('beql', 't0', 't1'), ('beq', 't0', 't0'), 0x100),     # B2 annulled, continue at A8
+    ('early_inner_likely_not', ('beq', 't0', 't0'), ('beql', 't0', 't1'), 0x1000),  # T1's first insn annulled
+    ('early_inner_not', ('beq', 't0', 't0'), ('beq', 't0', 't1'), 0x1001),      # T1 runs whole
+)
+EXPECTED['branchdelay'] = 'E2E bd ' + ' '.join(str(c[3]) for c in BRANCHDELAY_CASES)
+
+
+def program_branchdelay():
+    a = Assembler()
+
+    a.function('_start')
+    a.i('lui', 'sp', 'zero', 0x01F0)
+    a.jump('jal', 'main')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.r('or', rd='a0', rs='zero', rt='zero')
+    a.label('hang')
+    a.branch('beq', 'zero', 'zero', 'hang')
+    a.nop()
+
+    for name, b1, b2, _ in BRANCHDELAY_CASES:
+        a.function('bd_' + name)
+        a.li('v0', 0)
+        a.li('t0', 0)
+        a.li('t1', 1)
+        a.branch(b1[0], b1[1], b1[2], name + '_t1')
+        a.branch(b2[0], b2[1], b2[2], name + '_t2')
+        a.i('addiu', 'v0', 'v0', 0x100)
+        a.jump('j', name + '_done')
+        a.nop()
+        a.label(name + '_t1')
+        a.i('addiu', 'v0', 'v0', 0x1)
+        a.i('addiu', 'v0', 'v0', 0x1000)
+        a.jump('j', name + '_done')
+        a.nop()
+        a.label(name + '_t2')
+        a.i('addiu', 'v0', 'v0', 0x10)
+        a.jump('j', name + '_done')
+        a.nop()
+        a.label(name + '_done')
+        a.r('jr', rs='ra')
+        a.nop()
+
+    a.function('main')
+    a.i('addiu', 'sp', 'sp', -16)
+    a.i('sw', 'ra', 'sp', 12)
+    a.i('sw', 's4', 'sp', 8)
+    a.la('a0', 'outbuf')
+    a.la('a1', 's_bd')
+    a.jump('jal', 'strcpy_end')
+    a.nop()
+    a.r('or', rd='s4', rs='v0', rt='zero')
+    for name, _, _, _ in BRANCHDELAY_CASES:
+        a.jump('jal', 'bd_' + name)
+        a.nop()
+        a.li('t2', 0x20)
+        a.i('sb', 't2', 's4', 0)
+        a.i('addiu', 'a0', 's4', 1)
+        a.jump('jal', 'utoa')
+        a.r('or', rd='a1', rs='v0', rt='zero')   # delay slot
+        a.r('or', rd='s4', rs='v0', rt='zero')
+    a.i('sb', 'zero', 's4', 0)
+    a.la('a0', 'outbuf')
+    a.jump('jal', 'puts')
+    a.nop()
+    a.i('lw', 's4', 'sp', 8)
+    a.i('lw', 'ra', 'sp', 12)
+    a.r('jr', rs='ra')
+    a.i('addiu', 'sp', 'sp', 16)
+
+    emit_string_helpers(a)
+    for name in ('puts', 'exit'):
+        a.function(name)
+        a.r('jr', rs='ra')
+        a.nop()
+
+    a.data_block('outbuf', bytes(128))
+    a.data_block('s_bd', b'E2E bd\0', align=4)
+    return a, ['puts', 'exit']
+
+
 EXPECTED['gs_sprite'] = 'E2E gs frame submitted'
 
 # GS registers and packets (GS User's Manual register numbers; GIFtag layout: NLOOP 0-14, EOP 15, FLG 58-59,
@@ -304,7 +397,7 @@ FRAME_EXPECTATIONS = {
     },
 }
 
-PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite}
+PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay}
 
 
 def main():

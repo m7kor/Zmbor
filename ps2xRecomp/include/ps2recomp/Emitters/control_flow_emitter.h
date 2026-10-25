@@ -80,6 +80,15 @@ namespace ps2recomp
         bool emitRelocationCallIfAvailable(StaticBranchKind kind, std::string_view indent);
         std::string conditionalBranchExpression() const;
         uint32_t conditionalBranchTarget() const;
+
+        // Control transfer in the delay slot (see emitTransferInDelaySlot).
+        bool delaySlotIsOwnTransfer() const;
+        bool resolvesEarly() const;
+        bool linksUnconditionally() const;
+        const Instruction *findFunctionInstruction(uint32_t address) const;
+        void emitTransferTo(uint32_t target, std::string_view indent);
+        void warnDelaySlotTransfer(const std::string &message) const;
+        void emitTransferInDelaySlot();
     };
 }
 

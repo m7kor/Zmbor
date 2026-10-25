@@ -531,6 +531,9 @@ PS2Runtime::PS2Runtime()
     m_guestHeapLimit = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     m_guestHeapSuggestedBase = kGuestHeapDefaultBase;
     m_guestHeapConfigured = false;
+    m_runtimeArenaBlocks.clear();
+    m_runtimeArenaExhaustedWarned = false;
+    m_guestMainStackBase = 0u;
     m_asyncCallbackStackFloor = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     m_asyncCallbackStackTop = PS2_RAM_SIZE;
     m_asyncCallbackLowStackFloor = kAsyncCallbackLowStackFloor;
@@ -836,6 +839,43 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         std::cerr << "ELF program-header table is out of range." << std::endl;
         return false;
     }
+
+    // Validate every loadable segment against the runtime-owned EE kernel area (runtime arena and fixed HLE pools,
+    // 0x00020000-0x00080000) before anything is written: the runtime keeps live state there, so an ELF placed in it
+    // would be overwritten (or overwrite that state). It is kernel memory on a real PS2 as well. The ELF is refused.
+    for (uint16_t i = 0; i < header.phnum; i++)
+    {
+        const uint64_t phOffset =
+            static_cast<uint64_t>(header.phoff) + static_cast<uint64_t>(i) * static_cast<uint64_t>(header.phentsize);
+        ProgramHeader ph{};
+        if (phOffset + sizeof(ProgramHeader) > static_cast<uint64_t>(fileSize))
+            break; // reported by the loading loop
+        file.seekg(static_cast<std::streamoff>(phOffset), std::ios::beg);
+        if (!file.read(reinterpret_cast<char *>(&ph), sizeof(ph)))
+            break;
+        if (ph.type != PT_LOAD || ph.memsz == 0u ||
+            (ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE))
+            continue;
+        uint32_t physAddr = 0u;
+        try
+        {
+            physAddr = m_memory.translateAddress(ph.vaddr);
+        }
+        catch (const std::exception &)
+        {
+            continue; // reported by the loading loop
+        }
+        const uint64_t physEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
+        const std::string overlap = describeRuntimeReservedOverlap(physAddr, physEnd);
+        if (!overlap.empty())
+        {
+            std::cerr << "ELF segment " << i << " (vaddr 0x" << std::hex << ph.vaddr << ", RDRAM 0x" << physAddr
+                      << "-0x" << physEnd << std::dec << ") overlaps the runtime's reserved EE kernel area ("
+                      << overlap << "); the ELF is not loaded." << std::endl;
+            return false;
+        }
+    }
+    file.clear();
 
     m_cpuContext.pc = header.entry;
     m_debugPc.store(m_cpuContext.pc, std::memory_order_relaxed);
@@ -1674,14 +1714,15 @@ uint32_t PS2Runtime::clampGuestHeapBase(uint32_t guestBase) const
     return std::min(normalized, hardLimit);
 }
 
+// 0 selects the default limit (kGuestHeapHardLimit, used when the program never set up a main-thread stack);
+// an explicit limit may reach the end of RAM, as the kernel's SetupHeap allows up to the stack.
 uint32_t PS2Runtime::clampGuestHeapLimit(uint32_t guestLimit) const
 {
-    const uint32_t hardLimit = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
-    if (guestLimit == 0u || guestLimit > hardLimit)
+    if (guestLimit == 0u)
     {
-        return hardLimit;
+        return std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     }
-    return guestLimit;
+    return std::min(guestLimit, PS2_RAM_SIZE);
 }
 
 void PS2Runtime::resetGuestHeapLocked(uint32_t guestBase, uint32_t guestLimit)
@@ -1731,19 +1772,11 @@ void PS2Runtime::ensureGuestHeapInitializedLocked()
 
 int32_t PS2Runtime::findGuestHeapBlockIndexLocked(uint32_t guestAddr) const
 {
-    const uint32_t normalizedAddr = guestAddr & PS2_RAM_MASK;
-    for (size_t i = 0; i < m_guestHeapBlocks.size(); ++i)
-    {
-        const GuestHeapBlock &block = m_guestHeapBlocks[i];
-        if (!block.free && block.addr == normalizedAddr)
-        {
-            return static_cast<int32_t>(i);
-        }
-    }
-    return -1;
+    return findBlockIndex(m_guestHeapBlocks, guestAddr);
 }
 
-uint32_t PS2Runtime::allocateGuestBlockLocked(uint32_t size, uint32_t alignment)
+uint32_t PS2Runtime::allocateFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t size, uint32_t alignment,
+                                        uint32_t *highWater)
 {
     if (size == 0u)
     {
@@ -1762,9 +1795,9 @@ uint32_t PS2Runtime::allocateGuestBlockLocked(uint32_t size, uint32_t alignment)
         return 0u;
     }
 
-    for (size_t i = 0; i < m_guestHeapBlocks.size(); ++i)
+    for (size_t i = 0; i < blocks.size(); ++i)
     {
-        const GuestHeapBlock block = m_guestHeapBlocks[i];
+        const GuestHeapBlock block = blocks[i];
         if (!block.free)
         {
             continue;
@@ -1805,51 +1838,77 @@ uint32_t PS2Runtime::allocateGuestBlockLocked(uint32_t size, uint32_t alignment)
             replacement.push_back({static_cast<uint32_t>(allocEnd), suffixSize, true});
         }
 
-        m_guestHeapBlocks.erase(m_guestHeapBlocks.begin() + static_cast<std::ptrdiff_t>(i));
-        m_guestHeapBlocks.insert(m_guestHeapBlocks.begin() + static_cast<std::ptrdiff_t>(i),
+        blocks.erase(blocks.begin() + static_cast<std::ptrdiff_t>(i));
+        blocks.insert(blocks.begin() + static_cast<std::ptrdiff_t>(i),
                                  replacement.begin(),
                                  replacement.end());
 
-        m_guestHeapEnd = std::max(m_guestHeapEnd, static_cast<uint32_t>(allocEnd));
+        if (highWater)
+            *highWater = std::max(*highWater, static_cast<uint32_t>(allocEnd));
         return alignedAddr;
     }
 
     return 0u;
 }
 
+uint32_t PS2Runtime::allocateGuestBlockLocked(uint32_t size, uint32_t alignment)
+{
+    return allocateFromBlocks(m_guestHeapBlocks, size, alignment, &m_guestHeapEnd);
+}
+
 void PS2Runtime::coalesceGuestHeapLocked()
 {
-    if (m_guestHeapBlocks.empty())
+    (void)freeFromBlocks(m_guestHeapBlocks, 0u);
+}
+
+int32_t PS2Runtime::findBlockIndex(const std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr)
+{
+    const uint32_t normalizedAddr = guestAddr & PS2_RAM_MASK;
+    for (size_t i = 0; i < blocks.size(); ++i)
     {
-        return;
+        if (!blocks[i].free && blocks[i].addr == normalizedAddr)
+        {
+            return static_cast<int32_t>(i);
+        }
+    }
+    return -1;
+}
+
+// Frees the block at guestAddr (0: none) and merges adjacent free blocks; false when guestAddr is not allocated.
+bool PS2Runtime::freeFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr)
+{
+    bool freed = false;
+    if (guestAddr != 0u)
+    {
+        const int32_t index = findBlockIndex(blocks, guestAddr);
+        if (index < 0)
+        {
+            return false;
+        }
+        blocks[static_cast<size_t>(index)].free = true;
+        freed = true;
     }
 
     size_t i = 1;
-    while (i < m_guestHeapBlocks.size())
+    while (i < blocks.size())
     {
-        GuestHeapBlock &prev = m_guestHeapBlocks[i - 1];
-        GuestHeapBlock &curr = m_guestHeapBlocks[i];
+        GuestHeapBlock &prev = blocks[i - 1];
+        GuestHeapBlock &curr = blocks[i];
         const uint64_t prevEnd = static_cast<uint64_t>(prev.addr) + static_cast<uint64_t>(prev.size);
         if (prev.free && curr.free && prevEnd == curr.addr)
         {
             prev.size += curr.size;
-            m_guestHeapBlocks.erase(m_guestHeapBlocks.begin() + static_cast<std::ptrdiff_t>(i));
+            blocks.erase(blocks.begin() + static_cast<std::ptrdiff_t>(i));
             continue;
         }
         ++i;
     }
+    return freed;
 }
 
 void PS2Runtime::freeGuestBlockLocked(uint32_t guestAddr)
 {
-    const int32_t index = findGuestHeapBlockIndexLocked(guestAddr);
-    if (index < 0)
-    {
-        return;
-    }
-
-    m_guestHeapBlocks[static_cast<size_t>(index)].free = true;
-    coalesceGuestHeapLocked();
+    (void)freeFromBlocks(m_guestHeapBlocks, guestAddr);
 }
 
 void PS2Runtime::configureGuestHeap(uint32_t guestBase, uint32_t guestLimit)
@@ -2021,6 +2080,142 @@ uint32_t PS2Runtime::guestHeapLimit() const
 {
     std::lock_guard<std::mutex> lock(m_guestHeapMutex);
     return m_guestHeapConfigured ? m_guestHeapLimit : m_guestHeapSuggestedBase;
+}
+
+uint32_t PS2Runtime::runtimeMalloc(uint32_t size, uint32_t alignment)
+{
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    if (m_runtimeArenaBlocks.empty())
+    {
+        m_runtimeArenaBlocks.push_back({kRuntimeArenaBase, kRuntimeArenaEnd - kRuntimeArenaBase, true});
+    }
+    if (const uint32_t addr = allocateFromBlocks(m_runtimeArenaBlocks, size, alignment, nullptr); addr != 0u)
+    {
+        return addr;
+    }
+
+    // No fallback: the only other free RDRAM is the guest heap, where the program's own sbrk hands out memory
+    // starting at the heap base without telling the runtime, so a block there would overlap the program's data.
+    if (!m_runtimeArenaExhaustedWarned)
+    {
+        m_runtimeArenaExhaustedWarned = true;
+        std::cerr << "[runtime] runtime arena (0x" << std::hex << kRuntimeArenaBase << "-0x" << kRuntimeArenaEnd
+                  << ") cannot fit 0x" << size << " bytes; the HLE call fails instead of using guest memory"
+                  << std::dec << std::endl;
+    }
+    return 0u;
+}
+
+void PS2Runtime::runtimeFree(uint32_t guestAddr)
+{
+    if (guestAddr == 0u)
+    {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    (void)freeFromBlocks(m_runtimeArenaBlocks, guestAddr); // anything else was never a runtime block
+}
+
+static_assert(kAsyncCallbackLowStackFloor >= PS2Runtime::kRuntimeReservedEnd,
+              "async callback stacks stay above the runtime arena and HLE pools");
+
+std::string PS2Runtime::describeRuntimeReservedOverlap(uint32_t physStart, uint64_t physEnd)
+{
+    std::string hit;
+    for (const ReservedRegion &region : kRuntimeReservedRegions)
+    {
+        if (physEnd > region.start && physStart < region.end)
+        {
+            hit += (hit.empty() ? "" : ", ") + std::string(region.name);
+        }
+    }
+    return hit;
+}
+
+namespace
+{
+    // PCCR (ps2autotests cpu/ee_cop0/performance on a real PS2: writing 0x7FFFFFFF reads back 0x000FFBFE).
+    constexpr uint32_t kPccrWritableMask = 0x800FFBFEu;
+    constexpr uint32_t kPccrCte = 1u << 31;
+    constexpr uint32_t kPerfEventProcessorCycle = 1u;
+}
+
+// Brings PCR0/PCR1 up to the current guest cycle. A counter counts while PCCR.CTE is set, its event is processor
+// cycles, and the mode bit for the current CPU mode (EXL, else Status.KSU kernel/supervisor/user) is set; the
+// hardware test shows "all modes" counting and "no modes" not. Only the processor-cycle event is modelled, and
+// cycles are the scheduler's guest cycle accounting, not host time.
+void PS2Runtime::syncPerfCounters(const R5900Context *ctx)
+{
+    const uint64_t now = m_eeScheduler ? m_eeScheduler->currentEeCycle() : 0u;
+    const uint64_t elapsed = now >= m_perfCycleStamp ? now - m_perfCycleStamp : 0u;
+    m_perfCycleStamp = now;
+    if ((m_perfPccr & kPccrCte) == 0u || elapsed == 0u)
+    {
+        return;
+    }
+
+    const uint32_t status = ctx ? ctx->cop0_status : 0u;
+    uint32_t modeBit = 0u; // offset within a counter's EXL, K, S, U bits
+    if ((status & 0x6u) != 0u)
+    {
+        modeBit = 0u; // EXL or ERL
+    }
+    else
+    {
+        const uint32_t ksu = (status >> 3) & 0x3u;
+        modeBit = (ksu == 0u) ? 1u : (ksu == 1u) ? 2u : 3u;
+    }
+
+    for (uint32_t i = 0; i < 2u; ++i)
+    {
+        const uint32_t field = m_perfPccr >> (i == 0u ? 1u : 11u); // EXL, K, S, U, then the 5-bit event
+        const bool modeEnabled = ((field >> modeBit) & 1u) != 0u;
+        const uint32_t event = (field >> 4) & 0x1Fu;
+        if (modeEnabled && event == kPerfEventProcessorCycle)
+        {
+            m_perfPcr[i] += static_cast<uint32_t>(elapsed);
+        }
+    }
+}
+
+uint32_t PS2Runtime::readPerfControl(const R5900Context *ctx)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    return m_perfPccr;
+}
+
+void PS2Runtime::writePerfControl(const R5900Context *ctx, uint32_t value)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    m_perfPccr = value & kPccrWritableMask;
+}
+
+uint32_t PS2Runtime::readPerfCounter(const R5900Context *ctx, uint32_t index)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    return m_perfPcr[index & 1u];
+}
+
+void PS2Runtime::writePerfCounter(const R5900Context *ctx, uint32_t index, uint32_t value)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    m_perfPcr[index & 1u] = value;
+}
+
+void PS2Runtime::setGuestMainStackBase(uint32_t stackBase)
+{
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    m_guestMainStackBase = stackBase & PS2_RAM_MASK;
+}
+
+uint32_t PS2Runtime::guestMainStackBase() const
+{
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    return m_guestMainStackBase;
 }
 
 uint32_t PS2Runtime::reserveAsyncCallbackStack(uint32_t size, uint32_t alignment)

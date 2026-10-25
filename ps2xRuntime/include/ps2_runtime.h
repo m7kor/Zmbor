@@ -96,6 +96,7 @@ struct alignas(16) R5900Context
     uint32_t vu0_fbrst2;    // FBRST2
     uint32_t vu0_fbrst3;    // FBRST3
     uint32_t vu0_fbrst4;    // FBRST4
+    uint32_t vu0_cr24;      // reserved control register vi24 (writable bits 0x0C0C, see vu_translator.cpp)
     uint32_t vu0_itop;
     uint32_t vu0_top;
     uint32_t vu0_info;
@@ -391,6 +392,43 @@ public:
     uint32_t guestHeapLimit() const;
     uint32_t reserveAsyncCallbackStack(uint32_t size, uint32_t alignment = 16u);
 
+    // EE memory the runtime itself owns (HLE library state, packets it builds, IOP host buffers). It comes from
+    // an arena in the EE kernel area, never from the guest heap that SetupHeap/EndOfHeap give the program's
+    // sbrk, so the two cannot overlap. guestMalloc stays the allocator behind HLE malloc/free.
+    static constexpr uint32_t kRuntimeArenaBase = 0x00020000u;
+    static constexpr uint32_t kRuntimeArenaEnd = 0x0004F000u; // fixed HLE pools follow, up to 0x00080000
+    static constexpr uint32_t kRuntimeReservedEnd = 0x00080000u; // end of the arena plus the fixed HLE pools
+    // Returns 0 when the arena is full or disabled: there is no fallback into guest memory, which the program's
+    // own allocator owns. Callers handle 0 as an allocation failure.
+    uint32_t runtimeMalloc(uint32_t size, uint32_t alignment = 16u);
+    void runtimeFree(uint32_t guestAddr);
+    // The runtime-owned EE kernel area, region by region (Syscalls/Helpers/State.h asserts its pools match).
+    struct ReservedRegion
+    {
+        const char *name;
+        uint32_t start;
+        uint32_t end;
+    };
+    static constexpr ReservedRegion kRuntimeReservedRegions[] = {
+        {"runtime arena", kRuntimeArenaBase, kRuntimeArenaEnd},
+        {"HLE RPC packet pool", 0x0004F000u, 0x0005F000u},
+        {"HLE RPC server pool", 0x0005F000u, 0x0006F000u},
+        {"HLE TLS pool", 0x0006F000u, 0x0007F000u},
+        {"HLE boot-mode pool", 0x0007F000u, kRuntimeReservedEnd},
+    };
+    // The reserved regions [physStart, physEnd) intersects, comma-separated; empty when it intersects none.
+    // loadELF rejects an ELF with any such segment before writing guest memory.
+    static std::string describeRuntimeReservedOverlap(uint32_t physStart, uint64_t physEnd);
+    // COP0 performance counters (MFPS/MTPS: PCCR, MFPC/MTPC: PCR0/PCR1). One set for the EE, not per thread.
+    uint32_t readPerfControl(const R5900Context *ctx);
+    void writePerfControl(const R5900Context *ctx, uint32_t value);
+    uint32_t readPerfCounter(const R5900Context *ctx, uint32_t index);
+    void writePerfCounter(const R5900Context *ctx, uint32_t index, uint32_t value);
+
+    // Base of the main thread's stack (SetupThread); SetupHeap with size -1 ends the heap there.
+    void setGuestMainStackBase(uint32_t stackBase);
+    uint32_t guestMainStackBase() const;
+
     void drainCompletedDmacHandlers(uint8_t *rdram);
 
     void requestStop();
@@ -481,6 +519,10 @@ private:
     uint32_t allocateGuestBlockLocked(uint32_t size, uint32_t alignment);
     void freeGuestBlockLocked(uint32_t guestAddr);
     void coalesceGuestHeapLocked();
+    static uint32_t allocateFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t size, uint32_t alignment,
+                                       uint32_t *highWater);
+    static int32_t findBlockIndex(const std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr);
+    static bool freeFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr);
     void HandleIntegerOverflow(R5900Context *ctx);
 
     [[nodiscard]] ps2x::iop::RpcAbi selectIopRpcAbi(const ps2x::iop::RpcAbiRequest &request) const;
@@ -519,6 +561,14 @@ private:
     uint32_t m_guestHeapLimit = PS2_RAM_SIZE;
     uint32_t m_guestHeapSuggestedBase = 0x00100000u;
     bool m_guestHeapConfigured = false;
+    std::vector<GuestHeapBlock> m_runtimeArenaBlocks; // guarded by m_guestHeapMutex
+    bool m_runtimeArenaExhaustedWarned = false;
+    uint32_t m_guestMainStackBase = 0u;
+    void syncPerfCounters(const R5900Context *ctx);
+    std::mutex m_perfMutex;
+    uint32_t m_perfPccr = 0u;
+    uint32_t m_perfPcr[2] = {0u, 0u};
+    uint64_t m_perfCycleStamp = 0u;
     // Async (interrupt/callback/invocation) stacks come first from the gap between the EE kernel area and the
     // ELF image, which titles do not use; the top-of-RAM region is only a fallback since it overlaps the main
     // thread's stack (SetupThread places it there).

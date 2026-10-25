@@ -60,9 +60,8 @@ namespace
         uint32_t ft;
         uint32_t result;
         // 0: must match exactly.
-        // 1: the hardware does not round to nearest (MUL.S drops the low bits, the divide unit has its own rule);
-        //    that rounding is not emulated, so the row differs in the last mantissa bit. ADD.S/SUB.S round toward
-        //    zero and are emulated, so their rows are 0.
+        // 1: the divide/root unit's own rounding is not emulated, so the row differs in the last mantissa bit.
+        //    ADD.S/SUB.S (toward zero) and MUL.S (truncated, ps2_ee_fmul_bits) are emulated, so their rows are 0.
         // 2: an ADD.S/SUB.S/MUL.S operand has exponent 0 and a non-zero mantissa. The hardware reads it as
         //    zero, and so does the fast path now (it checks operands as well as the result): must match exactly.
         int known;
@@ -117,6 +116,20 @@ void register_ps2_float_semantics_tests()
                     t.Equals(got, v.result, describe(v, got));
                 }
             }
+        });
+
+        tc.Run("EE FPU MUL.S truncates and is not commutative for an all-ones ft", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_fpu/muldiv.expected (real PS2).
+            auto mul = [](uint32_t a, uint32_t b) { return ps2_ee_fmul_bits(a, b); };
+            t.Equals(mul(0x3F800000u, 0x3FFFFFFFu), 0x3FFFFFFEu, "mul CF_ONE, CF_MAX_MANTISSA");
+            t.Equals(mul(0x3FFFFFFFu, 0x3F800000u), 0x3FFFFFFFu, "mul CF_MAX_MANTISSA, CF_ONE");
+            t.Equals(mul(0x3F800000u, 0x7FFFFFFFu), 0x7FFFFFFEu, "mul CF_ONE, CF_MAX");
+            t.Equals(mul(0x3F800000u, 0xFFFFFFFFu), 0xFFFFFFFEu, "mul CF_ONE, CF_MIN");
+            t.Equals(mul(0x40400000u, 0x40400000u), 0x41100000u, "mul 3, 3");
+            t.Equals(mul(0x7FFFFFFFu, 0x7FFFFFFFu), 0x7FFFFFFFu, "mul max, max saturates");
+            t.Equals(mul(0x00001337u, 0xDEADBEEFu), 0x80000000u, "a denormal operand is zero");
+            t.Equals(mul(0x3FAAAAABu, 0x3FAAAAABu), 0x3FE38E39u, "products are truncated (nearest is 0x3FE38E3A)");
         });
 
         tc.Run("COP1 arithmetic sets the FCR31 flags real hardware sets", [](TestCase &t)

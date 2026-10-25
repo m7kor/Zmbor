@@ -260,7 +260,7 @@ namespace ps2_syscalls
         }
         if (ownedStack != 0u)
         {
-            runtime->guestFree(ownedStack);
+            runtime->runtimeFree(ownedStack);
         }
         setReturnS32(ctx, eeThreadResult(result, id));
     }
@@ -284,7 +284,7 @@ namespace ps2_syscalls
         }
         if (target->stack == 0u && target->stackSize != 0u)
         {
-            target->stack = runtime->guestMalloc(target->stackSize, 16u);
+            target->stack = runtime->runtimeMalloc(target->stackSize, 16u);
             if (target->stack == 0u)
             {
                 setReturnS32(ctx, -1);
@@ -325,7 +325,7 @@ namespace ps2_syscalls
         const int result = ee.terminateThread(id, ownedStack, false);
         if (ownedStack != 0u)
         {
-            runtime->guestFree(ownedStack);
+            runtime->runtimeFree(ownedStack);
         }
         setReturnS32(ctx, eeThreadResult(result, id));
     }

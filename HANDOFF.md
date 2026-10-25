@@ -1,9 +1,39 @@
-# Zmbor — handoff (2026-10-24)
+# Zmbor — handoff (updated 2026-10-25, Phase 4)
 
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
 built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
-## State
+## Phase 4 (pushed; draft PR #2 open, not merged)
+
+- Branch `ultimate/phase4-hardware-accuracy` is on https://github.com/m7kor/Zmbor with draft
+  **PR #2** (https://github.com/m7kor/Zmbor/pull/2) into `main`. Do not merge or mark it ready without the owner's
+  approval. Local worktree: `D:\Project\Zmbor\wt-phase4`.
+- Commits on Zmbor `main` `00173a2`:
+  - `3d935f4` branch in a delay slot;
+  - `a7449bb` heap ownership;
+  - `f81312d` COP0 performance counters;
+  - `363f8f2` MUL.S and vi24;
+  - `cb77d79` docs;
+  - a follow-up that removes the runtime-arena fallback (below).
+- Measured on this branch (Windows MSVC): hardware tests **53 / 55 exact, 8202 / 8250 lines**, 0 crashes,
+  0 timeouts, no regressions against the re-measured `00173a2` baseline (47 / 55, 8172); `ps2x_tests` 530 / 530;
+  ctest 49 / 49; `ps2xIOP` 4 / 4.
+- GitHub CI (Linux GCC, Linux Clang, Windows MSVC) builds and runs `ps2x_tests` only. It does not run the 55
+  hardware tests, which need the ps2autotests ELFs prepared outside the repository; those numbers are local runs.
+- Hardware tests for this branch use `D:\Project\Zmbor\hwtest_work\gen4` (configure with
+  `-DPS2X_HWTEST_GENERATED=D:/Project/Zmbor/hwtest_work/gen4`); run reports `p4_base.json` and `p4_m1/m2/m4/m5.json`.
+- Runtime arena policy (follow-up to `a7449bb`): `runtimeMalloc` returns 0 when the arena is full; it no longer falls
+  back to the guest heap allocator. That fallback placed runtime blocks at the heap base, where the program's own sbrk
+  starts. Every HLE caller handles 0. An ELF with a segment in 0x00020000-0x00080000 (arena or any fixed HLE pool)
+  is refused before anything is written, by both `PS2Runtime::loadELF` and the SifLoadElf loader (the guest gets an
+  error); none of the 55 hardware programs loads there.
+- Limited evidence, kept as documented hypotheses:
+  - the delay-slot model is fitted to three all-taken hardware rows;
+  - vi24 rests on one row;
+  - MUL.S fits 72 rows, which do not distinguish it from wider truncated-array forms.
+- Remaining failures: `cpu_ee_fpu_sqrt` (RSQRT.S) and `vu_lower_efu`, see below.
+
+## State before Phase 4
 
 There are two revisions, measured separately:
 
@@ -106,6 +136,16 @@ python tools\hwtest\hwtest.py report --out D:\Project\Zmbor\hwtest_work\gen --js
   `tryProcessScratchpadDma` (SPR normal, interleave, toSPR chain).
 - Hardware-test executables reserve a 64 MB stack (`ps2xTest/e2e/CMakeLists.txt`), because /Od host frames reach about 0.7 MB.
 
+Phase 4 additions:
+- Delay-slot control transfers: `ControlFlowEmitter::emitTransferInDelaySlot` (model and evidence in its comment); the
+  analyzer adds the entry points, `FunctionEmitter` emits the inner transfer as its own instruction.
+- EE memory ownership: `PS2Runtime::runtimeMalloc/runtimeFree` (arena `kRuntimeArenaBase..kRuntimeArenaEnd`, EE kernel
+  area; 0 on exhaustion, never a guest-heap fallback; an ELF overlapping the reserved area is refused, `describeRuntimeReservedOverlap`) for
+  runtime-owned memory; `guestMalloc` only for HLE malloc. HLE pools in `Syscalls/Helpers/State.h` sit at
+  0x0004F000-0x00080000. SetupHeap(-1) ends at `guestMainStackBase()` (recorded by SetupThread).
+- COP0 PCCR/PCR0/PCR1: `PS2Runtime::read/writePerfControl/Counter`, counted from `EeScheduler::currentEeCycle()`.
+- COP1 MUL.S: `ps2_ee_fmul_bits` in `ps2_runtime_macros.h` (VU multiplies are separate and unchanged).
+
 ## Completed milestones
 
 - Phase 0: upstream PRs #304/#268/#310 integrated with extensions, plus the #258 invocation-stack fix
@@ -122,26 +162,24 @@ python tools\hwtest\hwtest.py report --out D:\Project\Zmbor\hwtest_work\gen --js
 - Phase 3:
   - VU microcode execution: 6 of 7 VU tests exact.
   - VIF, SPR and DMAC: all 11 `dma/*` tests exact.
+- Phase 4: branch in a delay slot, heap ownership, COP0 performance counters, MUL.S, VU0 vi24: 53/55.
 
-## Remaining hardware failures (8)
+## Remaining hardware failures (2, after Phase 4)
 
 | test | lines | cause / lead |
 |---|---|---|
-| vu_lower_efu | 182/223 | 41 rows: EATAN/ESIN/EEXP last-bit differences; exact series term rounding unknown (model matches 167/208 vectors) |
-| cpu_ee_fpu_muldiv | 342/360 | MUL.S gives x-1ulp for 1.0*x with all-ones mantissa; needs a bit-level EE multiplier model (PCSX2's is GPL-3, do not copy) |
-| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S 1 ulp low; same bit-level divider issue |
-| cpu_ee_branchdelay | 12/13 | branch in a branch delay slot: hardware runs one instruction at the second target; recompiler does not model it |
-| cpu_ee_fpu_branchdelay | 2/4 | same, with BC1x |
-| cpu_ee_cop0_performance | 6/13 | PCCR write mask, PCR0/PCR1 event counting |
-| memory_ee_default | 12/13 | `malloc(30 MB)` fails: EndOfHeap 0x01F00000; runtime `guestMalloc` shares the region with guest sbrk |
-| cpu_vu0_macro_transfer | 35/36 | `cfc2 vi24` reads 0x0c0c after `ctc2 -1` on hardware; unexplained |
+| vu_lower_efu | 182/223 | 41 rows: EATAN/ESIN/EEXP last-bit differences; exact series term rounding unknown (model matches 167/208 vectors). The MUL.S finding (Booth-recoded ft, lowest negative digit missing its +1) is an untested lead for the series products |
+| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S 1 ulp on 7 rows. Fitted on all 39 rows (scratch scripts `fpu_rsqrt_fit.py`, `fpu_rsqrt_sweep.py`): root to nearest + truncated division fits 38; truncated/extra-bit roots fit fewer; DIV.S itself rounds up at 0.50 ulp where an RSQRT quotient at 0.52 ulp does not, so the two do not share one rounding rule |
 
-## Phase 4 priorities (suggested)
+Fixed in Phase 4: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay, memory_ee_default, cpu_ee_cop0_performance,
+cpu_ee_fpu_muldiv, cpu_vu0_macro_transfer (see `CHANGELOG.md`, Phase 4).
 
-1. Branch in a delay slot (two tests; a recompiler change in the control-flow emitter, testable by e2e).
-2. Heap limit: separate the runtime's `guestMalloc` arena from the guest heap/sbrk, then raise EndOfHeap.
-3. COP0 performance counters (PCCR mask, PCR0/1 events).
-4. Bit-level FPU MUL.S / RSQRT.S models built from the hardware vectors.
-5. EFU series last bits (time-box; diminishing returns).
-6. Integrate the queued community items in `docs/community-research/REUSABLE_IMPROVEMENTS.md` that the hardware tests
+## Next priorities (suggested)
+
+1. RSQRT.S: try a divider model (e.g. SRT/Newton with a fixed number of quotient bits) against the 39 rows plus the
+   36 DIV rows together.
+2. EFU series last bits (time-box).
+3. MUL.S speed: the integer model costs about 1.46x the host multiply in isolation; a host multiply plus an FMA
+   remainder check gives the same result where FMA is available.
+4. Integrate the queued community items in `docs/community-research/REUSABLE_IMPROVEMENTS.md` that the hardware tests
    do not cover, then validate on real game ELFs supplied by the user. Never commit game data or BIOS.

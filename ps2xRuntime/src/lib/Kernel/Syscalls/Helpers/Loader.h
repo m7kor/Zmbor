@@ -310,6 +310,32 @@ namespace
             ++secFilterLogCount;
         }
 
+        // As PS2Runtime::loadELF: refuse an ELF with an RDRAM segment in the runtime-owned EE kernel area (runtime
+        // arena and fixed HLE pools) before writing any segment.
+        for (uint32_t i = 0; i < header.phnum; ++i)
+        {
+            Elf32ProgramHeader ph{};
+            const uint64_t phOffset = static_cast<uint64_t>(header.phoff) + static_cast<uint64_t>(i) * header.phentsize;
+            if (!readFileBlockAt(file, phOffset, &ph, sizeof(ph)))
+            {
+                errorOut = "failed to read ELF program headers";
+                return false;
+            }
+            if (ph.type != kElfPtLoad || ph.memsz == 0u ||
+                (ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < (PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE)))
+            {
+                continue;
+            }
+            const uint32_t physAddr = runtime ? runtime->memory().translateAddress(ph.vaddr) : (ph.vaddr & PS2_RAM_MASK);
+            const std::string overlap =
+                PS2Runtime::describeRuntimeReservedOverlap(physAddr, static_cast<uint64_t>(physAddr) + ph.memsz);
+            if (!overlap.empty())
+            {
+                errorOut = "ELF segment overlaps the runtime's reserved EE kernel area (" + overlap + ")";
+                return false;
+            }
+        }
+
         for (uint32_t i = 0; i < header.phnum; ++i)
         {
             Elf32ProgramHeader ph{};

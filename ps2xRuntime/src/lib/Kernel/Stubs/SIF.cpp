@@ -558,7 +558,7 @@ namespace ps2_stubs
         if (!runtime->hasFunction(registered.function))
             return false;
 
-        const uint32_t packetAddress = runtime->guestMalloc(static_cast<uint32_t>(packetSize), 16u);
+        const uint32_t packetAddress = runtime->runtimeMalloc(static_cast<uint32_t>(packetSize), 16u);
         if (packetAddress == 0u)
             return false;
 
@@ -566,7 +566,7 @@ namespace ps2_stubs
         uint8_t *const last = getMemPtr(rdram, packetAddress + static_cast<uint32_t>(packetSize - 1u));
         if (!first || !last || last < first || static_cast<size_t>(last - first) != packetSize - 1u)
         {
-            runtime->guestFree(packetAddress);
+            runtime->runtimeFree(packetAddress);
             return false;
         }
 
@@ -588,14 +588,14 @@ namespace ps2_stubs
             SET_GPR_U32(&invocation.context, 31, 0u);
             invocation.onComplete = [runtime, packetAddress](const R5900Context &, R5900Context &)
             {
-                runtime->guestFree(packetAddress);
+                runtime->runtimeFree(packetAddress);
             };
             runtime->eeScheduler().queueInvocation(std::move(invocation));
             return true;
         }
         catch (...)
         {
-            runtime->guestFree(packetAddress);
+            runtime->runtimeFree(packetAddress);
             return false;
         }
     }

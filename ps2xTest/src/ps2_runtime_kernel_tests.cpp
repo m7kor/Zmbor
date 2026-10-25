@@ -1,3 +1,5 @@
+#include <fstream>
+#include <filesystem>
 #include "MiniTest.h"
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
@@ -532,6 +534,41 @@ namespace
         ctx->pc = 0u;
     }
 
+    // Minimal MIPS ELF32 executable: one PT_LOAD per (vaddr, size), each filled with `fill`.
+    void writeTestElf(const std::filesystem::path &path, const std::vector<std::pair<uint32_t, uint32_t>> &segments,
+                      uint8_t fill)
+    {
+        std::vector<uint8_t> out(52u + 32u * segments.size(), 0u);
+        auto put16 = [&](size_t at, uint16_t v) { std::memcpy(out.data() + at, &v, 2); };
+        auto put32 = [&](size_t at, uint32_t v) { std::memcpy(out.data() + at, &v, 4); };
+        const uint8_t ident[8] = {0x7F, 0x45, 0x4C, 0x46, 1, 1, 1, 0};
+        std::memcpy(out.data(), ident, sizeof(ident));
+        put16(16, 2);  // ET_EXEC
+        put16(18, 8);  // EM_MIPS
+        put32(20, 1);
+        put32(24, segments.empty() ? 0u : segments[0].first);
+        put32(28, 52); // phoff
+        put16(40, 52);
+        put16(42, 32);
+        put16(44, static_cast<uint16_t>(segments.size()));
+        put16(46, 40);
+        for (size_t i = 0; i < segments.size(); ++i)
+        {
+            const size_t ph = 52u + 32u * i;
+            put32(ph + 0, 1); // PT_LOAD
+            put32(ph + 4, static_cast<uint32_t>(out.size()));
+            put32(ph + 8, segments[i].first);
+            put32(ph + 12, segments[i].first);
+            put32(ph + 16, segments[i].second);
+            put32(ph + 20, segments[i].second);
+            put32(ph + 24, 5);
+            put32(ph + 28, 16);
+            out.insert(out.end(), segments[i].second, fill);
+        }
+        std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char *>(out.data()),
+                                                     static_cast<std::streamsize>(out.size()));
+    }
+
     struct TestEnv
     {
         std::vector<uint8_t> rdram;
@@ -923,6 +960,253 @@ void register_ps2_runtime_kernel_tests()
             const uint32_t reused = env.runtime.guestMalloc(0x80u, 16u);
             t.Equals(reused, heapBase, "guestFree should make the head block reusable");
         });
+
+        tc.Run("SetupHeap with size -1 ends the heap at the main thread's stack", [](TestCase &t)
+        {
+            // ps2autotests memory/ee/default (real PS2): with ps2sdk's default crt0, malloc(30 MB) succeeds and
+            // malloc(32 MB) fails, so the heap runs from the end of the program up to the main stack.
+            TestEnv env;
+            constexpr uint32_t kMainStackSize = 0x00020000u;
+            setRegU32(env.ctx, 29, PS2_RAM_SIZE - 0x10u);
+            setRegU32(env.ctx, 4, 0x0036A7F0u);
+            setRegU32(env.ctx, 5, 0xFFFFFFFFu);
+            setRegU32(env.ctx, 6, kMainStackSize);
+            t.IsTrue(callSyscall(0x3Cu, env.rdram.data(), &env.ctx, &env.runtime), "SetupThread should dispatch");
+            const uint32_t stackBase = env.runtime.guestMainStackBase();
+            t.IsTrue(stackBase > 0x01F00000u && stackBase < PS2_RAM_SIZE, "SetupThread records the main stack base");
+
+            setRegU32(env.ctx, 4, 0x00136000u);
+            setRegU32(env.ctx, 5, 0xFFFFFFFFu);
+            t.IsTrue(callSyscall(0x3Du, env.rdram.data(), &env.ctx, &env.runtime), "SetupHeap should dispatch");
+            t.IsTrue(callSyscall(0x3Eu, env.rdram.data(), &env.ctx, &env.runtime), "EndOfHeap should dispatch");
+            const uint32_t heapEnd = static_cast<uint32_t>(getRegS32(env.ctx, 2));
+            t.Equals(heapEnd, stackBase, "EndOfHeap is the main stack base");
+            t.IsTrue(heapEnd - 0x00136000u >= 30u * 1024u * 1024u, "30 MB fit between the program and the stack");
+            t.IsTrue(heapEnd - 0x00136000u < 32u * 1024u * 1024u, "32 MB do not");
+
+            // An explicit size still cannot run into the stack.
+            setRegU32(env.ctx, 4, 0x00136000u);
+            setRegU32(env.ctx, 5, 0x02000000u);
+            t.IsTrue(callSyscall(0x3Du, env.rdram.data(), &env.ctx, &env.runtime), "SetupHeap should dispatch");
+            t.IsTrue(callSyscall(0x3Eu, env.rdram.data(), &env.ctx, &env.runtime), "EndOfHeap should dispatch");
+            t.Equals(static_cast<uint32_t>(getRegS32(env.ctx, 2)), stackBase, "an oversized heap stops at the stack");
+        });
+
+        tc.Run("COP0 performance counters follow PCCR masks, CTE, events and modes", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_cop0/performance (real PS2).
+            TestEnv env;
+            R5900Context &ctx = env.ctx;
+            ctx.cop0_status = 0u; // kernel mode
+            env.runtime.writePerfControl(&ctx, 0x7FFFFFFFu);
+            t.Equals(env.runtime.readPerfControl(&ctx), 0x000FFBFEu, "PCCR write mask");
+
+            env.runtime.writePerfControl(&ctx, 0u);
+            env.runtime.writePerfCounter(&ctx, 0u, 0x89ABCDEFu);
+            env.runtime.writePerfCounter(&ctx, 1u, 0x01234567u);
+            t.Equals(env.runtime.readPerfCounter(&ctx, 0u), 0x89ABCDEFu, "PCR0 reads back");
+            t.Equals(env.runtime.readPerfCounter(&ctx, 1u), 0x01234567u, "PCR1 reads back");
+
+            auto run = [&](uint32_t pccr) {
+                env.runtime.writePerfControl(&ctx, 0u);
+                env.runtime.writePerfCounter(&ctx, 0u, 0u);
+                env.runtime.writePerfCounter(&ctx, 1u, 0u);
+                env.runtime.writePerfControl(&ctx, 0x80000000u | pccr);
+                for (int i = 0; i < 8; ++i)
+                    (void)env.runtime.eeCheckpointDue(32u);
+                env.runtime.writePerfControl(&ctx, 0u);
+                return std::pair<uint32_t, uint32_t>(env.runtime.readPerfCounter(&ctx, 0u),
+                                                     env.runtime.readPerfCounter(&ctx, 1u));
+            };
+            const auto c0 = run(0x1Eu | (1u << 5));            // all modes, processor cycles on counter 0
+            t.IsTrue(c0.first != 0u && c0.second == 0u, "counter 0 counts, counter 1 does not");
+            const auto c1 = run((0xFu << 11) | (1u << 15));    // all modes, processor cycles on counter 1
+            t.IsTrue(c1.first == 0u && c1.second != 0u, "counter 1 counts, counter 0 does not");
+            const auto none = run((1u << 5) | (1u << 15));     // processor cycles, no mode enabled
+            t.IsTrue(none.first == 0u && none.second == 0u, "no mode bit: no counting");
+            const auto user = run((1u << 4) | (1u << 5));      // user mode only, CPU in kernel mode
+            t.Equals(user.first, 0u, "only the current mode's bit enables counting");
+            const auto stopped = std::pair<uint32_t, uint32_t>(env.runtime.readPerfCounter(&ctx, 0u), 0u);
+            (void)env.runtime.eeCheckpointDue(32u);
+            t.Equals(env.runtime.readPerfCounter(&ctx, 0u), stopped.first, "CTE clear: counters hold");
+        });
+
+        tc.Run("runtime-owned allocations never come from the guest heap", [](TestCase &t)
+        {
+            TestEnv env;
+            env.runtime.configureGuestHeap(0x00180000u, 0x00190000u);
+            const uint32_t guestBlock = env.runtime.guestMalloc(0x100u, 16u);
+            const uint32_t runtimeBlock = env.runtime.runtimeMalloc(0x100u, 64u);
+            t.Equals(guestBlock, 0x00180000u, "HLE malloc uses the guest heap");
+            t.IsTrue(runtimeBlock >= PS2Runtime::kRuntimeArenaBase && runtimeBlock < PS2Runtime::kRuntimeArenaEnd,
+                     "runtime allocations come from the kernel-area arena");
+            t.Equals(runtimeBlock & 0x3Fu, 0u, "the arena honours alignment");
+            t.IsTrue(env.runtime.guestMalloc(0x100u, 16u) == 0x00180100u, "the guest heap is not advanced by the arena");
+
+            env.runtime.runtimeFree(runtimeBlock);
+            t.Equals(env.runtime.runtimeMalloc(0x100u, 64u), runtimeBlock, "runtimeFree makes the block reusable");
+
+            env.runtime.runtimeFree(runtimeBlock);
+        });
+
+        tc.Run("an exhausted runtime arena fails cleanly and never touches guest memory", [](TestCase &t)
+        {
+            // The program's own sbrk hands out the guest heap from its base without telling the runtime, so a
+            // runtime block there would overlap the program's first malloc. Exhaustion must fail instead.
+            TestEnv env;
+            constexpr uint32_t kHeapBase = 0x00180000u;
+            constexpr uint32_t kHeapEnd = 0x00190000u;
+            env.runtime.configureGuestHeap(kHeapBase, kHeapEnd);
+            std::memset(env.rdram.data() + kHeapBase, 0xA5, kHeapEnd - kHeapBase); // "guest data"
+
+            constexpr uint32_t kArenaSize = PS2Runtime::kRuntimeArenaEnd - PS2Runtime::kRuntimeArenaBase;
+            t.Equals(env.runtime.runtimeMalloc(kArenaSize + 16u, 16u), 0u, "a request larger than the arena fails");
+            const uint32_t all = env.runtime.runtimeMalloc(kArenaSize, 16u);
+            t.Equals(all, PS2Runtime::kRuntimeArenaBase, "the whole arena can be taken");
+            t.Equals(env.runtime.runtimeMalloc(16u, 16u), 0u, "the next request fails: no fallback");
+            t.Equals(env.runtime.guestMalloc(16u, 16u), kHeapBase, "the guest heap allocator was not used");
+            bool untouched = true;
+            const uint8_t *heap = env.rdram.data() + kHeapBase;
+            for (uint32_t i = 0; i < kHeapEnd - kHeapBase; ++i)
+                untouched = untouched && heap[i] == 0xA5;
+            t.IsTrue(untouched, "guest heap bytes are unchanged");
+            env.runtime.runtimeFree(kHeapBase); // a guest address is not a runtime block: ignored
+            t.Equals(env.runtime.guestMalloc(16u, 16u), kHeapBase + 16u, "runtimeFree did not free guest blocks");
+            env.runtime.runtimeFree(all);
+            t.Equals(env.runtime.runtimeMalloc(16u, 16u), PS2Runtime::kRuntimeArenaBase, "freed space is reusable");
+        });
+
+        tc.Run("runtime arena allocation is aligned, reusable and coalesces fragments", [](TestCase &t)
+        {
+            TestEnv env;
+            for (uint32_t alignment : {16u, 64u, 256u, 4096u})
+            {
+                const uint32_t a = env.runtime.runtimeMalloc(0x30u, alignment);
+                t.IsTrue(a != 0u && (a % alignment) == 0u, "aligned to " + std::to_string(alignment));
+                t.IsTrue(a >= PS2Runtime::kRuntimeArenaBase && a + 0x30u <= PS2Runtime::kRuntimeArenaEnd, "inside the arena");
+                env.runtime.runtimeFree(a);
+            }
+
+            const uint32_t first = env.runtime.runtimeMalloc(0x200u, 16u);
+            bool stable = true;
+            for (int i = 0; i < 1000; ++i)
+            {
+                env.runtime.runtimeFree(first);
+                stable = stable && env.runtime.runtimeMalloc(0x200u, 16u) == first;
+            }
+            t.IsTrue(stable, "1000 free/alloc cycles reuse the same block (no leak)");
+            env.runtime.runtimeFree(first);
+
+            // Fragment: 8 blocks, free every other one; a request larger than one hole goes after the blocks.
+            uint32_t blocks[8];
+            for (uint32_t &b : blocks)
+                b = env.runtime.runtimeMalloc(0x1000u, 16u);
+            for (int i = 0; i < 8; i += 2)
+                env.runtime.runtimeFree(blocks[i]);
+            const uint32_t big = env.runtime.runtimeMalloc(0x1800u, 16u);
+            t.IsTrue(big >= blocks[7] + 0x1000u, "a request larger than every hole is not split across holes");
+            t.Equals(env.runtime.runtimeMalloc(0x1000u, 16u), blocks[0], "a hole of the right size is reused");
+            env.runtime.runtimeFree(blocks[0]);
+            env.runtime.runtimeFree(big);
+            for (int i = 1; i < 8; i += 2)
+                env.runtime.runtimeFree(blocks[i]);
+            constexpr uint32_t kArenaSize = PS2Runtime::kRuntimeArenaEnd - PS2Runtime::kRuntimeArenaBase;
+            t.Equals(env.runtime.runtimeMalloc(kArenaSize, 16u), PS2Runtime::kRuntimeArenaBase,
+                     "after freeing everything the fragments coalesce into the whole arena");
+        });
+
+        tc.Run("ELFs overlapping the runtime-reserved EE kernel area are refused before any write", [](TestCase &t)
+        {
+            // Each reserved region (runtime arena and every fixed HLE pool), both exact boundaries, a kseg0 alias,
+            // and a valid segment placed before the conflicting one, which must not be written either.
+            struct Case
+            {
+                std::string what;
+                uint32_t vaddr;
+                uint32_t size;
+                bool loads;
+            };
+            std::vector<Case> cases = {
+                {"ends exactly at the arena", 0x00010000u, 0x00010000u, true},
+                {"starts exactly after the pools", PS2Runtime::kRuntimeReservedEnd, 0x00001000u, true},
+                {"ordinary user address", 0x00100000u, 0x00001000u, true},
+                {"crosses into the arena", 0x0001FFF0u, 0x00000020u, false},
+                {"crosses out of the boot-mode pool", 0x0007FFF0u, 0x00000020u, false},
+                {"kseg0 alias of the arena", 0x80030000u, 0x00000100u, false},
+            };
+            for (const PS2Runtime::ReservedRegion &region : PS2Runtime::kRuntimeReservedRegions)
+            {
+                cases.push_back({std::string(region.name) + " (start)", region.start, 0x20u, false});
+                cases.push_back({std::string(region.name) + " (end)", region.end - 0x10u, 0x10u, false});
+            }
+
+            const std::filesystem::path dir = std::filesystem::temp_directory_path() / "zmbor_reserved_elf_tests";
+            std::filesystem::create_directories(dir);
+            int index = 0;
+            for (const Case &c : cases)
+            {
+                // Segment 0: a valid block at 0x00180000. Segment 1: the case under test.
+                const std::filesystem::path path = dir / ("case" + std::to_string(index++) + ".elf");
+                writeTestElf(path, {{0x00180000u, 0x40u}, {c.vaddr, c.size}}, 0x5Au);
+
+                PS2Runtime runtime;
+                t.IsTrue(runtime.memory().initialize(), "runtime memory initialize should succeed");
+                const bool loaded = runtime.loadELF(path.string());
+                t.Equals(loaded, c.loads, "loadELF: " + c.what);
+                const uint8_t *rdram = runtime.memory().getRDRAM();
+                const uint32_t phys = c.vaddr & 0x1FFFFFFFu;
+                if (!c.loads)
+                {
+                    bool untouched = rdram[0x00180000u] == 0u && rdram[0x00180000u + 0x3Fu] == 0u;
+                    for (uint32_t i = 0; i < c.size; ++i)
+                        untouched = untouched && rdram[phys + i] == 0u;
+                    t.IsTrue(untouched, "a refused ELF writes nothing: " + c.what);
+                }
+                else
+                {
+                    t.IsTrue(rdram[phys] == 0x5Au && rdram[0x00180000u] == 0x5Au, "loaded: " + c.what);
+                }
+            }
+
+            t.Equals(PS2Runtime::describeRuntimeReservedOverlap(0x0005E000u, 0x00070000u),
+                     std::string("HLE RPC packet pool, HLE RPC server pool, HLE TLS pool"),
+                     "a segment spanning several regions names all of them");
+            t.Equals(PS2Runtime::describeRuntimeReservedOverlap(0x00100000u, 0x00200000u), std::string(),
+                     "no overlap, no description");
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
+        });
+
+#if defined(_WIN32)
+        tc.Run("SifLoadElf refuses an ELF overlapping the reserved area and the guest sees -1", [](TestCase &t)
+        {
+            // ELFs loaded by the guest at run time go through the same check (Syscalls/Helpers/Loader.h). An
+            // absolute Windows path is a native-host path for the PS2 path parser.
+            TestEnv env;
+            const std::filesystem::path dir = std::filesystem::temp_directory_path() / "zmbor_sifloadelf_tests";
+            std::filesystem::create_directories(dir);
+            const std::filesystem::path bad = dir / "overlap.elf";
+            const std::filesystem::path good = dir / "ok.elf";
+            writeTestElf(bad, {{0x00200000u, 0x40u}, {0x00060000u, 0x40u}}, 0x5Au);
+            writeTestElf(good, {{0x00200000u, 0x40u}}, 0x5Au);
+
+            auto load = [&](const std::filesystem::path &p) {
+                const std::string guestPath = p.generic_string();
+                std::memcpy(env.rdram.data() + 0x00300000u, guestPath.c_str(), guestPath.size() + 1u);
+                setRegU32(env.ctx, 4, 0x00300000u);
+                setRegU32(env.ctx, 5, 0u);
+                ps2_syscalls::sceSifLoadElf(env.rdram.data(), &env.ctx, &env.runtime);
+                return getRegS32(env.ctx, 2);
+            };
+            t.IsTrue(load(bad) < 0, "the guest gets an error for the overlapping ELF");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00200000u]), 0u, "and nothing of it was written");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00060000u]), 0u, "not even the reserved pool");
+            t.IsTrue(load(good) >= 0, "the same ELF without the conflicting segment loads");
+            t.Equals(static_cast<uint32_t>(env.rdram[0x00200000u]), 0x5Au, "and its segment is written");
+            std::error_code ec;
+            std::filesystem::remove_all(dir, ec);
+        });
+#endif
 
         tc.Run("memalign stubs allocate aligned guest memory", [](TestCase &t)
         {

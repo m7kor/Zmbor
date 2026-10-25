@@ -509,30 +509,19 @@ inline __m128 ps2_vmul_legacy(__m128 a, __m128 b)
 
 // VU0 macro mode executes on VU0's FMAC, so COP2 VADD/VSUB/VMUL (and every macro op built on them) follow the same
 // contract as the micro interpreter: ps2_vu_fmac.h (truncation, exponent-gap rule, PS2 float range).
-template <uint32_t (*Op)(uint32_t, uint32_t)>
-inline __m128 ps2_vfmac(__m128 a, __m128 b)
-{
-    alignas(16) uint32_t la[4], lb[4], lr[4];
-    _mm_store_ps(reinterpret_cast<float *>(la), a);
-    _mm_store_ps(reinterpret_cast<float *>(lb), b);
-    for (int i = 0; i < 4; ++i)
-        lr[i] = Op(la[i], lb[i]);
-    return _mm_load_ps(reinterpret_cast<const float *>(lr));
-}
-
 inline __m128 ps2_vadd(__m128 a, __m128 b)
 {
-    return ps2_vfmac<ps2_vu_fmac::add>(a, b);
+    return _mm_castsi128_ps(ps2_vu_fmac::add4(_mm_castps_si128(a), _mm_castps_si128(b)));
 }
 
 inline __m128 ps2_vsub(__m128 a, __m128 b)
 {
-    return ps2_vfmac<ps2_vu_fmac::sub>(a, b);
+    return _mm_castsi128_ps(ps2_vu_fmac::sub4(_mm_castps_si128(a), _mm_castps_si128(b)));
 }
 
 inline __m128 ps2_vmul(__m128 a, __m128 b)
 {
-    return ps2_vfmac<ps2_vu_fmac::mul>(a, b);
+    return _mm_castsi128_ps(ps2_vu_fmac::mul4(_mm_castps_si128(a), _mm_castps_si128(b)));
 }
 
 // PS2 VU (Vector Unit) operations

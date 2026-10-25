@@ -13,7 +13,7 @@
 
 namespace
 {
-    // EFU arithmetic on PS2 floats, fitted to ps2autotests vu/lower/efu.expected (real-PS2 results; 167 of the 208
+    // EFU arithmetic on PS2 floats, fitted to ps2autotests vu/lower/efu.expected (real-PS2 results; 168 of the 208
     // rows match exactly, the rest are last-bit differences in the EATAN/ESIN/EEXP series). As on the rest of the VU:
     // exponent 0 is zero, exponent 255 is an ordinary exponent, results saturate to +-0x7FFFFFFF at 2^129 and flush
     // below 2^-126. Each multiply/add stage truncates like the FMACs (ESUM/ESADD match only that way); the divider

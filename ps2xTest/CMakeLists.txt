@@ -123,3 +123,4 @@ endif()
 
 # Floating-point build policy guard: PS2 arithmetic must not depend on the host floating-point mode.
 add_subdirectory("${CMAKE_SOURCE_DIR}/tools/fpenv" "${CMAKE_CURRENT_BINARY_DIR}/fpenv")
+add_subdirectory("${CMAKE_SOURCE_DIR}/tools/bench" "${CMAKE_CURRENT_BINARY_DIR}/bench")

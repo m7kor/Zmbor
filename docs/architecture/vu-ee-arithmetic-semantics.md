@@ -55,8 +55,9 @@ Rules:
   (format, provisional threshold), U below 2^-126, Z, S. That is a second computation beside the value path
   (MSVC's `long double` is a double); whether it always agrees with the value's exponent is not tested beyond the
   existing flag tests. Open item, not changed.
-- Macro mode (`PS2_VADD`/`PS2_VSUB`/`PS2_VMUL`, used by every COP2 FMAC macro) now calls `ps2_vu_fmac::add/sub/mul`
-  per lane:
+- Macro mode (`PS2_VADD`/`PS2_VSUB`/`PS2_VMUL`, used by every COP2 FMAC macro) calls `ps2_vu_fmac::add4/sub4/mul4`,
+  the SSE2 form of `add/sub/mul` (bit-identical on the whole test corpus, in all four host rounding modes, with and
+  without DAZ/FTZ; 2.9–4.2× faster than calling the scalar kernel per lane, `benchmark-methodology.md`):
   - an exponent gap of 25 or more selects the larger operand;
   - otherwise operands are turned into doubles from their bits, added or multiplied exactly in double (a sum with
     a gap below 25 needs at most 49 bits, a product 48), and truncated back with integer operations.

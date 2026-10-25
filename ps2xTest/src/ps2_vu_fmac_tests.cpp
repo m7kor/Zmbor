@@ -136,6 +136,58 @@ void register_ps2_vu_fmac_tests()
             }
         });
 
+        tc.Run("Four-lane SSE2 FMAC lowering equals the reference in every lane, rounding mode and DAZ/FTZ setting", [](TestCase &t)
+        {
+            // The corpus in groups of four pairs (lane order and neighbours vary), once per host rounding mode, with
+            // and without MXCSR DAZ|FTZ: the claim is that neither lowering depends on them (round-downward would
+            // give -0 for x + -x; DAZ would zero a denormal produced from an exponent-0 operand).
+            const auto pairs = corpus();
+            const int previous = std::fegetround();
+            const unsigned int previousCsr = _mm_getcsr();
+            for (const unsigned int dazFtz : {0x0000u, 0x8040u})
+            for (const int mode : {FE_TONEAREST, FE_TOWARDZERO, FE_DOWNWARD, FE_UPWARD})
+            {
+                std::fesetround(mode);
+                _mm_setcsr((_mm_getcsr() & ~0x8040u) | dazFtz);
+                uint32_t mismatches = 0u, scalarMismatches = 0u;
+                std::string first;
+                for (size_t i = 0; i + 4 <= pairs.size(); i += 4)
+                {
+                    alignas(16) uint32_t a[4], b[4], r[3][4];
+                    for (int l = 0; l < 4; ++l)
+                    {
+                        a[l] = pairs[i + l].first;
+                        b[l] = pairs[i + l].second;
+                    }
+                    const __m128i va = _mm_load_si128(reinterpret_cast<const __m128i *>(a));
+                    const __m128i vb = _mm_load_si128(reinterpret_cast<const __m128i *>(b));
+                    _mm_store_si128(reinterpret_cast<__m128i *>(r[0]), ps2_vu_fmac::add4(va, vb));
+                    _mm_store_si128(reinterpret_cast<__m128i *>(r[1]), ps2_vu_fmac::sub4(va, vb));
+                    _mm_store_si128(reinterpret_cast<__m128i *>(r[2]), ps2_vu_fmac::mul4(va, vb));
+                    for (int l = 0; l < 4; ++l)
+                    {
+                        const uint32_t want[3] = {ps2_vu_fmac::addRef(a[l], b[l]), ps2_vu_fmac::subRef(a[l], b[l]),
+                                                  ps2_vu_fmac::mulRef(a[l], b[l])};
+                        const uint32_t scalar[3] = {ps2_vu_fmac::add(a[l], b[l]), ps2_vu_fmac::sub(a[l], b[l]),
+                                                    ps2_vu_fmac::mul(a[l], b[l])};
+                        for (int op = 0; op < 3; ++op)
+                        {
+                            scalarMismatches += scalar[op] != want[op];
+                            if (r[op][l] != want[op] && mismatches++ == 0)
+                                first = "op " + std::to_string(op) + " " + hex(a[l]) + ", " + hex(b[l]) + ": lanes " +
+                                        hex(r[op][l]) + ", reference " + hex(want[op]);
+                        }
+                    }
+                }
+                const std::string where = " (rounding mode " + std::to_string(mode) + ", DAZ|FTZ " +
+                                          std::to_string(dazFtz != 0u) + ")";
+                t.Equals(mismatches, 0u, "four-lane results differing from the reference" + where + " " + first);
+                t.Equals(scalarMismatches, 0u, "scalar lowering results differing from the reference" + where);
+            }
+            _mm_setcsr(previousCsr);
+            std::fesetround(previous);
+        });
+
         tc.Run("FMAC contract anchors from real-PS2 results", [](TestCase &t)
         {
             // vu/games/triace: ADDi of 0xB3E2A618 (-1.05e-7) and 0x42546666 reads 0x42546666 (A1, gap >= 25).

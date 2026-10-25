@@ -11,13 +11,23 @@
 //      -0 + -0 = -0. SUB is ADD with ft's sign flipped.
 //   M1 MUL: the exact product, truncated toward zero (provisional: no hardware row isolates it).
 //
-// Two implementations that share no code: `*Ref` is pure integer arithmetic (the reference), `add/sub/mul` build
-// doubles from the bits, compute exactly in double (a sum with an exponent gap below 25 needs at most 49 bits, a
-// product 48) and truncate back with integer operations, so neither depends on the host rounding mode.
-// ps2x_tests compares them on boundary, structured and random operands (PS2VuFmac tests).
+// Implementations: `*Ref` is pure integer arithmetic (the reference); `add/sub/mul` build doubles from the bits,
+// compute exactly in double (a sum with an exponent gap below 25 needs at most 49 bits, a product 48) and truncate
+// back with integer operations; `add4/sub4/mul4` are the same lowering for four lanes in SSE2. None depends on the
+// host rounding mode or FTZ/DAZ (the sign of an exact-zero sum is set explicitly, since round-downward would give
+// -0). ps2x_tests compares all three on boundary, structured and random operands (PS2VuFmac tests).
 
 #include <bit>
 #include <cstdint>
+#include <emmintrin.h>
+
+// The four-lane kernels must inline: MSVC otherwise emits a call that passes __m128i by pointer and spills xmm6+
+// (measured: add4 17.8 ns as a call; see docs/architecture/benchmark-methodology.md).
+#if defined(_MSC_VER)
+#define PS2_VU_FMAC_FORCEINLINE __forceinline
+#else
+#define PS2_VU_FMAC_FORCEINLINE inline __attribute__((always_inline))
+#endif
 
 namespace ps2_vu_fmac
 {
@@ -133,8 +143,9 @@ namespace ps2_vu_fmac
             if (eb >= ea + 25u)
                 return b;
         }
-        // Gap below 25 (or a zero operand): the double sum is exact.
-        return fromDoubleTruncated(toDouble(a) + toDouble(b));
+        // Gap below 25 (or a zero operand): the double sum is exact. An exact zero is +0 unless both are negative.
+        const double sum = toDouble(a) + toDouble(b);
+        return sum == 0.0 ? (a & b & kSign) : fromDoubleTruncated(sum);
     }
 
     inline uint32_t sub(uint32_t a, uint32_t b)
@@ -145,6 +156,113 @@ namespace ps2_vu_fmac
     inline uint32_t mul(uint32_t a, uint32_t b)
     {
         return fromDoubleTruncated(toDouble(a) * toDouble(b)); // 48-bit product: exact in double
+    }
+
+    // ---------------------------------------------------------------- four lanes (SSE2), same lowering
+
+    namespace detail
+    {
+        // Lanes `lo`/`hi` pairs of four PS2 floats as two pairs of doubles (exponent 0 gives a signed zero).
+        PS2_VU_FMAC_FORCEINLINE __m128d toDoublePair(__m128i x, bool high)
+        {
+            const __m128i zero = _mm_setzero_si128();
+            const __m128i isZero = _mm_cmpeq_epi32(_mm_and_si128(x, _mm_set1_epi32(0x7F800000)), zero);
+            const __m128i u = high ? _mm_unpackhi_epi32(x, zero) : _mm_unpacklo_epi32(x, zero);
+            const __m128i z = high ? _mm_unpackhi_epi32(isZero, isZero) : _mm_unpacklo_epi32(isZero, isZero);
+            const __m128i sign = _mm_slli_epi64(_mm_and_si128(u, _mm_set1_epi64x(0x80000000ll)), 32);
+            // (exponent << 23 | mantissa) << 29 puts the mantissa at bits 51..29 and the exponent at 52; rebias by 896.
+            const __m128i magnitude = _mm_add_epi64(_mm_slli_epi64(_mm_and_si128(u, _mm_set1_epi64x(0x7FFFFFFFll)), 29),
+                                                    _mm_set1_epi64x(896ll << 52));
+            return _mm_castsi128_pd(_mm_or_si128(sign, _mm_andnot_si128(z, magnitude)));
+        }
+
+        // fromDoubleTruncated for four exact double results (lanes 0,1 in r01, 2,3 in r23).
+        PS2_VU_FMAC_FORCEINLINE __m128i fromDoublesTruncated(__m128d r01, __m128d r23)
+        {
+            const __m128i hi = _mm_castps_si128(_mm_shuffle_ps(_mm_castpd_ps(r01), _mm_castpd_ps(r23), _MM_SHUFFLE(3, 1, 3, 1)));
+            const __m128i lo = _mm_castps_si128(_mm_shuffle_ps(_mm_castpd_ps(r01), _mm_castpd_ps(r23), _MM_SHUFFLE(2, 0, 2, 0)));
+            const __m128i sign = _mm_and_si128(hi, _mm_set1_epi32(static_cast<int>(kSign)));
+            const __m128i exponent = _mm_sub_epi32(_mm_and_si128(_mm_srli_epi32(hi, 20), _mm_set1_epi32(0x7FF)),
+                                                   _mm_set1_epi32(896));
+            const __m128i mantissa = _mm_or_si128(_mm_slli_epi32(_mm_and_si128(hi, _mm_set1_epi32(0xFFFFF)), 3),
+                                                  _mm_srli_epi32(lo, 29));
+            const __m128i normal = _mm_or_si128(sign, _mm_or_si128(_mm_slli_epi32(exponent, 23), mantissa));
+            const __m128i over = _mm_cmpgt_epi32(exponent, _mm_set1_epi32(255));
+            const __m128i under = _mm_cmplt_epi32(exponent, _mm_set1_epi32(1)); // also an exact zero (exponent field 0)
+            const __m128i saturated = _mm_or_si128(sign, _mm_set1_epi32(static_cast<int>(kMax)));
+            const __m128i inRange = _mm_andnot_si128(_mm_or_si128(over, under), normal);
+            return _mm_or_si128(inRange, _mm_or_si128(_mm_and_si128(over, saturated), _mm_and_si128(under, sign)));
+        }
+
+        // Both operands' four lanes as doubles (a01, a23, b01, b23). When no lane has exponent 0 or 255 every lane is
+        // an ordinary IEEE normal, and CVTPS2PD is exact whatever MXCSR says (DAZ/FTZ touch only denormals), so the
+        // common case skips the bit construction; ea/eb are the lanes' biased exponents.
+        PS2_VU_FMAC_FORCEINLINE void toDoubles(__m128i a, __m128i b, __m128i ea, __m128i eb, __m128d &a01, __m128d &a23,
+                                               __m128d &b01, __m128d &b23)
+        {
+            const __m128i zero = _mm_setzero_si128(), top = _mm_set1_epi32(0xFF);
+            const __m128i special = _mm_or_si128(_mm_or_si128(_mm_cmpeq_epi32(ea, zero), _mm_cmpeq_epi32(ea, top)),
+                                                 _mm_or_si128(_mm_cmpeq_epi32(eb, zero), _mm_cmpeq_epi32(eb, top)));
+            if (_mm_movemask_epi8(special) == 0)
+            {
+                const __m128 fa = _mm_castsi128_ps(a), fb = _mm_castsi128_ps(b);
+                a01 = _mm_cvtps_pd(fa);
+                a23 = _mm_cvtps_pd(_mm_movehl_ps(fa, fa));
+                b01 = _mm_cvtps_pd(fb);
+                b23 = _mm_cvtps_pd(_mm_movehl_ps(fb, fb));
+                return;
+            }
+            a01 = toDoublePair(a, false);
+            a23 = toDoublePair(a, true);
+            b01 = toDoublePair(b, false);
+            b23 = toDoublePair(b, true);
+        }
+
+        PS2_VU_FMAC_FORCEINLINE __m128i exponents(__m128i x)
+        {
+            return _mm_and_si128(_mm_srli_epi32(x, 23), _mm_set1_epi32(0xFF));
+        }
+
+        PS2_VU_FMAC_FORCEINLINE __m128i select(__m128i mask, __m128i a, __m128i b) // mask ? a : b
+        {
+            return _mm_or_si128(_mm_and_si128(mask, a), _mm_andnot_si128(mask, b));
+        }
+    }
+
+    PS2_VU_FMAC_FORCEINLINE __m128i add4(__m128i a, __m128i b)
+    {
+        using namespace detail;
+        const __m128i ea = exponents(a), eb = exponents(b);
+        const __m128i zero = _mm_setzero_si128();
+        const __m128i bothNonZero = _mm_andnot_si128(_mm_or_si128(_mm_cmpeq_epi32(ea, zero), _mm_cmpeq_epi32(eb, zero)),
+                                                     _mm_set1_epi32(-1));
+        const __m128i gap = _mm_set1_epi32(24);
+        const __m128i keepA = _mm_and_si128(bothNonZero, _mm_cmpgt_epi32(ea, _mm_add_epi32(eb, gap)));
+        const __m128i keepB = _mm_and_si128(bothNonZero, _mm_cmpgt_epi32(eb, _mm_add_epi32(ea, gap)));
+        __m128d a01, a23, b01, b23;
+        toDoubles(a, b, ea, eb, a01, a23, b01, b23);
+        const __m128d s01 = _mm_add_pd(a01, b01);
+        const __m128d s23 = _mm_add_pd(a23, b23);
+        // An exact-zero sum: +0 unless both operands are negative (explicit, as in add()).
+        const __m128i z01 = _mm_castpd_si128(_mm_cmpeq_pd(s01, _mm_setzero_pd()));
+        const __m128i z23 = _mm_castpd_si128(_mm_cmpeq_pd(s23, _mm_setzero_pd()));
+        const __m128i isZeroSum = _mm_castps_si128(_mm_shuffle_ps(_mm_castsi128_ps(z01), _mm_castsi128_ps(z23), _MM_SHUFFLE(2, 0, 2, 0)));
+        const __m128i zeroSum = _mm_and_si128(_mm_and_si128(a, b), _mm_set1_epi32(static_cast<int>(kSign)));
+        const __m128i sum = select(isZeroSum, zeroSum, fromDoublesTruncated(s01, s23));
+        return select(keepA, a, select(keepB, b, sum));
+    }
+
+    PS2_VU_FMAC_FORCEINLINE __m128i sub4(__m128i a, __m128i b)
+    {
+        return add4(a, _mm_xor_si128(b, _mm_set1_epi32(static_cast<int>(kSign))));
+    }
+
+    PS2_VU_FMAC_FORCEINLINE __m128i mul4(__m128i a, __m128i b)
+    {
+        using namespace detail;
+        __m128d a01, a23, b01, b23;
+        toDoubles(a, b, exponents(a), exponents(b), a01, a23, b01, b23);
+        return fromDoublesTruncated(_mm_mul_pd(a01, b01), _mm_mul_pd(a23, b23));
     }
 
     inline float addf(float a, float b) { return std::bit_cast<float>(add(std::bit_cast<uint32_t>(a), std::bit_cast<uint32_t>(b))); }

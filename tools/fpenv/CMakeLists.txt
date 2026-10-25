@@ -34,6 +34,15 @@ add_test(NAME fpenv_flag_independence
         -P "${CMAKE_CURRENT_SOURCE_DIR}/compare_outputs.cmake")
 set_tests_properties(fpenv_flag_independence PROPERTIES TIMEOUT 120 LABELS fpenv)
 
+# Informational compiler probe for the per-lane loop shape that MSVC 14.51 mishandled (not a ctest: production does
+# not use the loop; CI prints its result). Built with the default Release flags, like the failing CI build.
+add_executable(ps2x_lane_loop_probe "${CMAKE_CURRENT_SOURCE_DIR}/lane_loop_probe.cpp")
+target_compile_features(ps2x_lane_loop_probe PRIVATE cxx_std_20)
+target_include_directories(ps2x_lane_loop_probe PRIVATE "${CMAKE_SOURCE_DIR}/ps2xRuntime/include")
+if(NOT MSVC)
+    target_compile_options(ps2x_lane_loop_probe PRIVATE -msse4.1)
+endif()
+
 # Negative build test: including the arithmetic headers with -ffast-math must fail to compile.
 if(NOT MSVC)
     add_executable(ps2x_fp_fastmath_rejected EXCLUDE_FROM_ALL "${CMAKE_CURRENT_SOURCE_DIR}/fp_flag_sensitivity.cpp")

@@ -1,5 +1,6 @@
 #pragma once
-// VU FMAC arithmetic: one contract for VU0 macro mode (COP2 in EE code) and the VU micro interpreter.
+// VU FMAC arithmetic: one value contract for VU0 macro mode (COP2 in EE code) and the VU micro interpreter. Values
+// only: macro mode does not update MAC/STATUS (docs/architecture/vu0-macro-state.md).
 // See docs/architecture/vu-ee-arithmetic-semantics.md and docs/architecture/evidence-register.md (section 2).
 //
 // Contract (bit level, operands and results are PS2 floats):

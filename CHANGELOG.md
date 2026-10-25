@@ -219,7 +219,7 @@ reverted (mutation-checked).
     results were clamped to 0x7F7FFFFF (`d77d5b3`). The upstream overflow test assumed FLT_MAX*2 overflows; under the
     format it is the value 0x7FFFFFFF, so the test now overflows from 0x7FFFFFFF*2 (no `.expected` file changed).
 - EFU: the EATAN pi/4 literal hid a sub-ulp offset (3.3e-16 below 0x3F490FDB); series sums now use the FMAC adder
-  and the constant is 0x3F490FDA: vu_lower_efu 182 → 183/223, unit vectors 167 → 168/208 (`475c500`, provisional).
+  and the constant is 0x3F490FDA: vu_lower_efu 182 → 183/223, unit vectors 167 → 168/208 (`475c500`, provisional; **reverted at the merge gate**, see below).
 - Performance: macro VADD/VSUB/VMUL use an SSE2 four-lane form of the same lowering (forced inline, CVTPS2PD when no
   lane has exponent 0/255): 2.9–4.2× faster than the per-lane kernel; MUL faster than the legacy path, ADD/SUB ~4.4×
   slower than the legacy (wrong) host add (`b4cfa26`, `benchmark-methodology.md`). Bit-identical in all host rounding modes,

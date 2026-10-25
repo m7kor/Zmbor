@@ -9,11 +9,10 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
-#include "ps2_vu_fmac.h"
 
 namespace
 {
-    // EFU arithmetic on PS2 floats, fitted to ps2autotests vu/lower/efu.expected (real-PS2 results; 168 of the 208
+    // EFU arithmetic on PS2 floats, fitted to ps2autotests vu/lower/efu.expected (real-PS2 results; 167 of the 208
     // rows match exactly, the rest are last-bit differences in the EATAN/ESIN/EEXP series). As on the rest of the VU:
     // exponent 0 is zero, exponent 255 is an ordinary exponent, results saturate to +-0x7FFFFFFF at 2^129 and flush
     // below 2^-126. Each multiply/add stage truncates like the FMACs (ESUM/ESADD match only that way); the divider
@@ -73,8 +72,6 @@ namespace
 
     double efuTrunc(double d) { return efuValue(efuBits(d, false)); }
     double efuNearest(double d) { return efuValue(efuBits(d, true)); }
-    // The VU FMAC adder (ps2_vu_fmac: an operand 25+ exponent steps smaller is dropped, else truncated exact sum).
-    double efuFmacAdd(double a, double b) { return efuValue(ps2_vu_fmac::add(efuBits(a, false), efuBits(b, false))); }
 
     double efuDivide(double numerator, double denominator)
     {
@@ -93,7 +90,7 @@ namespace
         return efuTrunc(efuTrunc(efuTrunc(x * x) + efuTrunc(y * y)) + efuTrunc(z * z));
     }
 
-    // sum of c[k] * t^(first + 2k), each product truncated, partial sums through the FMAC adder (evidence register 2.5).
+    // sum of c[k] * t^(first + 2k), each product and partial sum truncated.
     template <size_t N>
     double efuSeries(double t, const double (&coefficients)[N], double step)
     {
@@ -101,7 +98,7 @@ namespace
         double power = t;
         for (const double c : coefficients)
         {
-            accumulator = efuFmacAdd(accumulator, efuTrunc(c * power));
+            accumulator = efuTrunc(accumulator + efuTrunc(c * power));
             power = efuTrunc(power * step);
         }
         return accumulator;
@@ -112,11 +109,11 @@ namespace
         constexpr double coefficients[] = {0.999999344348907, -0.333298563957214, 0.199465364217758,
                                            -0.139085337519646, 0.096420042216778, -0.055909886956215,
                                            0.021861229091883, -0.004054057877511};
-        // pi/4 truncated to 24 bits (0x3F490FDA). The literal used before (0.785398185253143) sat 3.3e-16 below the
-        // nearest float 0x3F490FDB, a hidden sub-ulp offset. With FMAC-adder series sums: 0x3F490FDB 158/223 lines,
-        // 0x3F490FDA 183/223, a double-precision pi/4 also 183/223 (evidence register 2.5): provisional.
         const double t = efuDivide(efuTrunc(b - a), efuTrunc(b + a));
-        return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + efuValue(0x3F490FDAu));
+        // Phase 3 model, kept unchanged: this decimal is not a float (it lies 3.3e-16 below 0x3F490FDB). Alternatives
+        // (FMAC-adder series, 0x3F490FDA) were selected on the same rows they are scored on and stay in research
+        // (tools/experiments/efu_ab.ps1, evidence register 2.5) until independent evidence exists.
+        return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + 0.785398185253143);
     }
 
     double efuSin(double x)

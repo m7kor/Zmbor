@@ -189,7 +189,7 @@ Phase 4 additions:
 
 | test | lines | cause / lead |
 |---|---|---|
-| vu_lower_efu | 183/223 | EATAN/ESIN/EEXP last bits (unit vectors 168/208). Phase 5: FMAC adder in the series + pi/4 = 0x3F490FDA (removed a hidden sub-ulp offset). EATAN(0)-type rows read 0x33E60000 on hardware, a cancellation residual no candidate reproduces (register 2.5) |
+| vu_lower_efu | 182/223 | EATAN/ESIN/EEXP last bits (unit vectors 167/208). Production is the Phase 3 model. A Phase 5 candidate (FMAC adder in the series + pi/4 = 0x3F490FDA, 183/223) was reverted at the merge gate because it was selected on the scored rows; it stays reproducible in `tools/experiments/efu_ab.ps1`. EATAN(0)-type rows read 0x33E60000 on hardware, a cancellation residual no candidate reproduces (register 2.5) |
 | cpu_ee_fpu_sqrt | 59/66 | RSQRT.S: not SQRT.S-then-DIV.S (that composition predicts 29/34 distinct rows); a post-hoc reciprocal datapath fits 34/34 but is not adopted; probe P3 separates them (register 1.5). Also sqrt(-0) = +0 on hardware |
 
 Fixed in Phase 4: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay, memory_ee_default, cpu_ee_cop0_performance,

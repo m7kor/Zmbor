@@ -1032,13 +1032,13 @@ void register_ps2_vu1_tests()
                 }
             }
             std::printf("    EFU rows exact: %u of %u\n", exact, total);
-            if (exact < 168u)
+            if (exact < 167u)
                 std::printf("%s", differences.c_str());
             t.Equals(total, 208u, "all 13 ops x 16 inputs should run");
-            // The model reproduces 168 rows bit for bit (167 before Phase 5's FMAC-adder series and 24-bit pi/4); the
-            // others differ in the last bits of the EATAN/ESIN/EEXP series. This is a floor: a change that loses a
-            // hardware-exact row fails here.
-            t.IsTrue(exact >= 168u, "at least 168 of 208 EFU rows should match the hardware exactly, got " + std::to_string(exact));
+            // The model reproduces 167 rows bit for bit; the others differ in the last bits of the EATAN/ESIN/EEXP
+            // series. This is a floor: a change that loses a hardware-exact row fails here. A higher count is not by
+            // itself a reason to change the model (evidence register 2.5).
+            t.IsTrue(exact >= 167u, "at least 167 of 208 EFU rows should match the hardware exactly, got " + std::to_string(exact));
         });
 
         tc.Run("EFU resource observes throughput separately from P visibility", [](TestCase &t)
@@ -2003,6 +2003,42 @@ void register_ps2_vu1_tests()
                      "MAC flags should describe the final accumulated value");
             t.Equals(vu1.state().status, 0x140u,
                      "the underflowing product should set sticky Z and U");
+        });
+
+        tc.Run("VU micro FMAC lanes stay independent (MSVC 14.51 lane-w regression)", [](TestCase &t)
+        {
+            // Observed on the MSVC 14.51 CI build (PR #3, a465d72): with a per-lane loop over the scalar kernel, every
+            // lane received lane w's result: ADD of (1,2,3,4) + (10,20,30,40) wrote 44 everywhere. Distinct values per
+            // lane for one form of each operand kind (vt, bc, q, i, ACC) catch that pattern directly.
+            struct Case { const char *name; uint32_t upper; bool toAcc; float want[4]; };
+            const Case cases[] = {
+                {"ADD", makeVuUpper(0x28u, 0xFu, 2u, 1u, 3u), false, {11.0f, 22.0f, 33.0f, 44.0f}},
+                {"ADDbc.y", makeVuUpper(0x01u, 0xFu, 2u, 1u, 3u), false, {21.0f, 22.0f, 23.0f, 24.0f}},
+                {"MULq", makeVuUpper(0x1Cu, 0xFu, 2u, 1u, 3u), false, {0.5f, 1.0f, 1.5f, 2.0f}},
+                {"SUBi", makeVuUpper(0x26u, 0xFu, 2u, 1u, 3u), false, {-2.0f, -1.0f, 0.0f, 1.0f}},
+                {"MADD", makeVuUpper(0x29u, 0xFu, 2u, 1u, 3u), false, {110.0f, 240.0f, 390.0f, 560.0f}},
+                {"MULA", makeVuUpper(0x3Eu, 0xFu, 2u, 1u, 0x0Au), true, {10.0f, 40.0f, 90.0f, 160.0f}},
+            };
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            for (const Case &c : cases)
+            {
+                writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, c.upper | (1u << 30));
+                writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, kVuUpperNop);
+                VU1Interpreter vu1;
+                for (int l = 0; l < 4; ++l)
+                {
+                    vu1.state().vf[1][l] = static_cast<float>(l + 1);
+                    vu1.state().vf[2][l] = static_cast<float>(10 * (l + 1));
+                    vu1.state().acc[l] = static_cast<float>(100 * (l + 1));
+                }
+                vu1.state().q = 0.5f;
+                vu1.state().i = 3.0f;
+                vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 32u);
+                const float *got = c.toAcc ? vu1.state().acc : vu1.state().vf[3];
+                for (int l = 0; l < 4; ++l)
+                    t.Equals(got[l], c.want[l], std::string(c.name) + " lane " + "xyzw"[l]);
+            }
         });
 
         tc.Run("VU micro MADD keeps the two-rounding contract value when the fused exact result would overflow", [](TestCase &t)

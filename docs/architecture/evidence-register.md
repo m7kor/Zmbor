@@ -105,9 +105,11 @@ through `ps2_vfmac`, micro mode through the same `ps2_vu_fmac` kernels at all 58
 micro forms and plain ADD/SUB/MUL with the integer reference; mutants of OPMSUB, MADDAq, raw operands and the
 overflow threshold are killed; a host-float product under FE_TOWARDZERO is an equivalent mutant in range).
 There is no hardware vector for macro-mode arithmetic itself (cpu/vu0_macro covers integer ops and transfers only).
-MAC/STATUS flags in macro mode remain a gap.
+MAC/STATUS flags in macro mode remain a gap. The shared contract covers FMAC **values** only: macro mode updates
+no MAC/STATUS/sticky flags after FMAC operations, and MAX/MINI/CLIP compare differently on exponent-255 operands.
+Full audit: `vu0-macro-state.md`. Macro and micro mode are therefore not equivalent.
 
-### 2.5 EFU — provisional (vu_lower_efu 183/223)
+### 2.5 EFU — provisional (vu_lower_efu 182/223, Phase 3 model in production)
 Stage model fitted in Phase 3 to 208 vectors; EATAN/ESIN/EEXP series differ in the last bits on the remaining rows.
 Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test alongside):
 - The established FMAC adder (2.2: gap rule + truncation) in place of "truncated exact sum": series sums only, the
@@ -117,12 +119,13 @@ Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test a
   offset that makes exact sums truncate one ulp lower. Replacing it by 0x3F490FDB (float pi/4 rounded to nearest)
   gives 158/223 (falsified); by 0x3F490FDA (pi/4 truncated to 24 bits) or a double-precision pi/4, together with the
   FMAC adder in the series, 183/223 with no line lost (`ps2x_tests` EFU vectors 167 -> 168 of 208).
-- Adopted: series sums through `ps2_vu_fmac::add`, constant 0x3F490FDA. Provisional: 0x3F490FDA and a wider pi/4
-  are not separated by any row; mutants of either part fail the EFU vector floor.
+- Briefly adopted in Phase 5 (`475c500`), then **reverted** at the merge gate: no evidence independent of the 223
+  scored rows supports it. Production is the Phase 3 model again; the candidates are reproducible with
+  `tools/experiments/efu_ab.ps1` (variants `fmac_series`, `pi4_nearest`, `pi4_trunc24`, `pi4_double`).
 - **Overfitting audit (release review).** The change removes a hidden fitted offset, but its replacement was still
   *selected on the same 223 rows* it is scored on, from three structural candidates (0x3F490FDB, 0x3F490FDA, a wider
   constant), and the gain is one line (EATANxy DECREASING). One row cannot exclude coincidence, and the FMAC adder
-  in the series is architectural (EFU sharing the FMAC adder design), not measured. Status: provisional, weak
+  in the series is architectural (EFU sharing the FMAC adder design), not measured. Status: candidate only (not in production), weak
   evidence; no further constants may be tuned against these rows. Independently testable hypothesis H-EFU-1: "the
   EATAN constant acts as a value below 0x3F490FDB and the series sums drop operands 25+ exponent steps smaller";
   it predicts different EATAN results from the Phase 3 model on inputs whose series sum plus pi/4 lands exactly on a

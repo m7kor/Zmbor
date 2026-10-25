@@ -279,6 +279,27 @@ void register_code_generator_tests()
         }
     });
 
+    tc.Run("MFPS/MTPS and MFPC/MTPC select PCCR and PCR0/PCR1 from the low six bits", [](TestCase &t) {
+        // ps2autotests cpu/ee_cop0/performance: even/odd reg fields map to PCR0/PCR1; any MFPS reads PCCR;
+        // MTPS to a reg field other than 0 is a no-op.
+        CodeGenerator gen({}, {});
+        auto perf = [&](uint32_t format, uint32_t low6) {
+            Instruction inst{};
+            inst.opcode = OPCODE_COP0;
+            inst.rs = format;
+            inst.rt = 8;
+            inst.rd = COP0_REG_PERF;
+            inst.raw = (0x10u << 26) | (format << 21) | (8u << 16) | (COP0_REG_PERF << 11) | low6;
+            return gen.translateInstruction(inst);
+        };
+        t.IsTrue(perf(COP0_MF, (31u << 1) | 1u).find("readPerfCounter(ctx, 1u)") != std::string::npos, "MFPC odd -> PCR1");
+        t.IsTrue(perf(COP0_MF, (30u << 1) | 1u).find("readPerfCounter(ctx, 0u)") != std::string::npos, "MFPC even -> PCR0");
+        t.IsTrue(perf(COP0_MF, 31u << 1).find("readPerfControl(ctx)") != std::string::npos, "MFPS any -> PCCR");
+        t.IsTrue(perf(COP0_MT, (31u << 1) | 1u).find("writePerfCounter(ctx, 1u") != std::string::npos, "MTPC odd -> PCR1");
+        t.IsTrue(perf(COP0_MT, 0u).find("writePerfControl(ctx") != std::string::npos, "MTPS 0 -> PCCR");
+        t.IsTrue(perf(COP0_MT, 15u << 1).find("writePerfControl") == std::string::npos, "MTPS 15 is a no-op");
+    });
+
     tc.Run("SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA", [](TestCase &t) {
         // ps2autotests cpu/ee_simd/funnel.expected: mtsa 0xFFFF -> mfsa 0xf, mtsab 15 -> 0xf, mtsah 7 -> 0xe.
         CodeGenerator gen({}, {});

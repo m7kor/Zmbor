@@ -955,6 +955,45 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(static_cast<uint32_t>(getRegS32(env.ctx, 2)), stackBase, "an oversized heap stops at the stack");
         });
 
+        tc.Run("COP0 performance counters follow PCCR masks, CTE, events and modes", [](TestCase &t)
+        {
+            // ps2autotests cpu/ee_cop0/performance (real PS2).
+            TestEnv env;
+            R5900Context &ctx = env.ctx;
+            ctx.cop0_status = 0u; // kernel mode
+            env.runtime.writePerfControl(&ctx, 0x7FFFFFFFu);
+            t.Equals(env.runtime.readPerfControl(&ctx), 0x000FFBFEu, "PCCR write mask");
+
+            env.runtime.writePerfControl(&ctx, 0u);
+            env.runtime.writePerfCounter(&ctx, 0u, 0x89ABCDEFu);
+            env.runtime.writePerfCounter(&ctx, 1u, 0x01234567u);
+            t.Equals(env.runtime.readPerfCounter(&ctx, 0u), 0x89ABCDEFu, "PCR0 reads back");
+            t.Equals(env.runtime.readPerfCounter(&ctx, 1u), 0x01234567u, "PCR1 reads back");
+
+            auto run = [&](uint32_t pccr) {
+                env.runtime.writePerfControl(&ctx, 0u);
+                env.runtime.writePerfCounter(&ctx, 0u, 0u);
+                env.runtime.writePerfCounter(&ctx, 1u, 0u);
+                env.runtime.writePerfControl(&ctx, 0x80000000u | pccr);
+                for (int i = 0; i < 8; ++i)
+                    (void)env.runtime.eeCheckpointDue(32u);
+                env.runtime.writePerfControl(&ctx, 0u);
+                return std::pair<uint32_t, uint32_t>(env.runtime.readPerfCounter(&ctx, 0u),
+                                                     env.runtime.readPerfCounter(&ctx, 1u));
+            };
+            const auto c0 = run(0x1Eu | (1u << 5));            // all modes, processor cycles on counter 0
+            t.IsTrue(c0.first != 0u && c0.second == 0u, "counter 0 counts, counter 1 does not");
+            const auto c1 = run((0xFu << 11) | (1u << 15));    // all modes, processor cycles on counter 1
+            t.IsTrue(c1.first == 0u && c1.second != 0u, "counter 1 counts, counter 0 does not");
+            const auto none = run((1u << 5) | (1u << 15));     // processor cycles, no mode enabled
+            t.IsTrue(none.first == 0u && none.second == 0u, "no mode bit: no counting");
+            const auto user = run((1u << 4) | (1u << 5));      // user mode only, CPU in kernel mode
+            t.Equals(user.first, 0u, "only the current mode's bit enables counting");
+            const auto stopped = std::pair<uint32_t, uint32_t>(env.runtime.readPerfCounter(&ctx, 0u), 0u);
+            (void)env.runtime.eeCheckpointDue(32u);
+            t.Equals(env.runtime.readPerfCounter(&ctx, 0u), stopped.first, "CTE clear: counters hold");
+        });
+
         tc.Run("runtime-owned allocations never come from the guest heap", [](TestCase &t)
         {
             TestEnv env;

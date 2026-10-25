@@ -2085,6 +2085,80 @@ void PS2Runtime::runtimeFree(uint32_t guestAddr)
     freeGuestBlockLocked(guestAddr); // allocated by the fallback path
 }
 
+namespace
+{
+    // PCCR (ps2autotests cpu/ee_cop0/performance on a real PS2: writing 0x7FFFFFFF reads back 0x000FFBFE).
+    constexpr uint32_t kPccrWritableMask = 0x800FFBFEu;
+    constexpr uint32_t kPccrCte = 1u << 31;
+    constexpr uint32_t kPerfEventProcessorCycle = 1u;
+}
+
+// Brings PCR0/PCR1 up to the current guest cycle. A counter counts while PCCR.CTE is set, its event is processor
+// cycles, and the mode bit for the current CPU mode (EXL, else Status.KSU kernel/supervisor/user) is set; the
+// hardware test shows "all modes" counting and "no modes" not. Only the processor-cycle event is modelled, and
+// cycles are the scheduler's guest cycle accounting, not host time.
+void PS2Runtime::syncPerfCounters(const R5900Context *ctx)
+{
+    const uint64_t now = m_eeScheduler ? m_eeScheduler->currentEeCycle() : 0u;
+    const uint64_t elapsed = now >= m_perfCycleStamp ? now - m_perfCycleStamp : 0u;
+    m_perfCycleStamp = now;
+    if ((m_perfPccr & kPccrCte) == 0u || elapsed == 0u)
+    {
+        return;
+    }
+
+    const uint32_t status = ctx ? ctx->cop0_status : 0u;
+    uint32_t modeBit = 0u; // offset within a counter's EXL, K, S, U bits
+    if ((status & 0x6u) != 0u)
+    {
+        modeBit = 0u; // EXL or ERL
+    }
+    else
+    {
+        const uint32_t ksu = (status >> 3) & 0x3u;
+        modeBit = (ksu == 0u) ? 1u : (ksu == 1u) ? 2u : 3u;
+    }
+
+    for (uint32_t i = 0; i < 2u; ++i)
+    {
+        const uint32_t field = m_perfPccr >> (i == 0u ? 1u : 11u); // EXL, K, S, U, then the 5-bit event
+        const bool modeEnabled = ((field >> modeBit) & 1u) != 0u;
+        const uint32_t event = (field >> 4) & 0x1Fu;
+        if (modeEnabled && event == kPerfEventProcessorCycle)
+        {
+            m_perfPcr[i] += static_cast<uint32_t>(elapsed);
+        }
+    }
+}
+
+uint32_t PS2Runtime::readPerfControl(const R5900Context *ctx)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    return m_perfPccr;
+}
+
+void PS2Runtime::writePerfControl(const R5900Context *ctx, uint32_t value)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    m_perfPccr = value & kPccrWritableMask;
+}
+
+uint32_t PS2Runtime::readPerfCounter(const R5900Context *ctx, uint32_t index)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    return m_perfPcr[index & 1u];
+}
+
+void PS2Runtime::writePerfCounter(const R5900Context *ctx, uint32_t index, uint32_t value)
+{
+    std::lock_guard<std::mutex> lock(m_perfMutex);
+    syncPerfCounters(ctx);
+    m_perfPcr[index & 1u] = value;
+}
+
 void PS2Runtime::setGuestMainStackBase(uint32_t stackBase)
 {
     std::lock_guard<std::mutex> lock(m_guestHeapMutex);

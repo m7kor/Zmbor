@@ -398,6 +398,12 @@ public:
     static constexpr uint32_t kRuntimeArenaEnd = 0x0004F000u; // fixed HLE pools follow, up to 0x00080000
     uint32_t runtimeMalloc(uint32_t size, uint32_t alignment = 16u);
     void runtimeFree(uint32_t guestAddr);
+    // COP0 performance counters (MFPS/MTPS: PCCR, MFPC/MTPC: PCR0/PCR1). One set for the EE, not per thread.
+    uint32_t readPerfControl(const R5900Context *ctx);
+    void writePerfControl(const R5900Context *ctx, uint32_t value);
+    uint32_t readPerfCounter(const R5900Context *ctx, uint32_t index);
+    void writePerfCounter(const R5900Context *ctx, uint32_t index, uint32_t value);
+
     // Base of the main thread's stack (SetupThread); SetupHeap with size -1 ends the heap there.
     void setGuestMainStackBase(uint32_t stackBase);
     uint32_t guestMainStackBase() const;
@@ -537,6 +543,11 @@ private:
     std::vector<GuestHeapBlock> m_runtimeArenaBlocks; // guarded by m_guestHeapMutex
     bool m_runtimeArenaFallbackWarned = false;
     uint32_t m_guestMainStackBase = 0u;
+    void syncPerfCounters(const R5900Context *ctx);
+    std::mutex m_perfMutex;
+    uint32_t m_perfPccr = 0u;
+    uint32_t m_perfPcr[2] = {0u, 0u};
+    uint64_t m_perfCycleStamp = 0u;
     // Async (interrupt/callback/invocation) stacks come first from the gap between the EE kernel area and the
     // ELF image, which titles do not use; the top-of-RAM region is only a fallback since it overlaps the main
     // thread's stack (SetupThread places it there).

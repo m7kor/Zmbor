@@ -64,7 +64,12 @@ namespace ps2recomp
             case COP0_REG_DEBUG:
                 return fmt::format("SET_GPR_S32(ctx, {}, (int32_t)ctx->cop0_debug);", rt);
             case COP0_REG_PERF:
-                return fmt::format("SET_GPR_S32(ctx, {}, (int32_t)ctx->cop0_perf);", rt);
+                // MFPS (bit 0 clear) reads PCCR whatever its reg field; MFPC (bit 0 set) reads PCR0 for an even
+                // reg field and PCR1 for an odd one (ps2autotests cpu/ee_cop0/performance).
+                if (inst.raw & 1u)
+                    return fmt::format("SET_GPR_S32(ctx, {}, (int32_t)runtime->readPerfCounter(ctx, {}u));", rt,
+                                       (inst.raw >> 1) & 1u);
+                return fmt::format("SET_GPR_S32(ctx, {}, (int32_t)runtime->readPerfControl(ctx));", rt);
             case COP0_REG_TAGLO:
                 return fmt::format("SET_GPR_S32(ctx, {}, (int32_t)ctx->cop0_taglo);", rt);
             case COP0_REG_TAGHI:
@@ -114,7 +119,12 @@ namespace ps2recomp
             case COP0_REG_DEBUG:
                 return fmt::format("ctx->cop0_debug = GPR_U32(ctx, {});", rt);
             case COP0_REG_PERF:
-                return fmt::format("ctx->cop0_perf = GPR_U32(ctx, {});", rt);
+                // MTPC writes PCR0/PCR1 by the reg field's low bit; MTPS writes PCCR only for reg 0 (others no-op).
+                if (inst.raw & 1u)
+                    return fmt::format("runtime->writePerfCounter(ctx, {}u, GPR_U32(ctx, {}));", (inst.raw >> 1) & 1u, rt);
+                if (((inst.raw >> 1) & 0x1Fu) == 0u)
+                    return fmt::format("runtime->writePerfControl(ctx, GPR_U32(ctx, {}));", rt);
+                return fmt::format("// MTPS to PCCR specifier {} ignored", (inst.raw >> 1) & 0x1Fu);
             case COP0_REG_TAGLO:
                 return fmt::format("ctx->cop0_taglo = GPR_U32(ctx, {});", rt);
             case COP0_REG_TAGHI:

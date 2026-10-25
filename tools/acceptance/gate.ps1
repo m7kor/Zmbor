@@ -49,12 +49,14 @@ if (-not $SkipHardware) {
 $unit = Step 'unit' { & (Join-Path $BuildDir 'ps2xTest/ps2x_tests.exe') 2>&1 }
 $m.unit = (($unit | Select-String '^Passed:|^Failed:' | ForEach-Object Line) -join ' ')
 $m.unit_failures = @($unit | Select-String '^\s+- ' | Select-Object -First 20 | ForEach-Object { $_.Line.Trim() })
+# ctest counts a skipped test as "not failed" in its "% tests passed" line; the (Skipped)/(Not Run) lines are kept
+# so that a skipped test is never reported as passed.
 Push-Location (Join-Path $BuildDir 'ps2xTest')
-$m.ctest_non_hwtest = ((Step 'ctest' { ctest -LE hwtest -j 8 2>&1 } | Select-String 'tests passed|tests failed|\(Failed\)' | ForEach-Object Line) -join ' ')
-$m.ctest_e2e = ((ctest -L e2e 2>&1 | Select-String 'tests passed|tests failed|\(Failed\)' | ForEach-Object Line) -join ' ')
+$m.ctest_non_hwtest = ((Step 'ctest' { ctest -LE hwtest -j 8 2>&1 } | Select-String 'tests passed|tests failed|\(Failed\)|\(Skipped\)|\(Not Run\)|\(Disabled\)' | ForEach-Object Line) -join ' ')
+$m.ctest_e2e = ((ctest -L e2e 2>&1 | Select-String 'tests passed|tests failed|\(Failed\)|\(Skipped\)|\(Not Run\)|\(Disabled\)' | ForEach-Object Line) -join ' ')
 Pop-Location
 Push-Location (Join-Path $BuildDir 'ps2xIOP')
-$m.iop = ((ctest -j 4 2>&1 | Select-String 'tests passed|tests failed' | ForEach-Object Line) -join ' ')
+$m.iop = ((ctest -j 4 2>&1 | Select-String 'tests passed|tests failed|\(Failed\)|\(Skipped\)|\(Not Run\)|\(Disabled\)' | ForEach-Object Line) -join ' ')
 Pop-Location
 $m.binaries = [ordered]@{}
 foreach ($b in 'ps2xRecomp/ps2_recomp.exe', 'ps2xRuntime/ps2_runtime.lib', 'ps2xTest/ps2x_tests.exe') {

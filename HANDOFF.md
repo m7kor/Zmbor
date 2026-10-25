@@ -3,11 +3,11 @@
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
 built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
-## Phase 5 (local only: not pushed, no PR)
+## Phase 5 (Draft PR #3, not merged)
 
 - Branch `ultimate/phase5-architectural-correctness`, worktree `D:\Project\Zmbor\wt-phase5`, based on Zmbor `main`
   `20f1a97` (PR #2 merged). `1d7629d` is the WIP start and is kept unchanged; later commits are listed in
-  `CHANGELOG.md` (Phase 5). Nothing pushed; pushing or opening a PR needs the owner's authorization.
+  `CHANGELOG.md` (Phase 5). Pushed with the owner's authorization as Draft PR https://github.com/m7kor/Zmbor/pull/3 (do not mark ready or merge without approval); CI 6/6 on `d1c6759`.
 - Build dirs: `build` (baseline, `20f1a97`) and `build-wip` (branch head); hardware tests use
   `D:\Project\Zmbor\hwtest_work\gen5`; reports `p5_base`, `p5_wip`, `p5_micro`, `p5_perf` (`.json/.md`) in
   `hwtest_work`. Full gate script used: scratchpad `gate5.ps1` (build, `ctest -L hwtest`, report against

@@ -240,3 +240,10 @@ reverted (mutation-checked).
   rounding points and never rewrite the value (2 new tests, both mutation-checked; gate unchanged: 53/55, 8203/8250,
   ps2x_tests 540/540). CI now also runs the FP build guard and the probe-lab self-test on all three compilers.
   The Z3 report is stored compactly with a provenance header (469 lines instead of ~7,000; data unchanged).
+- CI on the Draft PR (#3) found two real problems that local MSVC 14.44 runs could not: (1) GCC/Clang `-ffast-math`
+  changes EE ADD.S/SUB.S/DIV.S/RSQRT.S/MADD.S results (VU FMAC unaffected); `-ffast-math` is now a compile error with a
+  negative ctest, `ps2_runtime` imposes `-ffp-contract=off`, and the FP guard compares production-like flags
+  (MSVC `/fp:fast /arch:AVX2` measured identical). (2) MSVC 14.51 wrote lane w's result into every lane of the
+  micro per-lane FMAC loops; micro mode now uses the four-lane kernels (`d1c6759`). Also: `ps2_vu_fmac.h` honours
+  `USE_SSE2NEON`; MiniTest failures print got/expected values. After: CI 6/6 (Linux GCC, Linux Clang, Windows MSVC),
+  local gate unchanged (53/55, 8203/8250, ps2x_tests 540/540).

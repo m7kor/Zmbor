@@ -534,6 +534,10 @@ namespace ps2_syscalls
         }
 
         scheduler.setupCurrentThread(initialStack, stackSize, getRegU32(ctx, 28));
+        if (runtime)
+        {
+            runtime->setGuestMainStackBase(initialStack);
+        }
         setReturnU32(ctx, sp);
     }
 
@@ -545,14 +549,17 @@ namespace ps2_syscalls
 
         const uint32_t heapBase = (heapBaseRaw + 0xFu) & ~0xFu;
 
-        // Silent Hill and other games often pass -1 (0xFFFFFFFF) to mean "rest of RAM".
+        // Size -1 (ps2sdk crt0's default _heap_size; Silent Hill and others) means "up to the stack": the heap
+        // ends at the base of the main thread's stack set by SetupThread (ps2autotests memory/ee/default:
+        // malloc(30 MB) succeeds on a real PS2, 32 MB fails). Without a SetupThread stack the old default stays.
         static constexpr uint32_t kDefaultGuestHeapEnd = 0x01F00000u;
-        uint32_t heapLimit = kDefaultGuestHeapEnd;
+        const uint32_t mainStackBase = runtime ? runtime->guestMainStackBase() : 0u;
+        uint32_t heapLimit = (mainStackBase > heapBase) ? mainStackBase : kDefaultGuestHeapEnd;
 
         if (heapSize != 0u && heapSize != 0xFFFFFFFFu)
         {
             const uint64_t candidate = static_cast<uint64_t>(heapBase) + static_cast<uint64_t>(heapSize);
-            heapLimit = static_cast<uint32_t>(std::min<uint64_t>(candidate, kDefaultGuestHeapEnd));
+            heapLimit = static_cast<uint32_t>(std::min<uint64_t>(candidate, heapLimit));
         }
 
         if (heapLimit <= heapBase)

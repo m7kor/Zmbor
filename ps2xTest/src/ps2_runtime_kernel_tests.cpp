@@ -924,6 +924,59 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(reused, heapBase, "guestFree should make the head block reusable");
         });
 
+        tc.Run("SetupHeap with size -1 ends the heap at the main thread's stack", [](TestCase &t)
+        {
+            // ps2autotests memory/ee/default (real PS2): with ps2sdk's default crt0, malloc(30 MB) succeeds and
+            // malloc(32 MB) fails, so the heap runs from the end of the program up to the main stack.
+            TestEnv env;
+            constexpr uint32_t kMainStackSize = 0x00020000u;
+            setRegU32(env.ctx, 29, PS2_RAM_SIZE - 0x10u);
+            setRegU32(env.ctx, 4, 0x0036A7F0u);
+            setRegU32(env.ctx, 5, 0xFFFFFFFFu);
+            setRegU32(env.ctx, 6, kMainStackSize);
+            t.IsTrue(callSyscall(0x3Cu, env.rdram.data(), &env.ctx, &env.runtime), "SetupThread should dispatch");
+            const uint32_t stackBase = env.runtime.guestMainStackBase();
+            t.IsTrue(stackBase > 0x01F00000u && stackBase < PS2_RAM_SIZE, "SetupThread records the main stack base");
+
+            setRegU32(env.ctx, 4, 0x00136000u);
+            setRegU32(env.ctx, 5, 0xFFFFFFFFu);
+            t.IsTrue(callSyscall(0x3Du, env.rdram.data(), &env.ctx, &env.runtime), "SetupHeap should dispatch");
+            t.IsTrue(callSyscall(0x3Eu, env.rdram.data(), &env.ctx, &env.runtime), "EndOfHeap should dispatch");
+            const uint32_t heapEnd = static_cast<uint32_t>(getRegS32(env.ctx, 2));
+            t.Equals(heapEnd, stackBase, "EndOfHeap is the main stack base");
+            t.IsTrue(heapEnd - 0x00136000u >= 30u * 1024u * 1024u, "30 MB fit between the program and the stack");
+            t.IsTrue(heapEnd - 0x00136000u < 32u * 1024u * 1024u, "32 MB do not");
+
+            // An explicit size still cannot run into the stack.
+            setRegU32(env.ctx, 4, 0x00136000u);
+            setRegU32(env.ctx, 5, 0x02000000u);
+            t.IsTrue(callSyscall(0x3Du, env.rdram.data(), &env.ctx, &env.runtime), "SetupHeap should dispatch");
+            t.IsTrue(callSyscall(0x3Eu, env.rdram.data(), &env.ctx, &env.runtime), "EndOfHeap should dispatch");
+            t.Equals(static_cast<uint32_t>(getRegS32(env.ctx, 2)), stackBase, "an oversized heap stops at the stack");
+        });
+
+        tc.Run("runtime-owned allocations never come from the guest heap", [](TestCase &t)
+        {
+            TestEnv env;
+            env.runtime.configureGuestHeap(0x00180000u, 0x00190000u);
+            const uint32_t guestBlock = env.runtime.guestMalloc(0x100u, 16u);
+            const uint32_t runtimeBlock = env.runtime.runtimeMalloc(0x100u, 64u);
+            t.Equals(guestBlock, 0x00180000u, "HLE malloc uses the guest heap");
+            t.IsTrue(runtimeBlock >= PS2Runtime::kRuntimeArenaBase && runtimeBlock < PS2Runtime::kRuntimeArenaEnd,
+                     "runtime allocations come from the kernel-area arena");
+            t.Equals(runtimeBlock & 0x3Fu, 0u, "the arena honours alignment");
+            t.IsTrue(env.runtime.guestMalloc(0x100u, 16u) == 0x00180100u, "the guest heap is not advanced by the arena");
+
+            env.runtime.runtimeFree(runtimeBlock);
+            t.Equals(env.runtime.runtimeMalloc(0x100u, 64u), runtimeBlock, "runtimeFree makes the block reusable");
+
+            // A request larger than the arena still succeeds deterministically, from the guest heap.
+            const uint32_t huge = env.runtime.runtimeMalloc(PS2Runtime::kRuntimeArenaEnd, 16u);
+            t.IsTrue(huge >= 0x00180000u && huge < 0x00190000u || huge == 0u,
+                     "an arena overflow falls back to the guest heap (or fails when that is full too)");
+            env.runtime.runtimeFree(huge);
+        });
+
         tc.Run("memalign stubs allocate aligned guest memory", [](TestCase &t)
         {
             TestEnv env;

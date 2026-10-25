@@ -615,7 +615,7 @@ namespace ps2_stubs
         const uint32_t imageQwc = (totalImageBytes + 15u) / 16u;
         const uint32_t totalQwc = headerQwc + imageQwc;
 
-        uint32_t pktAddr = runtime->guestMalloc(totalQwc * 16u, 16u);
+        uint32_t pktAddr = runtime->runtimeMalloc(totalQwc * 16u, 16u);
         if (pktAddr == 0)
         {
             setReturnS32(ctx, -1);
@@ -626,7 +626,7 @@ namespace ps2_stubs
         const uint8_t *src = getConstMemPtr(rdram, srcAddr);
         if (!pkt || !src)
         {
-            runtime->guestFree(pktAddr);
+            runtime->runtimeFree(pktAddr);
             setReturnS32(ctx, -1);
             return;
         }
@@ -662,7 +662,7 @@ namespace ps2_stubs
         mem.writeIORegister(GIF_CHANNEL + 0x20u, totalQwc & 0xFFFFu);
         mem.writeIORegister(GIF_CHANNEL + 0x00u, CHCR_STR_MODE0);
         mem.processPendingTransfers();
-        runtime->guestFree(pktAddr);
+        runtime->runtimeFree(pktAddr);
 
         setReturnS32(ctx, 0);
     }
@@ -709,7 +709,7 @@ namespace ps2_stubs
                           (static_cast<uint64_t>(0u) << 48);
         uint64_t trxreg = static_cast<uint64_t>(img.height) << 32 | static_cast<uint64_t>(img.width);
 
-        uint32_t pktAddr = runtime->guestMalloc(80u, 16u);
+        uint32_t pktAddr = runtime->runtimeMalloc(80u, 16u);
         if (pktAddr == 0)
         {
             setReturnS32(ctx, -1);
@@ -719,7 +719,7 @@ namespace ps2_stubs
         uint8_t *pkt = getMemPtr(rdram, pktAddr);
         if (!pkt)
         {
-            runtime->guestFree(pktAddr);
+            runtime->runtimeFree(pktAddr);
             setReturnS32(ctx, -1);
             return;
         }
@@ -746,7 +746,7 @@ namespace ps2_stubs
 
         ps2TraceGuestRangeWrite(rdram, dstAddr, totalImageBytes, "sceGsExecStoreImage", ctx);
         runtime->gs().consumeLocalToHostBytes(dst, totalImageBytes);
-        runtime->guestFree(pktAddr);
+        runtime->runtimeFree(pktAddr);
 
         setReturnS32(ctx, 0);
     }
@@ -810,7 +810,7 @@ namespace ps2_stubs
 
             if (runtime)
             {
-                uint32_t pktAddr = runtime->guestMalloc(128u, 16u);
+                uint32_t pktAddr = runtime->runtimeMalloc(128u, 16u);
                 if (pktAddr != 0u)
                 {
                     uint8_t *pkt = getMemPtr(rdram, pktAddr);
@@ -840,11 +840,11 @@ namespace ps2_stubs
                         mem.writeIORegister(GIF_CHANNEL + 0x20u, 8u);
                         mem.writeIORegister(GIF_CHANNEL + 0x00u, CHCR_STR_MODE0);
                         mem.processPendingTransfers();
-                        runtime->guestFree(pktAddr);
+                        runtime->runtimeFree(pktAddr);
                     }
                     else
                     {
-                        runtime->guestFree(pktAddr);
+                        runtime->runtimeFree(pktAddr);
                     }
                 }
             }

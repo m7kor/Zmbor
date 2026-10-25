@@ -350,12 +350,16 @@ namespace
         return readReferencePSMCT32Pixel(vram, frameBaseToBlock(fbp), fbw, x, y);
     }
 
+    // HLE stubs build their temporary packets in the runtime arena (PS2Runtime::runtimeMalloc), never in the
+    // guest heap; after the call the arena's first block must be free again and the guest heap untouched.
     void expectGuestHeapReusable(TestCase &t, PS2Runtime &runtime, const char *message)
     {
-        const uint32_t expectedBase = runtime.guestHeapBase();
-        const uint32_t probe = runtime.guestMalloc(16u, 16u);
-        t.Equals(probe, expectedBase, message);
-        runtime.guestFree(probe);
+        const uint32_t probe = runtime.runtimeMalloc(16u, 16u);
+        t.Equals(probe, PS2Runtime::kRuntimeArenaBase, message);
+        runtime.runtimeFree(probe);
+        const uint32_t heapProbe = runtime.guestMalloc(16u, 16u);
+        t.Equals(heapProbe, runtime.guestHeapBase(), "the guest heap must not hold runtime packets");
+        runtime.guestFree(heapProbe);
     }
 
     struct GsPixelTestResult
@@ -3972,17 +3976,17 @@ void register_ps2_gs_tests()
             t.Equals(static_cast<int32_t>(getRegU32Test(loadCtx, 2)), 0,
                      "sceGsExecLoadImage should succeed for a simple CT32 upload");
             uint64_t loadTag = 0u;
-            std::memcpy(&loadTag, rdram + runtime.guestHeapBase(), sizeof(loadTag));
+            std::memcpy(&loadTag, rdram + PS2Runtime::kRuntimeArenaBase, sizeof(loadTag));
             t.Equals(loadTag, 0x1000000000008004ull,
                      "sceGsExecLoadImage should populate the packed A+D GIF tag in guest RAM");
             uint64_t loadReg1 = 0u;
             uint64_t loadReg2 = 0u;
             uint64_t loadReg3 = 0u;
             uint64_t loadReg4 = 0u;
-            std::memcpy(&loadReg1, rdram + runtime.guestHeapBase() + 24u, sizeof(loadReg1));
-            std::memcpy(&loadReg2, rdram + runtime.guestHeapBase() + 40u, sizeof(loadReg2));
-            std::memcpy(&loadReg3, rdram + runtime.guestHeapBase() + 56u, sizeof(loadReg3));
-            std::memcpy(&loadReg4, rdram + runtime.guestHeapBase() + 72u, sizeof(loadReg4));
+            std::memcpy(&loadReg1, rdram + PS2Runtime::kRuntimeArenaBase + 24u, sizeof(loadReg1));
+            std::memcpy(&loadReg2, rdram + PS2Runtime::kRuntimeArenaBase + 40u, sizeof(loadReg2));
+            std::memcpy(&loadReg3, rdram + PS2Runtime::kRuntimeArenaBase + 56u, sizeof(loadReg3));
+            std::memcpy(&loadReg4, rdram + PS2Runtime::kRuntimeArenaBase + 72u, sizeof(loadReg4));
             t.Equals(loadReg1, 0x50ull, "sceGsExecLoadImage should encode BITBLTBUF as A+D register 0x50");
             t.Equals(loadReg2, 0x51ull, "sceGsExecLoadImage should encode TRXPOS as A+D register 0x51");
             t.Equals(loadReg3, 0x52ull, "sceGsExecLoadImage should encode TRXREG as A+D register 0x52");
@@ -3997,17 +4001,17 @@ void register_ps2_gs_tests()
             t.Equals(static_cast<int32_t>(getRegU32Test(storeCtx, 2)), 0,
                      "sceGsExecStoreImage should succeed for a matching CT32 readback");
             uint64_t storeTag = 0u;
-            std::memcpy(&storeTag, rdram + runtime.guestHeapBase(), sizeof(storeTag));
+            std::memcpy(&storeTag, rdram + PS2Runtime::kRuntimeArenaBase, sizeof(storeTag));
             t.Equals(storeTag, 0x1000000000008004ull,
                      "sceGsExecStoreImage should populate the packed A+D GIF tag in guest RAM");
             uint64_t storeReg1 = 0u;
             uint64_t storeReg2 = 0u;
             uint64_t storeReg3 = 0u;
             uint64_t storeReg4 = 0u;
-            std::memcpy(&storeReg1, rdram + runtime.guestHeapBase() + 24u, sizeof(storeReg1));
-            std::memcpy(&storeReg2, rdram + runtime.guestHeapBase() + 40u, sizeof(storeReg2));
-            std::memcpy(&storeReg3, rdram + runtime.guestHeapBase() + 56u, sizeof(storeReg3));
-            std::memcpy(&storeReg4, rdram + runtime.guestHeapBase() + 72u, sizeof(storeReg4));
+            std::memcpy(&storeReg1, rdram + PS2Runtime::kRuntimeArenaBase + 24u, sizeof(storeReg1));
+            std::memcpy(&storeReg2, rdram + PS2Runtime::kRuntimeArenaBase + 40u, sizeof(storeReg2));
+            std::memcpy(&storeReg3, rdram + PS2Runtime::kRuntimeArenaBase + 56u, sizeof(storeReg3));
+            std::memcpy(&storeReg4, rdram + PS2Runtime::kRuntimeArenaBase + 72u, sizeof(storeReg4));
             t.Equals(storeReg1, 0x50ull, "sceGsExecStoreImage should encode BITBLTBUF as A+D register 0x50");
             t.Equals(storeReg2, 0x51ull, "sceGsExecStoreImage should encode TRXPOS as A+D register 0x51");
             t.Equals(storeReg3, 0x52ull, "sceGsExecStoreImage should encode TRXREG as A+D register 0x52");

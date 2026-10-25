@@ -391,6 +391,17 @@ public:
     uint32_t guestHeapLimit() const;
     uint32_t reserveAsyncCallbackStack(uint32_t size, uint32_t alignment = 16u);
 
+    // EE memory the runtime itself owns (HLE library state, packets it builds, IOP host buffers). It comes from
+    // an arena in the EE kernel area, never from the guest heap that SetupHeap/EndOfHeap give the program's
+    // sbrk, so the two cannot overlap. guestMalloc stays the allocator behind HLE malloc/free.
+    static constexpr uint32_t kRuntimeArenaBase = 0x00020000u;
+    static constexpr uint32_t kRuntimeArenaEnd = 0x0004F000u; // fixed HLE pools follow, up to 0x00080000
+    uint32_t runtimeMalloc(uint32_t size, uint32_t alignment = 16u);
+    void runtimeFree(uint32_t guestAddr);
+    // Base of the main thread's stack (SetupThread); SetupHeap with size -1 ends the heap there.
+    void setGuestMainStackBase(uint32_t stackBase);
+    uint32_t guestMainStackBase() const;
+
     void drainCompletedDmacHandlers(uint8_t *rdram);
 
     void requestStop();
@@ -481,6 +492,10 @@ private:
     uint32_t allocateGuestBlockLocked(uint32_t size, uint32_t alignment);
     void freeGuestBlockLocked(uint32_t guestAddr);
     void coalesceGuestHeapLocked();
+    static uint32_t allocateFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t size, uint32_t alignment,
+                                       uint32_t *highWater);
+    static int32_t findBlockIndex(const std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr);
+    static bool freeFromBlocks(std::vector<GuestHeapBlock> &blocks, uint32_t guestAddr);
     void HandleIntegerOverflow(R5900Context *ctx);
 
     [[nodiscard]] ps2x::iop::RpcAbi selectIopRpcAbi(const ps2x::iop::RpcAbiRequest &request) const;
@@ -519,6 +534,9 @@ private:
     uint32_t m_guestHeapLimit = PS2_RAM_SIZE;
     uint32_t m_guestHeapSuggestedBase = 0x00100000u;
     bool m_guestHeapConfigured = false;
+    std::vector<GuestHeapBlock> m_runtimeArenaBlocks; // guarded by m_guestHeapMutex
+    bool m_runtimeArenaFallbackWarned = false;
+    uint32_t m_guestMainStackBase = 0u;
     // Async (interrupt/callback/invocation) stacks come first from the gap between the EE kernel area and the
     // ELF image, which titles do not use; the top-of-RAM region is only a fallback since it overlaps the main
     // thread's stack (SetupThread places it there).

@@ -1,6 +1,6 @@
 {
  "generator": "tools/semantics/make_probes.py",
- "model_sources_sha256": "358b8a84534b46a999f5e877988f051d4524201300251b16eebb5b99103dd72e",
+ "model_sources_sha256": "abd3a4c9cf24128d6595cc66cd384daf6d54b5d33a85571706256d75244183c4",
  "note": "Predictions are MODEL_PREDICTED. No probe here has been built or run on a PS2.",
  "probes": {
   "p1_ee_add_guard_bits": {
@@ -81,6 +81,25 @@
    "question": "Is the VU multiplier operand-order asymmetric like the EE one?",
    "register": "2.3",
    "source": "p4_vu_mul_asymmetry.cpp",
+   "unit": "VU0 macro"
+  },
+  "p5_vu0_macro_flags": {
+   "build": "ps2sdk + ps2autotests (not available in this environment)",
+   "hardware_status": "UNMEASURED",
+   "instruction": "VADD + CFC2 vi16/vi17",
+   "models": [
+    "A immediate",
+    "B unchanged",
+    "C delayed"
+   ],
+   "observations": [],
+   "operand_pairs": 10,
+   "prediction_class": "MODEL_PREDICTED",
+   "predictions": "p5_vu0_macro_flags.predictions.json",
+   "question": "Does a macro FMAC op update MAC/STATUS, immediately or after the flag latency?",
+   "register": "2.4",
+   "source": "p5_vu0_macro_flags.cpp",
+   "structured": true,
    "unit": "VU0 macro"
   }
  },

@@ -26,8 +26,8 @@ remain.**
 - **MAC/STATUS after macro FMAC operations.** A `CFC2 vi17` (MAC) or `vi16` (STATUS) after a macro VADD returns the
   value left by the last microprogram or CTC2. Implementing "same as micro" would be an assumption: no real-PS2
   row here observes macro-mode flags, and the only implementation available to compare with is PCSX2's (emulator
-  output is not hardware evidence). Probe needed: macro FMAC on boundary operands, then CFC2 vi16/vi17
-  (`HANDOFF.md` next milestone, item 2).
+  output is not hardware evidence). Probe P5 (`hardware-probes.md`, Phase 6) separates "updated now", "never" and
+  "after the flag latency"; it is generated and `UNMEASURED`.
 - **MAX/MINI/CLIP on exponent-255 or denormal operands** differ between macro (host compare) and micro (normalised
   compare). Which one the hardware does is unmeasured; both stay as they are.
 - **Flag timing** (the micro interpreter's four-cycle flag pipeline) has no macro-mode counterpart.

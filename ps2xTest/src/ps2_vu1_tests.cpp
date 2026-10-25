@@ -1612,6 +1612,138 @@ void register_ps2_vu1_tests()
                      "XGKICK resource stalls should consume VU cycles");
         });
 
+        tc.Run("consecutive XGKICKs deliver exactly their own bytes (long packet, then a short one)", [](TestCase &t)
+        {
+            // The XGKICK buffer is reused without clearing; each delivered packet must still be exactly the source
+            // qwords of its own transfer: a 4-qword packet followed by a 2-qword one must not carry stale bytes.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<std::vector<uint8_t>> captured;
+            mem.setGifPacketCallback([&](const uint8_t *packet, uint32_t sizeBytes) { captured.emplace_back(packet, packet + sizeBytes); });
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            uint8_t *code = mem.getVU1Code();
+            uint8_t *data = mem.getVU1Data();
+            std::memset(code, 0, PS2_VU1_CODE_SIZE);
+            std::memset(data, 0, PS2_VU1_DATA_SIZE);
+            const uint64_t longTag = makeGifTag(3u, GIF_FMT_IMAGE, 0u, true);  // tag + 3 qwords
+            const uint64_t shortTag = makeGifTag(1u, GIF_FMT_IMAGE, 0u, true); // tag + 1 qword
+            std::memcpy(data + 0u, &longTag, sizeof(longTag));
+            for (uint32_t i = 16u; i < 64u; ++i)
+                data[i] = static_cast<uint8_t>(0xA0u + i);
+            std::memcpy(data + 64u, &shortTag, sizeof(shortTag));
+            std::memset(data + 80u, 0x5Au, 16u);
+            writeVuInstructionPair(code, 0u, makeVuLowerSpecial(0x6Cu, 1u), kVuUpperNop);  // XGKICK vi1 (qword 0)
+            writeVuInstructionPair(code, 8u, makeVuLowerSpecial(0x6Cu, 2u), kVuUpperNop);  // XGKICK vi2 (qword 4)
+            writeVuInstructionPair(code, 16u, 0x8000033Cu, kVuUpperNop | (1u << 30));
+            writeVuInstructionPair(code, 24u, 0x8000033Cu, kVuUpperNop);
+            VU1Interpreter vu1;
+            vu1.state().vi[1] = 0;
+            vu1.state().vi[2] = 4;
+            vu1.execute(code, PS2_VU1_CODE_SIZE, data, PS2_VU1_DATA_SIZE, gs, &mem, 0u, 0u, 0u, 200u);
+            t.Equals(captured.size(), static_cast<size_t>(2u), "two PATH1 packets");
+            if (captured.size() == 2u)
+            {
+                t.Equals(captured[0].size(), static_cast<size_t>(64u), "first packet is tag + 3 qwords");
+                t.IsTrue(std::equal(captured[0].begin(), captured[0].end(), data + 0u), "first packet bytes are its source");
+                t.Equals(captured[1].size(), static_cast<size_t>(32u), "second packet is tag + 1 qword");
+                t.IsTrue(std::equal(captured[1].begin(), captured[1].end(), data + 64u), "second packet bytes are its source");
+            }
+        });
+
+        tc.Run("XGKICK buffer: poisoned history, wrap-around, longest packet, oversized packet", [](TestCase &t)
+        {
+            // The packet buffer is reused between transfers. Each case checks the delivered bytes against an
+            // independent construction from VU data memory (source qwords, modulo the 16 KB data memory), after a
+            // large transfer has filled the buffer with a poison pattern that must never reappear.
+            constexpr size_t kXgkickBufferBytes = 0x10000u; // XgkickPipeline::kBufferSize
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<std::vector<uint8_t>> captured;
+            mem.setGifPacketCallback([&](const uint8_t *packet, uint32_t sizeBytes) { captured.emplace_back(packet, packet + sizeBytes); });
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            uint8_t *code = mem.getVU1Code();
+            uint8_t *data = mem.getVU1Data();
+            const auto expectedBytes = [&](uint32_t qword, uint32_t bytes) {
+                std::vector<uint8_t> out(bytes);
+                for (uint32_t i = 0; i < bytes; ++i)
+                    out[i] = data[(qword * 16u + i) % PS2_VU1_DATA_SIZE];
+                return out;
+            };
+            // One program: XGKICK vi1, XGKICK vi2, XGKICK vi3, E bit. Each test case sets the tags and addresses.
+            std::memset(code, 0, PS2_VU1_CODE_SIZE);
+            writeVuInstructionPair(code, 0u, makeVuLowerSpecial(0x6Cu, 1u), kVuUpperNop);
+            writeVuInstructionPair(code, 8u, makeVuLowerSpecial(0x6Cu, 2u), kVuUpperNop);
+            writeVuInstructionPair(code, 16u, makeVuLowerSpecial(0x6Cu, 3u), kVuUpperNop);
+            writeVuInstructionPair(code, 24u, 0x8000033Cu, kVuUpperNop | (1u << 30));
+            writeVuInstructionPair(code, 32u, 0x8000033Cu, kVuUpperNop);
+            VU1Interpreter vu1; // reused across cases: state must not leak between executions
+            const auto run = [&](uint32_t q1, uint32_t q2, uint32_t q3) {
+                captured.clear();
+                vu1.state().vi[1] = static_cast<int32_t>(q1);
+                vu1.state().vi[2] = static_cast<int32_t>(q2);
+                vu1.state().vi[3] = static_cast<int32_t>(q3);
+                vu1.execute(code, PS2_VU1_CODE_SIZE, data, PS2_VU1_DATA_SIZE, gs, &mem, 0u, 0u, 0u, 40000u);
+            };
+            const auto setTag = [&](uint32_t qword, uint16_t nloop) {
+                const uint64_t tag = makeGifTag(nloop, GIF_FMT_IMAGE, 0u, true);
+                std::memcpy(data + qword * 16u, &tag, sizeof(tag));
+                std::memset(data + qword * 16u + 8u, 0, 8u);
+            };
+
+            // Case 1: a 512-qword poison packet (0xCC), then a 2-qword and a 1-qword-payload packet.
+            std::memset(data, 0xCC, PS2_VU1_DATA_SIZE);
+            setTag(0u, 511u);
+            setTag(600u, 1u);
+            std::memset(data + 601u * 16u, 0x31, 16u);
+            setTag(610u, 2u);
+            std::memset(data + 611u * 16u, 0x42, 32u);
+            run(0u, 600u, 610u);
+            t.Equals(captured.size(), static_cast<size_t>(3u), "three packets after the poison packet");
+            if (captured.size() == 3u)
+            {
+                t.IsTrue(captured[0] == expectedBytes(0u, 512u * 16u), "poison packet delivered whole");
+                t.IsTrue(captured[1] == expectedBytes(600u, 32u), "short packet: exact bytes, no poison");
+                t.IsTrue(captured[2] == expectedBytes(610u, 48u), "second short packet: exact bytes, no poison");
+            }
+
+            // Case 2: a packet that starts at the last qword of data memory wraps to qword 0.
+            std::memset(data, 0x00, PS2_VU1_DATA_SIZE);
+            for (uint32_t i = 0; i < 64u; ++i)
+                data[i] = static_cast<uint8_t>(0x80u + i);
+            setTag(1023u, 3u); // tag at the last qword, payload qwords 0..2
+            setTag(100u, 1u);
+            setTag(200u, 1u);
+            run(1023u, 100u, 200u);
+            t.Equals(captured.size(), static_cast<size_t>(3u), "wrap-around case delivers three packets");
+            if (!captured.empty())
+                t.IsTrue(captured[0] == expectedBytes(1023u, 64u), "wrapped packet = last qword + qwords 0..2");
+
+            // Case 3: the longest legal packet, tag + 4095 qwords = the whole 64 KB buffer (source wraps four times),
+            // right before the E bit: the pipeline drain must deliver it completely within its bound.
+            for (uint32_t i = 0; i < PS2_VU1_DATA_SIZE; ++i)
+                data[i] = static_cast<uint8_t>(i * 7u + 3u);
+            setTag(0u, 4095u);
+            setTag(10u, 1u);
+            setTag(20u, 1u);
+            run(0u, 10u, 20u);
+            t.Equals(captured.size(), static_cast<size_t>(3u), "longest packet and two short ones delivered");
+            if (!captured.empty())
+            {
+                t.Equals(captured[0].size(), static_cast<size_t>(kXgkickBufferBytes), "the full buffer is delivered");
+                t.IsTrue(captured[0] == expectedBytes(0u, kXgkickBufferBytes), "longest packet bytes are its wrapped source");
+            }
+
+            // Case 4: one qword more than the buffer is refused and nothing is delivered for it.
+            setTag(0u, 4096u);
+            run(0u, 10u, 20u);
+            t.IsTrue(captured.empty() || captured[0].size() != static_cast<size_t>(kXgkickBufferBytes + 16u),
+                     "an oversized packet is never delivered");
+        });
+
         tc.Run("synthetic Code Veronica text packet preserves black-frame PATH1 data", [](TestCase &t)
         {
             PS2Memory mem;
@@ -2106,6 +2238,255 @@ void register_ps2_vu1_tests()
                      "reserved opcode should retain the diagnostic PC");
             t.Equals(vu1.state().vi[1], 0,
                      "instruction following a reserved opcode must not execute");
+        });
+
+        tc.Run("VU1 commit index matches the reference cycle by cycle (same-cycle events, reloads, restarts)", [](TestCase &t)
+        {
+            // Lockstep: the indexed interpreter and the full-scan reference advance one cycle at a time (resume with a
+            // budget of 1) and the complete architectural state plus data memory is compared after every cycle, so an
+            // event committed one cycle early or late, twice, or out of order shows at the cycle it happens.
+            constexpr uint32_t kLowerNop = 0x8000033Cu;
+            struct Program { const char *name; std::vector<std::pair<uint32_t, uint32_t>> pairs; };
+            std::vector<Program> programs;
+            // Four pipelines due on the same cycle 11: ESADD (P, 11) at 0, DIV (Q, 7) at 4, ADD (VF + flags, 4) at 7,
+            // SQ (store, 1) at 10.
+            programs.push_back({"same-cycle commits", {
+                {makeVuLowerSpecial(0x70u, 1u, 0u, 0u, 0xEu), kVuUpperNop},                      // 0  ESADD P
+                {kLowerNop, kVuUpperNop}, {kLowerNop, kVuUpperNop}, {kLowerNop, kVuUpperNop},
+                {makeVuDiv(1u, 2u, 0u, 1u), kVuUpperNop},                                       // 4  DIV Q
+                {kLowerNop, kVuUpperNop}, {kLowerNop, kVuUpperNop},
+                {kLowerNop, makeVuUpper(0x28u, 0xFu, 2u, 1u, 3u)},                              // 7  ADD vf3
+                {kLowerNop, kVuUpperNop}, {kLowerNop, kVuUpperNop},
+                {makeVuSq(0xFu, 1u, 0u, 5), kVuUpperNop},                                       // 10 SQ vf1
+                {kLowerNop, kVuUpperNop}, {kLowerNop, kVuUpperNop | (1u << 30)}, {kLowerNop, kVuUpperNop}}});
+            // Repeated writes to one register from different pipelines: the latest-sequence rule decides.
+            programs.push_back({"overlapping VF writes", {
+                {makeVuLq(0xFu, 4u, 0u, 1), makeVuUpper(0x2Au, 0xFu, 2u, 1u, 4u)},             // LQ vf4 | MUL vf4
+                {makeVuLq(0xFu, 4u, 0u, 2), kVuUpperNop},
+                {kLowerNop, makeVuUpper(0x28u, 0xFu, 4u, 4u, 4u)},                              // ADD vf4 = vf4 + vf4
+                {makeVuLq(0xAu, 4u, 0u, 3), kVuUpperNop},
+                {kLowerNop, makeVuUpper(0x2Cu, 0x5u, 1u, 4u, 4u)},
+                {kLowerNop, kVuUpperNop | (1u << 30)}, {kLowerNop, kVuUpperNop}}});
+            // A random program: generated below.
+            uint64_t s = 0x9E3779B97F4A7C15ull;
+            auto next = [&s]() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return static_cast<uint32_t>(s >> 16); };
+            for (int p = 0; p < 150; ++p)
+            {
+                Program prog{"random", {}};
+                const uint32_t count = 6u + next() % 30u;
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    uint32_t lower = kLowerNop, upper = kVuUpperNop;
+                    switch (next() % 6u)
+                    {
+                    case 0: lower = makeVuLq(0xFu, static_cast<uint8_t>(1u + next() % 8u), 0u, static_cast<int16_t>(next() % 32u)); break;
+                    case 1: lower = makeVuSq(0xFu, static_cast<uint8_t>(next() % 8u), 0u, static_cast<int16_t>(next() % 32u)); break;
+                    case 2: lower = makeVuDiv(static_cast<uint8_t>(1u + next() % 7u), static_cast<uint8_t>(1u + next() % 7u), static_cast<uint8_t>(next() % 4u), static_cast<uint8_t>(next() % 4u)); break;
+                    case 3: lower = makeVuLowerSpecial(static_cast<uint8_t>(0x70u + next() % 3u), static_cast<uint8_t>(1u + next() % 7u), 0u, 0u, 0xEu); break;
+                    case 4: lower = makeVuLowerSpecial(static_cast<uint8_t>(next() % 2u ? 0x3Bu : 0x7Bu), 0u); break; // WAITQ/WAITP
+                    default: break;
+                    }
+                    if (next() % 2u)
+                        upper = makeVuUpper(static_cast<uint8_t>(0x28u + next() % 6u), static_cast<uint8_t>(1u + next() % 15u),
+                                            static_cast<uint8_t>(next() % 8u), static_cast<uint8_t>(next() % 8u),
+                                            static_cast<uint8_t>(1u + next() % 7u));
+                    prog.pairs.emplace_back(lower, upper);
+                }
+                prog.pairs.emplace_back(kLowerNop, kVuUpperNop | (1u << 30));
+                prog.pairs.emplace_back(kLowerNop, kVuUpperNop);
+                programs.push_back(std::move(prog));
+            }
+
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            uint32_t comparedCycles = 0, mismatches = 0;
+            std::string first;
+            for (size_t index = 0; index < programs.size(); ++index)
+            {
+                const Program &prog = programs[index];
+                std::memset(fx.code, 0, PS2_VU1_CODE_SIZE);
+                for (size_t i = 0; i < prog.pairs.size(); ++i)
+                    writeVuInstructionPair(fx.code, static_cast<uint32_t>(i * 8u), prog.pairs[i].first, prog.pairs[i].second);
+                std::vector<uint8_t> dataA(PS2_VU1_DATA_SIZE), dataB(PS2_VU1_DATA_SIZE);
+                for (size_t i = 0; i < dataA.size(); ++i)
+                    dataA[i] = static_cast<uint8_t>((i * 37u + index) ^ (i >> 4));
+                dataB = dataA;
+                VU1Interpreter indexed, reference;
+                reference.setReferenceCommitMode(true);
+                for (VU1Interpreter *vu : {&indexed, &reference})
+                    for (int r = 1; r < 8; ++r)
+                        for (int l = 0; l < 4; ++l)
+                            vu->state().vf[r][l] = static_cast<float>(r * 4 + l + 1) * (l % 2 ? -0.75f : 1.25f);
+                // Restart check: a partial run, then execute() again from the start (resets the pipelines).
+                indexed.execute(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 3u);
+                reference.execute(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 3u);
+                indexed.execute(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 1u);
+                reference.execute(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 1u);
+                for (int cycle = 0; cycle < 600; ++cycle)
+                {
+                    const VU1State &p = indexed.state(), &q = reference.state();
+                    const bool same = std::memcmp(p.vf, q.vf, sizeof(p.vf)) == 0 && std::memcmp(p.vi, q.vi, sizeof(p.vi)) == 0 &&
+                                      std::memcmp(p.acc, q.acc, sizeof(p.acc)) == 0 && std::memcmp(&p.q, &q.q, 4) == 0 &&
+                                      std::memcmp(&p.p, &q.p, 4) == 0 && p.mac == q.mac && p.status == q.status &&
+                                      p.clip == q.clip && p.pc == q.pc && p.cycles == q.cycles && dataA == dataB;
+                    ++comparedCycles;
+                    if (!same && mismatches++ == 0)
+                        first = std::string(prog.name) + " #" + std::to_string(index) + " cycle " + std::to_string(p.cycles);
+                    indexed.resume(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 1u);
+                    reference.resume(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 1u);
+                }
+                if (index == 0)
+                {
+                    // All four same-cycle commits happened: P, Q, vf3 and the stored qword are no longer defaults.
+                    t.IsTrue(indexed.state().p != 0.0f, "ESADD committed P");
+                    t.IsTrue(indexed.state().q != 1.0f, "DIV committed Q");
+                    t.IsTrue(indexed.state().vf[3][0] != 0.0f, "ADD committed vf3");
+                    t.IsTrue(std::memcmp(dataA.data() + 5 * 16, indexed.state().vf[1], 16) == 0, "SQ committed the store");
+                }
+            }
+            std::printf("    lockstep: %zu programs, %u compared cycles, %u mismatches\n", programs.size(), comparedCycles, mismatches);
+            t.Equals(mismatches, 0u, "indexed and reference must agree after every cycle (first: " + first + ")");
+        });
+
+        tc.Run("VU1 commit index matches the full-scan reference on random programs (state, cycles, memory)", [](TestCase &t)
+        {
+            // Differential test of the pipeline commit index (m_nextReady): each random straight-line program (with
+            // forward branches) runs twice from the same state - once indexed, once in reference mode, which scans every
+            // pipeline on every call as the interpreter did before the index - and the complete architectural state,
+            // the cycle count and VU data memory must be identical, both at an interrupted point (cycle budget) and at
+            // the end. The instruction mix covers FMAC (all operand kinds, ACC forms), FDIV/EFU with WAITQ/WAITP,
+            // flag instructions, integer ops, loads/stores (immediate, post-increment, pre-decrement) and I-bit pairs.
+            constexpr uint32_t kLowerNop = 0x8000033Cu;
+            uint64_t s = 0x2545F4914F6CDD1Dull;
+            auto next = [&s]() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return static_cast<uint32_t>(s >> 16); };
+            auto pick = [&next](uint32_t n) { return next() % n; };
+            const auto upperOp = [&]() -> uint32_t {
+                const uint8_t dest = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t ft = static_cast<uint8_t>(pick(32u)), fs = static_cast<uint8_t>(pick(32u));
+                const uint8_t fd = static_cast<uint8_t>(1u + pick(31u));
+                switch (pick(4u))
+                {
+                case 0: return makeVuUpper(static_cast<uint8_t>(pick(0x30u)), dest, ft, fs, fd);            // ADD..MINI
+                case 1:
+                {
+                    static const uint8_t specials[] = {0x00, 0x01, 0x04, 0x05, 0x08, 0x0A, 0x0C, 0x0F, 0x10, 0x11, 0x14,
+                                                       0x15, 0x18, 0x19, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23,
+                                                       0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x2E};
+                    return makeVuUpperSpecial(specials[pick(sizeof(specials))], dest, ft, fs);
+                }
+                default: return kVuUpperNop;
+                }
+            };
+            const auto lowerOp = [&](uint32_t index, uint32_t count) -> uint32_t {
+                const uint8_t dest = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t a = static_cast<uint8_t>(1u + pick(31u)), b = static_cast<uint8_t>(pick(32u));
+                const uint8_t vi = static_cast<uint8_t>(1u + pick(4u)), vj = static_cast<uint8_t>(1u + pick(15u));
+                const uint8_t fsf = static_cast<uint8_t>(pick(4u)), ftf = static_cast<uint8_t>(pick(4u));
+                switch (pick(22u))
+                {
+                case 0: return makeVuLq(dest, a, vi, static_cast<int16_t>(pick(48u)));
+                case 1: return makeVuSq(dest, b, vi, static_cast<int16_t>(pick(48u)));
+                case 2: return makeVuIaddiu(vj, static_cast<uint8_t>(pick(16u)), static_cast<int16_t>(pick(32u)));
+                case 3: return makeVuLowerDirect(0x30u + static_cast<uint8_t>(pick(2u)), vj, vi, vj);  // IADD/ISUB
+                case 4: return makeVuLowerDirect(0x34u + static_cast<uint8_t>(pick(2u)), vj, vi, vj);  // IAND/IOR
+                case 5: return makeVuLowerSpecial(0x30u + static_cast<uint8_t>(pick(2u)), b, a, 0u, dest); // MOVE/MR32
+                case 6: return makeVuDiv(b, static_cast<uint8_t>(pick(32u)), fsf, ftf);
+                case 7: return makeVuSqrt(b, ftf);
+                case 8: return makeVuLowerSpecial(0x3Au, b, static_cast<uint8_t>(pick(32u)), 0u, static_cast<uint8_t>((ftf << 2) | fsf)); // RSQRT
+                case 9: return makeVuLowerSpecial(0x3Bu, 0u);                                          // WAITQ
+                case 10: return makeVuLowerSpecial(0x7Bu, 0u);                                         // WAITP
+                case 11: return makeVuLowerSpecial(static_cast<uint8_t>(0x70u + pick(7u)), b, 0u, 0u, 0xEu); // ESADD..ESUM
+                case 12: return makeVuLowerSpecial(static_cast<uint8_t>(0x78u + pick(3u)), b, 0u, 0u, static_cast<uint8_t>(fsf)); // ESQRT/ERSQRT/ERCPR
+                case 13: return makeVuLowerSpecial(0x64u, 0u, a, 0u, dest);                            // MFP
+                case 14: return makeVuFlagImmediate(static_cast<uint8_t>(0x10u + pick(4u)), vj, static_cast<uint16_t>(next() & 0xFFFu)); // FC*
+                case 15: return makeVuFlagImmediate(static_cast<uint8_t>(0x14u + pick(4u)), vj, static_cast<uint16_t>(next() & 0xFFFu)); // FS*
+                case 16: { static const uint8_t fm[] = {0x18u, 0x1Au, 0x1Bu, 0x1Cu}; return makeVuFlagRegister(fm[pick(4u)], vj, vi); } // FMEQ/FMAND/FMOR/FCGET
+                case 17: return makeVuLowerSpecial(static_cast<uint8_t>(0x34u + pick(4u)), vi, a, 0u, dest); // LQI/SQI/LQD/SQD
+                case 18: return makeVuIlw(dest, vj, vi, static_cast<int16_t>(pick(48u)));
+                case 19:
+                {
+                    if (index + 3u >= count)
+                        return kLowerNop;
+                    return makeVuBranch(static_cast<int16_t>(pick(3u))); // forward, lands inside the program
+                }
+                case 20: return makeVuLowerSpecial(static_cast<uint8_t>(0x3Cu + pick(2u)), vj, b, 0u, static_cast<uint8_t>(8u >> pick(4u))); // MTIR/MFIR
+                default: return kLowerNop;
+                }
+            };
+
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            std::vector<uint8_t> dataA(PS2_VU1_DATA_SIZE), dataB(PS2_VU1_DATA_SIZE);
+            uint32_t programs = 0, mismatched = 0, ended = 0;
+            std::string first;
+            const auto compare = [&](const VU1Interpreter &x, const VU1Interpreter &y, const char *where, uint32_t program) {
+                const VU1State &p = x.state(), &q = y.state();
+                const bool same = std::memcmp(p.vf, q.vf, sizeof(p.vf)) == 0 && std::memcmp(p.vi, q.vi, sizeof(p.vi)) == 0 &&
+                                  std::memcmp(p.acc, q.acc, sizeof(p.acc)) == 0 && std::memcmp(&p.q, &q.q, 4) == 0 &&
+                                  std::memcmp(&p.p, &q.p, 4) == 0 && std::memcmp(&p.i, &q.i, 4) == 0 && p.r == q.r &&
+                                  p.pc == q.pc && p.mac == q.mac && p.clip == q.clip && p.status == q.status &&
+                                  p.cycles == q.cycles && p.ebit == q.ebit && p.branchPending == q.branchPending &&
+                                  dataA == dataB;
+                if (!same && mismatched++ == 0)
+                    first = "program " + std::to_string(program) + " at " + where + ": cycles " + std::to_string(p.cycles) +
+                            "/" + std::to_string(q.cycles) + " status " + std::to_string(p.status) + "/" +
+                            std::to_string(q.status) + " mac " + std::to_string(p.mac) + "/" + std::to_string(q.mac);
+            };
+            for (uint32_t program = 0; program < 3000u; ++program)
+            {
+                const uint32_t count = 8u + pick(40u);
+                std::memset(fx.code, 0, PS2_VU1_CODE_SIZE);
+                for (uint32_t i = 0; i < count; ++i)
+                {
+                    const bool iBit = pick(16u) == 0u;
+                    const uint32_t upper = upperOp() | (iBit ? 0x80000000u : 0u);
+                    const uint32_t lower = iBit ? ((next() & 0x807FFFFFu) | ((100u + pick(56u)) << 23)) : lowerOp(i, count);
+                    writeVuInstructionPair(fx.code, i * 8u, lower, upper);
+                }
+                writeVuInstructionPair(fx.code, count * 8u, kLowerNop, kVuUpperNop | (1u << 30));
+                writeVuInstructionPair(fx.code, count * 8u + 8u, kLowerNop, kVuUpperNop);
+
+                VU1Interpreter indexed, reference;
+                reference.setReferenceCommitMode(true);
+                for (VU1Interpreter *vu : {&indexed, &reference})
+                {
+                    VU1State &st = vu->state();
+                    uint64_t seed = s;
+                    auto value = [&seed]() { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; return static_cast<uint32_t>(seed >> 16); };
+                    for (int r = 1; r < 32; ++r)
+                        for (int l = 0; l < 4; ++l)
+                        {
+                            const uint32_t bits = (value() & 0x807FFFFFu) | ((value() % 8u == 0u ? value() % 256u : 100u + value() % 56u) << 23);
+                            std::memcpy(&st.vf[r][l], &bits, 4);
+                        }
+                    for (int r = 1; r < 16; ++r)
+                        st.vi[r] = static_cast<int32_t>(value() % 64u);
+                    for (int l = 0; l < 4; ++l)
+                    {
+                        const uint32_t bits = (value() & 0x807FFFFFu) | ((100u + value() % 56u) << 23);
+                        std::memcpy(&st.acc[l], &bits, 4);
+                    }
+                    const uint32_t ib = (value() & 0x807FFFFFu) | (127u << 23);
+                    std::memcpy(&st.i, &ib, 4);
+                }
+                for (size_t i = 0; i < dataA.size(); ++i)
+                    dataA[i] = static_cast<uint8_t>(next());
+                dataB = dataA;
+                next(); // advance the shared stream past the register seed
+                const uint32_t budget = 20u + pick(200u);
+                indexed.execute(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, budget);
+                reference.execute(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, budget);
+                compare(indexed, reference, "budget", program);
+                indexed.resume(fx.code, PS2_VU1_CODE_SIZE, dataA.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 20000u);
+                reference.resume(fx.code, PS2_VU1_CODE_SIZE, dataB.data(), PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 20000u);
+                compare(indexed, reference, "end", program);
+                ended += indexed.state().cycles < 20000u + budget ? 1u : 0u;
+                ++programs;
+            }
+            std::printf("    commit index vs reference: %u programs, %u finished within budget, %u mismatches\n", programs,
+                        ended, mismatched);
+            t.Equals(mismatched, 0u, "indexed and reference runs must agree (first: " + first + ")");
+            t.IsTrue(ended > programs / 2u, "most random programs must run to their E bit");
         });
     });
 }

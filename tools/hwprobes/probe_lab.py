@@ -27,7 +27,8 @@ import tempfile
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 MODEL_SOURCES = ['tools/semantics/ee_fpu_models.py', 'tools/semantics/mul_models.py', 'tools/semantics/make_probes.py',
-                 'tools/semantics/z3_add_models.py', 'tools/semantics/ee_rsqrt_models.py']
+                 'tools/semantics/z3_add_models.py', 'tools/semantics/ee_rsqrt_models.py',
+                 'tools/semantics/make_macro_flag_probe.py', 'tools/semantics/vu_fmac_model.py']
 
 QUESTIONS = {
     'p1_ee_add_guard_bits': dict(register='1.2', unit='EE COP1', instruction='ADD.S',
@@ -40,6 +41,8 @@ QUESTIONS = {
                                           'rounded root times fs? (the latter fits 34/34 rows, chosen post hoc)'),
     'p4_vu_mul_asymmetry': dict(register='2.3', unit='VU0 macro', instruction='VMUL.x',
                                 question='Is the VU multiplier operand-order asymmetric like the EE one?'),
+    'p5_vu0_macro_flags': dict(register='2.4', unit='VU0 macro', instruction='VADD + CFC2 vi16/vi17',
+                               question='Does a macro FMAC op update MAC/STATUS, immediately or after the flag latency?'),
 }
 
 SOURCE_CLASS = {'hardware': 'HARDWARE_CONFIRMED', 'emulator': 'EMULATOR_OBSERVED', 'zmbor': 'ZMBOR_OBSERVED',
@@ -56,6 +59,20 @@ def read_predictions(path):
         raise ValueError(f'{path.name}: rows and header disagree in width (a model name containing a comma?)')
     table = [(int(r[0], 16), int(r[1], 16), {m: int(v, 16) for m, v in zip(models, r[2:])}) for r in body]
     return models, table
+
+
+def read_structured(path):
+    """Structured probe: a fixed sequence of readings; model predictions may refer to the first observed readings
+    ("m0", "s0") or set bits on them ("s0|0x1c7")."""
+    data = json.loads(path.read_text(encoding='utf-8'))
+    return list(data['models']), data['readings'], data['models']
+
+
+def resolve(token, observed):
+    if token.startswith('m0') or token.startswith('s0'):
+        base = observed[0] if token.startswith('m0') else observed[1]
+        return base | int(token.split('|', 1)[1], 16) if '|' in token else base
+    return int(token, 16)
 
 
 def sources_digest():
@@ -91,9 +108,21 @@ def cmd_manifest(directory):
             build='ps2sdk + ps2autotests (not available in this environment)',
             hardware_status='HARDWARE_CONFIRMED' if 'HARDWARE_CONFIRMED' in classes else 'UNMEASURED',
             observations=observations)
+    for json_path in sorted(directory.glob('*.predictions.json')):
+        name = json_path.name[:-len('.predictions.json')]
+        models, readings, _ = read_structured(json_path)
+        observations = old.get('probes', {}).get(name, {}).get('observations', [])
+        classes = {o['evidence_class'] for o in observations}
+        manifest['probes'][name] = dict(
+            QUESTIONS.get(name, {}), source=f'{name}.cpp', predictions=json_path.name, structured=True,
+            operand_pairs=len(readings), models=models, prediction_class='MODEL_PREDICTED',
+            build='ps2sdk + ps2autotests (not available in this environment)',
+            hardware_status='HARDWARE_CONFIRMED' if 'HARDWARE_CONFIRMED' in classes else 'UNMEASURED',
+            observations=observations)
     save_manifest(directory, manifest)
     for name, p in manifest['probes'].items():
-        print(f"{name}: {p['operand_pairs']} pairs, {len(p['models'])} models, hardware {p['hardware_status']}")
+        print(f"{name}: {p['operand_pairs']} {'readings' if p.get('structured') else 'pairs'}, {len(p['models'])} models, "
+              f"hardware {p['hardware_status']}")
     return manifest
 
 
@@ -129,9 +158,26 @@ def cmd_ingest(directory, probe, obs_path, source, provenance, console=None, rec
     if source == 'hardware' and not console:
         sys.exit('ingest: --source hardware requires --console (a physical console identifier); '
                  'an emulator or Zmbor run is not hardware')
-    models, table = read_predictions(directory / f'{probe}.predictions.csv')
-    observed = parse_observations(obs_path)
-    result, missing = score(models, table, observed)
+    structured = directory / f'{probe}.predictions.json'
+    if structured.exists():
+        models, readings, predictions = read_structured(structured)
+        values = [int(t, 16) for t in pathlib.Path(obs_path).read_text(encoding='utf-8').split()
+                  if len(t) == 8 and all(c in '0123456789abcdefABCDEF' for c in t)]
+        missing = max(0, len(readings) - len(values))
+        table = readings
+        result = {m: {'match': 0, 'mismatch': []} for m in models}
+        if not missing:
+            for m in models:
+                for i, name in enumerate(readings):
+                    want = resolve(predictions[m][i], values)
+                    if want == values[i]:
+                        result[m]['match'] += 1
+                    else:
+                        result[m]['mismatch'].append(f'{name}: predicted {want:08x}, observed {values[i]:08x}')
+    else:
+        models, table = read_predictions(directory / f'{probe}.predictions.csv')
+        observed = parse_observations(obs_path)
+        result, missing = score(models, table, observed)
     evidence = SOURCE_CLASS[source]
     complete = missing == 0
     surviving = [m for m in models if not result[m]['mismatch']] if complete else []
@@ -185,11 +231,29 @@ def cmd_selftest():
         if surviving or missing != 1:
             print('FAIL: partial observation selected a model')
             failures += 1
+    # Structured probe (P5): an observation generated from each model, with arbitrary initial MAC/STATUS, must be
+    # consistent with that model only.
+    with tempfile.TemporaryDirectory() as tmp:
+        d = pathlib.Path(tmp)
+        src = HERE / 'generated' / 'p5_vu0_macro_flags.predictions.json'
+        (d / src.name).write_text(src.read_text(encoding='utf-8'), encoding='utf-8')
+        models, readings, predictions = read_structured(d / src.name)
+        for truth in models:
+            initial = [0x00000010, 0x00000040]  # an arbitrary m0, s0 (sticky ZS already set)
+            values = []
+            for i, token in enumerate(predictions[truth]):
+                values.append(initial[i] if i < 2 else resolve(token, initial))
+            obs = d / 'obs.txt'
+            obs.write_text(''.join(f'{v:08x}\n' for v in values), encoding='utf-8')
+            evidence, surviving, _ = cmd_ingest(d, 'p5_vu0_macro_flags', obs, 'synthetic', 'selftest', record=False)
+            if surviving != [truth]:
+                print(f'FAIL: P5 observation generated from {truth} kept {surviving}')
+                failures += 1
+    csvs_and_json = {p.name.split('.predictions.')[0] for p in (HERE / 'generated').glob('*.predictions.*')}
     # The committed manifest: covers every probe, claims nothing it has not earned.
     committed = load_manifest(HERE / 'generated')
-    csvs = {p.name[:-len('.predictions.csv')] for p in (HERE / 'generated').glob('*.predictions.csv')}
-    if set(committed['probes']) != csvs:
-        print(f'FAIL: manifest.json lists {sorted(committed["probes"])}, predictions exist for {sorted(csvs)}')
+    if set(committed['probes']) != csvs_and_json:
+        print(f'FAIL: manifest.json lists {sorted(committed["probes"])}, predictions exist for {sorted(csvs_and_json)}')
         failures += 1
     for name, p in committed['probes'].items():
         hw = [o for o in p.get('observations', []) if o['evidence_class'] == 'HARDWARE_CONFIRMED']

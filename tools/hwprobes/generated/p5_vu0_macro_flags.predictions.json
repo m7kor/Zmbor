@@ -1,0 +1,55 @@
+{
+ "probe": "p5_vu0_macro_flags",
+ "evidence_class": "MODEL_PREDICTED",
+ "note": "m0/s0 = the first two observed readings; \"s0|0x...\" = s0 with those bits set",
+ "readings": [
+  "before: MAC",
+  "before: STATUS",
+  "op1 now: MAC",
+  "op1 now: STATUS",
+  "op1 +4: MAC",
+  "op1 +4: STATUS",
+  "op2 now: MAC",
+  "op2 now: STATUS",
+  "op2 +4: MAC",
+  "op2 +4: STATUS"
+ ],
+ "models": {
+  "A immediate": [
+   "m0",
+   "s0",
+   "0x00002149",
+   "s0|0x3cf",
+   "0x00002149",
+   "s0|0x3cf",
+   "0x00000000",
+   "s0|0x3c0",
+   "0x00000000",
+   "s0|0x3c0"
+  ],
+  "B unchanged": [
+   "m0",
+   "s0",
+   "m0",
+   "s0",
+   "m0",
+   "s0",
+   "m0",
+   "s0",
+   "m0",
+   "s0"
+  ],
+  "C delayed": [
+   "m0",
+   "s0",
+   "m0",
+   "s0",
+   "0x00002149",
+   "s0|0x3cf",
+   "0x00002149",
+   "s0|0x3cf",
+   "0x00000000",
+   "s0|0x3c0"
+  ]
+ }
+}

@@ -45,11 +45,20 @@ incomplete observation selects no model, and `--source hardware` is refused with
 | P2 `p2_ee_mul_partial_products` | 1.3 | EE MUL.S partial-product truncation: hot-one vs K-trunc | 3 | 7 | UNMEASURED |
 | P3 `p3_ee_rsqrt_datapath` | 1.5 | EE RSQRT.S: rounded root then divide, or reciprocal-multiply | 2 | 4 | UNMEASURED |
 | P4 `p4_vu_mul_asymmetry` | 2.3 | VU0 VMUL operand-order asymmetry: exact vs hot-one | 1 | 2 | UNMEASURED |
+| P5 `p5_vu0_macro_flags` | 2.4 | VU0 macro MAC/STATUS after VADD: updated now / never / after the 4-cycle flag latency | 10 readings | 3 | UNMEASURED |
 
 P3's candidates come from `tools/semantics/ee_rsqrt_models.py` (register 1.5): the composition the SQRT.S/DIV.S
 train sets predict (29/34, production), the best composition (33/34) and the post-hoc reciprocal datapath (34/34,
-two product roundings). The FMAC overflow threshold, macro-mode MAC/STATUS flags and the EFU series rounding
-(register 2.1/2.4/2.5) have no candidate set yet, so no probe exists for them.
+two product roundings).
+
+P5 (`tools/semantics/make_macro_flag_probe.py`, Phase 6) is a *structured* probe: one program, a fixed sequence of
+CFC2 readings (MAC and STATUS before anything, right after op1, four VNOPs later, right after op2, four VNOPs later),
+predictions in `p5_vu0_macro_flags.predictions.json` that may refer to the first observed readings (`m0`, `s0`)
+because model B ("unchanged", Zmbor today) predicts whatever the console held. op1 gives one flag kind per lane
+(x zero, y sign, z overflow at ~2^130, w underflow with zero); the three models predict three distinct sequences, and
+`probe_lab.py ingest` resolves `m0`/`s0` from the capture. The flag values use Zmbor's micro-mode classification,
+itself provisional (O at 2^129, U below 2^-126), so a capture also tests those thresholds bit by bit. The FMAC
+overflow threshold in isolation and the EFU series rounding still have no candidate set, so no probe exists for them.
 
 ## Z3 results (models only)
 

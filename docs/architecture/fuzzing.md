@@ -76,7 +76,8 @@ and "chain cycle detection does not stop a chain that CALLs the same subroutine 
 | elf | 120 s | 1,700 | 14 | no finding |
 | decoder (+ emitter) | 120 s + 30 s | 13,110 + 15,183 | 108 | no finding |
 
-These are short smoke runs, not a coverage claim. The low rates of gif, elf and the emitter come from per-input work
-in the targets (GS packet processing, a temporary file per ELF, code generation), not from instrumentation alone;
-they were not profiled. The first gif run ignored `-max_total_time` because the PowerShell driver passed the
-argument unexpanded (a harness-driver error, fixed by quoting).
+These are short smoke runs, not a coverage claim. The low rates of gif, dma, elf and the emitter were not profiled;
+candidate causes (GS packet processing, the 1 MB RDRAM copy per DMA input, a temporary file per ELF, code
+generation) are unconfirmed. The first gif run ran 34 min despite `-max_total_time=120`; the PowerShell driver
+passed that argument unquoted, and with the arguments quoted every later run stopped on time, so the driver is the
+likely cause (not further investigated).

@@ -1508,6 +1508,55 @@ void register_ps2_memory_tests()
             t.Equals(mem.readIORegister(0x1000D010u), 0x00030000u, "fromSPR MADR has no SPR bit");
         });
 
+        tc.Run("a source chain that loops without an end tag stops after one lap (ps2x_fuzz_dma regression)", [](TestCase &t)
+        {
+            // Minimized from tools/fuzz/regressions/dma: a NEXT tag whose ADDR is itself. Before the fix the walk
+            // gathered 2^20 laps (~750 MB for QWC=0x2E) before its tag limit stopped it.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kGifCh = 0x1000A000u;
+            constexpr uint32_t kTag = 0x00100000u;
+            uint8_t *rdram = mem.getRDRAM();
+            writeDmaTag(rdram, kTag, makeDmaTag(0x2Eu, 2u, kTag));
+            std::vector<size_t> packetSizes;
+            mem.setGifPacketCallback([&](const uint8_t *, uint32_t sizeBytes) { packetSizes.push_back(sizeBytes); });
+            mem.writeIORegister(kGifCh + 0x30u, kTag);
+            mem.writeIORegister(kGifCh + 0x20u, 0u);
+            mem.writeIORegister(kGifCh + 0x00u, 0x105u);
+            mem.processPendingTransfers();
+            size_t total = 0;
+            for (size_t s : packetSizes)
+                total += s;
+            t.Equals(total, static_cast<size_t>(0x2Eu * 16u), "exactly one lap of payload is delivered");
+            t.Equals(mem.readIORegister(kGifCh + 0x30u), kTag, "TADR is left at the repeating tag");
+        });
+
+        tc.Run("chain cycle detection does not stop a chain that CALLs the same subroutine twice", [](TestCase &t)
+        {
+            // CALL sub; CALL sub; END. The subroutine's RET tag is visited twice with the same TADR and ASP but a
+            // different return address (ASR0), so it is not a cycle.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kGifCh = 0x1000A000u;
+            constexpr uint32_t kMain = 0x00100000u;
+            constexpr uint32_t kSub = 0x00110000u;
+            uint8_t *rdram = mem.getRDRAM();
+            writeDmaTag(rdram, kMain + 0x00u, makeDmaTag(1u, 5u, kSub)); // CALL, 1 qword at kMain+0x10
+            writeDmaTag(rdram, kMain + 0x20u, makeDmaTag(1u, 5u, kSub)); // CALL, 1 qword at kMain+0x30
+            writeDmaTag(rdram, kMain + 0x40u, makeDmaTag(1u, 7u, 0u));   // END, 1 qword
+            writeDmaTag(rdram, kSub, makeDmaTag(2u, 6u, 0u));            // RET, 2 qwords
+            std::vector<size_t> packetSizes;
+            mem.setGifPacketCallback([&](const uint8_t *, uint32_t sizeBytes) { packetSizes.push_back(sizeBytes); });
+            mem.writeIORegister(kGifCh + 0x30u, kMain);
+            mem.writeIORegister(kGifCh + 0x20u, 0u);
+            mem.writeIORegister(kGifCh + 0x00u, 0x105u);
+            mem.processPendingTransfers();
+            size_t total = 0;
+            for (size_t s : packetSizes)
+                total += s;
+            t.Equals(total, static_cast<size_t>((1u + 2u + 1u + 2u + 1u) * 16u), "both calls and the END are transferred");
+        });
+
         tc.Run("GIF DMA chain can source tags and payload from 0xF000 scratchpad alias", [](TestCase &t)
         {
             PS2Memory mem;

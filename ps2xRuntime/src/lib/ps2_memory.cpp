@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -1490,6 +1491,34 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
     // Only a guard against a malformed (looping) chain: hardware has no tag limit, and heavy frames
     // exceed 4096 tags (4190-4600 measured in Shadow of the Colossus), losing the chain's tail.
     const int kMaxChainTags = 1 << 20;
+    // Guard on the gathered payload, not a hardware limit: 1M REF tags of 0xFFFF qwords would otherwise ask for
+    // ~1 TB here (found by tools/fuzz ps2x_fuzz_dma). 256 MiB is eight times RDRAM.
+    const size_t kMaxChainBytes = size_t{1} << 28;
+
+    // The walk is synchronous and reads memory it does not write, so the next step depends only on
+    // (TADR, ASP, ASR0, ASR1): a repeated state means the chain never reaches an end tag. Hardware would transfer
+    // forever; the walk stops after one lap instead of gathering up to kMaxChainTags laps (ps2x_fuzz_dma: a NEXT
+    // tag pointing at itself gathered ~750 MB).
+    struct ChainState
+    {
+        uint32_t tadr, asr0, asr1, asp;
+        bool operator==(const ChainState &o) const
+        {
+            return tadr == o.tadr && asr0 == o.asr0 && asr1 == o.asr1 && asp == o.asp;
+        }
+    };
+    struct ChainStateHash
+    {
+        size_t operator()(const ChainState &s) const
+        {
+            uint64_t h = (static_cast<uint64_t>(s.tadr) << 32) ^ (static_cast<uint64_t>(s.asr0) * 0x9E3779B97F4A7C15ull);
+            h ^= (static_cast<uint64_t>(s.asr1) << 7) ^ (static_cast<uint64_t>(s.asr1) * 0xC2B2AE3D27D4EB4Full) ^ s.asp;
+            return std::hash<uint64_t>{}(h);
+        }
+    };
+    std::unordered_set<ChainState, ChainStateHash> visited;
+    bool cycleDetected = false;
+    bool payloadLimitHit = false;
 
     auto appendData = [&](uint32_t srcAddr, uint32_t qwCount)
     {
@@ -1549,6 +1578,11 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
 
     while (tagsProcessed < kMaxChainTags)
     {
+        if (!visited.insert(ChainState{tagAddr, asr0, asr1, asp}).second)
+        {
+            cycleDetected = true;
+            break;
+        }
         const uint32_t currentTagAddr = tagAddr;
         const bool tagInSPR = isScratchpad(tagAddr);
         uint32_t physTag = 0;
@@ -1663,8 +1697,25 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
             endChain = true;
         if (endChain)
             break;
+        if (chainBuf.size() >= kMaxChainBytes)
+        {
+            payloadLimitHit = true;
+            break;
+        }
     }
-    if (tagsProcessed >= kMaxChainTags)
+    if (cycleDetected)
+    {
+        std::cerr << "[DMA] chain on channel base 0x" << std::hex << channelBase
+                  << " loops without an end tag (tag 0x" << tagAddr << " repeats after " << std::dec << tagsProcessed
+                  << " tags); stopped after one lap" << std::endl;
+    }
+    else if (payloadLimitHit)
+    {
+        std::cerr << "[DMA] chain on channel base 0x" << std::hex << channelBase
+                  << " stopped after gathering " << std::dec << chainBuf.size() << " bytes in " << tagsProcessed
+                  << " tags; next tag 0x" << std::hex << tagAddr << std::dec << std::endl;
+    }
+    else if (tagsProcessed >= kMaxChainTags)
     {
         std::cerr << "[DMA] chain on channel base 0x" << std::hex << channelBase
                   << " stopped after " << std::dec << kMaxChainTags

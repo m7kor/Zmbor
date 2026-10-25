@@ -50,3 +50,33 @@ sum. A signed overflow is undefined behaviour in C++, and overflow is the very c
 a sign-bit mask; the predicates are proved (above); the instrumented program no longer traps and prints the same
 result. Regression: `code_generator_tests` (emitted DADD/DSUB/DADDI/DADDIU use the unsigned forms),
 `ps2_runtime_expansion_tests` (boundary pairs for all four macros), CI UBSan job.
+
+### F2 — a looping DMA source chain gathered up to 2^20 laps (fixed)
+
+`ps2x_fuzz_dma` (120 s) reported a timeout (> 20 s) on a 32-byte input: a NEXT tag (QWC 0x2E) whose ADDR is the
+tag itself. `walkSourceChain` stops only after 2^20 tags, appending each tag's payload to the gathered buffer, so
+this input gathered ~750 MB; with QWC 0xFFFF the same shape asks for ~1 TB (allocation failure). Hardware would
+transfer forever; the runtime already truncated chains without an end tag, only too late. Fix: the walk is
+synchronous and reads memory it does not write, so its next step depends only on (TADR, ASP, ASR0, ASR1); a repeated
+state is an exact cycle and the walk stops after one lap (no threshold, no false positive: a chain calling the same
+subroutine twice revisits the RET tag with a different ASR0). A second guard stops a non-looping chain after 256 MiB
+of payload (a guard, not a hardware limit). Regression: `tools/fuzz/regressions/dma/cyclic_next_chain.bin`
+(replayed by CI; 56 ms after the fix), unit tests "a source chain that loops without an end tag stops after one lap"
+and "chain cycle detection does not stop a chain that CALLs the same subroutine twice".
+
+## Local fuzz runs (2026-10-25, MSVC 14.44 ASan + libFuzzer, i5-10400F, single process per target)
+
+| target | time | executions | exec/s | result |
+|---|---|---|---|---|
+| gif | 34 min (first run; time limit not applied, see below) + 120 s | ~132,000 + 1,725 | 65 / 14 | no finding |
+| vif0 | 120 s | 5,874,122 | 48,546 | no finding |
+| vif1 | 120 s | 983,430 | 7,805 | no finding |
+| dma | 120 s | — | — | F2 (timeout) |
+| dma, after the F2 fix | 120 s | 13,188 | 108 | no finding |
+| elf | 120 s | 1,700 | 14 | no finding |
+| decoder (+ emitter) | 120 s + 30 s | 13,110 + 15,183 | 108 | no finding |
+
+These are short smoke runs, not a coverage claim. The low rates of gif, elf and the emitter come from per-input work
+in the targets (GS packet processing, a temporary file per ELF, code generation), not from instrumentation alone;
+they were not profiled. The first gif run ignored `-max_total_time` because the PowerShell driver passed the
+argument unexpanded (a harness-driver error, fixed by quoting).

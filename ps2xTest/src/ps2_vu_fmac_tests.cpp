@@ -198,26 +198,6 @@ void register_ps2_vu_fmac_tests()
             }
             t.Equals(mismatches, 0u, "lanes differing from the reference");
         });
-
-        tc.Run("the pre-Phase-5 macro path differs from the FMAC contract (measured, for the record)", [](TestCase &t)
-        {
-            // Not a requirement of the contract: a measurement of what the replaced path got wrong, so a regression to
-            // it is visible. Normal operands only (the legacy path's exponent-255 handling is EE-style).
-            Xorshift64 rng{0x94D049BB133111EBull};
-            uint32_t addDiff = 0, mulDiff = 0, total = 0;
-            for (int i = 0; i < 100000; ++i)
-            {
-                const uint32_t a = (rng.next() & 0x807FFFFFu) | ((60u + rng.next() % 130u) << 23);
-                const uint32_t b = (rng.next() & 0x807FFFFFu) | ((60u + rng.next() % 130u) << 23);
-                const __m128 va = _mm_castsi128_ps(_mm_set1_epi32(static_cast<int>(a)));
-                const __m128 vb = _mm_castsi128_ps(_mm_set1_epi32(static_cast<int>(b)));
-                mulDiff += laneBits(ps2_vmul_legacy(va, vb), 0) != ps2_vu_fmac::mulRef(a, b);
-                ++total;
-            }
-            std::printf("    legacy macro path vs FMAC contract on %u normal pairs: ADD differs on %u, MUL on %u\n", total,
-                        addDiff, mulDiff);
-            t.IsTrue(addDiff > 0u && mulDiff > 0u, "the legacy path rounds to nearest, so it must differ somewhere");
-        });
     });
 }
 

@@ -61,9 +61,14 @@ negative). Underflow and inexact are not modelled (gap).
 
 ## 2. VU0/VU1 arithmetic
 
-### 2.1 Float format — established
-VU registers hold exponent-255 values, and VU results reach ±0x7FFFFFFF: vu/lower/efu.expected contains 0x7FFFFFFF
-20 times and 0x7F7FFFFF never (A). The micro interpreter's FMAC clamp to 0x7F7FFFFF has no hardware support.
+### 2.1 Float format — established for EFU operands and results; architectural for FMAC
+- VU results reach ±0x7FFFFFFF: vu/lower/efu.expected contains 0x7FFFFFFF 20 times and 0x7F7FFFFF never (A).
+- Exponent-255 **operands** are values, not clamped: `ERSQRT CVF_MAX_EXP` (0x7F800001) gives 0x1F800000 = 2^-64
+  = 1/sqrt(2^128), and `ERSQRT CVF_MAX` (0x7FFFFFFF) gives 0x1F3504F3 = 1/sqrt(~6.8e38); an operand clamped to
+  0x7F7FFFFF would give ~0x1F7FFFFF in both (A). This is measured for EFU operand reads.
+- The micro interpreter clamps exponent-255 operands (`normalizeOperand`) and FMAC results to 0x7F7FFFFF; both
+  contradict the format above. That the FMAC reads the same register format the same way is architectural (same
+  VF registers), not measured on an FMAC row.
 
 ### 2.2 FMAC ADD/SUB/MADD/MSUB — established for micro mode
 - Truncation toward zero: experiment E2 (micro rounding switched to nearest) breaks vu/games/triace (3/5) and

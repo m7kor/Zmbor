@@ -117,3 +117,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebI
     EnableFastReleaseMode(ps2_test_lib)
     EnableFastReleaseMode(ps2x_tests)
 endif()
+
+# Floating-point build policy guard: PS2 arithmetic must not depend on the host floating-point mode.
+add_subdirectory("${CMAKE_SOURCE_DIR}/tools/fpenv" "${CMAKE_CURRENT_BINARY_DIR}/fpenv")

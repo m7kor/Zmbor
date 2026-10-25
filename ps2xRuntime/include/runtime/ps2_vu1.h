@@ -193,6 +193,15 @@ private:
         bool active = false;
         bool currentTagEop = false;
 
+        // Resets the transfer state but not `packet`: progressXgkick() writes every byte below copiedBytes before
+        // anything reads it (tag parsing at the qword just copied; the submitted totalBytes <= copiedBytes), so
+        // clearing the 64 KB buffer on every XGKICK was unobservable work.
+        void resetTransfer()
+        {
+            sourceAddress = totalBytes = copiedBytes = currentTagEnd = cycleCredit = 0;
+            issueCycle = 0;
+            active = currentTagEop = false;
+        }
     };
 
     static constexpr uint32_t kFmacLatency = 4u;

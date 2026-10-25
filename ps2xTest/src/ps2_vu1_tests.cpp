@@ -1612,6 +1612,46 @@ void register_ps2_vu1_tests()
                      "XGKICK resource stalls should consume VU cycles");
         });
 
+        tc.Run("consecutive XGKICKs deliver exactly their own bytes (long packet, then a short one)", [](TestCase &t)
+        {
+            // The XGKICK buffer is reused without clearing; each delivered packet must still be exactly the source
+            // qwords of its own transfer: a 4-qword packet followed by a 2-qword one must not carry stale bytes.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<std::vector<uint8_t>> captured;
+            mem.setGifPacketCallback([&](const uint8_t *packet, uint32_t sizeBytes) { captured.emplace_back(packet, packet + sizeBytes); });
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            uint8_t *code = mem.getVU1Code();
+            uint8_t *data = mem.getVU1Data();
+            std::memset(code, 0, PS2_VU1_CODE_SIZE);
+            std::memset(data, 0, PS2_VU1_DATA_SIZE);
+            const uint64_t longTag = makeGifTag(3u, GIF_FMT_IMAGE, 0u, true);  // tag + 3 qwords
+            const uint64_t shortTag = makeGifTag(1u, GIF_FMT_IMAGE, 0u, true); // tag + 1 qword
+            std::memcpy(data + 0u, &longTag, sizeof(longTag));
+            for (uint32_t i = 16u; i < 64u; ++i)
+                data[i] = static_cast<uint8_t>(0xA0u + i);
+            std::memcpy(data + 64u, &shortTag, sizeof(shortTag));
+            std::memset(data + 80u, 0x5Au, 16u);
+            writeVuInstructionPair(code, 0u, makeVuLowerSpecial(0x6Cu, 1u), kVuUpperNop);  // XGKICK vi1 (qword 0)
+            writeVuInstructionPair(code, 8u, makeVuLowerSpecial(0x6Cu, 2u), kVuUpperNop);  // XGKICK vi2 (qword 4)
+            writeVuInstructionPair(code, 16u, 0x8000033Cu, kVuUpperNop | (1u << 30));
+            writeVuInstructionPair(code, 24u, 0x8000033Cu, kVuUpperNop);
+            VU1Interpreter vu1;
+            vu1.state().vi[1] = 0;
+            vu1.state().vi[2] = 4;
+            vu1.execute(code, PS2_VU1_CODE_SIZE, data, PS2_VU1_DATA_SIZE, gs, &mem, 0u, 0u, 0u, 200u);
+            t.Equals(captured.size(), static_cast<size_t>(2u), "two PATH1 packets");
+            if (captured.size() == 2u)
+            {
+                t.Equals(captured[0].size(), static_cast<size_t>(64u), "first packet is tag + 3 qwords");
+                t.IsTrue(std::equal(captured[0].begin(), captured[0].end(), data + 0u), "first packet bytes are its source");
+                t.Equals(captured[1].size(), static_cast<size_t>(32u), "second packet is tag + 1 qword");
+                t.IsTrue(std::equal(captured[1].begin(), captured[1].end(), data + 64u), "second packet bytes are its source");
+            }
+        });
+
         tc.Run("synthetic Code Veronica text packet preserves black-frame PATH1 data", [](TestCase &t)
         {
             PS2Memory mem;

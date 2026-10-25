@@ -4,6 +4,7 @@
 #include "runtime/gs/ps2_gs_psmct32.h"
 #include "runtime/ps2_memory.h"
 #include "runtime/ps2_vu1.h"
+#include "ps2_vu_fmac.h"
 
 #include <cmath>
 #include <cstdint>
@@ -831,6 +832,68 @@ void register_ps2_vu1_tests()
             uint32_t got = 0u;
             std::memcpy(&got, &vu1.state().vf[3][0], sizeof(got));
             t.Equals(got, 0x42546666u, "the tiny addend must not move the result");
+        });
+
+        tc.Run("VU micro ADD/SUB/MUL agree with the FMAC contract that macro mode uses", [](TestCase &t)
+        {
+            // One FMAC, two execution paths: the interpreter (host float under FE_TOWARDZERO plus vuAdd's gap rule)
+            // against ps2_vu_fmac's integer reference, on operands whose results stay in exponents 1..254. Outside
+            // that range the interpreter still clamps to 0x7F7FFFFF (evidence register 2.1), which is counted and
+            // printed rather than asserted.
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, makeVuUpper(0x28u, 0xFu, 2u, 1u, 3u)); // ADD vf3, vf1, vf2
+            writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, makeVuUpper(0x2Cu, 0xFu, 2u, 1u, 4u)); // SUB vf4, vf1, vf2
+            writeVuInstructionPair(fx.code, 16u, 0x8000033Cu, makeVuUpper(0x2Au, 0xFu, 2u, 1u, 5u) | (1u << 30)); // MUL; E
+            writeVuInstructionPair(fx.code, 24u, 0x8000033Cu, kVuUpperNop);
+            uint64_t s = 0x9E3779B97F4A7C15ull;
+            auto next = [&s]() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return static_cast<uint32_t>(s >> 16); };
+            uint32_t inRange = 0, mismatches = 0, outOfRange = 0, outOfRangeDiffer = 0;
+            std::string first;
+            for (int run = 0; run < 3000; ++run)
+            {
+                VU1Interpreter vu1;
+                uint32_t a[4], b[4];
+                for (int l = 0; l < 4; ++l)
+                {
+                    // Mostly normal operands with every exponent gap; some at the ends of the range.
+                    const bool edge = (next() & 15u) == 0u;
+                    const uint32_t ea = edge ? 250u + next() % 6u : 40u + next() % 170u;
+                    const uint32_t gap = next() % 32u;
+                    a[l] = (next() & 0x807FFFFFu) | (ea << 23);
+                    b[l] = (next() & 0x807FFFFFu) | ((ea - gap) << 23);
+                }
+                std::memcpy(vu1.state().vf[1], a, sizeof(a));
+                std::memcpy(vu1.state().vf[2], b, sizeof(b));
+                vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 64u);
+                uint32_t got[3][4];
+                std::memcpy(got[0], vu1.state().vf[3], sizeof(got[0]));
+                std::memcpy(got[1], vu1.state().vf[4], sizeof(got[1]));
+                std::memcpy(got[2], vu1.state().vf[5], sizeof(got[2]));
+                for (int l = 0; l < 4; ++l)
+                {
+                    const uint32_t want[3] = {ps2_vu_fmac::addRef(a[l], b[l]), ps2_vu_fmac::subRef(a[l], b[l]),
+                                              ps2_vu_fmac::mulRef(a[l], b[l])};
+                    for (int op = 0; op < 3; ++op)
+                    {
+                        const uint32_t e = (want[op] >> 23) & 0xFFu;
+                        const bool range = ((a[l] >> 23) & 0xFFu) != 255u && ((b[l] >> 23) & 0xFFu) != 255u && e != 255u;
+                        if (!range)
+                        {
+                            ++outOfRange;
+                            outOfRangeDiffer += got[op][l] != want[op];
+                            continue;
+                        }
+                        ++inRange;
+                        if (got[op][l] != want[op] && mismatches++ == 0)
+                            first = "op " + std::to_string(op) + " " + std::to_string(a[l]) + ", " + std::to_string(b[l]);
+                    }
+                }
+            }
+            std::printf("    micro FMAC vs contract: %u in-range results, %u outside (exponent 255), %u of those differ\n",
+                        inRange, outOfRange, outOfRangeDiffer);
+            t.Equals(mismatches, 0u, "in-range results differing from the contract (first: " + first + ")");
+            t.IsTrue(inRange > 30000u, "enough in-range results were compared");
         });
 
         tc.Run("EFU results match real-PS2 results (ps2autotests vu/lower/efu)", [](TestCase &t)

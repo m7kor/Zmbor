@@ -2005,6 +2005,50 @@ void register_ps2_vu1_tests()
                      "the underflowing product should set sticky Z and U");
         });
 
+        tc.Run("VU micro MADD keeps the two-rounding contract value when the fused exact result would overflow", [](TestCase &t)
+        {
+            // acc = -2^128, product 2^65 * 2^65 = 2^130. The contract (MA) saturates the product to 0x7FFFFFFF and then
+            // adds: (2^129 - 2^105) - 2^128 stays in range. The flag path used to compute the fused exact sum (3 * 2^128,
+            // an overflow) and overwrite the value with +max, so micro mode disagreed with macro mode.
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, makeVuUpper(0x29u, 0x8u, 2u, 1u, 3u) | (1u << 30)); // MADD.x; E
+            writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, kVuUpperNop);
+            const uint32_t acc = 0xFF800000u, a = 0x60000000u, b = 0x60000000u;
+            VU1Interpreter vu1;
+            std::memcpy(&vu1.state().acc[0], &acc, sizeof(acc));
+            std::memcpy(&vu1.state().vf[1][0], &a, sizeof(a));
+            std::memcpy(&vu1.state().vf[2][0], &b, sizeof(b));
+            vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 32u);
+            uint32_t got = 0u;
+            std::memcpy(&got, &vu1.state().vf[3][0], sizeof(got));
+            const uint32_t want = ps2_vu_fmac::addRef(acc, ps2_vu_fmac::mulRef(a, b));
+            t.Equals(got, want, "micro MADD must write the contract value (macro mode computes the same)");
+            t.Equals(vu1.state().mac & 0x8000u, 0u, "the final add does not overflow, so no current x O flag");
+        });
+
+        tc.Run("VU micro product sticky flags read exponent-255 operands as values", [](TestCase &t)
+        {
+            // MADD.x with fs = 0x7F800000 (2^128) and ft = 2: the product is 2^129, an overflow; the accumulator -2^128
+            // brings the sum back into range. Clamping fs to 0x7F7FFFFF (the old normalizeOperand) hid the product
+            // overflow: (2^129 - 2^105) < 2^129.
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, makeVuUpper(0x29u, 0x8u, 2u, 1u, 3u) | (1u << 30)); // MADD.x; E
+            writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, kVuUpperNop);
+            const uint32_t acc = 0xFF800000u, a = 0x7F800000u, b = 0x40000000u;
+            VU1Interpreter vu1;
+            std::memcpy(&vu1.state().acc[0], &acc, sizeof(acc));
+            std::memcpy(&vu1.state().vf[1][0], &a, sizeof(a));
+            std::memcpy(&vu1.state().vf[2][0], &b, sizeof(b));
+            vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 32u);
+            uint32_t got = 0u;
+            std::memcpy(&got, &vu1.state().vf[3][0], sizeof(got));
+            t.Equals(got, ps2_vu_fmac::addRef(acc, ps2_vu_fmac::mulRef(a, b)), "value follows the contract");
+            t.Equals(vu1.state().status & 0x8u, 0u, "the final sum does not overflow (no current O)");
+            t.Equals(vu1.state().status & 0x200u, 0x200u, "the product overflow sets sticky O");
+        });
+
         tc.Run("reserved opcodes stop before executing or corrupting state", [](TestCase &t)
         {
             Vu1Fixture fx;

@@ -51,10 +51,13 @@ Rules:
   Phase 5 it used host floats under `FE_TOWARDZERO` plus a local `vuAdd` A1 rule (OPMSUB lacked the A1 rule) and
   clamped exponent-255 operands and results to 0x7F7FFFFF. Unit tests compare micro mode with the integer reference:
   34,201 in-range plus 1,799 exponent-255 ADD/SUB/MUL results and 23,100 lane results over 39 other forms, all equal.
-- Micro-mode flags are still computed from a `long double` exact result (`normalizeFmacExactResult`): O at 2^129
-  (format, provisional threshold), U below 2^-126, Z, S. That is a second computation beside the value path
-  (MSVC's `long double` is a double); whether it always agrees with the value's exponent is not tested beyond the
-  existing flag tests. Open item, not changed.
+- Micro-mode flags (`fmacResultFlags`) classify an exact result taken at the contract's last rounding point: a
+  product inside MADD/MSUB/OPMSUB is the contract's truncated product, a lone sum or product is exact. O at 2^129
+  (format, provisional threshold), U below 2^-126, Z, S; product conditions go to the sticky flags. Flags never
+  rewrite the value. Before the Phase 5 release review the flag path used the fused exact sum and overwrote the
+  value on overflow/underflow/zero (MADD with acc = -2^128 and product 2^130 wrote 0x7FFFFFFF where the contract and
+  macro mode give 0x7F7FFFFF), and the product sticky flags still clamped exponent-255 operands. Which flags the
+  hardware raises in these cases is unmeasured (register 2.4).
 - Macro mode (`PS2_VADD`/`PS2_VSUB`/`PS2_VMUL`, used by every COP2 FMAC macro) calls `ps2_vu_fmac::add4/sub4/mul4`,
   the SSE2 form of `add/sub/mul` (bit-identical on the whole test corpus, in all four host rounding modes, with and
   without DAZ/FTZ; 2.9–4.2× faster than calling the scalar kernel per lane, `benchmark-methodology.md`):

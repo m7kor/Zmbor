@@ -554,6 +554,12 @@ if(PS2X_IS_VITA)
     endif()
 endif()
 
+# The PS2 arithmetic helpers emulate separately rounded multiply and add; a contracted FMA can change their results
+# (docs/architecture/vu-ee-arithmetic-semantics.md, section 4). PUBLIC so recompiled game code inherits it.
+if(NOT MSVC)
+    target_compile_options(ps2_runtime PUBLIC -ffp-contract=off)
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     EnableFastReleaseMode(ps2_runtime)
     EnableFastReleaseMode(ps2EntryRunner)

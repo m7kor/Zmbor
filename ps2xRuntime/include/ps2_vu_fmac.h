@@ -19,7 +19,20 @@
 
 #include <bit>
 #include <cstdint>
+#if defined(_MSC_VER)
+#include <intrin.h>
+#elif defined(USE_SSE2NEON) // same intrinsic source as ps2_runtime_macros.h (AArch64 builds)
+#include "sse2neon.h"
+#else
 #include <emmintrin.h>
+#endif
+
+// The arithmetic below relies on IEEE semantics (signed zeros, exact double results). GCC/Clang -ffast-math breaks
+// the EE COP1 helpers that share this header family (measured: fpenv_flag_independence on Linux), so it is refused
+// at compile time; see docs/architecture/vu-ee-arithmetic-semantics.md, section 4.
+#if defined(__FAST_MATH__)
+#error "PS2 arithmetic requires IEEE semantics: do not build the runtime or recompiled code with -ffast-math"
+#endif
 
 // The four-lane kernels must inline: MSVC otherwise emits a call that passes __m128i by pointer and spills xmm6+
 // (measured: add4 17.8 ns as a call; see docs/architecture/benchmark-methodology.md).

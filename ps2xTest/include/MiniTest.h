@@ -5,6 +5,10 @@
 #include <map>
 #include <iostream>
 #include <exception>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <type_traits>
 
 class TestCase;
 using TestRunnerCallback = std::function<void(TestCase&)>;
@@ -32,8 +36,40 @@ public:
     {
         if (!(a == b))
         {
-            m_failReason.emplace_back(message);
+            m_failReason.emplace_back(message + describeMismatch(a, b));
         }
+    }
+
+    // " (got X, expected Y)" for numbers; floats also as bits, so a failure log alone shows the difference.
+    template<typename T, typename B>
+    static std::string describeMismatch(const T& a, const B& b)
+    {
+        if constexpr (std::is_arithmetic_v<T> && std::is_arithmetic_v<B>)
+            return " (got " + describeValue(a) + ", expected " + describeValue(b) + ")";
+        else
+            return {};
+    }
+
+    template<typename V>
+    static std::string describeValue(V v)
+    {
+        char text[64];
+        if constexpr (std::is_same_v<V, float>)
+        {
+            uint32_t bits = 0;
+            std::memcpy(&bits, &v, sizeof(bits));
+            std::snprintf(text, sizeof(text), "%.9g [%08x]", static_cast<double>(v), bits);
+        }
+        else if constexpr (std::is_floating_point_v<V>)
+            std::snprintf(text, sizeof(text), "%.17g", static_cast<double>(v));
+        else if constexpr (std::is_same_v<V, bool>)
+            std::snprintf(text, sizeof(text), "%s", v ? "true" : "false");
+        else if constexpr (std::is_signed_v<V>)
+            std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(v));
+        else
+            std::snprintf(text, sizeof(text), "%llu [0x%llx]", static_cast<unsigned long long>(v),
+                          static_cast<unsigned long long>(v));
+        return text;
     }
 
     inline void IsTrue(bool condition, const std::string& message)

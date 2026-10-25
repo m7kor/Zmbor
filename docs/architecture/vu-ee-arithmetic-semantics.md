@@ -71,19 +71,24 @@ Rules:
 
 ## 4. Host floating-point environment
 
-Host-float emulation of PS2 arithmetic is only valid with strict IEEE compilation:
+Policy (enforced or measured; ctest label `fpenv`):
 
-- No `/fp:fast` (MSVC) or `-ffast-math` (GCC/Clang). Measured: the legacy macro path compiled with `/fp:fast`
-  produced a different result for the same operands inside a loop than in isolation (`e5eadc34` for
-  `9ed6597e + 471482b6`, whose sum is `471482b6`), and the generator's operand sequence itself changed.
-- No reliance on a global rounding mode that the compiler is not told about: code that calls `fesetround` must be
-  compiled so the compiler honours it (MSVC `/fp:precise` does not honour `fesetround` for constant folding; use
-  `#pragma fenv_access` or keep such code free of foldable constants).
+| compiler | flags | status |
+|---|---|---|
+| MSVC | `/fp:fast /arch:AVX2` (release `EnableFastReleaseMode`) vs `/fp:precise` | **measured identical** for every production helper (EE ADD/SUB/MUL/DIV/SQRT/RSQRT/MADD, VU VADD/VMUL) over 1M operands (`fpenv_flag_independence`) |
+| GCC/Clang | `-ffast-math` | **refused**: `ps2_vu_fmac.h` stops the build (`#error`, negative test `fpenv_fastmath_rejected`). Measured on CI before the guard: EE ADD.S/SUB.S/DIV.S/RSQRT.S/MADD.S results change; the VU FMAC paths do not |
+| GCC/Clang | FMA contraction | `ps2_runtime` imposes `-ffp-contract=off` PUBLICly (recompiled code inherits it); the effect of contraction itself is not measured |
+| GCC/Clang | `-O0` vs `-O3 -mavx2 -mfma` (contraction off) | compared by `fpenv_flag_independence` on CI |
+| all | host rounding mode, DAZ/FTZ | the VU FMAC lowerings are independent of both (unit test over all four modes, with and without DAZ/FTZ). The EE helpers assume round-to-nearest; the VU interpreter sets FE_TOWARDZERO for its own code |
 
-The release configuration (`ps2xRuntime/cmake/ReleaseMode.cmake`) used `/fp:fast` for `ps2_runtime`,
-`ps2EntryRunner` (which compiles the generated game code) and `ps2x_tests`. The hardware-result tests compile their
-generated code without it, so the configuration validated against real-PS2 output was not the one shipped on
-Windows, and Linux builds (no fast-math) could compute different PS2 results from Windows builds.
+- The legacy (pre-Phase-5) macro path was flag-sensitive: with `/fp:fast` it gave a different result for the same
+  operands inside a loop than in isolation (`e5eadc34` for `9ed6597e + 471482b6`, whose sum is `471482b6`).
+- Code that calls `fesetround` must not rely on the compiler honouring it for constant folding (MSVC `/fp:precise`
+  does not); keep such code free of foldable constants.
+- No result above says shipped builds computed wrong PS2 results: the measured flag-sensitive cases were the legacy
+  macro path and GCC/Clang `-ffast-math`, which no production configuration used.
+- `EnableFastReleaseMode` is applied only for single-config `CMAKE_BUILD_TYPE=Release`; multi-config (Visual Studio
+  generator) builds, including CI, use the default `/O2` flags.
 
 ## 5. EE COP1 contract (unchanged in Phase 5)
 

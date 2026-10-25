@@ -12,8 +12,8 @@ built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-m
   `D:\Project\Zmbor\hwtest_work\gen5`; reports `p5_base`, `p5_wip`, `p5_micro`, `p5_perf` (`.json/.md`) in
   `hwtest_work`. Full gate script used: scratchpad `gate5.ps1` (build, `ctest -L hwtest`, report against
   `p5_base.json`, `ps2x_tests`, `ctest -LE hwtest`, IOP ctest).
-- Measured at the branch head (Windows MSVC): hardware tests 53/55 exact, 8203/8250 lines, no regressions vs
-  `20f1a97`; `ps2x_tests` 538/538; ctest (non-hwtest) 52/52; `ps2xIOP` 4/4. No physical PS2 and
+- Measured at the branch head (Windows MSVC): hardware tests 53/55 exact, 8202/8250 lines (exact-source gate on `d8ac102`), no regressions vs
+  `20f1a97`; `ps2x_tests` 541/541; ctest (non-hwtest) 52/52; e2e 4/4; `ps2xIOP` 4/4. No physical PS2 and
   no ps2sdk toolchain were available: no new hardware measurement exists; every probe is `UNMEASURED`.
 - Architecture documents (start here): `docs/architecture/evidence-register.md` (every model with its evidence),
   `vu-ee-arithmetic-semantics.md` (VU FMAC contract, lowerings, FP policy in section 4), `hardware-probes.md` (probe

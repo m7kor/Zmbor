@@ -46,10 +46,15 @@ Rules:
 
 ### Lowering
 
-- The micro interpreter computes with host floats under `FE_TOWARDZERO`, plus `vuAdd`'s A1 rule. It agrees with
-  the reference on 34,201 of 34,201 in-range results (the micro test in `ps2_vu1_tests.cpp`). For exponent-255
-  operands or results it still clamps to 0x7F7FFFFF, which the format (section 2) contradicts. Moving micro mode onto
-  the shared lowering is the next step.
+- The micro interpreter (`ps2_vu1_upper.cpp`) calls the same `ps2_vu_fmac::addf/subf/mulf` at all 58 FMAC sites
+  (ADD/SUB/MUL/MADD/MSUB with vt/bc/q/i operands, their ACC forms, OPMULA/OPMSUB) on the raw registers. Before
+  Phase 5 it used host floats under `FE_TOWARDZERO` plus a local `vuAdd` A1 rule (OPMSUB lacked the A1 rule) and
+  clamped exponent-255 operands and results to 0x7F7FFFFF. Unit tests compare micro mode with the integer reference:
+  34,201 in-range plus 1,799 exponent-255 ADD/SUB/MUL results and 23,100 lane results over 39 other forms, all equal.
+- Micro-mode flags are still computed from a `long double` exact result (`normalizeFmacExactResult`): O at 2^129
+  (format, provisional threshold), U below 2^-126, Z, S. MSVC's `long double` is a double, so that exact result is
+  exact only while the sum needs at most 53 bits; values and flags can therefore disagree only at gaps of 25..29
+  on the U/Z boundary, which no test reaches (noted, not changed).
 - Macro mode (`PS2_VADD`/`PS2_VSUB`/`PS2_VMUL`, used by every COP2 FMAC macro) now calls `ps2_vu_fmac::add/sub/mul`
   per lane:
   - an exponent gap of 25 or more selects the larger operand;

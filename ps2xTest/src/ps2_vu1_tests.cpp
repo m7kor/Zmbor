@@ -836,10 +836,9 @@ void register_ps2_vu1_tests()
 
         tc.Run("VU micro ADD/SUB/MUL agree with the FMAC contract that macro mode uses", [](TestCase &t)
         {
-            // One FMAC, two execution paths: the interpreter (host float under FE_TOWARDZERO plus vuAdd's gap rule)
-            // against ps2_vu_fmac's integer reference, on operands whose results stay in exponents 1..254. Outside
-            // that range the interpreter still clamps to 0x7F7FFFFF (evidence register 2.1), which is counted and
-            // printed rather than asserted.
+            // One FMAC, two implementations: the interpreter (ps2_vu_fmac's double-based lowering) against its integer
+            // reference, on operands whose results stay in exponents 1..254. Outside that range the interpreter used to
+            // clamp to 0x7F7FFFFF; since Phase 5 it follows the same contract there too.
             Vu1Fixture fx;
             t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
             writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, makeVuUpper(0x28u, 0xFu, 2u, 1u, 3u)); // ADD vf3, vf1, vf2
@@ -893,7 +892,105 @@ void register_ps2_vu1_tests()
             std::printf("    micro FMAC vs contract: %u in-range results, %u outside (exponent 255), %u of those differ\n",
                         inRange, outOfRange, outOfRangeDiffer);
             t.Equals(mismatches, 0u, "in-range results differing from the contract (first: " + first + ")");
+            t.Equals(outOfRangeDiffer, 0u, "exponent-255 results differing from the contract (micro mode no longer clamps)");
             t.IsTrue(inRange > 30000u, "enough in-range results were compared");
+        });
+
+        tc.Run("VU micro FMAC broadcast/Q/I/accumulator/outer-product forms follow the FMAC contract", [](TestCase &t)
+        {
+            // Every FMAC form other than plain ADD/SUB/MUL, one instruction per run, against compositions of the
+            // integer reference (MADD/MSUB round the product, then the sum). Operands: vf1 (fs), vf2 (ft), ACC, Q, I.
+            enum Src { BC, Q, I, VT };
+            enum Kind { ADD, SUB, MUL, MADD, MSUB, OPMUL, OPMSUB };
+            struct Form { const char *name; uint8_t op; bool special; Kind kind; Src src; bool toAcc; };
+            const Form forms[] = {
+                {"ADDbc", 0x00, false, ADD, BC, false}, {"SUBbc", 0x04, false, SUB, BC, false},
+                {"MADDbc", 0x08, false, MADD, BC, false}, {"MSUBbc", 0x0C, false, MSUB, BC, false},
+                {"MULbc", 0x18, false, MUL, BC, false}, {"MULq", 0x1C, false, MUL, Q, false},
+                {"MULi", 0x1E, false, MUL, I, false}, {"ADDq", 0x20, false, ADD, Q, false},
+                {"MADDq", 0x21, false, MADD, Q, false}, {"ADDi", 0x22, false, ADD, I, false},
+                {"MADDi", 0x23, false, MADD, I, false}, {"SUBq", 0x24, false, SUB, Q, false},
+                {"MSUBq", 0x25, false, MSUB, Q, false}, {"SUBi", 0x26, false, SUB, I, false},
+                {"MSUBi", 0x27, false, MSUB, I, false}, {"MADD", 0x29, false, MADD, VT, false},
+                {"MSUB", 0x2D, false, MSUB, VT, false}, {"OPMSUB", 0x2E, false, OPMSUB, VT, false},
+                {"ADDAbc", 0x00, true, ADD, BC, true}, {"SUBAbc", 0x04, true, SUB, BC, true},
+                {"MADDAbc", 0x08, true, MADD, BC, true}, {"MSUBAbc", 0x0C, true, MSUB, BC, true},
+                {"MULAbc", 0x18, true, MUL, BC, true}, {"MULAq", 0x1C, true, MUL, Q, true},
+                {"MULAi", 0x1E, true, MUL, I, true}, {"ADDAq", 0x20, true, ADD, Q, true},
+                {"MADDAq", 0x21, true, MADD, Q, true}, {"ADDAi", 0x22, true, ADD, I, true},
+                {"MADDAi", 0x23, true, MADD, I, true}, {"SUBAq", 0x24, true, SUB, Q, true},
+                {"MSUBAq", 0x25, true, MSUB, Q, true}, {"SUBAi", 0x26, true, SUB, I, true},
+                {"MSUBAi", 0x27, true, MSUB, I, true}, {"ADDA", 0x28, true, ADD, VT, true},
+                {"MADDA", 0x29, true, MADD, VT, true}, {"MULA", 0x2A, true, MUL, VT, true},
+                {"SUBA", 0x2C, true, SUB, VT, true}, {"MSUBA", 0x2D, true, MSUB, VT, true},
+                {"OPMULA", 0x2E, true, OPMUL, VT, true},
+            };
+            uint64_t s = 0xD1B54A32D192ED03ull;
+            auto next = [&s]() { s ^= s << 13; s ^= s >> 7; s ^= s << 17; return static_cast<uint32_t>(s >> 16); };
+            auto operand = [&next](uint32_t exponent) { return (next() & 0x807FFFFFu) | (exponent << 23); };
+            uint32_t compared = 0, mismatches = 0;
+            std::string first;
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+            for (const Form &f : forms)
+            {
+                for (int run = 0; run < 150; ++run)
+                {
+                    const uint8_t bc = static_cast<uint8_t>(next() & 3u);
+                    const uint8_t op = static_cast<uint8_t>(f.op | (f.src == BC ? bc : 0u));
+                    // Special group: selector = bits 1:0 | bits 10:6 << 2, low op 0x3C..0x3F; ACC forms have no vd.
+                    const uint32_t upper = f.special
+                        ? makeVuUpper(static_cast<uint8_t>(0x3Cu | (op & 3u)), 0xFu, 2u, 1u, static_cast<uint8_t>(op >> 2))
+                        : makeVuUpper(op, f.kind == OPMSUB ? 0xEu : 0xFu, 2u, 1u, 3u);
+                    writeVuInstructionPair(fx.code, 0u, 0x8000033Cu, upper | (1u << 30));
+                    writeVuInstructionPair(fx.code, 8u, 0x8000033Cu, kVuUpperNop);
+                    // Exponents base +-15 (accumulator near the product's), so every product and sum stays in 1..254.
+                    const uint32_t base = 80u + next() % 90u;
+                    uint32_t a[4], b[4], acc[4], dst[4] = {0x11111111u, 0x22222222u, 0x33333333u, 0x44444444u};
+                    for (int l = 0; l < 4; ++l)
+                    {
+                        a[l] = operand(base + next() % 16u);
+                        b[l] = operand(base - next() % 16u);
+                        acc[l] = operand(2u * base - 127u + 16u - next() % 33u);
+                    }
+                    const uint32_t q = operand(base - next() % 16u), i = operand(base - next() % 16u);
+                    VU1Interpreter vu1;
+                    std::memcpy(vu1.state().vf[1], a, sizeof(a));
+                    std::memcpy(vu1.state().vf[2], b, sizeof(b));
+                    std::memcpy(vu1.state().vf[3], dst, sizeof(dst));
+                    std::memcpy(vu1.state().acc, acc, sizeof(acc));
+                    std::memcpy(&vu1.state().q, &q, sizeof(q));
+                    std::memcpy(&vu1.state().i, &i, sizeof(i));
+                    vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 32u);
+                    uint32_t got[4];
+                    std::memcpy(got, f.toAcc ? vu1.state().acc : vu1.state().vf[3], sizeof(got));
+                    for (int l = 0; l < (f.kind == OPMUL || f.kind == OPMSUB ? 3 : 4); ++l)
+                    {
+                        const uint32_t rhs = f.src == BC ? b[bc] : f.src == Q ? q : f.src == I ? i : b[l];
+                        uint32_t want = 0u;
+                        switch (f.kind)
+                        {
+                        case ADD: want = ps2_vu_fmac::addRef(a[l], rhs); break;
+                        case SUB: want = ps2_vu_fmac::subRef(a[l], rhs); break;
+                        case MUL: want = ps2_vu_fmac::mulRef(a[l], rhs); break;
+                        case MADD: want = ps2_vu_fmac::addRef(acc[l], ps2_vu_fmac::mulRef(a[l], rhs)); break;
+                        case MSUB: want = ps2_vu_fmac::subRef(acc[l], ps2_vu_fmac::mulRef(a[l], rhs)); break;
+                        case OPMUL: want = ps2_vu_fmac::mulRef(a[(l + 1) % 3], b[(l + 2) % 3]); break;
+                        case OPMSUB:
+                            want = ps2_vu_fmac::subRef(acc[l], ps2_vu_fmac::mulRef(a[(l + 1) % 3], b[(l + 2) % 3]));
+                            break;
+                        }
+                        ++compared;
+                        if (got[l] != want && mismatches++ == 0)
+                            first = std::string(f.name) + " lane " + std::to_string(l);
+                    }
+                    if (f.kind == OPMSUB)
+                        t.Equals(got[3], dst[3], "OPMSUB writes only xyz");
+                }
+            }
+            std::printf("    micro FMAC forms vs contract: %u lane results over %zu forms\n", compared,
+                        sizeof(forms) / sizeof(forms[0]));
+            t.Equals(mismatches, 0u, "FMAC form results differing from the contract (first: " + first + ")");
         });
 
         tc.Run("EFU results match real-PS2 results (ps2autotests vu/lower/efu)", [](TestCase &t)
@@ -1843,8 +1940,12 @@ void register_ps2_vu1_tests()
             writeVuInstructionPair(fx.code, 0u, 0u,
                                    makeVuUpper(0x2Au, 0xFu, 2u, 1u, 3u));
 
+            // Phase 5: exponent 255 holds values (evidence register 2.1), so the largest VU value is 0x7FFFFFFF and a
+            // result overflows at 2^129. The original operands (FLT_MAX * 2 = 0x7FFFFFFF exactly) no longer overflow;
+            // 0x7FFFFFFF * 2 = 2^129 does. Which exact magnitude sets O is provisional (no FMAC flag hardware row).
             VU1Interpreter vu1;
-            vu1.state().vf[1][0] = std::numeric_limits<float>::max();
+            const uint32_t psMax = 0x7FFFFFFFu;
+            std::memcpy(&vu1.state().vf[1][0], &psMax, sizeof(psMax));
             vu1.state().vf[1][1] = std::numeric_limits<float>::min();
             vu1.state().vf[1][2] = -2.0f;
             vu1.state().vf[1][3] = 0.0f;
@@ -1861,10 +1962,20 @@ void register_ps2_vu1_tests()
                      "MUL should report x overflow, y underflow+zero, z sign and w zero");
             t.Equals(vu1.state().status, 0x3CFu,
                      "current and sticky status should summarize Z/S/U/O");
-            t.Equals(vu1.state().vf[3][0], std::numeric_limits<float>::max(),
-                     "overflow should clamp to the largest finite VU value");
+            uint32_t x = 0u;
+            std::memcpy(&x, &vu1.state().vf[3][0], sizeof(x));
+            t.Equals(x, 0x7FFFFFFFu, "overflow saturates to the largest VU value, 0x7FFFFFFF");
             t.Equals(vu1.state().vf[3][1], 0.0f,
                      "underflow should flush to signed zero before writeback");
+
+            // FLT_MAX * 2 is (2 - 2^-23) * 2^128: an exponent-255 value, written without O.
+            VU1Interpreter vu2;
+            vu2.state().vf[1][0] = std::numeric_limits<float>::max();
+            vu2.state().vf[2][0] = 2.0f;
+            vu2.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 5u);
+            std::memcpy(&x, &vu2.state().vf[3][0], sizeof(x));
+            t.Equals(x, 0x7FFFFFFFu, "FLT_MAX * 2 is the exponent-255 value 0x7FFFFFFF");
+            t.Equals(vu2.state().mac & 0x8000u, 0u, "and it is not an overflow");
         });
 
         tc.Run("FMAC product contributes Z/S/U/O sticky flags", [](TestCase &t)

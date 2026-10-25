@@ -3,6 +3,8 @@
 #include "runtime/gs/gs_frontend.h"
 #include "runtime/ps2_memory.h"
 #include "ps2_vu1_detail.h"
+#include "ps2_vu_fmac.h"
+#include <bit>
 
 #include <algorithm>
 #include <cfenv>
@@ -227,9 +229,10 @@ bool VU1Interpreter::calculateFmacExactResult(uint32_t component,
     const uint8_t fs = FS(upper);
     const uint8_t ft = FT(upper);
 
-    const auto operand = [this](float value)
+    // Raw register value as the FMAC reads it (exponent 0 = zero, exponent 255 = a value), as ps2_vu_fmac does.
+    const auto operand = [](float value)
     {
-        return static_cast<long double>(normalizeOperand(value));
+        return static_cast<long double>(ps2_vu_fmac::toDouble(std::bit_cast<uint32_t>(value)));
     };
     const auto vs = [&](uint32_t lane)
     {
@@ -402,9 +405,12 @@ bool VU1Interpreter::calculateFmacExactResult(uint32_t component,
 uint8_t VU1Interpreter::normalizeFmacExactResult(float &value,
                                                   long double exactResult) const
 {
+    // Flags from the exact result; the value itself already follows ps2_vu_fmac (truncated, saturated, flushed).
+    // Exponent 255 holds values, so a result overflows only at 2^129 and saturates to +-0x7FFFFFFF (evidence register
+    // 2.1; which exact magnitude sets O is provisional: no hardware row observes FMAC MAC flags).
     const bool negative = std::signbit(exactResult);
     const long double magnitude = std::fabs(exactResult);
-    const long double maximum = static_cast<long double>(std::numeric_limits<float>::max());
+    const long double maximum = 0x1p129L;
     const long double minimum = static_cast<long double>(std::numeric_limits<float>::min());
     uint8_t flags = negative ? 0x2u : 0u;
 
@@ -414,10 +420,10 @@ uint8_t VU1Interpreter::normalizeFmacExactResult(float &value,
         flags |= 0x1u;
         std::memcpy(&value, &bits, sizeof(value));
     }
-    else if (magnitude > maximum)
+    else if (magnitude >= maximum)
     {
         flags |= 0x8u;
-        bits |= 0x7F7FFFFFu;
+        bits |= 0x7FFFFFFFu;
         std::memcpy(&value, &bits, sizeof(value));
     }
     else if (magnitude < minimum)

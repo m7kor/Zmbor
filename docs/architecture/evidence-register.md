@@ -66,17 +66,19 @@ negative). Underflow and inexact are not modelled (gap).
 - Exponent-255 **operands** are values, not clamped: `ERSQRT CVF_MAX_EXP` (0x7F800001) gives 0x1F800000 = 2^-64
   = 1/sqrt(2^128), and `ERSQRT CVF_MAX` (0x7FFFFFFF) gives 0x1F3504F3 = 1/sqrt(~6.8e38); an operand clamped to
   0x7F7FFFFF would give ~0x1F7FFFFF in both (A). This is measured for EFU operand reads.
-- The micro interpreter clamps exponent-255 operands (`normalizeOperand`) and FMAC results to 0x7F7FFFFF; both
-  contradict the format above. That the FMAC reads the same register format the same way is architectural (same
-  VF registers), not measured on an FMAC row.
+- Until Phase 5 the micro interpreter clamped exponent-255 FMAC operands (`normalizeOperand`) and results to
+  0x7F7FFFFF, contradicting the format above. Since Phase 5 micro FMAC arithmetic reads raw registers and saturates
+  at 2^129 like macro mode (`ps2_vu_fmac`); MAX/MINI/ABS/ITOF/FTOI still use the normalized operands (not audited).
+  That the FMAC reads the register format as the EFU does is architectural (same VF registers), not measured on an
+  FMAC row. The O flag threshold (2^129) follows from the format; no hardware row observes FMAC MAC flags.
 
 ### 2.2 FMAC ADD/SUB/MADD/MSUB — established for micro mode
 - Truncation toward zero: experiment E2 (micro rounding switched to nearest) breaks vu/games/triace (3/5) and
   nothing else (A).
 - An operand 25 or more exponent steps below the other is dropped, whatever its sign: experiment E4 (rule removed)
   breaks triace (4/5) (A).
-- Below a gap of 25 the exact sum is truncated (host IEEE toward zero); the data does not test shifted-out bits at
-  gaps 1-24 with opposite signs (provisional, probes P4).
+- Below a gap of 25 the exact sum is truncated toward zero (`ps2_vu_fmac::addRef`); the data does not test
+  shifted-out bits at gaps 1-24 with opposite signs (provisional; no probe generated yet).
 - MADD/MSUB round twice (product truncated, then the gap-rule add); fits all VU tests, not isolated (provisional).
 
 ### 2.3 FMAC MUL — provisional
@@ -86,7 +88,10 @@ the EE COP1 operand-order asymmetry (1.3) is untested (probe P4).
 ### 2.4 Macro mode (COP2 in EE code) vs micro mode — architectural; was a gap
 VU0 macro instructions execute on VU0's FMAC, so they must follow 2.2/2.3. Until Phase 5 they did not: macro mode
 rounded to nearest, had no gap rule, kept exponent-255 values while micro clamped them to 0x7F7FFFFF, and updated
-no MAC/STATUS flags. Phase 5 puts both modes on one FMAC contract (`docs/architecture/vu-ee-arithmetic-semantics.md`).
+no MAC/STATUS flags. Phase 5 puts both modes on one FMAC contract (`docs/architecture/vu-ee-arithmetic-semantics.md`): macro mode
+through `ps2_vfmac`, micro mode through the same `ps2_vu_fmac` kernels at all 58 FMAC sites (unit tests compare 39
+micro forms and plain ADD/SUB/MUL with the integer reference; mutants of OPMSUB, MADDAq, raw operands and the
+overflow threshold are killed; a host-float product under FE_TOWARDZERO is an equivalent mutant in range).
 There is no hardware vector for macro-mode arithmetic itself (cpu/vu0_macro covers integer ops and transfers only).
 MAC/STATUS flags in macro mode remain a gap.
 

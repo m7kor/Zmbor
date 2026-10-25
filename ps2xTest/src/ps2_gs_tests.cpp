@@ -3949,6 +3949,36 @@ void register_ps2_gs_tests()
                      "triangle fan quad should light at least one framebuffer row");
         });
 
+        tc.Run("sceGsExecLoadImage fails cleanly when the runtime arena is exhausted", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "runtime memory initialize should succeed");
+            uint8_t *const rdram = runtime.memory().getRDRAM();
+            constexpr uint32_t kImageAddr = 0x4000u;
+            constexpr uint32_t kSrcAddr = 0x5000u;
+            constexpr uint32_t kHeapBase = 0x00180000u;
+            constexpr uint32_t kHeapEnd = 0x00190000u;
+            runtime.configureGuestHeap(kHeapBase, kHeapEnd);
+            std::memset(rdram + kHeapBase, 0xA5, kHeapEnd - kHeapBase);
+
+            const GsImageMem image{0u, 0u, 2u, 2u, 0u, 1u, 0u};
+            writeGsImageTest(rdram, kImageAddr, image);
+            const uint32_t arena =
+                runtime.runtimeMalloc(PS2Runtime::kRuntimeArenaEnd - PS2Runtime::kRuntimeArenaBase, 16u);
+            t.Equals(arena, PS2Runtime::kRuntimeArenaBase, "the test takes the whole arena");
+
+            R5900Context ctx{};
+            setRegU32(ctx, 4, kImageAddr);
+            setRegU32(ctx, 5, kSrcAddr);
+            ps2_stubs::sceGsExecLoadImage(rdram, &ctx, &runtime);
+            t.Equals(static_cast<int32_t>(getRegU32Test(ctx, 2)), -1, "the stub reports failure");
+            bool untouched = true;
+            for (uint32_t i = kHeapBase; i < kHeapEnd; ++i)
+                untouched = untouched && rdram[i] == 0xA5u;
+            t.IsTrue(untouched, "no packet was built in the guest heap");
+            runtime.runtimeFree(arena);
+        });
+
         tc.Run("sceGsExecLoadImage and sceGsExecStoreImage roundtrip and free guest packets", [](TestCase &t)
         {
             PS2Runtime runtime;

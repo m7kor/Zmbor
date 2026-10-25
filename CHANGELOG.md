@@ -192,6 +192,8 @@ and was mutation-checked.
 - Runtime memory ownership (memory/ee/default): the heap set up with size -1 now ends at the main thread's stack
   (30 MB fit, 32 MB do not, as on hardware). Runtime-owned allocations and the HLE RPC/TLS/boot-mode pools moved to
   the EE kernel area (0x00020000-0x00080000) so they cannot overlap the program's sbrk heap.
+  When the arena is full, runtimeMalloc fails (HLE calls report failure) instead of borrowing guest-heap blocks the
+  program's sbrk also hands out; an ELF segment inside that area disables the arena with a warning.
 - COP0 performance counters: PCCR write mask, PCR0/PCR1 selection, and processor-cycle counting gated by CTE and the
   current mode's bit, from the scheduler's guest cycle count (not host time; not cycle-accurate).
 - FPU MUL.S/MULA/MADD/MSUB: the product is truncated and the multiplier is not commutative (1.0 * 0x3FFFFFFF =

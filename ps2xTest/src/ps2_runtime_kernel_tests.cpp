@@ -1009,11 +1009,94 @@ void register_ps2_runtime_kernel_tests()
             env.runtime.runtimeFree(runtimeBlock);
             t.Equals(env.runtime.runtimeMalloc(0x100u, 64u), runtimeBlock, "runtimeFree makes the block reusable");
 
-            // A request larger than the arena still succeeds deterministically, from the guest heap.
-            const uint32_t huge = env.runtime.runtimeMalloc(PS2Runtime::kRuntimeArenaEnd, 16u);
-            t.IsTrue(huge >= 0x00180000u && huge < 0x00190000u || huge == 0u,
-                     "an arena overflow falls back to the guest heap (or fails when that is full too)");
-            env.runtime.runtimeFree(huge);
+            env.runtime.runtimeFree(runtimeBlock);
+        });
+
+        tc.Run("an exhausted runtime arena fails cleanly and never touches guest memory", [](TestCase &t)
+        {
+            // The program's own sbrk hands out the guest heap from its base without telling the runtime, so a
+            // runtime block there would overlap the program's first malloc. Exhaustion must fail instead.
+            TestEnv env;
+            constexpr uint32_t kHeapBase = 0x00180000u;
+            constexpr uint32_t kHeapEnd = 0x00190000u;
+            env.runtime.configureGuestHeap(kHeapBase, kHeapEnd);
+            std::memset(env.rdram.data() + kHeapBase, 0xA5, kHeapEnd - kHeapBase); // "guest data"
+
+            constexpr uint32_t kArenaSize = PS2Runtime::kRuntimeArenaEnd - PS2Runtime::kRuntimeArenaBase;
+            t.Equals(env.runtime.runtimeMalloc(kArenaSize + 16u, 16u), 0u, "a request larger than the arena fails");
+            const uint32_t all = env.runtime.runtimeMalloc(kArenaSize, 16u);
+            t.Equals(all, PS2Runtime::kRuntimeArenaBase, "the whole arena can be taken");
+            t.Equals(env.runtime.runtimeMalloc(16u, 16u), 0u, "the next request fails: no fallback");
+            t.Equals(env.runtime.guestMalloc(16u, 16u), kHeapBase, "the guest heap allocator was not used");
+            bool untouched = true;
+            const uint8_t *heap = env.rdram.data() + kHeapBase;
+            for (uint32_t i = 0; i < kHeapEnd - kHeapBase; ++i)
+                untouched = untouched && heap[i] == 0xA5;
+            t.IsTrue(untouched, "guest heap bytes are unchanged");
+            env.runtime.runtimeFree(kHeapBase); // a guest address is not a runtime block: ignored
+            t.Equals(env.runtime.guestMalloc(16u, 16u), kHeapBase + 16u, "runtimeFree did not free guest blocks");
+            env.runtime.runtimeFree(all);
+            t.Equals(env.runtime.runtimeMalloc(16u, 16u), PS2Runtime::kRuntimeArenaBase, "freed space is reusable");
+        });
+
+        tc.Run("runtime arena allocation is aligned, reusable and coalesces fragments", [](TestCase &t)
+        {
+            TestEnv env;
+            for (uint32_t alignment : {16u, 64u, 256u, 4096u})
+            {
+                const uint32_t a = env.runtime.runtimeMalloc(0x30u, alignment);
+                t.IsTrue(a != 0u && (a % alignment) == 0u, "aligned to " + std::to_string(alignment));
+                t.IsTrue(a >= PS2Runtime::kRuntimeArenaBase && a + 0x30u <= PS2Runtime::kRuntimeArenaEnd, "inside the arena");
+                env.runtime.runtimeFree(a);
+            }
+
+            const uint32_t first = env.runtime.runtimeMalloc(0x200u, 16u);
+            bool stable = true;
+            for (int i = 0; i < 1000; ++i)
+            {
+                env.runtime.runtimeFree(first);
+                stable = stable && env.runtime.runtimeMalloc(0x200u, 16u) == first;
+            }
+            t.IsTrue(stable, "1000 free/alloc cycles reuse the same block (no leak)");
+            env.runtime.runtimeFree(first);
+
+            // Fragment: 8 blocks, free every other one; a request larger than one hole goes after the blocks.
+            uint32_t blocks[8];
+            for (uint32_t &b : blocks)
+                b = env.runtime.runtimeMalloc(0x1000u, 16u);
+            for (int i = 0; i < 8; i += 2)
+                env.runtime.runtimeFree(blocks[i]);
+            const uint32_t big = env.runtime.runtimeMalloc(0x1800u, 16u);
+            t.IsTrue(big >= blocks[7] + 0x1000u, "a request larger than every hole is not split across holes");
+            t.Equals(env.runtime.runtimeMalloc(0x1000u, 16u), blocks[0], "a hole of the right size is reused");
+            env.runtime.runtimeFree(blocks[0]);
+            env.runtime.runtimeFree(big);
+            for (int i = 1; i < 8; i += 2)
+                env.runtime.runtimeFree(blocks[i]);
+            constexpr uint32_t kArenaSize = PS2Runtime::kRuntimeArenaEnd - PS2Runtime::kRuntimeArenaBase;
+            t.Equals(env.runtime.runtimeMalloc(kArenaSize, 16u), PS2Runtime::kRuntimeArenaBase,
+                     "after freeing everything the fragments coalesce into the whole arena");
+        });
+
+        tc.Run("an ELF segment inside the runtime's reserved area disables the arena", [](TestCase &t)
+        {
+            {
+                TestEnv env;
+                env.runtime.noteGuestSegment(0x00100000u, 0x00180000u);
+                env.runtime.noteGuestSegment(0x00000000u, PS2Runtime::kRuntimeArenaBase);    // ends at the arena
+                env.runtime.noteGuestSegment(PS2Runtime::kRuntimeReservedEnd, 0x00090000u); // starts after the pools
+                t.IsTrue(env.runtime.runtimeArenaAvailable(), "segments outside 0x20000-0x80000 leave the arena");
+                t.IsTrue(env.runtime.runtimeMalloc(16u, 16u) != 0u, "and it allocates");
+            }
+            for (const auto &[start, end] : {std::pair<uint32_t, uint64_t>{0x00010000u, 0x00020010u},
+                                             std::pair<uint32_t, uint64_t>{0x0007FFF0u, 0x00100000u},
+                                             std::pair<uint32_t, uint64_t>{0x00030000u, 0x00031000u}})
+            {
+                TestEnv env;
+                env.runtime.noteGuestSegment(start, end);
+                t.IsFalse(env.runtime.runtimeArenaAvailable(), "an overlapping segment disables the arena");
+                t.Equals(env.runtime.runtimeMalloc(16u, 16u), 0u, "and runtime allocations fail");
+            }
         });
 
         tc.Run("memalign stubs allocate aligned guest memory", [](TestCase &t)

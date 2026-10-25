@@ -541,6 +541,16 @@ namespace ps2_syscalls
         setReturnU32(ctx, sp);
     }
 
+    // The fixed HLE pools fill the reserved EE kernel area right after the runtime arena, and never overlap it.
+    static_assert(kRpcPacketPoolBase == PS2Runtime::kRuntimeArenaEnd, "HLE pools start where the runtime arena ends");
+    static_assert(kRpcPacketPoolBase + kRpcPacketPoolBytes <= kRpcServerPoolBase &&
+                      kRpcServerPoolBase + kRpcServerPoolBytes <= kTlsPoolBase &&
+                      kTlsPoolBase + kTlsPoolBytes <= kBootModePoolBase &&
+                      kBootModePoolBase + kBootModePoolBytes <= PS2Runtime::kRuntimeReservedEnd,
+                  "HLE pools are disjoint and stay inside the reserved area");
+    static_assert(kGuestSyscallTablePhysBase + 0x400u <= PS2Runtime::kRuntimeArenaBase,
+                  "the syscall table mirror stays below the runtime arena");
+
     // 0x3D SetupHeap: returns heap base/start pointer
     void SetupHeap(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {

@@ -3,17 +3,34 @@
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
 built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
-## Phase 4 (local, not pushed)
+## Phase 4 (pushed; draft PR #2 open, not merged)
 
-- Worktree `D:\Project\Zmbor\wt-phase4`, branch `ultimate/phase4-hardware-accuracy`, four commits on Zmbor
-  `main` `00173a2`: `3d935f4` (branch in a delay slot), `a7449bb` (heap ownership), `f81312d` (COP0 performance
-  counters), `363f8f2` (MUL.S, vi24), plus a docs commit. Not pushed; `main` is protected, so it goes in by PR.
+- Branch `ultimate/phase4-hardware-accuracy` is on https://github.com/m7kor/Zmbor with draft
+  **PR #2** (https://github.com/m7kor/Zmbor/pull/2) into `main`. Do not merge or mark it ready without the owner's
+  approval. Local worktree: `D:\Project\Zmbor\wt-phase4`.
+- Commits on Zmbor `main` `00173a2`:
+  - `3d935f4` branch in a delay slot;
+  - `a7449bb` heap ownership;
+  - `f81312d` COP0 performance counters;
+  - `363f8f2` MUL.S and vi24;
+  - `cb77d79` docs;
+  - a follow-up that removes the runtime-arena fallback (below).
 - Measured on this branch (Windows MSVC): hardware tests **53 / 55 exact, 8202 / 8250 lines**, 0 crashes,
-  0 timeouts, no regressions against the re-measured `00173a2` baseline (47 / 55, 8172); `ps2x_tests` 526 / 526;
-  ctest 49 / 49; `ps2xIOP` 4 / 4. Linux GCC/Clang not run locally (CI runs them on push).
-- Its hardware tests use their own prepared directory `D:\Project\Zmbor\hwtest_work\gen4` (configure with
-  `-DPS2X_HWTEST_GENERATED=D:/Project/Zmbor/hwtest_work/gen4`); runs `p4_base.json`, `p4_m1/m2/m4.json` there.
-- Remaining: `cpu_ee_fpu_sqrt` (RSQRT.S) and `vu_lower_efu`, see below.
+  0 timeouts, no regressions against the re-measured `00173a2` baseline (47 / 55, 8172); `ps2x_tests` 530 / 530;
+  ctest 49 / 49; `ps2xIOP` 4 / 4.
+- GitHub CI (Linux GCC, Linux Clang, Windows MSVC) builds and runs `ps2x_tests` only. It does not run the 55
+  hardware tests, which need the ps2autotests ELFs prepared outside the repository; those numbers are local runs.
+- Hardware tests for this branch use `D:\Project\Zmbor\hwtest_work\gen4` (configure with
+  `-DPS2X_HWTEST_GENERATED=D:/Project/Zmbor/hwtest_work/gen4`); run reports `p4_base.json` and `p4_m1/m2/m4/m5.json`.
+- Runtime arena policy (follow-up to `a7449bb`): `runtimeMalloc` returns 0 when the arena is full; it no longer falls
+  back to the guest heap allocator. That fallback placed runtime blocks at the heap base, where the program's own sbrk
+  starts. Every HLE caller handles 0. An ELF segment inside 0x00020000-0x00080000 disables the arena with a warning;
+  none of the 55 hardware programs does.
+- Limited evidence, kept as documented hypotheses:
+  - the delay-slot model is fitted to three all-taken hardware rows;
+  - vi24 rests on one row;
+  - MUL.S fits 72 rows, which do not distinguish it from wider truncated-array forms.
+- Remaining failures: `cpu_ee_fpu_sqrt` (RSQRT.S) and `vu_lower_efu`, see below.
 
 ## State before Phase 4
 
@@ -122,7 +139,8 @@ Phase 4 additions:
 - Delay-slot control transfers: `ControlFlowEmitter::emitTransferInDelaySlot` (model and evidence in its comment); the
   analyzer adds the entry points, `FunctionEmitter` emits the inner transfer as its own instruction.
 - EE memory ownership: `PS2Runtime::runtimeMalloc/runtimeFree` (arena `kRuntimeArenaBase..kRuntimeArenaEnd`, EE kernel
-  area) for runtime-owned memory; `guestMalloc` only for HLE malloc. HLE pools in `Syscalls/Helpers/State.h` sit at
+  area; 0 on exhaustion, never a guest-heap fallback; disabled by an overlapping ELF segment, `noteGuestSegment`) for
+  runtime-owned memory; `guestMalloc` only for HLE malloc. HLE pools in `Syscalls/Helpers/State.h` sit at
   0x0004F000-0x00080000. SetupHeap(-1) ends at `guestMainStackBase()` (recorded by SetupThread).
 - COP0 PCCR/PCR0/PCR1: `PS2Runtime::read/writePerfControl/Counter`, counted from `EeScheduler::currentEeCycle()`.
 - COP1 MUL.S: `ps2_ee_fmul_bits` in `ps2_runtime_macros.h` (VU multiplies are separate and unchanged).

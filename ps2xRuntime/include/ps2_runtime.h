@@ -397,8 +397,15 @@ public:
     // sbrk, so the two cannot overlap. guestMalloc stays the allocator behind HLE malloc/free.
     static constexpr uint32_t kRuntimeArenaBase = 0x00020000u;
     static constexpr uint32_t kRuntimeArenaEnd = 0x0004F000u; // fixed HLE pools follow, up to 0x00080000
+    static constexpr uint32_t kRuntimeReservedEnd = 0x00080000u; // end of the arena plus the fixed HLE pools
+    // Returns 0 when the arena is full or disabled: there is no fallback into guest memory, which the program's
+    // own allocator owns. Callers handle 0 as an allocation failure.
     uint32_t runtimeMalloc(uint32_t size, uint32_t alignment = 16u);
     void runtimeFree(uint32_t guestAddr);
+    // Called for every loaded ELF segment (physical RDRAM range); a segment inside the runtime's reserved range
+    // disables the arena so the runtime never writes over program data.
+    void noteGuestSegment(uint32_t physStart, uint64_t physEnd);
+    bool runtimeArenaAvailable() const;
     // COP0 performance counters (MFPS/MTPS: PCCR, MFPC/MTPC: PCR0/PCR1). One set for the EE, not per thread.
     uint32_t readPerfControl(const R5900Context *ctx);
     void writePerfControl(const R5900Context *ctx, uint32_t value);
@@ -542,7 +549,8 @@ private:
     uint32_t m_guestHeapSuggestedBase = 0x00100000u;
     bool m_guestHeapConfigured = false;
     std::vector<GuestHeapBlock> m_runtimeArenaBlocks; // guarded by m_guestHeapMutex
-    bool m_runtimeArenaFallbackWarned = false;
+    bool m_runtimeArenaExhaustedWarned = false;
+    bool m_runtimeArenaDisabled = false;
     uint32_t m_guestMainStackBase = 0u;
     void syncPerfCounters(const R5900Context *ctx);
     std::mutex m_perfMutex;

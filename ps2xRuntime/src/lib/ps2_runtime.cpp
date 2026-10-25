@@ -532,7 +532,8 @@ PS2Runtime::PS2Runtime()
     m_guestHeapSuggestedBase = kGuestHeapDefaultBase;
     m_guestHeapConfigured = false;
     m_runtimeArenaBlocks.clear();
-    m_runtimeArenaFallbackWarned = false;
+    m_runtimeArenaExhaustedWarned = false;
+    m_runtimeArenaDisabled = false;
     m_guestMainStackBase = 0u;
     m_asyncCallbackStackFloor = std::min(kGuestHeapHardLimit, PS2_RAM_SIZE);
     m_asyncCallbackStackTop = PS2_RAM_SIZE;
@@ -947,6 +948,7 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         {
             maxLoadedRdramEnd = std::max(maxLoadedRdramEnd, static_cast<uint32_t>(segmentMemEnd));
             minLoadedRdramStart = std::min(minLoadedRdramStart, physAddr);
+            noteGuestSegment(physAddr, segmentMemEnd);
         }
 
         if (ph.flags & 0x1u) // PF_X
@@ -2048,6 +2050,10 @@ uint32_t PS2Runtime::guestHeapLimit() const
 uint32_t PS2Runtime::runtimeMalloc(uint32_t size, uint32_t alignment)
 {
     std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    if (m_runtimeArenaDisabled)
+    {
+        return 0u;
+    }
     if (m_runtimeArenaBlocks.empty())
     {
         m_runtimeArenaBlocks.push_back({kRuntimeArenaBase, kRuntimeArenaEnd - kRuntimeArenaBase, true});
@@ -2057,17 +2063,16 @@ uint32_t PS2Runtime::runtimeMalloc(uint32_t size, uint32_t alignment)
         return addr;
     }
 
-    // Arena full: the request still succeeds from the guest heap allocator, which the program's own sbrk does
-    // not know about, so say so once.
-    if (!m_runtimeArenaFallbackWarned)
+    // No fallback: the only other free RDRAM is the guest heap, where the program's own sbrk hands out memory
+    // starting at the heap base without telling the runtime, so a block there would overlap the program's data.
+    if (!m_runtimeArenaExhaustedWarned)
     {
-        m_runtimeArenaFallbackWarned = true;
+        m_runtimeArenaExhaustedWarned = true;
         std::cerr << "[runtime] runtime arena (0x" << std::hex << kRuntimeArenaBase << "-0x" << kRuntimeArenaEnd
-                  << ") is full; allocating 0x" << size << " bytes from the guest heap, which the program's own "
-                  << "allocator does not track" << std::dec << std::endl;
+                  << ") cannot fit 0x" << size << " bytes; the HLE call fails instead of using guest memory"
+                  << std::dec << std::endl;
     }
-    ensureGuestHeapInitializedLocked();
-    return allocateGuestBlockLocked(size, alignment);
+    return 0u;
 }
 
 void PS2Runtime::runtimeFree(uint32_t guestAddr)
@@ -2077,12 +2082,33 @@ void PS2Runtime::runtimeFree(uint32_t guestAddr)
         return;
     }
     std::lock_guard<std::mutex> lock(m_guestHeapMutex);
-    if (freeFromBlocks(m_runtimeArenaBlocks, guestAddr))
+    (void)freeFromBlocks(m_runtimeArenaBlocks, guestAddr); // anything else was never a runtime block
+}
+
+static_assert(kAsyncCallbackLowStackFloor >= PS2Runtime::kRuntimeReservedEnd,
+              "async callback stacks stay above the runtime arena and HLE pools");
+
+void PS2Runtime::noteGuestSegment(uint32_t physStart, uint64_t physEnd)
+{
+    if (physEnd <= kRuntimeArenaBase || physStart >= kRuntimeReservedEnd)
     {
         return;
     }
-    ensureGuestHeapInitializedLocked();
-    freeGuestBlockLocked(guestAddr); // allocated by the fallback path
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    if (!m_runtimeArenaDisabled)
+    {
+        std::cerr << "[runtime] ELF segment 0x" << std::hex << physStart << "-0x" << physEnd
+                  << " overlaps the runtime's reserved EE kernel area 0x" << kRuntimeArenaBase << "-0x"
+                  << kRuntimeReservedEnd << "; the runtime arena is disabled (HLE calls needing it fail) and the fixed "
+                  << "HLE RPC/TLS pools there may overwrite this segment" << std::dec << std::endl;
+    }
+    m_runtimeArenaDisabled = true;
+}
+
+bool PS2Runtime::runtimeArenaAvailable() const
+{
+    std::lock_guard<std::mutex> lock(m_guestHeapMutex);
+    return !m_runtimeArenaDisabled;
 }
 
 namespace

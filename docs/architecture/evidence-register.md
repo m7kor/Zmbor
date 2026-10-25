@@ -51,9 +51,18 @@ Host division rounded to nearest, x/0 = ±max with D/I flags (A: muldiv, fcr). O
 (`div CF_ONE, CF_MAX_MANTISSA: 3f000001`) rounds up at 0.50 ulp. Nothing tests ties or other fractions.
 
 ### 1.5 RSQRT.S — unresolved (cpu_ee_fpu_sqrt 59/66)
-Fitted on 39 rows: root rounded to nearest then truncated division 38/39; other root/division rounding choices
-fewer. DIV.S rounds up at 0.50 ulp where an RSQRT quotient at 0.52 ulp does not, so the two do not share one simple
-rule. Production unchanged; probes P3.
+`tools/semantics/ee_rsqrt_models.py`, exact arithmetic, 34 distinct RSQRT rows (A):
+- **Prediction falsified.** Train sets pick SQRT.S = round to nearest (15/16; the miss is sqrt(-0) = +0, a sign
+  rule) and DIV.S = nearest (31/31). Their composition, which is also production's behaviour, predicts 29/34 RSQRT
+  rows. RSQRT.S is therefore not "SQRT.S then DIV.S".
+- Best composition of root and quotient roundings: root nearest, quotient truncated, 33/34 (misses 1/sqrt(25):
+  quotient remainder 0.80 ulp rounds up). Remainders of the inexact rows (root nearest): 0.41, 0.52, 0.70 down;
+  0.80 up — no standard rounding of a single quotient explains them.
+- **Post-hoc candidate**: fs × N(1/N(sqrt|ft|)) (reciprocal of the rounded root, rounded, then multiplied) fits
+  34/34 with product truncated or nearest. It was chosen after seeing the rows, from 27 combinations, so it is not
+  a validated prediction. The same datapath does not describe DIV.S (23/31), and the EFU ERSQRT rows (another
+  unit) fit no composition beyond 8/10, so no independent data supports it.
+- Production unchanged (adopting a post-hoc fit would be tuning to the test). Probe P3 separates the candidates.
 
 ### 1.6 FCR31 flags — provisional
 Only the cases in fcr.expected are modelled (overflow O/SO on saturation, D/SD for x/0, I/SI for 0/0 and sqrt of a

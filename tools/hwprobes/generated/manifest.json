@@ -1,0 +1,88 @@
+{
+ "generator": "tools/semantics/make_probes.py",
+ "model_sources_sha256": "358b8a84534b46a999f5e877988f051d4524201300251b16eebb5b99103dd72e",
+ "note": "Predictions are MODEL_PREDICTED. No probe here has been built or run on a PS2.",
+ "probes": {
+  "p1_ee_add_guard_bits": {
+   "build": "ps2sdk + ps2autotests (not available in this environment)",
+   "hardware_status": "UNMEASURED",
+   "instruction": "ADD.S",
+   "models": [
+    "M1 exact toward zero",
+    "M2 g=0",
+    "M2 g=1",
+    "M2 g=2",
+    "M2 g=3",
+    "M2 g=8",
+    "M2 g=29"
+   ],
+   "observations": [],
+   "operand_pairs": 5,
+   "prediction_class": "MODEL_PREDICTED",
+   "predictions": "p1_ee_add_guard_bits.predictions.csv",
+   "question": "How many guard bits does the EE adder keep when aligning, and is there a sticky bit? (M1 = exact toward zero, M2 g = g guard bits, no sticky)",
+   "register": "1.2",
+   "source": "p1_ee_add_guard_bits.cpp",
+   "unit": "EE COP1"
+  },
+  "p2_ee_mul_partial_products": {
+   "build": "ps2sdk + ps2autotests (not available in this environment)",
+   "hardware_status": "UNMEASURED",
+   "instruction": "MUL.S",
+   "models": [
+    "hot",
+    "1",
+    "2",
+    "4",
+    "8",
+    "16",
+    "22"
+   ],
+   "observations": [],
+   "operand_pairs": 3,
+   "prediction_class": "MODEL_PREDICTED",
+   "predictions": "p2_ee_mul_partial_products.predictions.csv",
+   "question": "Which partial-product truncation reproduces the EE multiplier?",
+   "register": "1.3",
+   "source": "p2_ee_mul_partial_products.cpp",
+   "unit": "EE COP1"
+  },
+  "p3_ee_rsqrt_datapath": {
+   "build": "ps2sdk + ps2autotests (not available in this environment)",
+   "hardware_status": "UNMEASURED",
+   "instruction": "RSQRT.S",
+   "models": [
+    "compose root=near quotient=near",
+    "compose root=near quotient=trunc",
+    "reciprocal=near product=trunc",
+    "reciprocal=near product=near"
+   ],
+   "observations": [],
+   "operand_pairs": 2,
+   "prediction_class": "MODEL_PREDICTED",
+   "predictions": "p3_ee_rsqrt_datapath.predictions.csv",
+   "question": "Is RSQRT.S a rounded root then a divide, or a rounded reciprocal of the rounded root times fs? (the latter fits 34/34 rows, chosen post hoc)",
+   "register": "1.5",
+   "source": "p3_ee_rsqrt_datapath.cpp",
+   "unit": "EE COP1"
+  },
+  "p4_vu_mul_asymmetry": {
+   "build": "ps2sdk + ps2autotests (not available in this environment)",
+   "hardware_status": "UNMEASURED",
+   "instruction": "VMUL.x",
+   "models": [
+    "exact",
+    "hot"
+   ],
+   "observations": [],
+   "operand_pairs": 1,
+   "prediction_class": "MODEL_PREDICTED",
+   "predictions": "p4_vu_mul_asymmetry.predictions.csv",
+   "question": "Is the VU multiplier operand-order asymmetric like the EE one?",
+   "register": "2.3",
+   "source": "p4_vu_mul_asymmetry.cpp",
+   "unit": "VU0 macro"
+  }
+ },
+ "schema": 1
+}

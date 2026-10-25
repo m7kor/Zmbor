@@ -14,6 +14,9 @@ if(BUILD_TESTING)
     if(Python3_Interpreter_FOUND)
         add_test(NAME research_database_valid
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/research/validate_research.py)
+        # Probe manifests and observation scoring (synthetic data only; no hardware is involved).
+        add_test(NAME hwprobes_lab_selftest
+                 COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/hwprobes/probe_lab.py selftest)
     endif()
 
     option(PS2X_BUILD_E2E_TESTS "Build the ELF-to-native end-to-end tests" ON)

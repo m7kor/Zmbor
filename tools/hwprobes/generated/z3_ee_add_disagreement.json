@@ -1,0 +1,6417 @@
+[
+ {
+  "gap": 0,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 0,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca800001",
+  "predictions": {
+   "M1": "4a7ffffe",
+   "M2 g=0": "4a800000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca800001",
+  "predictions": {
+   "M2 g=0": "4a800000",
+   "M2 g=1": "4a7ffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca800001",
+  "predictions": {
+   "M2 g=0": "4a800000",
+   "M2 g=2": "4a7ffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca800001",
+  "predictions": {
+   "M2 g=0": "4a800000",
+   "M2 g=3": "4a7ffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca800001",
+  "predictions": {
+   "M2 g=0": "4a800000",
+   "M2 g=8": "4a7ffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 1,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M1": "4abfffff",
+   "M2 g=0": "4ac00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M1": "4abfffff",
+   "M2 g=1": "4ac00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000002",
+  "predictions": {
+   "M2 g=0": "4ac00000",
+   "M2 g=1": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M2 g=0": "4ac00000",
+   "M2 g=2": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M2 g=0": "4ac00000",
+   "M2 g=3": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000002",
+  "predictions": {
+   "M2 g=0": "4ac00000",
+   "M2 g=8": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M2 g=1": "4ac00000",
+   "M2 g=2": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M2 g=1": "4ac00000",
+   "M2 g=3": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "ca000001",
+  "predictions": {
+   "M2 g=1": "4ac00000",
+   "M2 g=8": "4abfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 2,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800004",
+  "predictions": {
+   "M1": "4adfffff",
+   "M2 g=0": "4ae00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800002",
+  "predictions": {
+   "M1": "4adfffff",
+   "M2 g=1": "4ae00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800001",
+  "predictions": {
+   "M1": "4adfffff",
+   "M2 g=2": "4ae00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800004",
+  "predictions": {
+   "M2 g=0": "4ae00000",
+   "M2 g=1": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800004",
+  "predictions": {
+   "M2 g=0": "4ae00000",
+   "M2 g=2": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800002",
+  "predictions": {
+   "M2 g=0": "4ae00000",
+   "M2 g=3": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800004",
+  "predictions": {
+   "M2 g=0": "4ae00000",
+   "M2 g=8": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800002",
+  "predictions": {
+   "M2 g=1": "4ae00000",
+   "M2 g=2": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800001",
+  "predictions": {
+   "M2 g=1": "4ae00000",
+   "M2 g=3": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800001",
+  "predictions": {
+   "M2 g=1": "4ae00000",
+   "M2 g=8": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800001",
+  "predictions": {
+   "M2 g=2": "4ae00000",
+   "M2 g=3": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9800001",
+  "predictions": {
+   "M2 g=2": "4ae00000",
+   "M2 g=8": "4adfffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 3,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M1": "4aefffff",
+   "M2 g=0": "4af00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M1": "4aefffff",
+   "M2 g=1": "4af00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000002",
+  "predictions": {
+   "M1": "4aefffff",
+   "M2 g=2": "4af00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000001",
+  "predictions": {
+   "M1": "4aefffff",
+   "M2 g=3": "4af00000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000008",
+  "predictions": {
+   "M2 g=0": "4af00000",
+   "M2 g=1": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000008",
+  "predictions": {
+   "M2 g=0": "4af00000",
+   "M2 g=2": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M2 g=0": "4af00000",
+   "M2 g=3": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000008",
+  "predictions": {
+   "M2 g=0": "4af00000",
+   "M2 g=8": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M2 g=1": "4af00000",
+   "M2 g=2": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M2 g=1": "4af00000",
+   "M2 g=3": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000004",
+  "predictions": {
+   "M2 g=1": "4af00000",
+   "M2 g=8": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000002",
+  "predictions": {
+   "M2 g=2": "4af00000",
+   "M2 g=3": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000002",
+  "predictions": {
+   "M2 g=2": "4af00000",
+   "M2 g=8": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 4,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c9000001",
+  "predictions": {
+   "M2 g=3": "4af00000",
+   "M2 g=8": "4aefffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800010",
+  "predictions": {
+   "M1": "4af7ffff",
+   "M2 g=0": "4af80000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800001",
+  "predictions": {
+   "M1": "4af7ffff",
+   "M2 g=1": "4af80000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800001",
+  "predictions": {
+   "M1": "4af7ffff",
+   "M2 g=2": "4af80000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800002",
+  "predictions": {
+   "M1": "4af7ffff",
+   "M2 g=3": "4af80000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800010",
+  "predictions": {
+   "M2 g=0": "4af80000",
+   "M2 g=1": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800008",
+  "predictions": {
+   "M2 g=0": "4af80000",
+   "M2 g=2": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800008",
+  "predictions": {
+   "M2 g=0": "4af80000",
+   "M2 g=3": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800010",
+  "predictions": {
+   "M2 g=0": "4af80000",
+   "M2 g=8": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800008",
+  "predictions": {
+   "M2 g=1": "4af80000",
+   "M2 g=2": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800008",
+  "predictions": {
+   "M2 g=1": "4af80000",
+   "M2 g=3": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800001",
+  "predictions": {
+   "M2 g=1": "4af80000",
+   "M2 g=8": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800004",
+  "predictions": {
+   "M2 g=2": "4af80000",
+   "M2 g=3": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800004",
+  "predictions": {
+   "M2 g=2": "4af80000",
+   "M2 g=8": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 5,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8800001",
+  "predictions": {
+   "M2 g=3": "4af80000",
+   "M2 g=8": "4af7ffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000020",
+  "predictions": {
+   "M1": "4afbffff",
+   "M2 g=0": "4afc0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000002",
+  "predictions": {
+   "M1": "4afbffff",
+   "M2 g=1": "4afc0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000004",
+  "predictions": {
+   "M1": "4afbffff",
+   "M2 g=2": "4afc0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000004",
+  "predictions": {
+   "M1": "4afbffff",
+   "M2 g=3": "4afc0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000020",
+  "predictions": {
+   "M2 g=0": "4afc0000",
+   "M2 g=1": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000010",
+  "predictions": {
+   "M2 g=0": "4afc0000",
+   "M2 g=2": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000008",
+  "predictions": {
+   "M2 g=0": "4afc0000",
+   "M2 g=3": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000001",
+  "predictions": {
+   "M2 g=0": "4afc0000",
+   "M2 g=8": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000010",
+  "predictions": {
+   "M2 g=1": "4afc0000",
+   "M2 g=2": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000008",
+  "predictions": {
+   "M2 g=1": "4afc0000",
+   "M2 g=3": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000001",
+  "predictions": {
+   "M2 g=1": "4afc0000",
+   "M2 g=8": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000008",
+  "predictions": {
+   "M2 g=2": "4afc0000",
+   "M2 g=3": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000002",
+  "predictions": {
+   "M2 g=2": "4afc0000",
+   "M2 g=8": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 6,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c8000001",
+  "predictions": {
+   "M2 g=3": "4afc0000",
+   "M2 g=8": "4afbffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800001",
+  "predictions": {
+   "M1": "4afdffff",
+   "M2 g=0": "4afe0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800010",
+  "predictions": {
+   "M1": "4afdffff",
+   "M2 g=1": "4afe0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800010",
+  "predictions": {
+   "M1": "4afdffff",
+   "M2 g=2": "4afe0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800001",
+  "predictions": {
+   "M1": "4afdffff",
+   "M2 g=3": "4afe0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800040",
+  "predictions": {
+   "M2 g=0": "4afe0000",
+   "M2 g=1": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800040",
+  "predictions": {
+   "M2 g=0": "4afe0000",
+   "M2 g=2": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800040",
+  "predictions": {
+   "M2 g=0": "4afe0000",
+   "M2 g=3": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800020",
+  "predictions": {
+   "M2 g=0": "4afe0000",
+   "M2 g=8": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800020",
+  "predictions": {
+   "M2 g=1": "4afe0000",
+   "M2 g=2": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800020",
+  "predictions": {
+   "M2 g=1": "4afe0000",
+   "M2 g=3": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800002",
+  "predictions": {
+   "M2 g=1": "4afe0000",
+   "M2 g=8": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800010",
+  "predictions": {
+   "M2 g=2": "4afe0000",
+   "M2 g=3": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800010",
+  "predictions": {
+   "M2 g=2": "4afe0000",
+   "M2 g=8": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 7,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7800008",
+  "predictions": {
+   "M2 g=3": "4afe0000",
+   "M2 g=8": "4afdffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000002",
+  "predictions": {
+   "M1": "4afeffff",
+   "M2 g=0": "4aff0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000004",
+  "predictions": {
+   "M1": "4afeffff",
+   "M2 g=1": "4aff0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000020",
+  "predictions": {
+   "M1": "4afeffff",
+   "M2 g=2": "4aff0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000002",
+  "predictions": {
+   "M1": "4afeffff",
+   "M2 g=3": "4aff0000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000080",
+  "predictions": {
+   "M2 g=0": "4aff0000",
+   "M2 g=1": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000080",
+  "predictions": {
+   "M2 g=0": "4aff0000",
+   "M2 g=2": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000080",
+  "predictions": {
+   "M2 g=0": "4aff0000",
+   "M2 g=3": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000001",
+  "predictions": {
+   "M2 g=0": "4aff0000",
+   "M2 g=8": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000040",
+  "predictions": {
+   "M2 g=1": "4aff0000",
+   "M2 g=2": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000040",
+  "predictions": {
+   "M2 g=1": "4aff0000",
+   "M2 g=3": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000002",
+  "predictions": {
+   "M2 g=1": "4aff0000",
+   "M2 g=8": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000020",
+  "predictions": {
+   "M2 g=2": "4aff0000",
+   "M2 g=3": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000002",
+  "predictions": {
+   "M2 g=2": "4aff0000",
+   "M2 g=8": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 8,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c7000010",
+  "predictions": {
+   "M2 g=3": "4aff0000",
+   "M2 g=8": "4afeffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800020",
+  "predictions": {
+   "M1": "4aff7fff",
+   "M2 g=0": "4aff8000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800002",
+  "predictions": {
+   "M1": "4aff7fff",
+   "M2 g=1": "4aff8000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800001",
+  "predictions": {
+   "M1": "4aff7fff",
+   "M2 g=2": "4aff8000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800010",
+  "predictions": {
+   "M1": "4aff7fff",
+   "M2 g=3": "4aff8000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800001",
+  "predictions": {
+   "M1": "4aff7fff",
+   "M2 g=8": "4aff8000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800100",
+  "predictions": {
+   "M2 g=0": "4aff8000",
+   "M2 g=1": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800100",
+  "predictions": {
+   "M2 g=0": "4aff8000",
+   "M2 g=2": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800040",
+  "predictions": {
+   "M2 g=0": "4aff8000",
+   "M2 g=3": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800002",
+  "predictions": {
+   "M2 g=0": "4aff8000",
+   "M2 g=8": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800080",
+  "predictions": {
+   "M2 g=1": "4aff8000",
+   "M2 g=2": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800040",
+  "predictions": {
+   "M2 g=1": "4aff8000",
+   "M2 g=3": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800004",
+  "predictions": {
+   "M2 g=1": "4aff8000",
+   "M2 g=8": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800040",
+  "predictions": {
+   "M2 g=2": "4aff8000",
+   "M2 g=3": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800008",
+  "predictions": {
+   "M2 g=2": "4aff8000",
+   "M2 g=8": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 9,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6800002",
+  "predictions": {
+   "M2 g=3": "4aff8000",
+   "M2 g=8": "4aff7fff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000001",
+  "predictions": {
+   "M1": "4affbfff",
+   "M2 g=0": "4affc000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000001",
+  "predictions": {
+   "M1": "4affbfff",
+   "M2 g=1": "4affc000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000080",
+  "predictions": {
+   "M1": "4affbfff",
+   "M2 g=2": "4affc000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000020",
+  "predictions": {
+   "M1": "4affbfff",
+   "M2 g=3": "4affc000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000001",
+  "predictions": {
+   "M1": "4affbfff",
+   "M2 g=8": "4affc000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000200",
+  "predictions": {
+   "M2 g=0": "4affc000",
+   "M2 g=1": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000200",
+  "predictions": {
+   "M2 g=0": "4affc000",
+   "M2 g=2": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000200",
+  "predictions": {
+   "M2 g=0": "4affc000",
+   "M2 g=3": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000008",
+  "predictions": {
+   "M2 g=0": "4affc000",
+   "M2 g=8": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000100",
+  "predictions": {
+   "M2 g=1": "4affc000",
+   "M2 g=2": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000080",
+  "predictions": {
+   "M2 g=1": "4affc000",
+   "M2 g=3": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000100",
+  "predictions": {
+   "M2 g=1": "4affc000",
+   "M2 g=8": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000080",
+  "predictions": {
+   "M2 g=2": "4affc000",
+   "M2 g=3": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000080",
+  "predictions": {
+   "M2 g=2": "4affc000",
+   "M2 g=8": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 10,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c6000020",
+  "predictions": {
+   "M2 g=3": "4affc000",
+   "M2 g=8": "4affbfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800002",
+  "predictions": {
+   "M1": "4affdfff",
+   "M2 g=0": "4affe000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800001",
+  "predictions": {
+   "M1": "4affdfff",
+   "M2 g=1": "4affe000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800004",
+  "predictions": {
+   "M1": "4affdfff",
+   "M2 g=2": "4affe000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800004",
+  "predictions": {
+   "M1": "4affdfff",
+   "M2 g=3": "4affe000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800002",
+  "predictions": {
+   "M1": "4affdfff",
+   "M2 g=8": "4affe000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800400",
+  "predictions": {
+   "M2 g=0": "4affe000",
+   "M2 g=1": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800400",
+  "predictions": {
+   "M2 g=0": "4affe000",
+   "M2 g=2": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800100",
+  "predictions": {
+   "M2 g=0": "4affe000",
+   "M2 g=3": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800008",
+  "predictions": {
+   "M2 g=0": "4affe000",
+   "M2 g=8": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800200",
+  "predictions": {
+   "M2 g=1": "4affe000",
+   "M2 g=2": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800100",
+  "predictions": {
+   "M2 g=1": "4affe000",
+   "M2 g=3": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800200",
+  "predictions": {
+   "M2 g=1": "4affe000",
+   "M2 g=8": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800100",
+  "predictions": {
+   "M2 g=2": "4affe000",
+   "M2 g=3": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800080",
+  "predictions": {
+   "M2 g=2": "4affe000",
+   "M2 g=8": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 11,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5800080",
+  "predictions": {
+   "M2 g=3": "4affe000",
+   "M2 g=8": "4affdfff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000040",
+  "predictions": {
+   "M1": "4affefff",
+   "M2 g=0": "4afff000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000200",
+  "predictions": {
+   "M1": "4affefff",
+   "M2 g=1": "4afff000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000020",
+  "predictions": {
+   "M1": "4affefff",
+   "M2 g=2": "4afff000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000010",
+  "predictions": {
+   "M1": "4affefff",
+   "M2 g=3": "4afff000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000008",
+  "predictions": {
+   "M1": "4affefff",
+   "M2 g=8": "4afff000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000800",
+  "predictions": {
+   "M2 g=0": "4afff000",
+   "M2 g=1": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000800",
+  "predictions": {
+   "M2 g=0": "4afff000",
+   "M2 g=2": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000200",
+  "predictions": {
+   "M2 g=0": "4afff000",
+   "M2 g=3": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000080",
+  "predictions": {
+   "M2 g=0": "4afff000",
+   "M2 g=8": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000400",
+  "predictions": {
+   "M2 g=1": "4afff000",
+   "M2 g=2": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000400",
+  "predictions": {
+   "M2 g=1": "4afff000",
+   "M2 g=3": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000020",
+  "predictions": {
+   "M2 g=1": "4afff000",
+   "M2 g=8": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000200",
+  "predictions": {
+   "M2 g=2": "4afff000",
+   "M2 g=3": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000200",
+  "predictions": {
+   "M2 g=2": "4afff000",
+   "M2 g=8": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 12,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c5000100",
+  "predictions": {
+   "M2 g=3": "4afff000",
+   "M2 g=8": "4affefff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800020",
+  "predictions": {
+   "M1": "4afff7ff",
+   "M2 g=0": "4afff800"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800004",
+  "predictions": {
+   "M1": "4afff7ff",
+   "M2 g=1": "4afff800"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800400",
+  "predictions": {
+   "M1": "4afff7ff",
+   "M2 g=2": "4afff800"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800010",
+  "predictions": {
+   "M1": "4afff7ff",
+   "M2 g=3": "4afff800"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800008",
+  "predictions": {
+   "M1": "4afff7ff",
+   "M2 g=8": "4afff800"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4801000",
+  "predictions": {
+   "M2 g=0": "4afff800",
+   "M2 g=1": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800800",
+  "predictions": {
+   "M2 g=0": "4afff800",
+   "M2 g=2": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800400",
+  "predictions": {
+   "M2 g=0": "4afff800",
+   "M2 g=3": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800200",
+  "predictions": {
+   "M2 g=0": "4afff800",
+   "M2 g=8": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800800",
+  "predictions": {
+   "M2 g=1": "4afff800",
+   "M2 g=2": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800800",
+  "predictions": {
+   "M2 g=1": "4afff800",
+   "M2 g=3": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800400",
+  "predictions": {
+   "M2 g=1": "4afff800",
+   "M2 g=8": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800400",
+  "predictions": {
+   "M2 g=2": "4afff800",
+   "M2 g=3": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800020",
+  "predictions": {
+   "M2 g=2": "4afff800",
+   "M2 g=8": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 13,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4800080",
+  "predictions": {
+   "M2 g=3": "4afff800",
+   "M2 g=8": "4afff7ff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4002000",
+  "predictions": {
+   "M1": "4afffbff",
+   "M2 g=0": "4afffc00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000200",
+  "predictions": {
+   "M1": "4afffbff",
+   "M2 g=1": "4afffc00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000800",
+  "predictions": {
+   "M1": "4afffbff",
+   "M2 g=2": "4afffc00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000001",
+  "predictions": {
+   "M1": "4afffbff",
+   "M2 g=3": "4afffc00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000001",
+  "predictions": {
+   "M1": "4afffbff",
+   "M2 g=8": "4afffc00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4002000",
+  "predictions": {
+   "M2 g=0": "4afffc00",
+   "M2 g=1": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4002000",
+  "predictions": {
+   "M2 g=0": "4afffc00",
+   "M2 g=2": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000800",
+  "predictions": {
+   "M2 g=0": "4afffc00",
+   "M2 g=3": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000200",
+  "predictions": {
+   "M2 g=0": "4afffc00",
+   "M2 g=8": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4001000",
+  "predictions": {
+   "M2 g=1": "4afffc00",
+   "M2 g=2": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000800",
+  "predictions": {
+   "M2 g=1": "4afffc00",
+   "M2 g=3": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000400",
+  "predictions": {
+   "M2 g=1": "4afffc00",
+   "M2 g=8": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000800",
+  "predictions": {
+   "M2 g=2": "4afffc00",
+   "M2 g=3": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000080",
+  "predictions": {
+   "M2 g=2": "4afffc00",
+   "M2 g=8": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 14,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c4000040",
+  "predictions": {
+   "M2 g=3": "4afffc00",
+   "M2 g=8": "4afffbff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800080",
+  "predictions": {
+   "M1": "4afffdff",
+   "M2 g=0": "4afffe00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800004",
+  "predictions": {
+   "M1": "4afffdff",
+   "M2 g=1": "4afffe00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800800",
+  "predictions": {
+   "M1": "4afffdff",
+   "M2 g=2": "4afffe00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800080",
+  "predictions": {
+   "M1": "4afffdff",
+   "M2 g=3": "4afffe00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800002",
+  "predictions": {
+   "M1": "4afffdff",
+   "M2 g=8": "4afffe00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3804000",
+  "predictions": {
+   "M2 g=0": "4afffe00",
+   "M2 g=1": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3802000",
+  "predictions": {
+   "M2 g=0": "4afffe00",
+   "M2 g=2": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3804000",
+  "predictions": {
+   "M2 g=0": "4afffe00",
+   "M2 g=3": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800080",
+  "predictions": {
+   "M2 g=0": "4afffe00",
+   "M2 g=8": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3802000",
+  "predictions": {
+   "M2 g=1": "4afffe00",
+   "M2 g=2": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3802000",
+  "predictions": {
+   "M2 g=1": "4afffe00",
+   "M2 g=3": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800080",
+  "predictions": {
+   "M2 g=1": "4afffe00",
+   "M2 g=8": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3801000",
+  "predictions": {
+   "M2 g=2": "4afffe00",
+   "M2 g=3": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800400",
+  "predictions": {
+   "M2 g=2": "4afffe00",
+   "M2 g=8": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 15,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3800080",
+  "predictions": {
+   "M2 g=3": "4afffe00",
+   "M2 g=8": "4afffdff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000200",
+  "predictions": {
+   "M1": "4afffeff",
+   "M2 g=0": "4affff00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000002",
+  "predictions": {
+   "M1": "4afffeff",
+   "M2 g=1": "4affff00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000080",
+  "predictions": {
+   "M1": "4afffeff",
+   "M2 g=2": "4affff00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000002",
+  "predictions": {
+   "M1": "4afffeff",
+   "M2 g=3": "4affff00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000080",
+  "predictions": {
+   "M1": "4afffeff",
+   "M2 g=8": "4affff00"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3008000",
+  "predictions": {
+   "M2 g=0": "4affff00",
+   "M2 g=1": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3004000",
+  "predictions": {
+   "M2 g=0": "4affff00",
+   "M2 g=2": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3008000",
+  "predictions": {
+   "M2 g=0": "4affff00",
+   "M2 g=3": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3008000",
+  "predictions": {
+   "M2 g=0": "4affff00",
+   "M2 g=8": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3004000",
+  "predictions": {
+   "M2 g=1": "4affff00",
+   "M2 g=2": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3002000",
+  "predictions": {
+   "M2 g=1": "4affff00",
+   "M2 g=3": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3004000",
+  "predictions": {
+   "M2 g=1": "4affff00",
+   "M2 g=8": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3002000",
+  "predictions": {
+   "M2 g=2": "4affff00",
+   "M2 g=3": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000100",
+  "predictions": {
+   "M2 g=2": "4affff00",
+   "M2 g=8": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 16,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c3000100",
+  "predictions": {
+   "M2 g=3": "4affff00",
+   "M2 g=8": "4afffeff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2804000",
+  "predictions": {
+   "M1": "4affff7f",
+   "M2 g=0": "4affff80"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800020",
+  "predictions": {
+   "M1": "4affff7f",
+   "M2 g=1": "4affff80"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800200",
+  "predictions": {
+   "M1": "4affff7f",
+   "M2 g=2": "4affff80"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800100",
+  "predictions": {
+   "M1": "4affff7f",
+   "M2 g=3": "4affff80"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800010",
+  "predictions": {
+   "M1": "4affff7f",
+   "M2 g=8": "4affff80"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2810000",
+  "predictions": {
+   "M2 g=0": "4affff80",
+   "M2 g=1": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2808000",
+  "predictions": {
+   "M2 g=0": "4affff80",
+   "M2 g=2": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2810000",
+  "predictions": {
+   "M2 g=0": "4affff80",
+   "M2 g=3": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800200",
+  "predictions": {
+   "M2 g=0": "4affff80",
+   "M2 g=8": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2808000",
+  "predictions": {
+   "M2 g=1": "4affff80",
+   "M2 g=2": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2808000",
+  "predictions": {
+   "M2 g=1": "4affff80",
+   "M2 g=3": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800200",
+  "predictions": {
+   "M2 g=1": "4affff80",
+   "M2 g=8": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2804000",
+  "predictions": {
+   "M2 g=2": "4affff80",
+   "M2 g=3": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800400",
+  "predictions": {
+   "M2 g=2": "4affff80",
+   "M2 g=8": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 17,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2800200",
+  "predictions": {
+   "M2 g=3": "4affff80",
+   "M2 g=8": "4affff7f"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2000002",
+  "predictions": {
+   "M1": "4affffbf",
+   "M2 g=0": "4affffc0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2002000",
+  "predictions": {
+   "M1": "4affffbf",
+   "M2 g=1": "4affffc0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2002000",
+  "predictions": {
+   "M1": "4affffbf",
+   "M2 g=2": "4affffc0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2000010",
+  "predictions": {
+   "M1": "4affffbf",
+   "M2 g=3": "4affffc0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2000100",
+  "predictions": {
+   "M1": "4affffbf",
+   "M2 g=8": "4affffc0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2020000",
+  "predictions": {
+   "M2 g=0": "4affffc0",
+   "M2 g=1": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2010000",
+  "predictions": {
+   "M2 g=0": "4affffc0",
+   "M2 g=2": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2020000",
+  "predictions": {
+   "M2 g=0": "4affffc0",
+   "M2 g=3": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2020000",
+  "predictions": {
+   "M2 g=0": "4affffc0",
+   "M2 g=8": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2010000",
+  "predictions": {
+   "M2 g=1": "4affffc0",
+   "M2 g=2": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2008000",
+  "predictions": {
+   "M2 g=1": "4affffc0",
+   "M2 g=3": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2004000",
+  "predictions": {
+   "M2 g=1": "4affffc0",
+   "M2 g=8": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2008000",
+  "predictions": {
+   "M2 g=2": "4affffc0",
+   "M2 g=3": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2000400",
+  "predictions": {
+   "M2 g=2": "4affffc0",
+   "M2 g=8": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 18,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c2002000",
+  "predictions": {
+   "M2 g=3": "4affffc0",
+   "M2 g=8": "4affffbf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1800002",
+  "predictions": {
+   "M1": "4affffdf",
+   "M2 g=0": "4affffe0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1800008",
+  "predictions": {
+   "M1": "4affffdf",
+   "M2 g=1": "4affffe0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M1": "4affffdf",
+   "M2 g=2": "4affffe0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1800004",
+  "predictions": {
+   "M1": "4affffdf",
+   "M2 g=3": "4affffe0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1800040",
+  "predictions": {
+   "M1": "4affffdf",
+   "M2 g=8": "4affffe0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1840000",
+  "predictions": {
+   "M2 g=0": "4affffe0",
+   "M2 g=1": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1840000",
+  "predictions": {
+   "M2 g=0": "4affffe0",
+   "M2 g=2": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M2 g=0": "4affffe0",
+   "M2 g=3": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M2 g=0": "4affffe0",
+   "M2 g=8": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1820000",
+  "predictions": {
+   "M2 g=1": "4affffe0",
+   "M2 g=2": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M2 g=1": "4affffe0",
+   "M2 g=3": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1802000",
+  "predictions": {
+   "M2 g=1": "4affffe0",
+   "M2 g=8": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M2 g=2": "4affffe0",
+   "M2 g=3": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1810000",
+  "predictions": {
+   "M2 g=2": "4affffe0",
+   "M2 g=8": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 19,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1808000",
+  "predictions": {
+   "M2 g=3": "4affffe0",
+   "M2 g=8": "4affffdf"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1000001",
+  "predictions": {
+   "M1": "4affffef",
+   "M2 g=0": "4afffff0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1040000",
+  "predictions": {
+   "M1": "4affffef",
+   "M2 g=1": "4afffff0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1000100",
+  "predictions": {
+   "M1": "4affffef",
+   "M2 g=2": "4afffff0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1000040",
+  "predictions": {
+   "M1": "4affffef",
+   "M2 g=3": "4afffff0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1000800",
+  "predictions": {
+   "M1": "4affffef",
+   "M2 g=8": "4afffff0"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1080000",
+  "predictions": {
+   "M2 g=0": "4afffff0",
+   "M2 g=1": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1040000",
+  "predictions": {
+   "M2 g=0": "4afffff0",
+   "M2 g=2": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1020000",
+  "predictions": {
+   "M2 g=0": "4afffff0",
+   "M2 g=3": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1001000",
+  "predictions": {
+   "M2 g=0": "4afffff0",
+   "M2 g=8": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1040000",
+  "predictions": {
+   "M2 g=1": "4afffff0",
+   "M2 g=2": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1020000",
+  "predictions": {
+   "M2 g=1": "4afffff0",
+   "M2 g=3": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1040000",
+  "predictions": {
+   "M2 g=1": "4afffff0",
+   "M2 g=8": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1020000",
+  "predictions": {
+   "M2 g=2": "4afffff0",
+   "M2 g=3": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1001000",
+  "predictions": {
+   "M2 g=2": "4afffff0",
+   "M2 g=8": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 20,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c1001000",
+  "predictions": {
+   "M2 g=3": "4afffff0",
+   "M2 g=8": "4affffef"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0801000",
+  "predictions": {
+   "M1": "4afffff7",
+   "M2 g=0": "4afffff8"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0820000",
+  "predictions": {
+   "M1": "4afffff7",
+   "M2 g=1": "4afffff8"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0801000",
+  "predictions": {
+   "M1": "4afffff7",
+   "M2 g=2": "4afffff8"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0800001",
+  "predictions": {
+   "M1": "4afffff7",
+   "M2 g=3": "4afffff8"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0800010",
+  "predictions": {
+   "M1": "4afffff7",
+   "M2 g=8": "4afffff8"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0900000",
+  "predictions": {
+   "M2 g=0": "4afffff8",
+   "M2 g=1": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0880000",
+  "predictions": {
+   "M2 g=0": "4afffff8",
+   "M2 g=2": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0900000",
+  "predictions": {
+   "M2 g=0": "4afffff8",
+   "M2 g=3": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0804000",
+  "predictions": {
+   "M2 g=0": "4afffff8",
+   "M2 g=8": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0880000",
+  "predictions": {
+   "M2 g=1": "4afffff8",
+   "M2 g=2": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0840000",
+  "predictions": {
+   "M2 g=1": "4afffff8",
+   "M2 g=3": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0810000",
+  "predictions": {
+   "M2 g=1": "4afffff8",
+   "M2 g=8": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0840000",
+  "predictions": {
+   "M2 g=2": "4afffff8",
+   "M2 g=3": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0802000",
+  "predictions": {
+   "M2 g=2": "4afffff8",
+   "M2 g=8": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 21,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0802000",
+  "predictions": {
+   "M2 g=3": "4afffff8",
+   "M2 g=8": "4afffff7"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0000001",
+  "predictions": {
+   "M1": "4afffffb",
+   "M2 g=0": "4afffffc"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0100000",
+  "predictions": {
+   "M1": "4afffffb",
+   "M2 g=1": "4afffffc"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0000008",
+  "predictions": {
+   "M1": "4afffffb",
+   "M2 g=2": "4afffffc"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0000020",
+  "predictions": {
+   "M1": "4afffffb",
+   "M2 g=3": "4afffffc"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0000001",
+  "predictions": {
+   "M1": "4afffffb",
+   "M2 g=8": "4afffffc"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0200000",
+  "predictions": {
+   "M2 g=0": "4afffffc",
+   "M2 g=1": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0100000",
+  "predictions": {
+   "M2 g=0": "4afffffc",
+   "M2 g=2": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0080000",
+  "predictions": {
+   "M2 g=0": "4afffffc",
+   "M2 g=3": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0040000",
+  "predictions": {
+   "M2 g=0": "4afffffc",
+   "M2 g=8": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0100000",
+  "predictions": {
+   "M2 g=1": "4afffffc",
+   "M2 g=2": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0080000",
+  "predictions": {
+   "M2 g=1": "4afffffc",
+   "M2 g=3": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0004000",
+  "predictions": {
+   "M2 g=1": "4afffffc",
+   "M2 g=8": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0080000",
+  "predictions": {
+   "M2 g=2": "4afffffc",
+   "M2 g=3": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0004000",
+  "predictions": {
+   "M2 g=2": "4afffffc",
+   "M2 g=8": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 22,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "c0020000",
+  "predictions": {
+   "M2 g=3": "4afffffc",
+   "M2 g=8": "4afffffb"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf800001",
+  "predictions": {
+   "M1": "4afffffd",
+   "M2 g=0": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bfa00000",
+  "predictions": {
+   "M1": "4afffffd",
+   "M2 g=1": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf800040",
+  "predictions": {
+   "M1": "4afffffd",
+   "M2 g=2": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf800200",
+  "predictions": {
+   "M1": "4afffffd",
+   "M2 g=3": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf800002",
+  "predictions": {
+   "M1": "4afffffd",
+   "M2 g=8": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bfc00000",
+  "predictions": {
+   "M2 g=0": "4afffffe",
+   "M2 g=1": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bfa00000",
+  "predictions": {
+   "M2 g=0": "4afffffe",
+   "M2 g=2": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf900000",
+  "predictions": {
+   "M2 g=0": "4afffffe",
+   "M2 g=3": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf840000",
+  "predictions": {
+   "M2 g=0": "4afffffe",
+   "M2 g=8": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bfa00000",
+  "predictions": {
+   "M2 g=1": "4afffffe",
+   "M2 g=2": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf900000",
+  "predictions": {
+   "M2 g=1": "4afffffe",
+   "M2 g=3": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf810000",
+  "predictions": {
+   "M2 g=1": "4afffffe",
+   "M2 g=8": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf900000",
+  "predictions": {
+   "M2 g=2": "4afffffe",
+   "M2 g=3": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf810000",
+  "predictions": {
+   "M2 g=2": "4afffffe",
+   "M2 g=8": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 23,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf840000",
+  "predictions": {
+   "M2 g=3": "4afffffe",
+   "M2 g=8": "4afffffd"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf400000",
+  "predictions": {
+   "M1": "4afffffe",
+   "M2 g=1": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf040000",
+  "predictions": {
+   "M1": "4afffffe",
+   "M2 g=2": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf001000",
+  "predictions": {
+   "M1": "4afffffe",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf008000",
+  "predictions": {
+   "M1": "4afffffe",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=1": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=2": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf400000",
+  "predictions": {
+   "M2 g=1": "4affffff",
+   "M2 g=2": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf200000",
+  "predictions": {
+   "M2 g=1": "4affffff",
+   "M2 g=3": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf100000",
+  "predictions": {
+   "M2 g=1": "4affffff",
+   "M2 g=8": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf200000",
+  "predictions": {
+   "M2 g=2": "4affffff",
+   "M2 g=3": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf100000",
+  "predictions": {
+   "M2 g=2": "4affffff",
+   "M2 g=8": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 24,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bf100000",
+  "predictions": {
+   "M2 g=3": "4affffff",
+   "M2 g=8": "4afffffe"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=2": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=2": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be800000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 25,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=2": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=3": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "be000000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 26,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=2": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=3": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 27,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd800000",
+  "predictions": {
+   "M2 g=3": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=2": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=3": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 28,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bd000000",
+  "predictions": {
+   "M2 g=3": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=2": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=3": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 29,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc800000",
+  "predictions": {
+   "M2 g=3": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M1",
+   "M2 g=0"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=0": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M1",
+   "M2 g=1"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=1": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M1",
+   "M2 g=2"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=2": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M1",
+   "M2 g=3"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M1": "4affffff",
+   "M2 g=3": "4b000000"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M1",
+   "M2 g=8"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=0",
+   "M2 g=1"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=0",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=0",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=0",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M2 g=0": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=1",
+   "M2 g=2"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=1",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=1",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M2 g=1": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=2",
+   "M2 g=3"
+  ],
+  "z3": "unsat"
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=2",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M2 g=2": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ },
+ {
+  "gap": 30,
+  "models": [
+   "M2 g=3",
+   "M2 g=8"
+  ],
+  "z3": "sat",
+  "fs": "4b000000",
+  "ft": "bc000000",
+  "predictions": {
+   "M2 g=3": "4b000000",
+   "M2 g=8": "4affffff"
+  },
+  "independently_confirmed": true
+ }
+]

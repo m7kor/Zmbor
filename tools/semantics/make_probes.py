@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import ee_fpu_models as em  # noqa: E402
 import mul_models as mm  # noqa: E402
+import ee_rsqrt_models as rm  # noqa: E402
 
 
 def separating_set(models, candidates, limit):
@@ -80,6 +81,23 @@ def vu_mul_candidates(rng):
         out.append(((a, b), {m: mm.mul(a, b, m) for m in models}))
         out.append(((b, a), {m: mm.mul(b, a, m) for m in models}))
     return models, out
+
+
+def ee_rsqrt_candidates(rng):
+    # Models scoring >= 33/34 on the RSQRT.S hardware rows (ee_rsqrt_models.py), plus the SQRT.S-then-DIV.S composition
+    # the train sets predict (29/34, the production behaviour).
+    models = {
+        'compose root=near quotient=near': lambda a, b: rm.rsqrt_composed(a, b, 'near', 'near'),
+        'compose root=near quotient=trunc': lambda a, b: rm.rsqrt_composed(a, b, 'near', 'trunc'),
+        'reciprocal=near product=trunc': lambda a, b: rm.rsqrt_reciprocal(a, b, 'near', 'near', 'trunc'),
+        'reciprocal=near product=near': lambda a, b: rm.rsqrt_reciprocal(a, b, 'near', 'near', 'near'),
+    }
+    out = []
+    for _ in range(600):
+        a = (127 << 23) | rng.getrandbits(23)
+        b = ((126 + rng.randrange(2)) << 23) | rng.getrandbits(23)
+        out.append(((a, b), {n: f(a, b) for n, f in models.items()}))
+    return list(models), out
 
 
 PROGRAM = '''// Hardware probe: {title}
@@ -164,3 +182,7 @@ if __name__ == '__main__':
     chosen, unresolved = separating_set(models, cands, 8)
     write(out, 'p4_vu_mul_asymmetry', 'VU0 FMAC MUL operand-order asymmetry (evidence register 2.3)', models,
           chosen, unresolved, vu=True)
+    models, cands = ee_rsqrt_candidates(rng)
+    chosen, unresolved = separating_set(models, cands, 12)
+    write(out, 'p3_ee_rsqrt_datapath', 'EE RSQRT.S datapath: composed root/divide vs reciprocal-multiply (register 1.5)',
+          models, chosen, unresolved, insn='rsqrt.s $f0, $f1, $f2')

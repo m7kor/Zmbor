@@ -52,9 +52,9 @@ Rules:
   clamped exponent-255 operands and results to 0x7F7FFFFF. Unit tests compare micro mode with the integer reference:
   34,201 in-range plus 1,799 exponent-255 ADD/SUB/MUL results and 23,100 lane results over 39 other forms, all equal.
 - Micro-mode flags are still computed from a `long double` exact result (`normalizeFmacExactResult`): O at 2^129
-  (format, provisional threshold), U below 2^-126, Z, S. MSVC's `long double` is a double, so that exact result is
-  exact only while the sum needs at most 53 bits; values and flags can therefore disagree only at gaps of 25..29
-  on the U/Z boundary, which no test reaches (noted, not changed).
+  (format, provisional threshold), U below 2^-126, Z, S. That is a second computation beside the value path
+  (MSVC's `long double` is a double); whether it always agrees with the value's exponent is not tested beyond the
+  existing flag tests. Open item, not changed.
 - Macro mode (`PS2_VADD`/`PS2_VSUB`/`PS2_VMUL`, used by every COP2 FMAC macro) now calls `ps2_vu_fmac::add/sub/mul`
   per lane:
   - an exponent gap of 25 or more selects the larger operand;

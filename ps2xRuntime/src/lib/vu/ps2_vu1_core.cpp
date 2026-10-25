@@ -3,6 +3,8 @@
 #include "runtime/gs/gs_frontend.h"
 #include "runtime/ps2_memory.h"
 #include "ps2_vu1_detail.h"
+#include "ps2_vu_fmac.h"
+#include <bit>
 
 #include <algorithm>
 #include <cfenv>
@@ -16,6 +18,30 @@
 
 namespace
 {
+    // Operands of the FMAC flag computation (calculateFmacExactResult). Sums and lone products are exact; a product
+    // that feeds a sum is first truncated by the contract (ps2_vu_fmac::mul), as MADD/MSUB/OPMSUB do.
+    struct FmacOperand
+    {
+        uint32_t bits;
+    };
+
+    struct FmacProduct
+    {
+        uint32_t a, b;
+        operator long double() const // a lone product (MUL/MULA/OPMULA): exact
+        {
+            return static_cast<long double>(ps2_vu_fmac::toDouble(a)) * ps2_vu_fmac::toDouble(b);
+        }
+    };
+
+    long double fmacValue(FmacOperand x) { return ps2_vu_fmac::toDouble(x.bits); }
+    long double fmacValue(FmacProduct p) { return ps2_vu_fmac::toDouble(ps2_vu_fmac::mul(p.a, p.b)); }
+    FmacProduct operator*(FmacOperand x, FmacOperand y) { return {x.bits, y.bits}; }
+    long double operator+(FmacOperand x, FmacOperand y) { return fmacValue(x) + fmacValue(y); }
+    long double operator-(FmacOperand x, FmacOperand y) { return fmacValue(x) - fmacValue(y); }
+    long double operator+(FmacOperand x, FmacProduct p) { return fmacValue(x) + fmacValue(p); }
+    long double operator-(FmacOperand x, FmacProduct p) { return fmacValue(x) - fmacValue(p); }
+
     constexpr uint8_t laneForComponent(uint32_t component)
     {
         return static_cast<uint8_t>(1u << (3u - component));
@@ -206,7 +232,7 @@ void VU1Interpreter::normalizeFmacResult(float *result, uint8_t dest,
         long double exactResult = 0.0L;
         if (calculateFmacExactResult(component, exactResult))
         {
-            laneFlags[component] = normalizeFmacExactResult(result[component], exactResult);
+            laneFlags[component] = fmacResultFlags(exactResult);
             continue;
         }
 
@@ -227,9 +253,12 @@ bool VU1Interpreter::calculateFmacExactResult(uint32_t component,
     const uint8_t fs = FS(upper);
     const uint8_t ft = FT(upper);
 
-    const auto operand = [this](float value)
+    // Raw register value as the FMAC reads it (exponent 0 = zero, exponent 255 = a value), as ps2_vu_fmac does.
+    // FmacOperand arithmetic follows the contract's rounding points: a product inside a sum is the contract's
+    // truncated product (MA), a lone product or sum is exact, so the flags describe the value ps2_vu_fmac wrote.
+    const auto operand = [](float value)
     {
-        return static_cast<long double>(normalizeOperand(value));
+        return FmacOperand{std::bit_cast<uint32_t>(value)};
     };
     const auto vs = [&](uint32_t lane)
     {
@@ -244,8 +273,8 @@ bool VU1Interpreter::calculateFmacExactResult(uint32_t component,
         return operand(m_state.acc[lane]);
     };
 
-    const long double q = operand(m_state.q);
-    const long double i = operand(m_state.i);
+    const FmacOperand q = operand(m_state.q);
+    const FmacOperand i = operand(m_state.i);
 
     if (op < 0x3Cu)
     {
@@ -399,33 +428,20 @@ bool VU1Interpreter::calculateFmacExactResult(uint32_t component,
     return true;
 }
 
-uint8_t VU1Interpreter::normalizeFmacExactResult(float &value,
-                                                  long double exactResult) const
+uint8_t VU1Interpreter::fmacResultFlags(long double exactResult) const
 {
-    const bool negative = std::signbit(exactResult);
+    // Z/S/U/O of the value ps2_vu_fmac wrote, from the exact result at the contract's last rounding point (see
+    // FmacOperand). Only flags: the value is never rewritten here, so micro mode writes exactly what macro mode does.
+    // Exponent 255 holds values, so a result overflows only at 2^129 and saturates to +-0x7FFFFFFF (evidence register
+    // 2.1; which exact magnitude sets O is provisional: no hardware row observes FMAC MAC flags).
     const long double magnitude = std::fabs(exactResult);
-    const long double maximum = static_cast<long double>(std::numeric_limits<float>::max());
-    const long double minimum = static_cast<long double>(std::numeric_limits<float>::min());
-    uint8_t flags = negative ? 0x2u : 0u;
-
-    uint32_t bits = negative ? 0x80000000u : 0u;
+    uint8_t flags = std::signbit(exactResult) ? 0x2u : 0u;
     if (magnitude == 0.0L)
-    {
         flags |= 0x1u;
-        std::memcpy(&value, &bits, sizeof(value));
-    }
-    else if (magnitude > maximum)
-    {
+    else if (magnitude >= 0x1p129L)
         flags |= 0x8u;
-        bits |= 0x7F7FFFFFu;
-        std::memcpy(&value, &bits, sizeof(value));
-    }
-    else if (magnitude < minimum)
-    {
+    else if (magnitude < static_cast<long double>(std::numeric_limits<float>::min()))
         flags |= 0x5u;
-        std::memcpy(&value, &bits, sizeof(value));
-    }
-
     return flags;
 }
 
@@ -454,32 +470,32 @@ uint32_t VU1Interpreter::calculateFmacProductSticky(uint8_t dest) const
         static constexpr uint8_t crossLeft[4] = {1u, 2u, 0u, 3u};
         static constexpr uint8_t crossRight[4] = {2u, 0u, 1u, 3u};
         const uint8_t leftComponent = op == 0x2Eu ? crossLeft[component] : static_cast<uint8_t>(component);
-        const float left = normalizeOperand(m_state.vf[fs][leftComponent]);
+        // Raw operands, as the value path reads them (exponent 255 is a value, not clamped).
+        const float left = m_state.vf[fs][leftComponent];
         float right = 0.0f;
         if ((op >= 0x08u && op <= 0x0Fu) || (special >= 0x08u && special <= 0x0Fu))
         {
-            right = normalizeOperand(m_state.vf[ft][(op >= 0x08u && op <= 0x0Fu ? op : special) & 3u]);
+            right = m_state.vf[ft][(op >= 0x08u && op <= 0x0Fu ? op : special) & 3u];
         }
         else if (op == 0x21u || op == 0x25u || special == 0x21u || special == 0x25u)
         {
-            right = normalizeOperand(m_state.q);
+            right = m_state.q;
         }
         else if (op == 0x23u || op == 0x27u || special == 0x23u || special == 0x27u)
         {
-            right = normalizeOperand(m_state.i);
+            right = m_state.i;
         }
         else if (op == 0x2Eu)
         {
-            right = normalizeOperand(m_state.vf[ft][crossRight[component]]);
+            right = m_state.vf[ft][crossRight[component]];
         }
         else
         {
-            right = normalizeOperand(m_state.vf[ft][component]);
+            right = m_state.vf[ft][component];
         }
 
-        float product = left * right;
-        const long double exactProduct = static_cast<long double>(left) * static_cast<long double>(right);
-        const uint8_t productFlags = normalizeFmacExactResult(product, exactProduct);
+        const uint8_t productFlags = fmacResultFlags(
+            static_cast<long double>(FmacProduct{std::bit_cast<uint32_t>(left), std::bit_cast<uint32_t>(right)}));
         // Product-sum instructions report Z/S/U/O from the add/subtract result
         // as current flags, while every product condition accumulates into the
         // corresponding sticky flag.

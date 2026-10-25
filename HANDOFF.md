@@ -1,13 +1,34 @@
-# Zmbor — handoff (updated 2026-10-25, Phase 4)
+# Zmbor — handoff (updated 2026-10-25, Phase 5)
 
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,
 built on the upstream project `ran-j/PS2Recomp@eb8688b` plus upstream #384. Re-measure before quoting any number.
 
-## Phase 4 (pushed; draft PR #2 open, not merged)
+## Phase 5 (Draft PR #3, not merged)
 
-- Branch `ultimate/phase4-hardware-accuracy` is on https://github.com/m7kor/Zmbor with draft
-  **PR #2** (https://github.com/m7kor/Zmbor/pull/2) into `main`. Do not merge or mark it ready without the owner's
-  approval. Local worktree: `D:\Project\Zmbor\wt-phase4`.
+- Branch `ultimate/phase5-architectural-correctness`, worktree `D:\Project\Zmbor\wt-phase5`, based on Zmbor `main`
+  `20f1a97` (PR #2 merged). `1d7629d` is the WIP start and is kept unchanged; later commits are listed in
+  `CHANGELOG.md` (Phase 5). Pushed with the owner's authorization as Draft PR https://github.com/m7kor/Zmbor/pull/3 (do not mark ready or merge without approval); CI 6/6 on `d1c6759`.
+- Build dirs: `build` (baseline, `20f1a97`) and `build-wip` (branch head); hardware tests use
+  `D:\Project\Zmbor\hwtest_work\gen5`; reports `p5_base`, `p5_wip`, `p5_micro`, `p5_perf` (`.json/.md`) in
+  `hwtest_work`. Full gate script used: scratchpad `gate5.ps1` (build, `ctest -L hwtest`, report against
+  `p5_base.json`, `ps2x_tests`, `ctest -LE hwtest`, IOP ctest).
+- Measured at the branch head (Windows MSVC): hardware tests 53/55 exact, 8202/8250 lines (exact-source gate on `d8ac102`), no regressions vs
+  `20f1a97`; `ps2x_tests` 541/541; ctest (non-hwtest) 52/52; e2e 4/4; `ps2xIOP` 4/4. No physical PS2 and
+  no ps2sdk toolchain were available: no new hardware measurement exists; every probe is `UNMEASURED`.
+- Architecture documents (start here): `docs/architecture/evidence-register.md` (every model with its evidence),
+  `vu-ee-arithmetic-semantics.md` (VU FMAC contract, lowerings, FP policy in section 4), `hardware-probes.md` (probe
+  pipeline and inventory), `benchmark-methodology.md`, `control-flow-invariants.md`.
+- Tools: `tools/semantics/` (exact models, Z3 search `z3_add_models.py` needs `pip install z3-solver==4.13.0.0`,
+  RSQRT analysis `ee_rsqrt_models.py`), `tools/hwprobes/probe_lab.py` (manifests, ingest), `tools/fpenv/` (FP flag
+  guard, ctest `fpenv_flag_independence`), `tools/bench/` (`ps2x_bench_vu_fmac`).
+- Open questions are listed per entry in the evidence register; the main ones: EE ADD guard bits (P1), MUL.S form
+  (P2), RSQRT.S datapath (P3, best fit post hoc), VU MUL asymmetry (P4), EFU cancellation residual, macro-mode
+  MAC/STATUS flags (gap), FMAC overflow threshold (provisional).
+
+## Phase 4 (merged into main as PR #2)
+
+- Branch `ultimate/phase4-hardware-accuracy` was merged into `main` by the owner as **PR #2**
+  (https://github.com/m7kor/Zmbor/pull/2, merge commit `20f1a97`). Local worktree: `D:\Project\Zmbor\wt-phase4`.
 - Commits on Zmbor `main` `00173a2`:
   - `3d935f4` branch in a delay slot;
   - `a7449bb` heap ownership;
@@ -164,22 +185,30 @@ Phase 4 additions:
   - VIF, SPR and DMAC: all 11 `dma/*` tests exact.
 - Phase 4: branch in a delay slot, heap ownership, COP0 performance counters, MUL.S, VU0 vi24: 53/55.
 
-## Remaining hardware failures (2, after Phase 4)
+## Remaining hardware failures (2, after Phase 5)
 
 | test | lines | cause / lead |
 |---|---|---|
-| vu_lower_efu | 182/223 | 41 rows: EATAN/ESIN/EEXP last-bit differences; exact series term rounding unknown (model matches 167/208 vectors). The MUL.S finding (Booth-recoded ft, lowest negative digit missing its +1) is an untested lead for the series products |
-| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S 1 ulp on 7 rows. Fitted on all 39 rows (scratch scripts `fpu_rsqrt_fit.py`, `fpu_rsqrt_sweep.py`): root to nearest + truncated division fits 38; truncated/extra-bit roots fit fewer; DIV.S itself rounds up at 0.50 ulp where an RSQRT quotient at 0.52 ulp does not, so the two do not share one rounding rule |
+| vu_lower_efu | 182/223 | EATAN/ESIN/EEXP last bits (unit vectors 167/208). Production is the Phase 3 model. A Phase 5 candidate (FMAC adder in the series + pi/4 = 0x3F490FDA, 183/223) was reverted at the merge gate because it was selected on the scored rows; it stays reproducible in `tools/experiments/efu_ab.ps1`. EATAN(0)-type rows read 0x33E60000 on hardware, a cancellation residual no candidate reproduces (register 2.5) |
+| cpu_ee_fpu_sqrt | 59/66 | RSQRT.S: not SQRT.S-then-DIV.S (that composition predicts 29/34 distinct rows); a post-hoc reciprocal datapath fits 34/34 but is not adopted; probe P3 separates them (register 1.5). Also sqrt(-0) = +0 on hardware |
 
 Fixed in Phase 4: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay, memory_ee_default, cpu_ee_cop0_performance,
 cpu_ee_fpu_muldiv, cpu_vu0_macro_transfer (see `CHANGELOG.md`, Phase 4).
 
-## Next priorities (suggested)
+## Next fundamental milestone (Phase 6, proposed)
 
-1. RSQRT.S: try a divider model (e.g. SRT/Newton with a fixed number of quotient bits) against the 39 rows plus the
-   36 DIV rows together.
-2. EFU series last bits (time-box).
-3. MUL.S speed: the integer model costs about 1.46x the host multiply in isolation; a host multiply plus an FMA
-   remainder check gives the same result where FMA is available.
-4. Integrate the queued community items in `docs/community-research/REUSABLE_IMPROVEMENTS.md` that the hardware tests
-   do not cover, then validate on real game ELFs supplied by the user. Never commit game data or BIOS.
+Rule: nothing below is implemented on assumption. Each item first produces evidence (category A/B) or a falsifiable
+model with a probe; production changes only when the evidence picks one model.
+
+| # | item | needs | first deliverable | blocked on |
+|---|---|---|---|---|
+| 1 | Hardware evidence for P1–P4 | ps2sdk/ps2dev toolchain, a PS2 with ps2link or uLaunchELF, the owner's consent to run homebrew | build the four generated probes in ps2autotests, capture the `fs ft result` lines, `probe_lab.py ingest --source hardware --console <id>` | console + toolchain |
+| 2 | Macro-mode MAC/STATUS flags (register 2.4, gap) | a probe that runs COP2 VADD/VMUL in macro mode, then CFC2 vi16/vi17 (MAC/STATUS), on boundary operands | probe generator + expected-flag candidates (same as micro / not updated / delayed) | item 1's setup |
+| 3 | EE ADD guard bits (register 1.2) | P1 results (gaps 1–24, opposite signs) | pick M1 or M2(g); change `ps2_fadd` only then; keep the Z3 report as the design record | item 1 |
+| 4 | RSQRT.S datapath (register 1.5) | P3 results, more operand pairs from the same generator | decide composed vs reciprocal; a non-post-hoc validation set first | item 1 |
+| 5 | EFU remainder (register 2.5, H-EFU-1, EATAN(0) residual) | a Python EFU model independent of the interpreter, then an EFU probe | reproduce the 0x33E60000 residual from a stated alignment rule, or record its failure | model work; probe needs item 1 |
+| 6 | Native runtime profile | a representative workload: a user-supplied game ELF (never committed) or a homebrew 3D demo; Tracy or Windows ETW | time split per subsystem (EE code, VU interpreter, GS, VIF/DMA) before any further optimisation | workload |
+
+Also open from the Phase 5 review: when a MADD/MSUB product overflows but the final sum does not, micro mode now
+reports O only as sticky (from the product), not as a current flag; hardware behaviour is unmeasured (item 2).
+ctest `e2e` and `hwtest` have never run on Linux.

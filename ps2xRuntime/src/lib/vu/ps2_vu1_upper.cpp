@@ -1,37 +1,25 @@
 #include "runtime/ps2_vu1.h"
 #include "ps2_vu1_detail.h"
+#include "ps2_vu_fmac.h"
 
 #include <cmath>
 #include <cstring>
 #include <limits>
 
-namespace
-{
-    // VU FMAC addition: the smaller operand is aligned to the larger one and the bits shifted out are dropped
-    // before the add, so an operand 25 or more exponent steps below the other leaves it unchanged, even when it
-    // has the opposite sign (ps2autotests vu/games/triace.expected: 0x42546666 + -1.05e-7 stays 0x42546666, where
-    // a truncated exact sum gives 0x42546665). Closer operands keep the host sum under the interpreter's
-    // round-toward-zero mode.
-    float vuAdd(float a, float b)
-    {
-        uint32_t ua = 0, ub = 0;
-        std::memcpy(&ua, &a, sizeof(ua));
-        std::memcpy(&ub, &b, sizeof(ub));
-        const int ea = static_cast<int>((ua >> 23) & 0xFFu);
-        const int eb = static_cast<int>((ub >> 23) & 0xFFu);
-        if (ea != 0 && eb != 0)
-        {
-            if (ea - eb >= 25)
-                return a;
-            if (eb - ea >= 25)
-                return b;
-        }
-        return a + b;
-    }
-}
+// FMAC ADD/SUB/MUL/MADD/MSUB/OPMULA/OPMSUB use ps2_vu_fmac, the contract VU0 macro mode uses too: exponent-gap rule
+// (vu/games/triace), truncation, exponent 255 as a value. It does not depend on the interpreter's FE_TOWARDZERO.
 
 namespace
 {
+    // Four FMAC lanes at once through ps2_vu_fmac's SSE2 kernels, the code VU0 macro mode runs. With a per-lane loop
+    // over the scalar kernel, the MSVC 14.51 CI build wrote lane w's result into every lane (14.44 and GCC/Clang
+    // builds were correct). The cause is not identified: review found no aliasing or UB, and the same loop shape in
+    // isolation (tools/fpenv/lane_loop_probe.cpp) keeps its lanes on 14.51. The four-lane form is the shared lowering
+    // anyway; the "lanes stay independent" unit test guards the observed pattern.
+    inline __m128i lanes(const float *v) { return _mm_loadu_si128(reinterpret_cast<const __m128i *>(v)); }
+    inline __m128i splat(float v) { return _mm_set1_epi32(std::bit_cast<int32_t>(v)); }
+    inline void store(float *result, __m128i v) { _mm_storeu_si128(reinterpret_cast<__m128i *>(result), v); }
+
     int32_t vuFloatToInt(float value, float scale)
     {
         const double scaled = static_cast<double>(value) * static_cast<double>(scale);
@@ -70,6 +58,13 @@ void VU1Interpreter::execUpper(uint32_t instr)
     const float *acc = normalizedAcc;
     const float q = normalizeOperand(m_state.q);
     const float i = normalizeOperand(m_state.i);
+    // FMAC arithmetic reads the raw registers: ps2_vu_fmac treats exponent 0 as zero and exponent 255 as a value
+    // (docs/architecture/evidence-register.md 2.1). The normalized copies above stay for MAX/MINI/ABS/conversions.
+    const float *rvs = m_state.vf[fs];
+    const float *rvt = m_state.vf[ft];
+    const float *racc = m_state.acc;
+    const float rq = m_state.q;
+    const float ri = m_state.i;
     float result[4];
 
     // Upper opcode decoding (bits 5:0 of upper word)
@@ -80,9 +75,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x02:
     case 0x03: // ADDbc
     {
-        float bc = broadcast(vt, op & 3);
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], bc);
+        const float rbc = rvt[op & 3];
+        store(result, ps2_vu_fmac::add4(lanes(rvs), splat(rbc)));
         applyFmacDest(vd, result, dest);
         return;
     }
@@ -91,9 +85,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x06:
     case 0x07: // SUBbc
     {
-        float bc = broadcast(vt, op & 3);
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], -bc);
+        const float rbc = rvt[op & 3];
+        store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(rbc)));
         applyFmacDest(vd, result, dest);
         return;
     }
@@ -102,9 +95,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x0A:
     case 0x0B: // MADDbc
     {
-        float bc = broadcast(vt, op & 3);
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], vs[c] * bc);
+        const float rbc = rvt[op & 3];
+        store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rbc))));
         applyFmacDest(vd, result, dest);
         return;
     }
@@ -113,9 +105,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x0E:
     case 0x0F: // MSUBbc
     {
-        float bc = broadcast(vt, op & 3);
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], -(vs[c] * bc));
+        const float rbc = rvt[op & 3];
+        store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rbc))));
         applyFmacDest(vd, result, dest);
         return;
     }
@@ -146,15 +137,13 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x1A:
     case 0x1B: // MULbc
     {
-        float bc = broadcast(vt, op & 3);
-        for (int c = 0; c < 4; c++)
-            result[c] = vs[c] * bc;
+        const float rbc = rvt[op & 3];
+        store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(rbc)));
         applyFmacDest(vd, result, dest);
         return;
     }
     case 0x1C: // MULq
-        for (int c = 0; c < 4; c++)
-            result[c] = vs[c] * q;
+        store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(rq)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x1D: // MAXi
@@ -163,8 +152,7 @@ void VU1Interpreter::execUpper(uint32_t instr)
         applyDest(vd, result, dest);
         return;
     case 0x1E: // MULi
-        for (int c = 0; c < 4; c++)
-            result[c] = vs[c] * i;
+        store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(ri)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x1F: // MINIi
@@ -173,58 +161,47 @@ void VU1Interpreter::execUpper(uint32_t instr)
         applyDest(vd, result, dest);
         return;
     case 0x20: // ADDq
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], q);
+        store(result, ps2_vu_fmac::add4(lanes(rvs), splat(rq)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x21: // MADDq
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], vs[c] * q);
+        store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rq))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x22: // ADDi
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], i);
+        store(result, ps2_vu_fmac::add4(lanes(rvs), splat(ri)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x23: // MADDi
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], vs[c] * i);
+        store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(ri))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x24: // SUBq
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], -q);
+        store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(rq)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x25: // MSUBq
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], -(vs[c] * q));
+        store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rq))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x26: // SUBi
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], -i);
+        store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(ri)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x27: // MSUBi
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], -(vs[c] * i));
+        store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(ri))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x28: // ADD
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], vt[c]);
+        store(result, ps2_vu_fmac::add4(lanes(rvs), lanes(rvt)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x29: // MADD
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], vs[c] * vt[c]);
+        store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x2A: // MUL
-        for (int c = 0; c < 4; c++)
-            result[c] = vs[c] * vt[c];
+        store(result, ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x2B: // MAX
@@ -233,19 +210,17 @@ void VU1Interpreter::execUpper(uint32_t instr)
         applyDest(vd, result, dest);
         return;
     case 0x2C: // SUB
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(vs[c], -vt[c]);
+        store(result, ps2_vu_fmac::sub4(lanes(rvs), lanes(rvt)));
         applyFmacDest(vd, result, dest);
         return;
     case 0x2D: // MSUB
-        for (int c = 0; c < 4; c++)
-            result[c] = vuAdd(acc[c], -(vs[c] * vt[c]));
+        store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt))));
         applyFmacDest(vd, result, dest);
         return;
     case 0x2E: // OPMSUB
-        result[0] = acc[0] - vs[1] * vt[2];
-        result[1] = acc[1] - vs[2] * vt[0];
-        result[2] = acc[2] - vs[0] * vt[1];
+        result[0] = ps2_vu_fmac::subf(racc[0], ps2_vu_fmac::mulf(rvs[1], rvt[2]));
+        result[1] = ps2_vu_fmac::subf(racc[1], ps2_vu_fmac::mulf(rvs[2], rvt[0]));
+        result[2] = ps2_vu_fmac::subf(racc[2], ps2_vu_fmac::mulf(rvs[0], rvt[1]));
         result[3] = 0.0f;
         applyFmacDest(vd, result, dest);
         return;
@@ -274,9 +249,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
         case 0x02:
         case 0x03: // ADDAbc
         {
-            float bc = broadcast(vt, specialOp & 3);
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], bc);
+            const float rbc = rvt[specialOp & 3];
+            store(result, ps2_vu_fmac::add4(lanes(rvs), splat(rbc)));
             applyFmacDestAcc(result, dest);
             return;
         }
@@ -285,9 +259,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
         case 0x06:
         case 0x07: // SUBAbc
         {
-            float bc = broadcast(vt, specialOp & 3);
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], -bc);
+            const float rbc = rvt[specialOp & 3];
+            store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(rbc)));
             applyFmacDestAcc(result, dest);
             return;
         }
@@ -296,9 +269,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
         case 0x0A:
         case 0x0B: // MADDAbc
         {
-            float bc = broadcast(vt, specialOp & 3);
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], vs[c] * bc);
+            const float rbc = rvt[specialOp & 3];
+            store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rbc))));
             applyFmacDestAcc(result, dest);
             return;
         }
@@ -307,9 +279,8 @@ void VU1Interpreter::execUpper(uint32_t instr)
         case 0x0E:
         case 0x0F: // MSUBAbc
         {
-            float bc = broadcast(vt, specialOp & 3);
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], -(vs[c] * bc));
+            const float rbc = rvt[specialOp & 3];
+            store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rbc))));
             applyFmacDestAcc(result, dest);
             return;
         }
@@ -386,15 +357,13 @@ void VU1Interpreter::execUpper(uint32_t instr)
         case 0x1A:
         case 0x1B: // MULAbc
         {
-            float bc = broadcast(vt, specialOp & 3);
-            for (int c = 0; c < 4; c++)
-                result[c] = vs[c] * bc;
+            const float rbc = rvt[specialOp & 3];
+            store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(rbc)));
             applyFmacDestAcc(result, dest);
             return;
         }
         case 0x1C: // MULAq
-            for (int c = 0; c < 4; c++)
-                result[c] = vs[c] * q;
+            store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(rq)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x1D: // ABS
@@ -403,8 +372,7 @@ void VU1Interpreter::execUpper(uint32_t instr)
             applyDest(vtDest, result, dest);
             return;
         case 0x1E: // MULAi
-            for (int c = 0; c < 4; c++)
-                result[c] = vs[c] * i;
+            store(result, ps2_vu_fmac::mul4(lanes(rvs), splat(ri)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x1F: // CLIP
@@ -440,74 +408,61 @@ void VU1Interpreter::execUpper(uint32_t instr)
             return;
         }
         case 0x20: // ADDAq
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], q);
+            store(result, ps2_vu_fmac::add4(lanes(rvs), splat(rq)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x21: // MADDAq
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], vs[c] * q);
+            store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rq))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x22: // ADDAi
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], i);
+            store(result, ps2_vu_fmac::add4(lanes(rvs), splat(ri)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x23: // MADDAi
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], vs[c] * i);
+            store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(ri))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x24: // SUBAq
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], -q);
+            store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(rq)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x25: // MSUBAq
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], -(vs[c] * q));
+            store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(rq))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x26: // SUBAi
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], -i);
+            store(result, ps2_vu_fmac::sub4(lanes(rvs), splat(ri)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x27: // MSUBAi
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], -(vs[c] * i));
+            store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), splat(ri))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x28: // ADDA
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], vt[c]);
+            store(result, ps2_vu_fmac::add4(lanes(rvs), lanes(rvt)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x29: // MADDA
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], vs[c] * vt[c]);
+            store(result, ps2_vu_fmac::add4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x2A: // MULA
-            for (int c = 0; c < 4; c++)
-                result[c] = vs[c] * vt[c];
+            store(result, ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x2C: // SUBA
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(vs[c], -vt[c]);
+            store(result, ps2_vu_fmac::sub4(lanes(rvs), lanes(rvt)));
             applyFmacDestAcc(result, dest);
             return;
         case 0x2D: // MSUBA
-            for (int c = 0; c < 4; c++)
-                result[c] = vuAdd(acc[c], -(vs[c] * vt[c]));
+            store(result, ps2_vu_fmac::sub4(lanes(racc), ps2_vu_fmac::mul4(lanes(rvs), lanes(rvt))));
             applyFmacDestAcc(result, dest);
             return;
         case 0x2E: // OPMULA
-            result[0] = vs[1] * vt[2];
-            result[1] = vs[2] * vt[0];
-            result[2] = vs[0] * vt[1];
+            result[0] = ps2_vu_fmac::mulf(rvs[1], rvt[2]);
+            result[1] = ps2_vu_fmac::mulf(rvs[2], rvt[0]);
+            result[2] = ps2_vu_fmac::mulf(rvs[0], rvt[1]);
             result[3] = 0.0f;
             applyFmacDestAcc(result, dest);
             return;

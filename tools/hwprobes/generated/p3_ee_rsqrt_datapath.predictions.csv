@@ -1,0 +1,4 @@
+# category D: model predictions, not hardware results
+fs,ft,compose root=near quotient=near,compose root=near quotient=trunc,reciprocal=near product=trunc,reciprocal=near product=near
+3fee69e4,3f7de123,3fef6842,3fef6841,3fef6842,3fef6843
+3f962e49,3fa96b7e,3f8289c0,3f8289bf,3f8289bf,3f8289c0

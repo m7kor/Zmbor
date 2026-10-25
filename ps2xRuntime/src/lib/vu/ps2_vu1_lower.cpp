@@ -110,6 +110,9 @@ namespace
                                            -0.139085337519646, 0.096420042216778, -0.055909886956215,
                                            0.021861229091883, -0.004054057877511};
         const double t = efuDivide(efuTrunc(b - a), efuTrunc(b + a));
+        // Phase 3 model, kept unchanged: this decimal is not a float (it lies 3.3e-16 below 0x3F490FDB). Alternatives
+        // (FMAC-adder series, 0x3F490FDA) were selected on the same rows they are scored on and stay in research
+        // (tools/experiments/efu_ab.ps1, evidence register 2.5) until independent evidence exists.
         return efuTrunc(efuSeries(t, coefficients, efuTrunc(t * t)) + 0.785398185253143);
     }
 

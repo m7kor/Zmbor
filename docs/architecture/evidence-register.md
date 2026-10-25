@@ -1,0 +1,167 @@
+# Architectural evidence register
+
+Every behavioural model in Zmbor that is not plain MIPS/IEEE semantics, with the evidence it rests on.
+Evidence categories (keep them apart; only A and B are hardware proof):
+
+- **A** known real-PS2 vectors (ps2autotests `.expected`, the `*_hw_vectors.inc` files);
+- **B** newly measured real-PS2 results (none yet — see `docs/architecture/hardware-probes.md`);
+- **C** emulator reference results (PCSX2 etc.);
+- **D** synthetic results derived from a specification or from a model;
+- **E** Zmbor's own output.
+
+Probe tooling uses the names A = HARDWARE_REFERENCE, B = HARDWARE_CONFIRMED, C = EMULATOR_OBSERVED,
+D = MODEL_PREDICTED, E = ZMBOR_OBSERVED, plus UNMEASURED (`tools/hwprobes/probe_lab.py`, `hardware-probes.md`).
+
+Status: **established** (A/B evidence that discriminates the alternatives), **architectural** (follows from
+documented hardware structure, not measured directly), **provisional** (fits the data, but the data does not exclude
+alternatives), **unresolved** (competing models fit; no choice is claimed), **gap** (behaviour not modelled).
+
+Tools for the arithmetic entries: `tools/semantics/` (exact rational/integer models, fitted against A).
+
+---
+
+## 1. EE COP1 (FPU)
+
+### 1.1 Float format — established
+PS2 floats have no Inf/NaN/denormal: exponent 0 is zero whatever the mantissa, exponent 255 is an ordinary
+exponent (0x7F800000 = 2^128), results >= 2^129 saturate to ±0x7FFFFFFF, results below 2^-126 flush to ±0.
+Evidence A: cpu/ee_fpu/{arithmetic,muldiv,sqrt,fcr}.expected (e.g. `mul CF_GARBAGE1, CF_GARBAGE2: 80000000` with a
+denormal fs; `add CF_MAX, CF_MAX: 7fffffff`). Safe to generalise: yes.
+
+### 1.2 ADD.S/SUB.S/ADDA/SUBA — the documented contract is falsified; the true model is unresolved
+- Code comment (Phase 2) claims: *exact sum rounded toward zero*. Exact rational model M1 of that claim
+  (`tools/semantics/fit_ee_add.py`): **132/144** hardware rows. The 12 failures are all opposite-sign operands with an
+  exponent gap of 128 (`sub CF_MAX_EXP, CF_ONE: 7f800001`, M1 gives 7f800000): the hardware drops the smaller
+  operand.
+- The runtime passes those rows by accident: its "exact" sum is a double, which loses the smaller operand at gaps
+  of about 54 and more. Its effective behaviour is M1 below a gap of ~54 and "larger operand" above.
+- Alternative M2(g): align the smaller mantissa keeping g guard bits, drop the rest (no sticky), add, truncate:
+  **144/144 for every g tested (0..3)**, and the data cannot bound g (every discriminating row has gap 128).
+- Consequence: production, M2(0..3) and M2(29) all fit; they differ for opposite-sign operands with gaps of about
+  24-53 and for shifted-out bits at smaller gaps. Discriminating probes: `hardware-probes.md` P1.
+- Production is **not** changed (no evidence picks a model). The VU adder (2.2) drops at gap 25; whether the EE adder
+  shares that design is a hypothesis, not evidence.
+
+### 1.3 MUL.S/MULA/MADD/MSUB — provisional
+Truncated product, non-commutative: `1.0 * 0x3FFFFFFF = 0x3FFFFFFE`, reversed operands exact (A, 72 rows).
+Implemented (`ps2_ee_fmul_bits`) as a radix-4 Booth recoding of ft whose lowest negative digit misses its +1.
+Wider truncated-array models (columns below K = 1..22 dropped) fit the same 72 rows. Prediction shared by all of
+them: fs = power of two times ft with mantissa bit 1 set loses one ulp. They differ for other low partial-product
+patterns (probes P2). Safe to generalise: the shared prediction yes; the exact form no.
+
+### 1.4 DIV.S — provisional
+Host division rounded to nearest, x/0 = ±max with D/I flags (A: muldiv, fcr). Only 4 DIV rows are inexact; one
+(`div CF_ONE, CF_MAX_MANTISSA: 3f000001`) rounds up at 0.50 ulp. Nothing tests ties or other fractions.
+
+### 1.5 RSQRT.S — unresolved (cpu_ee_fpu_sqrt 59/66)
+`tools/semantics/ee_rsqrt_models.py`, exact arithmetic, 34 distinct RSQRT rows (A):
+- **Prediction falsified.** Train sets pick SQRT.S = round to nearest (15/16; the miss is sqrt(-0) = +0, a sign
+  rule) and DIV.S = nearest (31/31). Their composition, which is also production's behaviour, predicts 29/34 RSQRT
+  rows. RSQRT.S is therefore not "SQRT.S then DIV.S".
+- Best composition of root and quotient roundings: root nearest, quotient truncated, 33/34 (misses 1/sqrt(25):
+  quotient remainder 0.80 ulp rounds up). Remainders of the inexact rows (root nearest): 0.41, 0.52, 0.70 down;
+  0.80 up — no standard rounding of a single quotient explains them.
+- **Post-hoc candidate**: fs × N(1/N(sqrt|ft|)) (reciprocal of the rounded root, rounded, then multiplied) fits
+  34/34 with product truncated or nearest. It was chosen after seeing the rows, from 27 combinations, so it is not
+  a validated prediction. The same datapath does not describe DIV.S (23/31), and the EFU ERSQRT rows (another
+  unit) fit no composition beyond 8/10, so no independent data supports it.
+- Production unchanged (adopting a post-hoc fit would be tuning to the test). Probe P3 separates the candidates.
+
+### 1.6 FCR31 flags — provisional
+Only the cases in fcr.expected are modelled (overflow O/SO on saturation, D/SD for x/0, I/SI for 0/0 and sqrt of a
+negative). Underflow and inexact are not modelled (gap).
+
+## 2. VU0/VU1 arithmetic
+
+### 2.1 Float format — established for EFU operands and results; architectural for FMAC
+- VU results reach ±0x7FFFFFFF: vu/lower/efu.expected contains 0x7FFFFFFF 20 times and 0x7F7FFFFF never (A).
+- Exponent-255 **operands** are values, not clamped: `ERSQRT CVF_MAX_EXP` (0x7F800001) gives 0x1F800000 = 2^-64
+  = 1/sqrt(2^128), and `ERSQRT CVF_MAX` (0x7FFFFFFF) gives 0x1F3504F3 = 1/sqrt(~6.8e38); an operand clamped to
+  0x7F7FFFFF would give ~0x1F7FFFFF in both (A). This is measured for EFU operand reads.
+- Until Phase 5 the micro interpreter clamped exponent-255 FMAC operands (`normalizeOperand`) and results to
+  0x7F7FFFFF, contradicting the format above. Since Phase 5 micro FMAC arithmetic reads raw registers and saturates
+  at 2^129 like macro mode (`ps2_vu_fmac`); MAX/MINI/ABS/ITOF/FTOI still use the normalized operands (not audited).
+  That the FMAC reads the register format as the EFU does is architectural (same VF registers), not measured on an
+  FMAC row. The O flag threshold (2^129) follows from the format; no hardware row observes FMAC MAC flags.
+
+### 2.2 FMAC ADD/SUB/MADD/MSUB — established for micro mode
+- Truncation toward zero: experiment E2 (micro rounding switched to nearest) breaks vu/games/triace (3/5) and
+  nothing else (A).
+- An operand 25 or more exponent steps below the other is dropped, whatever its sign: experiment E4 (rule removed)
+  breaks triace (4/5) (A).
+- Below a gap of 25 the exact sum is truncated toward zero (`ps2_vu_fmac::addRef`); the data does not test
+  shifted-out bits at gaps 1-24 with opposite signs (provisional; no probe generated yet).
+- MADD/MSUB round twice (product truncated, then the gap-rule add); fits all VU tests, not isolated (provisional).
+
+### 2.3 FMAC MUL — provisional
+Exact product truncated toward zero. All VU tests pass with it; no row isolates it. Whether the VU multiplier has
+the EE COP1 operand-order asymmetry (1.3) is untested (probe P4).
+
+### 2.4 Macro mode (COP2 in EE code) vs micro mode — architectural; was a gap
+VU0 macro instructions execute on VU0's FMAC, so they must follow 2.2/2.3. Until Phase 5 they did not: macro mode
+rounded to nearest, had no gap rule, kept exponent-255 values while micro clamped them to 0x7F7FFFFF, and updated
+no MAC/STATUS flags. Phase 5 puts both modes on one FMAC contract (`docs/architecture/vu-ee-arithmetic-semantics.md`): macro mode
+through `ps2_vfmac`, micro mode through the same `ps2_vu_fmac` kernels at all 58 FMAC sites (unit tests compare 39
+micro forms and plain ADD/SUB/MUL with the integer reference; mutants of OPMSUB, MADDAq, raw operands and the
+overflow threshold are killed; a host-float product under FE_TOWARDZERO is an equivalent mutant in range).
+There is no hardware vector for macro-mode arithmetic itself (cpu/vu0_macro covers integer ops and transfers only).
+MAC/STATUS flags in macro mode remain a gap. The shared contract covers FMAC **values** only: macro mode updates
+no MAC/STATUS/sticky flags after FMAC operations, and MAX/MINI/CLIP compare differently on exponent-255 operands.
+Full audit: `vu0-macro-state.md`. Macro and micro mode are therefore not equivalent.
+
+### 2.5 EFU — provisional (vu_lower_efu 182/223, Phase 3 model in production)
+Stage model fitted in Phase 3 to 208 vectors; EATAN/ESIN/EEXP series differ in the last bits on the remaining rows.
+Phase 5 experiments (one `vu_lower_efu` run each, `ps2x_tests` EFU vector test alongside):
+- The established FMAC adder (2.2: gap rule + truncation) in place of "truncated exact sum": series sums only, the
+  sum of squares, EATAN's (x-1)/(x+1) operands, EEXP's 1+series — each alone **neutral** (182/223). The data does not
+  distinguish the two adders at those stages.
+- The Phase 3 EATAN constant `0.785398185253143` is not a float: it lies 3.3e-16 below 0x3F490FDB, a hidden sub-ulp
+  offset that makes exact sums truncate one ulp lower. Replacing it by 0x3F490FDB (float pi/4 rounded to nearest)
+  gives 158/223 (falsified); by 0x3F490FDA (pi/4 truncated to 24 bits) or a double-precision pi/4, together with the
+  FMAC adder in the series, 183/223 with no line lost (`ps2x_tests` EFU vectors 167 -> 168 of 208).
+- Briefly adopted in Phase 5 (`475c500`), then **reverted** at the merge gate: no evidence independent of the 223
+  scored rows supports it. Production is the Phase 3 model again; the candidates are reproducible with
+  `tools/experiments/efu_ab.ps1` (variants `fmac_series`, `pi4_nearest`, `pi4_trunc24`, `pi4_double`).
+- **Overfitting audit (release review).** The change removes a hidden fitted offset, but its replacement was still
+  *selected on the same 223 rows* it is scored on, from three structural candidates (0x3F490FDB, 0x3F490FDA, a wider
+  constant), and the gain is one line (EATANxy DECREASING). One row cannot exclude coincidence, and the FMAC adder
+  in the series is architectural (EFU sharing the FMAC adder design), not measured. Status: candidate only (not in production), weak
+  evidence; no further constants may be tuned against these rows. Independently testable hypothesis H-EFU-1: "the
+  EATAN constant acts as a value below 0x3F490FDB and the series sums drop operands 25+ exponent steps smaller";
+  it predicts different EATAN results from the Phase 3 model on inputs whose series sum plus pi/4 lands exactly on a
+  float boundary. A probe needs an EFU model outside the C++ interpreter (not written yet).
+- Not explained: EATAN(0) etc. read 0x33E60000 on hardware (a cancellation residual with only 7 mantissa bits set);
+  no candidate reproduces it, which points at the series/constant alignment, not at rounding. No probe yet.
+
+### 2.6 COP2 control registers — mixed
+- Write masks of vi16/vi18/vi20/vi27/vi28/vi31 and the read-only registers: established, one row each
+  (cpu/vu0_macro/transfer `ctc2 -1` rows) — each mask is the readback of an all-ones write, so other bit patterns
+  are a prediction (safe for plain masks).
+- vi24 keeps the written bits 0x0C0C: **provisional, one row**; whether it is a latch, a mirror of FBRST's DE/TE, or
+  has side effects is unknown (no probe generated yet).
+- vi19 reads 0x2E30 (revision) whatever is written: one row.
+
+## 3. Control flow
+
+### 3.1 Delay slots, branch-likely annulment, links — established
+Ordinary delay slots, likely annulment, BGEZALL/BLTZALL linking when not taken (A: cpu/ee/branch).
+
+### 3.2 Control transfer inside a delay slot — provisional (three rows)
+`beq` x4 -> 2, `bc1t` x4 -> 4, `bc1tl` x4 -> 2, all branches taken (A). Modelled as early-resolved (jumps, likely,
+fixed-outcome encodings: the inner branch's delay slot is the instruction at the outer target) versus late (a taken
+inner branch replaces the outer transfer). Alternatives not excluded: the split may depend on the BTB state or on
+the unit (BC1 vs GPR) rather than the encoding. No row has a not-taken branch in this position (no probe generated yet; invariants: `control-flow-invariants.md`).
+Register jumps and calls in this position fall back with a warning (gap).
+
+### 3.3 Scheduling and exceptions — gap
+Guest exceptions are raised by the runtime only for a subset of cases (address errors on loads/stores, overflow
+traps); there is no precise-exception restart model for branch delay slots beyond `ctx->in_delay_slot`/`branch_pc`.
+
+## 4. Memory and loading — established/architectural
+- Heap to the main stack (A: memory/ee/default), runtime arena and HLE pools in the EE kernel area, ELFs overlapping
+  them refused (architectural: kernel memory on a real PS2), arena exhaustion fails cleanly. Tests and mutants:
+  Phase 4.
+
+## 5. COP0 performance counters — provisional/gap
+PCCR mask, PCR selection, CTE/mode gating: established (A, one test). Only the processor-cycle event counts, from the
+scheduler's guest cycle count (not cycle-accurate). Other events: gap.

@@ -14,6 +14,9 @@ if(BUILD_TESTING)
     if(Python3_Interpreter_FOUND)
         add_test(NAME research_database_valid
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/research/validate_research.py)
+        # Probe manifests and observation scoring (synthetic data only; no hardware is involved).
+        add_test(NAME hwprobes_lab_selftest
+                 COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/hwprobes/probe_lab.py selftest)
     endif()
 
     option(PS2X_BUILD_E2E_TESTS "Build the ELF-to-native end-to-end tests" ON)
@@ -50,6 +53,7 @@ add_library(ps2_test_lib STATIC
     src/ps2_recompiler_tests.cpp
     src/ps2_runtime_expansion_tests.cpp
     src/ps2_float_semantics_tests.cpp
+    src/ps2_vu_fmac_tests.cpp
 )
 
 target_include_directories(ps2_test_lib PRIVATE
@@ -116,3 +120,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebI
     EnableFastReleaseMode(ps2_test_lib)
     EnableFastReleaseMode(ps2x_tests)
 endif()
+
+# Floating-point build policy guard: PS2 arithmetic must not depend on the host floating-point mode.
+add_subdirectory("${CMAKE_SOURCE_DIR}/tools/fpenv" "${CMAKE_CURRENT_BINARY_DIR}/fpenv")
+add_subdirectory("${CMAKE_SOURCE_DIR}/tools/bench" "${CMAKE_CURRENT_BINARY_DIR}/bench")

@@ -266,6 +266,140 @@ def program_branchdelay():
     return a, ['puts', 'exit']
 
 
+# VU0 macro mode (COP2) FMAC arithmetic through the real pipeline. Expected values come from
+# tools/semantics/vu_fmac_model.py, an exact-rational statement of the FMAC contract that shares no code with the
+# runtime (evidence class MODEL_PREDICTED, not hardware). Operands are chosen so that truncation and the old macro
+# path's round-to-nearest give different bits, plus an exponent-gap lane and an exponent-255 lane.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / 'tools' / 'semantics'))
+import vu_fmac_model as fmac  # noqa: E402
+
+
+def _vu_macro_operands():
+    import random
+    rng = random.Random(20261025)
+
+    def search(pred):
+        while True:
+            a = (rng.getrandbits(1) << 31) | ((100 + rng.randrange(50)) << 23) | rng.getrandbits(23)
+            b = (rng.getrandbits(1) << 31) | ((100 + rng.randrange(50)) << 23) | rng.getrandbits(23)
+            c = ((100 + rng.randrange(50)) << 23) | rng.getrandbits(23)
+            if pred(a, b, c):
+                return a, b, c
+
+    # lane x: ADD and SUB truncate where nearest rounds away; lane y: MUL and MADD likewise;
+    # lane z: exponent gap >= 25 with opposite signs (A1); lane w: an exponent-255 operand (2^128 * 1.5 * 1.25).
+    x = search(lambda a, b, c: fmac.add(a, b) != fmac.nearest(fmac.value(a) + fmac.value(b)) and
+               fmac.sub(a, b) != fmac.nearest(fmac.value(a) - fmac.value(b)))
+    y = search(lambda a, b, c: fmac.mul(a, b) != fmac.nearest(fmac.value(a) * fmac.value(b)) and
+               fmac.mul(c, b) != fmac.nearest(fmac.value(c) * fmac.value(b)))
+    z = (0x42546666, 0xB3E2A618, 0x3F800000)
+    w = (0x7FC00000, 0x3FA00000, 0x3F800000)
+    lanes = [x, y, z, w]
+    return [l[0] for l in lanes], [l[1] for l in lanes], [l[2] for l in lanes]
+
+
+VU_A, VU_B, VU_C = _vu_macro_operands()
+VU_RESULTS = ([fmac.add(a, b) for a, b in zip(VU_A, VU_B)] +
+              [fmac.sub(a, b) for a, b in zip(VU_A, VU_B)] +
+              [fmac.mul(a, b) for a, b in zip(VU_A, VU_B)] +
+              [fmac.add(fmac.mul(a, b), fmac.mul(c, b)) for a, b, c in zip(VU_A, VU_B, VU_C)])
+EXPECTED['vu_macro'] = 'E2E vu ' + ' '.join(f'{r:08x}' for r in VU_RESULTS)
+
+
+def cop2_vop(funct, fd, fs, ft, dest=0xF):
+    return (0x12 << 26) | (1 << 25) | (dest << 21) | (ft << 16) | (fs << 11) | (fd << 6) | funct
+
+
+def program_vu_macro():
+    import struct
+    a = Assembler()
+
+    a.function('_start')
+    a.i('lui', 'sp', 'zero', 0x01F0)
+    a.jump('jal', 'main')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.r('or', rd='a0', rs='zero', rt='zero')
+    a.label('hang')
+    a.branch('beq', 'zero', 'zero', 'hang')
+    a.nop()
+
+    a.function('main')
+    a.i('addiu', 'sp', 'sp', -16)
+    a.i('sw', 'ra', 'sp', 12)
+    a.i('sw', 's4', 'sp', 8)
+    for vf, block in ((1, 'vu_a'), (2, 'vu_b'), (3, 'vu_c')):
+        a.la('t0', block)
+        a.i('lq', 't1', 't0', 0)
+        a.word((0x12 << 26) | (0x05 << 21) | (9 << 16) | (vf << 11))        # qmtc2 t1, vfN
+    a.word(cop2_vop(0x28, 4, 1, 2))                                          # vadd.xyzw vf4, vf1, vf2
+    a.word(cop2_vop(0x2C, 5, 1, 2))                                          # vsub.xyzw vf5, vf1, vf2
+    a.word(cop2_vop(0x2A, 6, 1, 2))                                          # vmul.xyzw vf6, vf1, vf2
+    a.word(cop2_vop(0x3E, 0x0A, 1, 2))                                       # vmula.xyzw ACC, vf1, vf2
+    a.word(cop2_vop(0x29, 7, 3, 2))                                          # vmadd.xyzw vf7, vf3, vf2
+    a.la('t0', 'vu_out')
+    for k, vf in enumerate((4, 5, 6, 7)):
+        a.word((0x12 << 26) | (0x01 << 21) | (10 << 16) | (vf << 11))       # qmfc2 t2, vfN
+        a.i('sq', 't2', 't0', 16 * k)
+
+    a.la('a0', 'outbuf')
+    a.la('a1', 's_vu')
+    a.jump('jal', 'strcpy_end')
+    a.nop()
+    a.r('or', rd='s4', rs='v0', rt='zero')
+    for k in range(16):
+        a.li('t2', 0x20)
+        a.i('sb', 't2', 's4', 0)
+        a.i('addiu', 'a0', 's4', 1)
+        a.la('t0', 'vu_out')
+        a.jump('jal', 'hex32')
+        a.i('lw', 'a1', 't0', 4 * k)                                        # delay slot
+        a.r('or', rd='s4', rs='v0', rt='zero')
+    a.i('sb', 'zero', 's4', 0)
+    a.la('a0', 'outbuf')
+    a.jump('jal', 'puts')
+    a.nop()
+    a.i('lw', 's4', 'sp', 8)
+    a.i('lw', 'ra', 'sp', 12)
+    a.r('jr', rs='ra')
+    a.i('addiu', 'sp', 'sp', 16)
+
+    # hex32(a0 = dst, a1 = value) -> v0 = dst + 8: eight lower-case hex digits, most significant first
+    a.function('hex32')
+    a.li('t4', 8)
+    a.label('hx_loop')
+    a.r('srl', rd='t3', rt='a1', sa=28)
+    a.r('sll', rd='a1', rt='a1', sa=4)
+    a.i('sltiu', 't5', 't3', 10)
+    a.branch('beq', 't5', 'zero', 'hx_letter')
+    a.i('addiu', 't3', 't3', 48)                                             # delay slot: '0' + digit
+    a.branch('beq', 'zero', 'zero', 'hx_store')
+    a.nop()
+    a.label('hx_letter')
+    a.i('addiu', 't3', 't3', 39)                                             # 'a' - 10 - '0' + '0'
+    a.label('hx_store')
+    a.i('sb', 't3', 'a0', 0)
+    a.i('addiu', 't4', 't4', -1)
+    a.branch('bne', 't4', 'zero', 'hx_loop')
+    a.i('addiu', 'a0', 'a0', 1)                                              # delay slot
+    a.r('jr', rs='ra')
+    a.r('or', rd='v0', rs='a0', rt='zero')
+
+    emit_string_helpers(a)
+    for name in ('puts', 'exit'):
+        a.function(name)
+        a.r('jr', rs='ra')
+        a.nop()
+
+    a.data_block('vu_a', struct.pack('<4I', *VU_A))
+    a.data_block('vu_b', struct.pack('<4I', *VU_B))
+    a.data_block('vu_c', struct.pack('<4I', *VU_C))
+    a.data_block('vu_out', bytes(64))
+    a.data_block('outbuf', bytes(256))
+    a.data_block('s_vu', b'E2E vu\0', align=4)
+    return a, ['puts', 'exit']
+
+
 EXPECTED['gs_sprite'] = 'E2E gs frame submitted'
 
 # GS registers and packets (GS User's Manual register numbers; GIFtag layout: NLOOP 0-14, EOP 15, FLG 58-59,
@@ -397,7 +531,8 @@ FRAME_EXPECTATIONS = {
     },
 }
 
-PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay}
+PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay,
+            'vu_macro': program_vu_macro}
 
 
 def main():

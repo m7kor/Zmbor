@@ -202,3 +202,64 @@ and was mutation-checked.
   distinguish this from wider truncated-array forms. About 1.46x the cost of the host multiply in isolation.
 - VU0 vi24 keeps the written bits 0x0C0C (one hardware row).
 - Not fixed: RSQRT.S (no simple rounding model fits all 39 rows) and the EFU series last bits.
+
+## Phase 5 — architectural correctness (2026-10-25, branch ultimate/phase5-architectural-correctness, local)
+
+Baseline `20f1a97` (Zmbor main after PR #2): 53/55, 8202/8250 lines. Final (merge gate, `d8ac102`): 53/55 exact, 8202/8250 lines, no crashes, no timeouts, no regressions (the EFU candidate that gave 8203 was reverted); `ps2x_tests` 541/541. Earlier interim figures below: `ps2x_tests` 538/538, ctest
+(non-hwtest) 52/52, `ps2xIOP` 4/4 (Windows MSVC; Linux not run locally and not pushed to CI). No physical PS2 or
+ps2sdk was available: no new hardware measurement was made. Every change below has a test that fails when it is
+reverted (mutation-checked).
+
+- VU FMAC contract (`ps2_vu_fmac.h`, `docs/architecture/vu-ee-arithmetic-semantics.md`): one contract for VU0 macro
+  mode and the micro interpreter — exponent-gap rule (triace, E4), truncation (E2), exponent 255 as a value (EFU
+  operand rows), saturation at 2^129. Integer reference + exact-double lowering, compared on boundary pairs, 124,000 structured and 400,000 random operand pairs.
+  - Macro mode (`PS2_VADD/VSUB/VMUL`) used host round-to-nearest without the gap rule (`1d7629d`); e2e program
+    `vu_macro` checks it through the real ELF → recompiler → runtime pipeline (`13b9935`).
+  - Micro mode: all 58 FMAC sites moved to the shared kernels; OPMSUB lacked the gap rule; exponent-255 operands and
+    results were clamped to 0x7F7FFFFF (`d77d5b3`). The upstream overflow test assumed FLT_MAX*2 overflows; under the
+    format it is the value 0x7FFFFFFF, so the test now overflows from 0x7FFFFFFF*2 (no `.expected` file changed).
+- EFU: the EATAN pi/4 literal hid a sub-ulp offset (3.3e-16 below 0x3F490FDB); series sums now use the FMAC adder
+  and the constant is 0x3F490FDA: vu_lower_efu 182 → 183/223, unit vectors 167 → 168/208 (`475c500`, provisional; **reverted at the merge gate**, see below).
+- Performance: macro VADD/VSUB/VMUL use an SSE2 four-lane form of the same lowering (forced inline, CVTPS2PD when no
+  lane has exponent 0/255): 2.9–4.2× faster than the per-lane kernel; MUL faster than the legacy path, ADD/SUB ~4.4×
+  slower than the legacy (wrong) host add (`b4cfa26`, `benchmark-methodology.md`). Bit-identical in all host rounding modes,
+  with and without DAZ/FTZ; the sign of an exact-zero sum is now explicit (round-downward gave -0).
+- FP build policy (`5a6ed54`): ctest `fpenv_flag_independence` builds the arithmetic helpers with `/fp:precise` and
+  `/fp:fast` and compares 1M results; only the legacy macro path was flag-sensitive. No claim that shipped builds
+  corrupt games.
+- Research lab (`f657d46`): Z3 disagreement search for EE ADD models (465 queries, all counterexamples confirmed by
+  independent code), probe manifests with evidence classes and an ingest step that never promotes emulator, model or
+  Zmbor output (`tools/hwprobes/`), RSQRT.S analysis with a train/validation split (SQRT.S-then-DIV.S falsified:
+  29/34; post-hoc reciprocal datapath 34/34, not adopted; probe P3).
+- Not changed (no evidence picks a model): EE ADD guard bits, MUL.S form, RSQRT.S, macro-mode MAC/STATUS flags.
+- Docs: `evidence-register.md`, `hardware-probes.md`, `benchmark-methodology.md`, `control-flow-invariants.md`
+  (no IR change was made), HANDOFF and RESUME_PROMPT for Phase 5.
+- Release review (before the Draft PR): micro-mode flags were computed from the fused exact sum and overwrote the
+  value on overflow/underflow/zero, so MADD could write +max where the contract (and macro mode) gives 0x7F7FFFFF;
+  the product sticky flags still clamped exponent-255 operands. Flags now classify the result at the contract's
+  rounding points and never rewrite the value (2 new tests, both mutation-checked; gate unchanged: 53/55, 8203/8250,
+  ps2x_tests 540/540). CI now also runs the FP build guard and the probe-lab self-test on all three compilers.
+  The Z3 report is stored compactly with a provenance header (469 lines instead of ~7,000; data unchanged).
+- CI on the Draft PR (#3) found two real problems that local MSVC 14.44 runs could not: (1) GCC/Clang `-ffast-math`
+  changes EE ADD.S/SUB.S/DIV.S/RSQRT.S/MADD.S results (VU FMAC unaffected); `-ffast-math` is now a compile error with a
+  negative ctest, `ps2_runtime` imposes `-ffp-contract=off`, and the FP guard compares production-like flags
+  (MSVC `/fp:fast /arch:AVX2` measured identical). (2) MSVC 14.51 wrote lane w's result into every lane of the
+  micro per-lane FMAC loops; micro mode now uses the four-lane kernels (`d1c6759`). Also: `ps2_vu_fmac.h` honours
+  `USE_SSE2NEON`; MiniTest failures print got/expected values. After: CI 6/6 (Linux GCC, Linux Clang, Windows MSVC),
+  local gate unchanged (53/55, 8203/8250, ps2x_tests 540/540).
+- Merge gate (`d8ac102`): production EFU restored to the base Phase 3 model (the FMAC-adder series and pi/4 =
+  0x3F490FDA were selected on the scored rows; kept in `tools/experiments/efu_ab.ps1`); VU0 macro architectural
+  state audited (`docs/architecture/vu0-macro-state.md`: no MAC/STATUS updates after macro FMAC ops, host
+  compares in MAX/MINI/CLIP, per-class test coverage; nothing implemented without evidence); explicit regression test
+  for the MSVC 14.51 lane-w corruption plus an informational probe of the old loop shape; CI runs the e2e programs
+  basic, branchdelay and vu_macro on Linux GCC and Clang (xvfb). The Windows runner has no OpenGL driver, so e2e runs
+  there only in the local gate.
+  Exact-source gate on `d8ac102` (clean tree; the 55 programs regenerated by that commit's `ps2_recomp`): 53/55,
+  8202/8250, no regressions; ps2x_tests 541/541; ctest (non-hwtest) 52/52; e2e 4/4; ps2xIOP 4/4. SHA-256:
+  ps2_recomp.exe a90e5a8e4bee0d53..., ps2_runtime.lib f163b57da65a9b3d..., ps2x_tests.exe 0fb5d6614ea15944...,
+  aggregate of the 55 hardware executables 5ae96557d0238264... (full values in the PR #3 description).
+- MSVC 14.51 lane-w cause: the informational probe (old loop shape in isolation) keeps its lanes on MSVC 14.51
+  (`_MSC_FULL_VER 195136260`), GCC 13.3 and Clang 18.1 (CI on `6af2f16`). The corruption therefore needs the
+  interpreter's context; review found no aliasing or UB. Cause **not identified**; not classified as a compiler defect.
+  The regression test guards the observed pattern; the four-lane implementation is validated against the integer
+  reference independently of it.

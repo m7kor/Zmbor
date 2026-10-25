@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
+          sudo apt-get install -y ninja-build libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev pkg-config libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev xvfb
 
       - name: Configure
         run: |
@@ -37,6 +37,17 @@ jobs:
 
       - name: Tests
         run: ./build/ps2xTest/ps2x_tests
+
+      - name: Floating-point build guard and probe lab self-test
+        run: |
+          ctest --test-dir build/ps2xTest -L fpenv --output-on-failure
+          ctest --test-dir build/ps2xTest -R hwprobes_lab_selftest --output-on-failure
+
+      - name: End-to-end (generated ELF -> ps2_recomp -> runtime)
+        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro)$" --output-on-failure
+
+      - name: Lane loop compiler probe (informational)
+        run: ./build/ps2xTest/fpenv/ps2x_lane_loop_probe || echo "lane loop probe reproduced the pattern (informational, not a failure)"
 
   windows-msvc:
     strategy:
@@ -70,6 +81,22 @@ jobs:
         shell: cmd
         run: |
           .\build\ps2xTest\Release\ps2x_tests.exe
+
+      - name: Floating-point build guard and probe lab self-test
+        shell: cmd
+        run: |
+          ctest --test-dir build\ps2xTest -C Release -L fpenv --output-on-failure || exit /b 1
+          ctest --test-dir build\ps2xTest -C Release -R hwprobes_lab_selftest --output-on-failure
+
+      # No end-to-end step here: the hosted Windows runner has no OpenGL driver (WGL), and the runtime opens a window
+      # even when hidden. The e2e programs run on the Linux jobs (xvfb + Mesa) and in the local Windows gate.
+
+      - name: Lane loop compiler probe (informational)
+        shell: cmd
+        run: |
+          .\build\ps2xTest\fpenv\Release\ps2x_lane_loop_probe.exe || echo lane loop probe reproduced the pattern (informational, not a failure)
+          exit /b 0
+
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:

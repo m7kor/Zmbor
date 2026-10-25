@@ -13,6 +13,7 @@
 #endif
 
 #include "ps2_runtime.h"
+#include "ps2_vu_fmac.h"
 
 static inline int32_t Ps2ExtractEpi32(__m128i v, int index)
 {
@@ -489,19 +490,38 @@ inline __m128 ps2_vfinish(__m128 a, __m128 b, __m128 r, Ps2VecOp op)
     return _mm_castsi128_ps(_mm_andnot_si128(flush, _mm_castps_si128(r)));
 }
 
-inline __m128 ps2_vadd(__m128 a, __m128 b)
+// Pre-Phase-5 macro-mode arithmetic (host round-to-nearest, no exponent-gap rule, EE-style exponent 255). Kept only
+// to measure against the FMAC contract (PS2VuFmac tests, benchmarks); generated code no longer uses it.
+inline __m128 ps2_vadd_legacy(__m128 a, __m128 b)
 {
     return ps2_vfinish(a, b, _mm_add_ps(a, b), Ps2VecOp::Add);
 }
 
-inline __m128 ps2_vsub(__m128 a, __m128 b)
+inline __m128 ps2_vsub_legacy(__m128 a, __m128 b)
 {
     return ps2_vfinish(a, b, _mm_sub_ps(a, b), Ps2VecOp::Sub);
 }
 
-inline __m128 ps2_vmul(__m128 a, __m128 b)
+inline __m128 ps2_vmul_legacy(__m128 a, __m128 b)
 {
     return ps2_vfinish(a, b, _mm_mul_ps(a, b), Ps2VecOp::Mul);
+}
+
+// VU0 macro mode executes on VU0's FMAC, so COP2 VADD/VSUB/VMUL (and every macro op built on them) follow the same
+// contract as the micro interpreter: ps2_vu_fmac.h (truncation, exponent-gap rule, PS2 float range).
+inline __m128 ps2_vadd(__m128 a, __m128 b)
+{
+    return _mm_castsi128_ps(ps2_vu_fmac::add4(_mm_castps_si128(a), _mm_castps_si128(b)));
+}
+
+inline __m128 ps2_vsub(__m128 a, __m128 b)
+{
+    return _mm_castsi128_ps(ps2_vu_fmac::sub4(_mm_castps_si128(a), _mm_castps_si128(b)));
+}
+
+inline __m128 ps2_vmul(__m128 a, __m128 b)
+{
+    return _mm_castsi128_ps(ps2_vu_fmac::mul4(_mm_castps_si128(a), _mm_castps_si128(b)));
 }
 
 // PS2 VU (Vector Unit) operations

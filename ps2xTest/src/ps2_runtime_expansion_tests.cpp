@@ -404,6 +404,50 @@ void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
     {
+        // Boundary pairs for the overflow helpers; the predicates are proved for all inputs by
+        // tools/semantics/z3_int_semantics.py, these pin the C++ to the same answers.
+        tc.Run("integer overflow helpers: ADD/SUB 32/64 overflow flags and wrapped results at the boundaries", [](TestCase &t)
+        {
+            struct Case32 { uint32_t a, b; bool addOv, subOv; };
+            const Case32 cases32[] = {
+                {0x7FFFFFFFu, 1u, true, false},           {0x80000000u, 0xFFFFFFFFu, true, false},
+                {0x80000000u, 1u, false, true},           {0x7FFFFFFFu, 0xFFFFFFFFu, false, true},
+                {0x7FFFFFFFu, 0x80000000u, false, true},  {0u, 0x80000000u, false, true},
+                {0xFFFFFFFFu, 0x80000000u, true, false},  {0x40000000u, 0x40000000u, true, false},
+                {0x3FFFFFFFu, 0x40000000u, false, false}, {0u, 0u, false, false},
+            };
+            for (const Case32 &c : cases32)
+            {
+                uint32_t r = 0u;
+                bool ov = false;
+                ADD32_OV(c.a, c.b, r, ov);
+                t.Equals(ov, c.addOv, "ADD32_OV flag");
+                t.Equals(r, static_cast<uint32_t>(c.a + c.b), "ADD32_OV result");
+                SUB32_OV(c.a, c.b, r, ov);
+                t.Equals(ov, c.subOv, "SUB32_OV flag");
+                t.Equals(r, static_cast<uint32_t>(c.a - c.b), "SUB32_OV result");
+            }
+            struct Case64 { uint64_t a, b; bool addOv, subOv; };
+            const Case64 cases64[] = {
+                {0x7FFFFFFFFFFFFFFFull, 1ull, true, false},
+                {0x8000000000000000ull, 0xFFFFFFFFFFFFFFFFull, true, false},
+                {0x8000000000000000ull, 1ull, false, true},
+                {0u, 0x8000000000000000ull, false, true},
+                {0x000000007FFFFFFFull, 1ull, false, false}, // 32-bit overflow is not 64-bit overflow
+            };
+            for (const Case64 &c : cases64)
+            {
+                uint64_t r = 0u;
+                bool ov = false;
+                ADD64_OV(c.a, c.b, r, ov);
+                t.Equals(ov, c.addOv, "ADD64_OV flag");
+                t.Equals(r, c.a + c.b, "ADD64_OV result");
+                SUB64_OV(c.a, c.b, r, ov);
+                t.Equals(ov, c.subOv, "SUB64_OV flag");
+                t.Equals(r, c.a - c.b, "SUB64_OV result");
+            }
+        });
+
         // MMI HI/LO family against PCSX2 MMI.cpp, with expectations computed from scalar products here.
         tc.Run("MMI halfword and word multiplies match real-PS2 results (ps2autotests ee_simd/muldiv)", [](TestCase &t)
         {

@@ -191,6 +191,36 @@ void register_code_generator_tests()
                  "the registration source must use the same unambiguous stub header");
     });
 
+    tc.Run("overflow-trapping adds and subtracts emit unsigned arithmetic (no signed-overflow UB)", [](TestCase &t) {
+        // A signed add that overflows is undefined behaviour in C++, and overflow is exactly what these
+        // instructions test for. The emitted code must compute in unsigned types (proof: tools/semantics/z3_int_semantics.py).
+        CodeGenerator gen({}, {});
+        auto special = [](uint32_t function) {
+            Instruction inst{};
+            inst.address = 0x1000;
+            inst.opcode = OPCODE_SPECIAL;
+            inst.function = function;
+            inst.rs = 1;
+            inst.rt = 2;
+            inst.rd = 3;
+            return inst;
+        };
+        const std::string dadd = gen.translateInstruction(special(SPECIAL_DADD));
+        const std::string dsub = gen.translateInstruction(special(SPECIAL_DSUB));
+        const std::string daddi = gen.translateInstruction(makeIType(0x1004, OPCODE_DADDI, 1, 2, 0x8000));
+        const std::string daddiu = gen.translateInstruction(makeIType(0x1008, OPCODE_DADDIU, 1, 2, 0x8000));
+        t.IsTrue(dadd.find("ADD64_OV(") != std::string::npos, "DADD must use ADD64_OV: " + dadd);
+        t.IsTrue(dsub.find("SUB64_OV(") != std::string::npos, "DSUB must use SUB64_OV: " + dsub);
+        t.IsTrue(daddi.find("ADD64_OV(") != std::string::npos, "DADDI must use ADD64_OV: " + daddi);
+        t.IsTrue(daddiu.find("int64_t)GPR_S64") == std::string::npos && daddiu.find("GPR_U64(ctx, 1) +") != std::string::npos,
+                 "DADDIU must add in uint64_t: " + daddiu);
+        for (const std::string *code : {&dadd, &dsub, &daddi})
+        {
+            t.IsTrue(code->find("int64_t r = ") == std::string::npos && code->find("int64_t res = ") == std::string::npos,
+                     "no signed 64-bit result temporary may remain: " + *code);
+        }
+    });
+
     tc.Run("unsigned integer loads use explicit zero extension", [](TestCase &t) {
         CodeGenerator gen({}, {});
         const std::string lbu = gen.translateInstruction(makeIType(0x8F10, OPCODE_LBU, 1, 2, 0x10));

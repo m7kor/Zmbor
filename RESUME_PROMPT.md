@@ -1,6 +1,6 @@
 # Resume prompt for the next session
 
-Paste the text below into a new Claude Code session opened at `D:\Project\Zmbor\wt-phase5`.
+Paste the text below into a new Claude Code session opened at `D:\Project\Zmbor\wt-phase6`.
 
 ---
 
@@ -20,15 +20,15 @@ ran-j/PS2Recomp.
 - Never modify m7kor/PS2Recomp or ran-j/PS2Recomp, other worktrees, or the read-only RE4 locations
   (`D:\Project\compatbilty`, `C:\Project\PS2redmption`).
 
-Read `HANDOFF.md` first (Phase 5 section), then the architecture documents it lists. `CHANGELOG.md` has every change
+Read `HANDOFF.md` first (Phase 6 section), then the architecture documents it lists. `CHANGELOG.md` has every change
 with its root cause and measurements.
 
-Work in `D:\Project\Zmbor\wt-phase5` on branch `ultimate/phase5-architectural-correctness` (local, unpushed).
+Work in `D:\Project\Zmbor\wt-phase6` on branch `ultimate/phase6-native-compatibility` (local, unpushed; Phase 5 is merged as PR #3).
 
 Before changing anything:
 
 1. Run `git status` and `git log --oneline -10`; compare with `git ls-remote https://github.com/m7kor/Zmbor.git`.
-2. Build `build-wip` and rerun the full gate (see HANDOFF): expect the numbers in `CHANGELOG.md` Phase 5, and report
+2. Build `build` and rerun `tools/acceptance/gate.ps1` (see `docs/architecture/acceptance-gate.md`): expect the numbers in `CHANGELOG.md` Phase 6, and report
    any difference.
 
 Then continue with the next priorities in `HANDOFF.md`. Find each root cause before making architectural changes; add

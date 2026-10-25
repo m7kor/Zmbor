@@ -59,6 +59,31 @@ address the measured cost; the pipeline timing model's bookkeeping does.
   sizes compared with the source; a mutant that keeps `copiedBytes` across transfers is killed.
 - All existing VU, VIF, XGKICK and hardware tests (see the Phase 6 gate in `CHANGELOG.md`).
 
+### Release review (PR #4)
+
+- **Lockstep**: "VU1 commit index matches the reference cycle by cycle": 152 programs (a program with four
+  pipelines due on the same cycle - ESADD/P, DIV/Q, ADD/VF+flags, SQ/store; overlapping VF writes from LQ and FMAC;
+  150 random ones mixing LQ, SQ, DIV, ESADD..ELENG, WAITQ/WAITP and FMAC ops), each started with a partial run and a
+  fresh `execute()` (restart), then stepped one cycle at a time in both modes with the complete state and data memory
+  compared after every cycle: 91,200 cycles, 0 mismatches. Mutants "commit one cycle late" (`>` for `>=`) and
+  "stores not indexed" are killed, so an event committed late, early, twice or out of order would be seen.
+- Ordering argument: pipelines are visited in the fixed original order and each in array order; a pipeline whose
+  minimum is not yet due holds no due entry, so skipping it commits nothing that the full scan would have committed
+  in that call. Hazard tracking (`m_vfReady`, `m_viReady`, `m_accReady`, latest-write sequences) is unchanged.
+  `readyCycle` = issue + latency (latency <= 54); the cycle counter is 64-bit and starts at 0, so overflow would need
+  ~5.8e9 years at 100 MHz. `resetScheduler()` (every `execute()`) restores every slot to UINT64_MAX; `resume()` keeps
+  pending entries and their slots.
+- **XGKICK** "poisoned history, wrap-around, longest packet, oversized packet": a 512-qword 0xCC packet followed by
+  2- and 3-qword packets (no poison in their bytes), a packet whose tag is the last data-memory qword (payload wraps
+  to qword 0), the longest legal packet (tag + 4095 qwords = the whole 64 KB buffer, source wrapping four times,
+  delivered byte-exact while the program ends - an 8192-cycle drain) and one qword more (refused, never delivered);
+  one interpreter reused across all cases. Mutant "submit 16 bytes more" is killed. The buffer is value-initialised
+  at construction, so no byte is ever uninitialised; bytes beyond `totalBytes` are never submitted.
+- **Flush termination**: no instruction runs during a flush, so nothing is queued; every pending entry commits once
+  `m_cycle` reaches its readyCycle (at most 54 cycles after issue); an active XGKICK finishes within 2 x 4096 + 1
+  cycles. Hence a reachable state drains within 8193 cycles; `kFlushLimit` = 9216 (checked by a `static_assert`) is
+  only reached by a scheduler defect, which is reported and stops the run (the index mutants above show that path).
+
 ## A/B result
 
 Five alternating rounds, each the median of 21 runs; binary A = the same benchmark source built against the runtime

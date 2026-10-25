@@ -46,6 +46,9 @@ jobs:
       - name: End-to-end (generated ELF -> ps2_recomp -> runtime)
         run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro)$" --output-on-failure
 
+      - name: VU1 workload correctness (output vs integer reference; timings informational)
+        run: ./build/ps2xTest/bench/ps2x_bench_vu1 5 256 && ./build/ps2xTest/bench/ps2x_bench_vu1 5 200 xgkick
+
       - name: Lane loop compiler probe (informational)
         run: ./build/ps2xTest/fpenv/ps2x_lane_loop_probe || echo "lane loop probe reproduced the pattern (informational, not a failure)"
 
@@ -90,6 +93,12 @@ jobs:
 
       # No end-to-end step here: the hosted Windows runner has no OpenGL driver (WGL), and the runtime opens a window
       # even when hidden. The e2e programs run on the Linux jobs (xvfb + Mesa) and in the local Windows gate.
+
+      - name: VU1 workload correctness (output vs integer reference; timings informational)
+        shell: cmd
+        run: |
+          .\build\ps2xTest\bench\Release\ps2x_bench_vu1.exe 5 256 || exit /b 1
+          .\build\ps2xTest\bench\Release\ps2x_bench_vu1.exe 5 200 xgkick
 
       - name: Lane loop compiler probe (informational)
         shell: cmd

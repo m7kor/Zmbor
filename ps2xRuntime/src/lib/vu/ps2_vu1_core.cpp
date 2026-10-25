@@ -1091,10 +1091,14 @@ bool VU1Interpreter::pipelinesPending() const
 
 void VU1Interpreter::flushPipelines()
 {
-    // Every pending entry becomes due within a bounded number of cycles; the longest is an XGKICK of a full packet
-    // buffer at two cycles per qword. Still pending past that bound means the scheduler lost an entry (a commit that
-    // never fires): report it and stop instead of spinning forever.
+    // Termination: a flush executes no instruction, so no entry is queued while it runs; every pending entry was
+    // queued with readyCycle = issue cycle + latency, the longest latency being 54 (EATAN), and is committed once
+    // m_cycle reaches it; an active XGKICK copies one qword per two cycles and holds at most kBufferSize / 16 qwords.
+    // So from any state the interpreter can reach, pipelinesPending() turns false within 2 * 4096 + 1 cycles. Still
+    // pending past kFlushLimit (that bound plus a margin) means an entry can never commit - a scheduler defect: it is
+    // reported and the run stops instead of spinning (tests: "XGKICK buffer: ... longest packet" drains 8192 cycles).
     constexpr uint64_t kFlushLimit = 2u * (XgkickPipeline::kBufferSize / 16u) + 1024u;
+    static_assert(kFlushLimit > 2u * (XgkickPipeline::kBufferSize / 16u) + 1u + 54u, "flush bound below the longest drain");
     const uint64_t limit = m_cycle + kFlushLimit;
     while (pipelinesPending())
     {

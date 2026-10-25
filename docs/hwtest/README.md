@@ -11,19 +11,19 @@ files are never edited; a test passes only when the guest's own output matches t
 |---|---|---|
 | first run | 6 / 54 (1 ELF did not recompile) | 5346 / 8240 (65%) |
 | end of Phase 2 | 32 / 55 | 6627 / 8250 (80%) |
-| current (Phase 3) | 47 / 55 | 8172 / 8250 (99.1%) |
+| end of Phase 3 | 47 / 55 | 8172 / 8250 (99.1%) |
+| current (Phase 4) | 53 / 55 | 8202 / 8250 (99.4%) |
 
-Fully matching areas: `kernel/ee` 10/10 (threads, interrupts), `dma` 11/11 (VIF, SPR, DMAC), `cpu/ee_simd` 6/6,
-`gs` 2/2, `vu` 6 of 7, 6 of 9 `cpu/ee_fpu`, 5 of 6 `cpu/ee`. No crash or timeout. No test that passed in an earlier
+Fully matching areas: `kernel/ee` 10/10, `dma` 11/11, `cpu/ee` 6/6, `cpu/ee_cop0` 1/1, `cpu/ee_simd` 6/6,
+`cpu/vu0_macro` 2/2, `memory/ee` 1/1, `gs` 2/2, `vu` 6 of 7, `cpu/ee_fpu` 8 of 9. No crash or timeout. No test that passed in an earlier
 run fails in a later one.
 
 ## Remaining failures, by cause
 
 | area | tests | what differs | status |
 |---|---|---|---|
-| FPU multiply/divide rounding | fpu_muldiv, fpu_sqrt | MUL.S gives x-1ulp for 1.0*x with an all-ones mantissa; RSQRT.S 1ulp low | needs a bit-level model of the EE multiplier/divider built from the vectors (PCSX2's model is GPL-3, not reused) |
+| RSQRT.S rounding | fpu_sqrt (59/66 lines) | 1 ulp on 7 rows (e.g. `rsqrt 3, 3` gives 3fddb3d7, we give 3fddb3d8) | no simple model fits all 39 RSQRT rows: root to nearest with a truncated division fits 38, and DIV.S rounds differently (1/0x3FFFFFFF rounds up at 0.50 ulp, an RSQRT quotient at 0.52 ulp does not) |
 | VU EFU series | vu/lower/efu (182/223 lines) | EATAN/ESIN/EEXP differ in the last bit on 41 rows | the EFU model (`ps2_vu1_lower.cpp`) matches 167 of 208 hardware vectors; the exact term rounding of the series is not known |
-| COP0 performance counters | cop0_performance | PCCR write mask and PCR0/PCR1 counting | |
-| Branch in a delay slot | branchdelay, fpu_branchdelay | the hardware follows the second branch's target for one instruction | not modelled by the recompiler |
-| Heap limit | memory/ee/default | `malloc(30 MB)` fails: EndOfHeap stops at 0x01F00000 | the runtime's own guestMalloc shares that region with the guest's sbrk; raising the limit needs the two separated first |
-| VU0 reserved register | vu0_macro/transfer | `cfc2 vi24` reads 0x0c0c on hardware after `ctc2 -1` | no explanation found; left as is |
+
+Fixed in Phase 4 (see `CHANGELOG.md`): branch in a delay slot, heap ownership (memory/ee/default), COP0 performance
+counters, MUL.S truncation and non-commutativity, VU0 vi24.

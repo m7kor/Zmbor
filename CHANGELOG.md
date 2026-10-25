@@ -176,3 +176,26 @@ regressions. Root causes, by subsystem:
   never taken.
 - Mutation-checked: CL = 0, split UNPACK, VIF1_NUM, STMOD mode 3, R0-R3 reads, FIFO completion, VPS = 2, V2 lanes,
   toSPR chain, chain MADR, CPCOND0, interleave skip, BC0 emission, delay-slot starts.
+
+## Phase 4 — hardware accuracy (2026-10-25, branch ultimate/phase4-hardware-accuracy)
+
+Baseline re-measured on `00173a2` (Zmbor main, after the #384 merge): 47/55, 8172/8250 lines. After:
+53/55 exact, 8202/8250 lines (99.4%), no crashes, no timeouts, no regressions; `ps2x_tests` 526/526, ctest 49/49
+(with the new e2e_branchdelay), `ps2xIOP` 4/4 (Windows MSVC; Linux left to CI). Each fix has a regression test
+and was mutation-checked.
+
+- Recompiler, branch in a delay slot (cpu/ee/branchdelay, cpu/ee_fpu/branchdelay): the inner branch was
+  translated as an ordinary instruction. It is now emitted as its own instruction and the outer transfer is
+  modelled: an outer branch whose outcome is known early (jumps, branch-likely, beq rs,rs, b/bal) makes the
+  instruction at its target the inner branch's delay slot; otherwise a taken inner branch replaces it. Fitted to the
+  three all-taken hardware rows; register jumps and calls in this position fall back with a warning.
+- Runtime memory ownership (memory/ee/default): the heap set up with size -1 now ends at the main thread's stack
+  (30 MB fit, 32 MB do not, as on hardware). Runtime-owned allocations and the HLE RPC/TLS/boot-mode pools moved to
+  the EE kernel area (0x00020000-0x00080000) so they cannot overlap the program's sbrk heap.
+- COP0 performance counters: PCCR write mask, PCR0/PCR1 selection, and processor-cycle counting gated by CTE and the
+  current mode's bit, from the scheduler's guest cycle count (not host time; not cycle-accurate).
+- FPU MUL.S/MULA/MADD/MSUB: the product is truncated and the multiplier is not commutative (1.0 * 0x3FFFFFFF =
+  0x3FFFFFFE), modelled as a Booth-recoded ft whose lowest negative digit misses its +1; the hardware rows do not
+  distinguish this from wider truncated-array forms. About 1.46x the cost of the host multiply in isolation.
+- VU0 vi24 keeps the written bits 0x0C0C (one hardware row).
+- Not fixed: RSQRT.S (no simple rounding model fits all 39 rows) and the EFU series last bits.

@@ -87,25 +87,46 @@ static inline uint32_t ps2_plzcw32(uint32_t x)
 #define PS2_EXTRACT_EPI64_1(v) Ps2ExtractEpi64((v), 1)
 
 // Basic MIPS arithmetic operations
+// The _OV forms compute in unsigned arithmetic: a signed add that overflows is undefined behaviour in C++, and
+// overflow is exactly the case they must detect. The predicates are proved equal to "the exact sum is outside the
+// signed range" by tools/semantics/z3_int_semantics.py.
 #define ADD32(a, b) ((uint32_t)((a) + (b)))
-#define ADD32_OV(rs, rt, result32, overflow)              \
-    do                                                    \
-    {                                                     \
-        int32_t _a = (int32_t)(rs);                       \
-        int32_t _b = (int32_t)(rt);                       \
-        int32_t _r = _a + _b;                             \
-        overflow = (((_a ^ _b) >= 0) && ((_a ^ _r) < 0)); \
-        result32 = (uint32_t)_r;                          \
+#define ADD32_OV(rs, rt, result32, overflow)                        \
+    do                                                              \
+    {                                                               \
+        uint32_t _a = (uint32_t)(rs);                               \
+        uint32_t _b = (uint32_t)(rt);                               \
+        uint32_t _r = _a + _b;                                      \
+        overflow = ((~(_a ^ _b) & (_a ^ _r)) & 0x80000000u) != 0u;  \
+        result32 = _r;                                              \
     } while (0);
 #define SUB32(a, b) ((uint32_t)((a) - (b)))
-#define SUB32_OV(rs, rt, result32, overflow)             \
-    do                                                   \
-    {                                                    \
-        int32_t _a = (int32_t)(rs);                      \
-        int32_t _b = (int32_t)(rt);                      \
-        int32_t _r = _a - _b;                            \
-        overflow = (((_a ^ _b) < 0) && ((_a ^ _r) < 0)); \
-        result32 = (uint32_t)_r;                         \
+#define SUB32_OV(rs, rt, result32, overflow)                        \
+    do                                                              \
+    {                                                               \
+        uint32_t _a = (uint32_t)(rs);                               \
+        uint32_t _b = (uint32_t)(rt);                               \
+        uint32_t _r = _a - _b;                                      \
+        overflow = (((_a ^ _b) & (_a ^ _r)) & 0x80000000u) != 0u;   \
+        result32 = _r;                                              \
+    } while (0);
+#define ADD64_OV(rs, rt, result64, overflow)                                    \
+    do                                                                          \
+    {                                                                           \
+        uint64_t _a = (uint64_t)(rs);                                           \
+        uint64_t _b = (uint64_t)(rt);                                           \
+        uint64_t _r = _a + _b;                                                  \
+        overflow = ((~(_a ^ _b) & (_a ^ _r)) & 0x8000000000000000ull) != 0ull;  \
+        result64 = _r;                                                          \
+    } while (0);
+#define SUB64_OV(rs, rt, result64, overflow)                                    \
+    do                                                                          \
+    {                                                                           \
+        uint64_t _a = (uint64_t)(rs);                                           \
+        uint64_t _b = (uint64_t)(rt);                                           \
+        uint64_t _r = _a - _b;                                                  \
+        overflow = (((_a ^ _b) & (_a ^ _r)) & 0x8000000000000000ull) != 0ull;   \
+        result64 = _r;                                                          \
     } while (0);
 #define MUL32(a, b) ((uint32_t)((a) * (b)))
 #define DIV32(a, b) ((uint32_t)((a) / (b)))

@@ -292,3 +292,27 @@ PS2 or ps2sdk: no new hardware measurement. The final commit adds one `#include 
 - Recompiler: JALR-wide resume-entry promotion measured, not adopted (`5dd6a1b`,
   `docs/architecture/indirect-call-entry-analysis.md`).
 - Not changed: EE/VU arithmetic semantics, RSQRT.S, EFU, macro-mode flags (no new evidence).
+
+## Phase 7 — sanitizers, fuzzing, integer proofs (2026-10-25)
+
+Baseline (main `d4310f1`, reproduced): hardware 53/55, 8202/8250 lines; `ps2x_tests` 545/545; ctest 53/53; e2e 4/4;
+`ps2xIOP` 4/4. No physical PS2, no ps2sdk; no new hardware measurement; no commercial program run.
+
+- Fix: overflow-trapping ADD/ADDI/SUB/DADD/DADDI/DSUB and DADDIU computed signed sums, undefined behaviour exactly
+  when they overflow (clang UBSan traps on `ADD32_OV(0x7FFFFFFF, 1)`). Now unsigned with a sign-bit mask; Z3 proofs
+  (`tools/semantics/z3_int_semantics.py`, 29/29 incl. negative controls; integer only). Regenerate game code.
+- Fix (found by fuzzing): a DMA source chain that loops without an end tag gathered 2^20 laps of payload (~750 MB
+  for the found input, ~1 TB worst case). Exact cycle detection on (TADR, ASP, ASR0, ASR1) stops it after one lap;
+  256 MiB payload guard. Regression input in `tools/fuzz/regressions/dma`.
+- `PS2X_SANITIZE` / `PS2X_BUILD_FUZZERS`; six libFuzzer harnesses (GIF, VIF0, VIF1, DMA, ELF, decoder+emitter).
+  `ps2x_tests` under MSVC ASan: 549/549, no report. Local smoke runs: `docs/architecture/fuzzing.md`.
+- CI: `linux-clang-asan-ubsan` (unit, Z3, e2e) and `linux-clang-fuzz-smoke` (60 s per harness) — written, not yet
+  run on GitHub.
+- Gate: skipped/unrun ctest tests are reported, never folded into "passed".
+- Docs: `phase7-gap-matrix.md`, `phase7-tool-evaluation.md`, `fuzzing.md`.
+- Not changed: RSQRT.S and EFU stay at 59/66 and 182/223. A post-hoc RSQRT.S datapath fits 34/34 rows but was chosen
+  after seeing them and has no held-out confirmation, so it is not adopted.
+- Phase 7.1: test for finite chains that repeat the same data; mutation checks of the F1/F2 tests (one weak test found and strengthened: DADDI/DADDIU immediate extension); `phase8-roadmap.md`. `ps2x_tests` 550/550.
+- Fix (found by the CI fuzz smoke job): a REL section whose data did not load (sh_size past end of file) made
+  ELFIO's relocation accessor dereference null. ElfParser now skips such symbol/relocation tables. `ps2x_tests`
+  551/551.

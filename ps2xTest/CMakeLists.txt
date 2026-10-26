@@ -20,6 +20,11 @@ if(BUILD_TESTING)
         # Compatibility matrix schema: the validator rejects entries that claim more than a run observed.
         add_test(NAME compat_matrix_selftest
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/compat/compat.py selftest)
+        # Z3 bit-vector proofs of the integer helpers used by generated code. -E rather than -I: z3-solver is
+        # usually a user-site package. Exit 77 (z3 missing) is reported as skipped, never as passed.
+        add_test(NAME z3_int_semantics
+                 COMMAND ${Python3_EXECUTABLE} -E ${CMAKE_SOURCE_DIR}/tools/semantics/z3_int_semantics.py)
+        set_tests_properties(z3_int_semantics PROPERTIES SKIP_RETURN_CODE 77)
     endif()
 
     option(PS2X_BUILD_E2E_TESTS "Build the ELF-to-native end-to-end tests" ON)

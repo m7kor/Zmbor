@@ -87,6 +87,37 @@ if(PS2X_IS_ARM_TARGET)
     endif()
 endif()
 
+# Sanitizer and fuzzing builds (docs/architecture/fuzzing.md). Instrumentation applies to every target, fetched
+# dependencies included, so a defect reached through a dependency is reported too. Use RelWithDebInfo or Debug:
+# Release adds /GL and /fp:fast through EnableFastReleaseMode.
+set(PS2X_SANITIZE "" CACHE STRING "Sanitizers to enable: empty, address, or address,undefined (undefined: GCC/Clang)")
+option(PS2X_BUILD_FUZZERS "Build the libFuzzer harnesses in tools/fuzz (MSVC or Clang, needs PS2X_SANITIZE=address)" OFF)
+if(PS2X_SANITIZE)
+    if(MSVC)
+        if(NOT PS2X_SANITIZE STREQUAL "address")
+            message(FATAL_ERROR "MSVC supports only PS2X_SANITIZE=address")
+        endif()
+        add_compile_options(/fsanitize=address)
+        add_link_options(/INCREMENTAL:NO)
+        if(PS2X_BUILD_FUZZERS)
+            add_compile_options(/fsanitize-coverage=inline-8bit-counters /fsanitize-coverage=edge
+                                /fsanitize-coverage=trace-cmp)
+            # MSVC defines the coverage symbols only in the libFuzzer runtime, so executables without a fuzzer
+            # entry point (ps2x_tests, runners) cannot link here; run the unit suite from a PS2X_SANITIZE-only build.
+            set(PS2X_BUILD_TEST OFF)
+            set(PS2X_BUILD_ANALYZER OFF)
+        endif()
+    else()
+        add_compile_options(-fsanitize=${PS2X_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+        add_link_options(-fsanitize=${PS2X_SANITIZE})
+        if(PS2X_BUILD_FUZZERS)
+            add_compile_options(-fsanitize=fuzzer-no-link)
+        endif()
+    endif()
+elseif(PS2X_BUILD_FUZZERS)
+    message(FATAL_ERROR "PS2X_BUILD_FUZZERS requires PS2X_SANITIZE=address")
+endif()
+
 if(PS2X_BUILD_RECOMP)
     add_subdirectory("ps2xRecomp")
 endif()
@@ -106,4 +137,8 @@ endif()
 
 if(PS2X_BUILD_STUDIO)
     add_subdirectory("ps2xStudio")
+endif()
+
+if(PS2X_BUILD_FUZZERS)
+    add_subdirectory("tools/fuzz")
 endif()

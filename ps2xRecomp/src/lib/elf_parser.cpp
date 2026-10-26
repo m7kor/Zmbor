@@ -1702,6 +1702,37 @@ namespace
     }
 }
 
+namespace
+{
+    // ELFIO's relocation accessor reads get_data() + index * sh_entsize without checking either: a section whose
+    // data failed to load (sh_offset/sh_size past the end of the file leaves get_data() null while get_size()
+    // keeps the header's value) or whose sh_entsize is smaller than one record is read out of bounds. The symbol
+    // accessor checks for null data but not the record size. Found by tools/fuzz ps2x_fuzz_elf.
+    bool tableSectionIsReadable(const ELFIO::elfio &elf, const ELFIO::section *section)
+    {
+        if (section->get_size() == 0 || section->get_entry_size() == 0)
+            return true; // no entries: the accessors read nothing
+        const bool is64 = elf.get_class() == ELFIO::ELFCLASS64;
+        ELFIO::Elf_Xword record = 0;
+        switch (section->get_type())
+        {
+        case ELFIO::SHT_REL:
+            record = is64 ? sizeof(ELFIO::Elf64_Rel) : sizeof(ELFIO::Elf32_Rel);
+            break;
+        case ELFIO::SHT_RELA:
+            record = is64 ? sizeof(ELFIO::Elf64_Rela) : sizeof(ELFIO::Elf32_Rela);
+            break;
+        case ELFIO::SHT_SYMTAB:
+        case ELFIO::SHT_DYNSYM:
+            record = is64 ? sizeof(ELFIO::Elf64_Sym) : sizeof(ELFIO::Elf32_Sym);
+            break;
+        default:
+            return false;
+        }
+        return section->get_data() != nullptr && section->get_entry_size() >= record;
+    }
+}
+
 namespace ps2recomp
 {
 
@@ -2394,6 +2425,16 @@ namespace ps2recomp
                     continue;
                 }
 
+                if (!tableSectionIsReadable(*m_elf, psec))
+                {
+                    if (m_reporter)
+                    {
+                        m_reporter->warning("elf", "Symbol section " + std::to_string(i) +
+                                                       " has no loadable data or a short entry size; skipped");
+                    }
+                    continue;
+                }
+
                 ELFIO::symbol_section_accessor symbols(*m_elf, psec);
 
                 ELFIO::Elf_Xword sym_num = symbols.get_symbols_num();
@@ -2452,9 +2493,19 @@ namespace ps2recomp
                     continue;
                 }
 
-                ELFIO::relocation_section_accessor relocs(*m_elf, psec);
-
                 ELFIO::section *symSec = m_elf->sections[psec->get_link()];
+
+                if (!tableSectionIsReadable(*m_elf, psec) || !tableSectionIsReadable(*m_elf, symSec))
+                {
+                    if (m_reporter)
+                    {
+                        m_reporter->warning("elf", "Relocation section " + std::to_string(i) +
+                                                       " or its symbol table has no loadable data or a short entry size; skipped");
+                    }
+                    continue;
+                }
+
+                ELFIO::relocation_section_accessor relocs(*m_elf, psec);
 
                 if (symSec->get_link() >= m_elf->sections.size())
                 {

@@ -131,11 +131,10 @@ namespace ps2recomp
             return fmt::format("ctx->sa = GPR_U32(ctx, {}) & 0xF;", inst.rs); // SA counts bytes
         case SPECIAL_DADD:
             return fmt::format(
-                "{{ int64_t a = (int64_t)GPR_S64(ctx, {}); "
-                "int64_t b = (int64_t)GPR_S64(ctx, {}); "
-                "int64_t r = a + b; "
-                "if (((a ^ b) >= 0) && ((a ^ r) < 0)) runtime->SignalException(ctx, EXCEPTION_INTEGER_OVERFLOW); "
-                "else SET_GPR_S64(ctx, {}, r); }}",
+                "{{ uint64_t r; bool ov; "
+                "ADD64_OV(GPR_U64(ctx, {}), GPR_U64(ctx, {}), r, ov); "
+                "if (ov) runtime->SignalException(ctx, EXCEPTION_INTEGER_OVERFLOW); "
+                "else SET_GPR_U64(ctx, {}, r); }}",
                 inst.rs, inst.rt, inst.rd);
         case SPECIAL_DADDU:
             return fmt::format(
@@ -143,11 +142,10 @@ namespace ps2recomp
                 inst.rd, inst.rs, inst.rt);
         case SPECIAL_DSUB:
             return fmt::format(
-                "{{ int64_t a = (int64_t)GPR_S64(ctx, {}); "
-                "int64_t b = (int64_t)GPR_S64(ctx, {}); "
-                "int64_t r = a - b; "
-                "if (((a ^ b) < 0) && ((a ^ r) < 0)) runtime->SignalException(ctx, EXCEPTION_INTEGER_OVERFLOW); "
-                "else SET_GPR_S64(ctx, {}, r); }}",
+                "{{ uint64_t r; bool ov; "
+                "SUB64_OV(GPR_U64(ctx, {}), GPR_U64(ctx, {}), r, ov); "
+                "if (ov) runtime->SignalException(ctx, EXCEPTION_INTEGER_OVERFLOW); "
+                "else SET_GPR_U64(ctx, {}, r); }}",
                 inst.rs, inst.rt, inst.rd);
         case SPECIAL_DSUBU:
             return fmt::format("SET_GPR_U64(ctx, {}, GPR_U64(ctx, {}) - GPR_U64(ctx, {}));", inst.rd, inst.rs, inst.rt);

@@ -1,0 +1,440 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="760" viewBox="0 0 1000 760" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" role="img" aria-labelledby="t-framework">
+<title id="t-framework">Zmbor — Recompiler, Tools &amp; Compatibility: component status (generated from docs/status/components.json at c7e5960)</title>
+<rect width="1000" height="760" fill="#0d1117"/>
+<text x="16" y="30" fill="#e6edf3" font-size="20" font-weight="600">Recompiler, Tools &amp; Compatibility</text>
+<text x="16" y="50" fill="#8b949e" font-size="12">53 components · statuses written by hand, checked against cited evidence · evidence commit c7e5960</text>
+<rect x="16" y="64" width="12" height="12" rx="2" fill="#2ea043" stroke="#30363d"/>
+<text x="33" y="74" fill="#e6edf3" font-size="11">verified complete 4</text>
+<rect x="154.7" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
+<text x="171.7" y="74" fill="#e6edf3" font-size="11">verified partial 29</text>
+<rect x="285.92" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
+<text x="302.92" y="74" fill="#e6edf3" font-size="11">implemented, unverified 11</text>
+<rect x="462.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
+<text x="479.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 0</text>
+<rect x="563.1" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
+<text x="580.1" y="74" fill="#e6edf3" font-size="11">missing 1</text>
+<rect x="646.58" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
+<text x="663.58" y="74" fill="#e6edf3" font-size="11">not applicable 0</text>
+<rect x="767.24" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
+<text x="784.24" y="74" fill="#e6edf3" font-size="11">unknown 8</text>
+<rect x="17" y="93" width="966" height="208" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="107" fill="#e6edf3" font-size="12" font-weight="600">I · STATIC RECOMPILATION  (17 · 1 ok · 11 part)</text>
+<rect x="20" y="114" width="348.3" height="184" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="124" fill="#8b949e" font-size="10" font-weight="500">Front end  (6 · 0 ok · 5 part)</text>
+<g><title>rc.elf — ELF parsing (sections, symbols, relocations)
+status: VERIFIED_PARTIAL
+implemented: 55/55 ps2autotests ELFs parsed; malformed tables skipped (F3)
+missing: No commercial ELF parsed in tests</title>
+<rect x="23" y="131" width="170.1" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="146" fill="#0d1117" font-size="11">ELF parsing (sections,</text>
+<text x="27" y="159" fill="#0d1117" font-size="11">symbols, relocations)</text>
+<text x="189.1" y="180.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.discovery — Function discovery (symbols, stripped ELFs, Ghidra map)
+status: VERIFIED_PARTIAL</title>
+<rect x="195.1" y="131" width="170.1" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="199.1" y="146" fill="#0d1117" font-size="11">Function discovery (symbols,</text>
+<text x="199.1" y="159" fill="#0d1117" font-size="11">stripped ELFs, Ghidra map)</text>
+<text x="361.3" y="180.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.cfg — Control-flow graph, labels, resume entries
+status: VERIFIED_PARTIAL
+hardware programs: cpu_ee_branch, cpu_ee_branchdelay</title>
+<rect x="23" y="186.3" width="170.1" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="201.3" fill="#0d1117" font-size="11">Control-flow graph, labels,</text>
+<text x="27" y="214.3" fill="#0d1117" font-size="11">resume entries</text>
+<text x="189.1" y="235.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.decoder — Decoder robustness (fuzzed)
+status: VERIFIED_PARTIAL
+missing: Smoke-length fuzzing only</title>
+<rect x="23" y="241.7" width="170.1" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="256.7" fill="#0d1117" font-size="11">Decoder robustness (fuzzed)</text>
+<text x="189.1" y="291" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.config — TOML configuration (stubs, skip, patches, jump tables)
+status: VERIFIED_PARTIAL</title>
+<rect x="195.1" y="186.3" width="170.1" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="199.1" y="201.3" fill="#0d1117" font-size="11">TOML configuration (stubs,</text>
+<text x="199.1" y="214.3" fill="#0d1117" font-size="11">skip, patches, jump tables)</text>
+<text x="361.3" y="235.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.relocs — Relocation symbol auto-binding at call sites
+status: IMPLEMENTED_UNVERIFIED
+missing: No test of the auto-binding</title>
+<rect x="195.1" y="241.7" width="170.1" height="53.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="199.1" y="256.7" fill="#f0f6fc" font-size="11">Relocation symbol</text>
+<text x="199.1" y="269.7" fill="#f0f6fc" font-size="11">auto-binding at call sites</text>
+<text x="361.3" y="291" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="370.3" y="114" width="609.7" height="184" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="375.3" y="124" fill="#8b949e" font-size="10" font-weight="500">Translation and output  (11 · 1 ok · 6 part)</text>
+<g><title>rc.translate — Instruction translation to C++
+status: VERIFIED_PARTIAL
+implemented: 53/55 hardware programs match exactly when recompiled
+hardware programs: cpu_ee_alu, cpu_ee_simd_muldiv</title>
+<rect x="373.3" y="131" width="163.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="377.3" y="146" fill="#0d1117" font-size="11">Instruction translation to</text>
+<text x="377.3" y="159" fill="#0d1117" font-size="11">C++</text>
+<text x="532.5" y="180.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.ub — No signed-overflow UB in trapping arithmetic (F1)
+status: VERIFIED_COMPLETE
+implemented: Emitted forms proved, mutation-checked, run under UBSan in CI</title>
+<rect x="373.3" y="186.3" width="163.2" height="53.3" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="377.3" y="201.3" fill="#ffffff" font-size="11">No signed-overflow UB in</text>
+<text x="377.3" y="214.3" fill="#ffffff" font-size="11">trapping arithmetic (F1)</text>
+<text x="532.5" y="235.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>rc.emitter — Function emitter and generated sources
+status: VERIFIED_PARTIAL</title>
+<rect x="373.3" y="241.7" width="163.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="377.3" y="256.7" fill="#0d1117" font-size="11">Function emitter and</text>
+<text x="377.3" y="269.7" fill="#0d1117" font-size="11">generated sources</text>
+<text x="532.5" y="291" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.indirect — Indirect jumps and calls (JR, JALR, jump tables)
+status: VERIFIED_PARTIAL</title>
+<rect x="538.5" y="131" width="163.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="542.5" y="146" fill="#0d1117" font-size="11">Indirect jumps and calls</text>
+<text x="542.5" y="159" fill="#0d1117" font-size="11">(JR, JALR, jump tables)</text>
+<text x="697.7" y="180.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.resume — JALR/JAL resume entries
+status: VERIFIED_PARTIAL
+missing: JALR-wide promotion measured and rejected (docs/architecture/indirect-call-entry-analysis.md)</title>
+<rect x="538.5" y="186.3" width="163.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="542.5" y="201.3" fill="#0d1117" font-size="11">JALR/JAL resume entries</text>
+<text x="697.7" y="235.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.dispatch — Runtime function dispatch (lookupFunction)
+status: VERIFIED_PARTIAL</title>
+<rect x="538.5" y="241.7" width="163.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="542.5" y="256.7" fill="#0d1117" font-size="11">Runtime function dispatch</text>
+<text x="542.5" y="269.7" fill="#0d1117" font-size="11">(lookupFunction)</text>
+<text x="697.7" y="291" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.native — Native compilation and linking with the runtime
+status: VERIFIED_PARTIAL
+implemented: 55 hardware programs and 4 e2e programs built (MSVC local; e2e also GCC/Clang in CI)
+hardware programs: cpu_ee_alu</title>
+<rect x="703.7" y="131" width="135.7" height="64.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="707.7" y="146" fill="#0d1117" font-size="11">Native compilation and</text>
+<text x="707.7" y="159" fill="#0d1117" font-size="11">linking with the</text>
+<text x="707.7" y="172" fill="#0d1117" font-size="11">runtime</text>
+<text x="835.3" y="191.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>rc.opt — Generated-code optimisation
+status: IMPLEMENTED_UNVERIFIED
+implemented: Fast memory paths, native GIF DMA kick helper
+missing: Hardware programs build at /Od by default; no optimised-build gate</title>
+<rect x="841.3" y="131" width="135.7" height="64.4" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="845.3" y="146" fill="#f0f6fc" font-size="11">Generated-code</text>
+<text x="845.3" y="159" fill="#f0f6fc" font-size="11">optimisation</text>
+<text x="973" y="191.4" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>rc.stubs — Stub and skip binding (handler@address)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="703.7" y="197.4" width="181.5" height="47.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="707.7" y="212.4" fill="#f0f6fc" font-size="11">Stub and skip binding</text>
+<text x="707.7" y="225.4" fill="#f0f6fc" font-size="11">(handler@address)</text>
+<text x="881.2" y="241.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>rc.overrides — Game-specific override registry
+status: IMPLEMENTED_UNVERIFIED
+missing: No test</title>
+<rect x="703.7" y="247.2" width="181.5" height="47.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="707.7" y="262.2" fill="#f0f6fc" font-size="11">Game-specific override registry</text>
+<text x="881.2" y="291" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>rc.diag — Diagnostics and reporter
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="887.2" y="197.4" width="89.8" height="97.6" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="891.2" y="212.4" fill="#f0f6fc" font-size="11">Diagnostics</text>
+<text x="891.2" y="225.4" fill="#f0f6fc" font-size="11">and reporter</text>
+<text x="973" y="291" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="17" y="303" width="966" height="292.7" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="317" fill="#e6edf3" font-size="12" font-weight="600">J · DEVELOPER PLATFORM  (24 · 3 ok · 14 part)</text>
+<rect x="20" y="324" width="418.2" height="180.8" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="334" fill="#8b949e" font-size="10" font-weight="500">Modules  (7 · 0 ok · 4 part)</text>
+<g><title>dv.analyzer — ps2xAnalyzer
+status: VERIFIED_PARTIAL</title>
+<rect x="23" y="341" width="175.5" height="52.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="356" fill="#0d1117" font-size="11">ps2xAnalyzer</text>
+<text x="194.5" y="389.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.recomp — ps2xRecomp
+status: VERIFIED_PARTIAL</title>
+<rect x="23" y="395.3" width="175.5" height="52.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="410.3" fill="#0d1117" font-size="11">ps2xRecomp</text>
+<text x="194.5" y="443.5" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.runtime — ps2xRuntime
+status: VERIFIED_PARTIAL</title>
+<rect x="23" y="449.5" width="175.5" height="52.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="464.5" fill="#0d1117" font-size="11">ps2xRuntime</text>
+<text x="194.5" y="497.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.iop — ps2xIOP
+status: VERIFIED_PARTIAL</title>
+<rect x="200.5" y="341" width="116.3" height="79.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="204.5" y="356" fill="#0d1117" font-size="11">ps2xIOP</text>
+<text x="312.8" y="416.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.studio — ps2xStudio GUI
+status: IMPLEMENTED_UNVERIFIED
+missing: Built by the Windows CI job; no tests</title>
+<rect x="318.8" y="341" width="116.3" height="79.4" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="322.8" y="356" fill="#f0f6fc" font-size="11">ps2xStudio GUI</text>
+<text x="431.2" y="416.4" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>dv.debug — Runtime debug panel and trace tools
+status: IMPLEMENTED_UNVERIFIED
+missing: No tests</title>
+<rect x="200.5" y="422.4" width="116.3" height="79.4" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="204.5" y="437.4" fill="#f0f6fc" font-size="11">Runtime debug</text>
+<text x="204.5" y="450.4" fill="#f0f6fc" font-size="11">panel and trace</text>
+<text x="204.5" y="463.4" fill="#f0f6fc" font-size="11">tools</text>
+<text x="312.8" y="497.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>dv.ports — Android and PS Vita ports
+status: IMPLEMENTED_UNVERIFIED
+missing: Not built in CI</title>
+<rect x="318.8" y="422.4" width="116.3" height="79.4" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="322.8" y="437.4" fill="#f0f6fc" font-size="11">Android and PS</text>
+<text x="322.8" y="450.4" fill="#f0f6fc" font-size="11">Vita ports</text>
+<text x="431.2" y="497.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="20" y="506.8" width="418.2" height="85.8" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="516.8" fill="#8b949e" font-size="10" font-weight="500">Build and CI  (3 · 2 ok · 0 part)</text>
+<g><title>dv.cmake — CMake build (MSVC, GCC, Clang)
+status: VERIFIED_COMPLETE
+implemented: Scope: the three compiler jobs of .github/workflows/build.yml build cleanly (runs 40257464815 and 40257466538 on c7e5960)</title>
+<rect x="23" y="523.8" width="136.1" height="65.8" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="538.8" fill="#ffffff" font-size="11">CMake build (MSVC,</text>
+<text x="27" y="551.8" fill="#ffffff" font-size="11">GCC, Clang)</text>
+<text x="155.1" y="585.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>dv.ci — CI: build, unit, e2e, sanitizers, fuzz smoke
+status: VERIFIED_COMPLETE
+implemented: Scope: every job in build.yml passes on the PR head (runs 40257464815 and 40257466538 on c7e5960: 10/10)</title>
+<rect x="161.1" y="523.8" width="136.1" height="65.8" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="165.1" y="538.8" fill="#ffffff" font-size="11">CI: build, unit, e2e,</text>
+<text x="165.1" y="551.8" fill="#ffffff" font-size="11">sanitizers, fuzz smoke</text>
+<text x="293.1" y="585.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>dv.gate — Acceptance gate with identity manifest
+status: IMPLEMENTED_UNVERIFIED
+implemented: Used for every Phase 6-7 release decision
+missing: No automated test of the gate itself; Windows/PowerShell only; needs local ps2autotests</title>
+<rect x="299.1" y="523.8" width="136.1" height="65.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="303.1" y="538.8" fill="#f0f6fc" font-size="11">Acceptance gate with</text>
+<text x="303.1" y="551.8" fill="#f0f6fc" font-size="11">identity manifest</text>
+<text x="431.2" y="585.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="440.2" y="324" width="539.8" height="268.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="445.2" y="334" fill="#8b949e" font-size="10" font-weight="500">Verification tools  (14 · 1 ok · 10 part)</text>
+<g><title>dv.unit — Unit tests (MiniTest)
+status: VERIFIED_PARTIAL</title>
+<rect x="443.2" y="341" width="132" height="69.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="447.2" y="356" fill="#0d1117" font-size="11">Unit tests (MiniTest)</text>
+<text x="571.1" y="406.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.hwtest — Hardware result pipeline (hwtest.py)
+status: VERIFIED_PARTIAL
+missing: Not run in CI (ps2autotests not vendored)
+hardware programs: cpu_ee_alu</title>
+<rect x="577.1" y="341" width="132" height="69.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="581.1" y="356" fill="#0d1117" font-size="11">Hardware result</text>
+<text x="581.1" y="369" fill="#0d1117" font-size="11">pipeline (hwtest.py)</text>
+<text x="705.1" y="406.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.e2e — End-to-end ELF to native tests
+status: VERIFIED_PARTIAL
+missing: Not run on the Windows CI runner (no OpenGL)</title>
+<rect x="711.1" y="341" width="132" height="69.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="715.1" y="356" fill="#0d1117" font-size="11">End-to-end ELF to</text>
+<text x="715.1" y="369" fill="#0d1117" font-size="11">native tests</text>
+<text x="839" y="406.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.diff — Differential testing (VU reference mode)
+status: VERIFIED_PARTIAL</title>
+<rect x="845" y="341" width="132" height="69.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="849" y="356" fill="#0d1117" font-size="11">Differential testing</text>
+<text x="849" y="369" fill="#0d1117" font-size="11">(VU reference mode)</text>
+<text x="973" y="406.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.fuzz — Fuzzing (6 libFuzzer harnesses)
+status: VERIFIED_PARTIAL
+missing: Smoke runs only (60 s per target in CI)</title>
+<rect x="443.2" y="412.6" width="158.7" height="57.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="447.2" y="427.6" fill="#0d1117" font-size="11">Fuzzing (6 libFuzzer</text>
+<text x="447.2" y="440.6" fill="#0d1117" font-size="11">harnesses)</text>
+<text x="597.9" y="466.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.san — Sanitizers (ASan, UBSan)
+status: VERIFIED_PARTIAL
+missing: UBSan only with Clang/GCC; MSVC ASan run locally</title>
+<rect x="443.2" y="472.3" width="158.7" height="57.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="447.2" y="487.3" fill="#0d1117" font-size="11">Sanitizers (ASan, UBSan)</text>
+<text x="597.9" y="526" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.z3 — Z3 integer proofs
+status: VERIFIED_COMPLETE
+implemented: Scope: the 29 properties of z3_int_semantics.py, each with a negative control</title>
+<rect x="443.2" y="532" width="158.7" height="57.7" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="447.2" y="547" fill="#ffffff" font-size="11">Z3 integer proofs</text>
+<text x="597.9" y="585.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>dv.mutation — Committed mutation-testing runner
+status: MISSING
+missing: Mutation checks were run by hand; no runner in the repository</title>
+<rect x="603.9" y="412.6" width="123" height="74.7" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="607.9" y="427.6" fill="#ffffff" font-size="11">Committed</text>
+<text x="607.9" y="440.6" fill="#ffffff" font-size="11">mutation-testing</text>
+<text x="607.9" y="453.6" fill="#ffffff" font-size="11">runner</text>
+<text x="723" y="483.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dv.prof — Profiling and benchmarks
+status: VERIFIED_PARTIAL
+missing: No performance gate (roadmap item 6)</title>
+<rect x="729" y="412.6" width="123" height="74.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="733" y="427.6" fill="#0d1117" font-size="11">Profiling and</text>
+<text x="733" y="440.6" fill="#0d1117" font-size="11">benchmarks</text>
+<text x="848" y="483.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.compat — Compatibility matrix (tools/compat)
+status: VERIFIED_PARTIAL</title>
+<rect x="854" y="412.6" width="123" height="74.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="858" y="427.6" fill="#0d1117" font-size="11">Compatibility matrix</text>
+<text x="858" y="440.6" fill="#0d1117" font-size="11">(tools/compat)</text>
+<text x="973" y="483.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.probes — Hardware probe lab (P1-P5)
+status: IMPLEMENTED_UNVERIFIED
+missing: No probe has run on hardware
+blocker: Physical PS2 and ps2sdk</title>
+<rect x="603.9" y="489.4" width="185.5" height="49.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="607.9" y="504.4" fill="#f0f6fc" font-size="11">Hardware probe lab (P1-P5)</text>
+<text x="785.5" y="534.5" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>dv.research — Community research database
+status: VERIFIED_PARTIAL</title>
+<rect x="603.9" y="540.5" width="185.5" height="49.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="607.9" y="555.5" fill="#0d1117" font-size="11">Community research database</text>
+<text x="785.5" y="585.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.status — Status dashboard pipeline
+status: VERIFIED_PARTIAL
+missing: Statuses are reviewed by hand; the validator checks evidence links, not semantics</title>
+<rect x="791.5" y="489.4" width="185.5" height="49.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="795.5" y="504.4" fill="#0d1117" font-size="11">Status dashboard pipeline</text>
+<text x="973" y="534.5" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dv.docs — Developer documentation
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="791.5" y="540.5" width="185.5" height="49.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="795.5" y="555.5" fill="#f0f6fc" font-size="11">Developer documentation</text>
+<text x="973" y="585.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="17" y="597.7" width="966" height="145.3" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="611.7" fill="#e6edf3" font-size="12" font-weight="600">K · GAME COMPATIBILITY  (12 · 0 ok · 4 part)</text>
+<rect x="20" y="618.7" width="960" height="121.3" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="628.7" fill="#8b949e" font-size="10" font-weight="500">Stages  (12 · 0 ok · 4 part)</text>
+<g><title>c.elf — ELF loading (stage 0)
+status: VERIFIED_PARTIAL
+implemented: 55/55 test programs
+missing: No game ELF
+hardware programs: cpu_ee_alu</title>
+<rect x="23" y="635.7" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="650.7" fill="#0d1117" font-size="11">ELF loading (stage 0)</text>
+<text x="176.3" y="681.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>c.native — Native executable generation (stages 1-2)
+status: VERIFIED_PARTIAL
+implemented: 55/55 test programs
+missing: No game ELF
+hardware programs: cpu_ee_alu</title>
+<rect x="23" y="687.3" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="702.3" fill="#0d1117" font-size="11">Native executable</text>
+<text x="27" y="715.3" fill="#0d1117" font-size="11">generation (stages 1-2)</text>
+<text x="176.3" y="733" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>c.init — Initialisation (stage 3)
+status: VERIFIED_PARTIAL
+implemented: 55/55 test programs produce output
+missing: No game
+hardware programs: cpu_ee_alu</title>
+<rect x="182.3" y="635.7" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="186.3" y="650.7" fill="#0d1117" font-size="11">Initialisation (stage 3)</text>
+<text x="335.7" y="681.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>c.checkpoint — Stable checkpoint (stage 4)
+status: VERIFIED_PARTIAL
+implemented: 55/55 test programs reach their end marker
+missing: Test programs, not games
+hardware programs: cpu_ee_alu</title>
+<rect x="182.3" y="687.3" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="186.3" y="702.3" fill="#0d1117" font-size="11">Stable checkpoint (stage</text>
+<text x="186.3" y="715.3" fill="#0d1117" font-size="11">4)</text>
+<text x="335.7" y="733" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>c.mainloop — Main loop execution
+status: UNKNOWN
+missing: No game run</title>
+<rect x="341.7" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="345.7" y="650.7" fill="#c9d1d9" font-size="11">Main loop execution</text>
+<text x="495" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.render — Rendering
+status: UNKNOWN
+missing: Only a synthetic e2e frame is checked</title>
+<rect x="341.7" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="345.7" y="702.3" fill="#c9d1d9" font-size="11">Rendering</text>
+<text x="495" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.input — Controller input (stage 5)
+status: UNKNOWN
+missing: No scripted input runs</title>
+<rect x="501" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="505" y="650.7" fill="#c9d1d9" font-size="11">Controller input (stage 5)</text>
+<text x="654.3" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.sound — Sound
+status: UNKNOWN
+missing: No game run</title>
+<rect x="501" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="505" y="702.3" fill="#c9d1d9" font-size="11">Sound</text>
+<text x="654.3" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.scenes — Scene transitions (stage 6)
+status: UNKNOWN
+missing: No game run</title>
+<rect x="660.3" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="664.3" y="650.7" fill="#c9d1d9" font-size="11">Scene transitions (stage 6)</text>
+<text x="813.7" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.save — Save and load (stage 8)
+status: UNKNOWN
+missing: No game run</title>
+<rect x="660.3" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="664.3" y="702.3" fill="#c9d1d9" font-size="11">Save and load (stage 8)</text>
+<text x="813.7" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.extended — Extended execution (stage 7)
+status: UNKNOWN
+missing: No game run</title>
+<rect x="819.7" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="823.7" y="650.7" fill="#c9d1d9" font-size="11">Extended execution (stage</text>
+<text x="823.7" y="663.7" fill="#c9d1d9" font-size="11">7)</text>
+<text x="973" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<g><title>c.complete — Full completion (stage 9)
+status: UNKNOWN
+missing: No game run</title>
+<rect x="819.7" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="823.7" y="702.3" fill="#c9d1d9" font-size="11">Full completion (stage 9)</text>
+<text x="973" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+</svg>

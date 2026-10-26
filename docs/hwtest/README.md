@@ -12,7 +12,11 @@ files are never edited; a test passes only when the guest's own output matches t
 | first run | 6 / 54 (1 ELF did not recompile) | 5346 / 8240 (65%) |
 | end of Phase 2 | 32 / 55 | 6627 / 8250 (80%) |
 | end of Phase 3 | 47 / 55 | 8172 / 8250 (99.1%) |
-| current (Phase 4) | 53 / 55 | 8202 / 8250 (99.4%) |
+| end of Phase 4 | 53 / 55 | 8202 / 8250 (99.4%) |
+| current (Phase 7, gate on `c7e5960` = main `a13b47a`) | 53 / 55 | 8202 / 8250 (99.4%) |
+
+`dashboard.json` is that Phase 7 gate run; `docs/status/components.json` records its SHA-256, so replacing it
+requires re-measuring the status inventory (`tools/status/generate_dashboard.py measure`).
 
 Fully matching areas: `kernel/ee` 10/10, `dma` 11/11, `cpu/ee` 6/6, `cpu/ee_cop0` 1/1, `cpu/ee_simd` 6/6,
 `cpu/vu0_macro` 2/2, `memory/ee` 1/1, `gs` 2/2, `vu` 6 of 7, `cpu/ee_fpu` 8 of 9. No crash or timeout. No test that passed in an earlier

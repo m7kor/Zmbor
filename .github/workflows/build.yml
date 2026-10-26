@@ -52,6 +52,21 @@ jobs:
       - name: Lane loop compiler probe (informational)
         run: ./build/ps2xTest/fpenv/ps2x_lane_loop_probe || echo "lane loop probe reproduced the pattern (informational, not a failure)"
 
+  # Status dashboard (docs/status): the inventory's evidence links and measurements must be consistent, and the
+  # SVGs, docs/status/README.md and the README block must equal what components.json generates. Statuses are never
+  # changed here; a status change is a reviewed edit of components.json.
+  status-dashboard:
+    name: status-dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate inventory and generated files
+        run: python3 -I tools/status/validate_dashboard.py
+
+      - name: Validator self-test (each rule rejects a crafted bad inventory)
+        run: python3 -I tools/status/validate_dashboard.py --selftest
+
   # Unit suite, Z3 proofs and the e2e programs (generated code included) under AddressSanitizer + UBSan.
   # Any sanitizer report fails the job (-fno-sanitize-recover=all, halt_on_error).
   linux-clang-sanitizers:

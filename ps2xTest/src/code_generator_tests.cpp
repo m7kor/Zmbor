@@ -212,8 +212,11 @@ void register_code_generator_tests()
         t.IsTrue(dadd.find("ADD64_OV(") != std::string::npos, "DADD must use ADD64_OV: " + dadd);
         t.IsTrue(dsub.find("SUB64_OV(") != std::string::npos, "DSUB must use SUB64_OV: " + dsub);
         t.IsTrue(daddi.find("ADD64_OV(") != std::string::npos, "DADDI must use ADD64_OV: " + daddi);
-        t.IsTrue(daddiu.find("int64_t)GPR_S64") == std::string::npos && daddiu.find("GPR_U64(ctx, 1) +") != std::string::npos,
-                 "DADDIU must add in uint64_t: " + daddiu);
+        // imm16 0x8000 must reach the add sign-extended to 64 bits (simmediate is already sign-extended to 32).
+        t.IsTrue(daddi.find("ADD64_OV(GPR_U64(ctx, 1), (uint64_t)(int64_t)(int32_t)4294934528, res, ov)") != std::string::npos,
+                 "DADDI must add the sign-extended immediate: " + daddi);
+        t.IsTrue(daddiu.find("SET_GPR_U64(ctx, 2, GPR_U64(ctx, 1) + (uint64_t)(int64_t)(int32_t)4294934528)") != std::string::npos,
+                 "DADDIU must add the sign-extended immediate in uint64_t: " + daddiu);
         for (const std::string *code : {&dadd, &dsub, &daddi})
         {
             t.IsTrue(code->find("int64_t r = ") == std::string::npos && code->find("int64_t res = ") == std::string::npos,

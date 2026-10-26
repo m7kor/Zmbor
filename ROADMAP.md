@@ -2,13 +2,11 @@
 
 Order is by priority. `HANDOFF.md` has the details and the current measured state.
 
-1. **Remaining PS2 hardware accuracy.** Fix the 8 failing hardware tests:
-   - branch inside a delay slot (2 tests);
-   - the guest heap limit;
-   - COP0 performance counters;
-   - FPU MUL.S/RSQRT.S at bit level;
-   - the last bits of the EFU series;
-   - VU0 vi24.
+1. **Remaining PS2 hardware accuracy.** Two hardware programs still mismatch: FPU RSQRT.S rounding
+   (`cpu_ee_fpu_sqrt`) and the last bits of the EFU series (`vu_lower_efu`). Both need new hardware measurements;
+   the six other failures of the original list were fixed in Phase 4. The next concrete steps are in
+   [docs/architecture/phase8-roadmap.md](docs/architecture/phase8-roadmap.md) and the per-component state in
+   [docs/status](docs/status/README.md).
 2. **Native recompilation.** Make function discovery more robust on stripped ELFs, generate faster code (optimized
    builds of generated code), and reduce how often execution falls back to runtime dispatch.
 3. **Broader VU and IOP execution.** Cover more VU1 microprogram paths (XGKICK, the timing VIF and GIF depend on) and

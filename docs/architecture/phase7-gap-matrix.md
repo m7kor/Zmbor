@@ -40,3 +40,12 @@ Identical to the Phase 6 release gate (`p6_release.json`).
 
 `game_overrides.cpp` is a generic descriptor registry (data, no per-title logic in the runtime); `games_database.cpp`
 holds metadata; one comment in `MPEG.cpp` names a title as the origin of a test case. No output hardcoding was found.
+
+## Known failures at the Phase 7 head
+
+| item | state | why it stays open |
+|---|---|---|
+| `cpu_ee_fpu_sqrt` | 59/66 lines (RSQRT.S rows) | no pre-registered model fits; post-hoc fit not adopted; needs probe P3 run on hardware |
+| `vu_lower_efu` | 182/223 lines | EFU last-bit results; needs a new EFU probe run on hardware |
+| CI sanitizer and fuzz-smoke jobs | first run on the Phase 7 PR | results are recorded in the PR, not here |
+| SPU2, GS hardware accuracy, IOP timing, compatibility stages 5–9 | unsupported / untested | `phase8-roadmap.md` |

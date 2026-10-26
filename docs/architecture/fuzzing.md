@@ -81,3 +81,18 @@ candidate causes (GS packet processing, the 1 MB RDRAM copy per DMA input, a tem
 generation) are unconfirmed. The first gif run ran 34 min despite `-max_total_time=120`; the PowerShell driver
 passed that argument unquoted, and with the arguments quoted every later run stopped on time, so the driver is the
 likely cause (not further investigated).
+
+## Mutation checks of the F1/F2 regression tests (Phase 7.1)
+
+Each mutant was applied to the source, `ps2x_tests` rebuilt and run, and the file restored from git
+(`p7_mutate.ps1`, local). A surviving mutant means a test that cannot fail on that defect.
+
+| mutant | first result | after test change |
+|---|---|---|
+| M1 `ADD32_OV` without the operand-sign term | killed (boundary-pairs test) | — |
+| M2 `SUB64_OV` uses the ADD predicate | killed (boundary-pairs test) | — |
+| M3 DADDI zero-extends its immediate | **survived** (emitter test only looked for `ADD64_OV(`) | killed: the test pins the exact sign-extended operand |
+| M3b DADDIU zero-extends its immediate | — | killed |
+| M4 cycle key without ASR0, in `operator==` only | survived: not a valid mutant (the hash still separated the states, so they were never compared) | — |
+| M4b cycle key without ASR0, in equality and hash | — | killed ("CALLs the same subroutine twice") |
+| M5 no cycle detection | — | killed ("loops without an end tag stops after one lap") |

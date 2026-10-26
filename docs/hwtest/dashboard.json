@@ -152,7 +152,7 @@
       "id": "cpu_ee_alu",
       "matching_lines": 787,
       "regression": false,
-      "run_seconds": 8.022,
+      "run_seconds": 8.041,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -163,7 +163,7 @@
       "id": "cpu_ee_branch",
       "matching_lines": 326,
       "regression": false,
-      "run_seconds": 2.855,
+      "run_seconds": 3.289,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -174,7 +174,7 @@
       "id": "cpu_ee_branchdelay",
       "matching_lines": 13,
       "regression": false,
-      "run_seconds": 4.954,
+      "run_seconds": 3.19,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -185,7 +185,7 @@
       "id": "cpu_ee_cop0_performance",
       "matching_lines": 13,
       "regression": false,
-      "run_seconds": 4.89,
+      "run_seconds": 4.434,
       "status": "PASS",
       "subsystem": "cpu/ee_cop0"
     },
@@ -196,7 +196,7 @@
       "id": "cpu_ee_fpu_arithmetic",
       "matching_lines": 293,
       "regression": false,
-      "run_seconds": 10.454,
+      "run_seconds": 10.48,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -207,7 +207,7 @@
       "id": "cpu_ee_fpu_branch",
       "matching_lines": 26,
       "regression": false,
-      "run_seconds": 5.016,
+      "run_seconds": 1.397,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -218,7 +218,7 @@
       "id": "cpu_ee_fpu_branchdelay",
       "matching_lines": 4,
       "regression": false,
-      "run_seconds": 4.965,
+      "run_seconds": 1.381,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -229,7 +229,7 @@
       "id": "cpu_ee_fpu_compare",
       "matching_lines": 170,
       "regression": false,
-      "run_seconds": 8.135,
+      "run_seconds": 7.041,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -240,7 +240,7 @@
       "id": "cpu_ee_fpu_convert",
       "matching_lines": 70,
       "regression": false,
-      "run_seconds": 2.664,
+      "run_seconds": 4.769,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -251,7 +251,7 @@
       "id": "cpu_ee_fpu_fcr",
       "matching_lines": 53,
       "regression": false,
-      "run_seconds": 5.541,
+      "run_seconds": 2.094,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -262,7 +262,7 @@
       "id": "cpu_ee_fpu_muldiv",
       "matching_lines": 360,
       "regression": false,
-      "run_seconds": 11.426,
+      "run_seconds": 16.335,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -273,7 +273,7 @@
       "id": "cpu_ee_fpu_sqrt",
       "matching_lines": 59,
       "regression": false,
-      "run_seconds": 5.651,
+      "run_seconds": 5.155,
       "status": "MISMATCH",
       "subsystem": "cpu/ee_fpu"
     },
@@ -284,7 +284,7 @@
       "id": "cpu_ee_fpu_transfer",
       "matching_lines": 26,
       "regression": false,
-      "run_seconds": 5.096,
+      "run_seconds": 4.423,
       "status": "PASS",
       "subsystem": "cpu/ee_fpu"
     },
@@ -295,7 +295,7 @@
       "id": "cpu_ee_lsu",
       "matching_lines": 171,
       "regression": false,
-      "run_seconds": 2.266,
+      "run_seconds": 2.312,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -306,7 +306,7 @@
       "id": "cpu_ee_lsudelay",
       "matching_lines": 3,
       "regression": false,
-      "run_seconds": 5.105,
+      "run_seconds": 4.35,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -317,7 +317,7 @@
       "id": "cpu_ee_muldiv",
       "matching_lines": 498,
       "regression": false,
-      "run_seconds": 10.876,
+      "run_seconds": 9.802,
       "status": "PASS",
       "subsystem": "cpu/ee"
     },
@@ -328,7 +328,7 @@
       "id": "cpu_ee_simd_arithmetic",
       "matching_lines": 744,
       "regression": false,
-      "run_seconds": 9.098,
+      "run_seconds": 5.209,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -339,7 +339,7 @@
       "id": "cpu_ee_simd_compare",
       "matching_lines": 182,
       "regression": false,
-      "run_seconds": 5.211,
+      "run_seconds": 4.202,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -350,7 +350,7 @@
       "id": "cpu_ee_simd_funnel",
       "matching_lines": 46,
       "regression": false,
-      "run_seconds": 5.024,
+      "run_seconds": 4.549,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -361,7 +361,7 @@
       "id": "cpu_ee_simd_logic",
       "matching_lines": 400,
       "regression": false,
-      "run_seconds": 5.712,
+      "run_seconds": 3.244,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -372,7 +372,7 @@
       "id": "cpu_ee_simd_muldiv",
       "matching_lines": 770,
       "regression": false,
-      "run_seconds": 13.958,
+      "run_seconds": 13.092,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -383,7 +383,7 @@
       "id": "cpu_ee_simd_shuffle",
       "matching_lines": 626,
       "regression": false,
-      "run_seconds": 4.831,
+      "run_seconds": 4.59,
       "status": "PASS",
       "subsystem": "cpu/ee_simd"
     },
@@ -394,7 +394,7 @@
       "id": "cpu_vu0_macro_integer",
       "matching_lines": 118,
       "regression": false,
-      "run_seconds": 4.859,
+      "run_seconds": 1.955,
       "status": "PASS",
       "subsystem": "cpu/vu0_macro"
     },
@@ -405,7 +405,7 @@
       "id": "cpu_vu0_macro_transfer",
       "matching_lines": 36,
       "regression": false,
-      "run_seconds": 4.798,
+      "run_seconds": 4.533,
       "status": "PASS",
       "subsystem": "cpu/vu0_macro"
     },
@@ -416,7 +416,7 @@
       "id": "dma_dmac_cpcond",
       "matching_lines": 8,
       "regression": false,
-      "run_seconds": 5.021,
+      "run_seconds": 3.419,
       "status": "PASS",
       "subsystem": "dma/dmac"
     },
@@ -427,7 +427,7 @@
       "id": "dma_dmac_tagintr",
       "matching_lines": 10,
       "regression": false,
-      "run_seconds": 4.871,
+      "run_seconds": 4.444,
       "status": "PASS",
       "subsystem": "dma/dmac"
     },
@@ -438,7 +438,7 @@
       "id": "dma_spr_chain",
       "matching_lines": 25,
       "regression": false,
-      "run_seconds": 4.687,
+      "run_seconds": 4.122,
       "status": "PASS",
       "subsystem": "dma/spr"
     },
@@ -449,7 +449,7 @@
       "id": "dma_spr_interleave",
       "matching_lines": 629,
       "regression": false,
-      "run_seconds": 3.336,
+      "run_seconds": 3.657,
       "status": "PASS",
       "subsystem": "dma/spr"
     },
@@ -460,7 +460,7 @@
       "id": "dma_spr_normal",
       "matching_lines": 36,
       "regression": false,
-      "run_seconds": 4.95,
+      "run_seconds": 2.616,
       "status": "PASS",
       "subsystem": "dma/spr"
     },
@@ -471,7 +471,7 @@
       "id": "dma_vif_basic",
       "matching_lines": 12,
       "regression": false,
-      "run_seconds": 4.665,
+      "run_seconds": 2.629,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -482,7 +482,7 @@
       "id": "dma_vif_intstall",
       "matching_lines": 18,
       "regression": false,
-      "run_seconds": 4.403,
+      "run_seconds": 1.356,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -493,7 +493,7 @@
       "id": "dma_vif_mskpath3",
       "matching_lines": 5,
       "regression": false,
-      "run_seconds": 5.044,
+      "run_seconds": 2.945,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -504,7 +504,7 @@
       "id": "dma_vif_stcycl",
       "matching_lines": 510,
       "regression": false,
-      "run_seconds": 12.648,
+      "run_seconds": 11.297,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -515,7 +515,7 @@
       "id": "dma_vif_stmod",
       "matching_lines": 134,
       "regression": false,
-      "run_seconds": 4.88,
+      "run_seconds": 3.006,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -526,7 +526,7 @@
       "id": "dma_vif_unpack",
       "matching_lines": 56,
       "regression": false,
-      "run_seconds": 4.969,
+      "run_seconds": 4.412,
       "status": "PASS",
       "subsystem": "dma/vif"
     },
@@ -537,7 +537,7 @@
       "id": "gs_label",
       "matching_lines": 4,
       "regression": false,
-      "run_seconds": 4.817,
+      "run_seconds": 4.441,
       "status": "PASS",
       "subsystem": "gs"
     },
@@ -548,7 +548,7 @@
       "id": "gs_signal",
       "matching_lines": 4,
       "regression": false,
-      "run_seconds": 4.863,
+      "run_seconds": 2.703,
       "status": "PASS",
       "subsystem": "gs"
     },
@@ -559,7 +559,7 @@
       "id": "kernel_ee_interrupt_dmac_order",
       "matching_lines": 9,
       "regression": false,
-      "run_seconds": 5.114,
+      "run_seconds": 1.469,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -570,7 +570,7 @@
       "id": "kernel_ee_interrupt_intc_order",
       "matching_lines": 10,
       "regression": false,
-      "run_seconds": 4.532,
+      "run_seconds": 6.116,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -581,7 +581,7 @@
       "id": "kernel_ee_thread_delete",
       "matching_lines": 21,
       "regression": false,
-      "run_seconds": 4.508,
+      "run_seconds": 2.571,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -592,7 +592,7 @@
       "id": "kernel_ee_thread_exit",
       "matching_lines": 11,
       "regression": false,
-      "run_seconds": 5.018,
+      "run_seconds": 3.112,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -603,7 +603,7 @@
       "id": "kernel_ee_thread_resume",
       "matching_lines": 17,
       "regression": false,
-      "run_seconds": 4.921,
+      "run_seconds": 4.593,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -614,7 +614,7 @@
       "id": "kernel_ee_thread_sleep",
       "matching_lines": 4,
       "regression": false,
-      "run_seconds": 2.901,
+      "run_seconds": 2.478,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -625,7 +625,7 @@
       "id": "kernel_ee_thread_stat",
       "matching_lines": 23,
       "regression": false,
-      "run_seconds": 5.037,
+      "run_seconds": 1.393,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -636,7 +636,7 @@
       "id": "kernel_ee_thread_suspend",
       "matching_lines": 18,
       "regression": false,
-      "run_seconds": 3.521,
+      "run_seconds": 1.344,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -647,7 +647,7 @@
       "id": "kernel_ee_thread_terminate",
       "matching_lines": 20,
       "regression": false,
-      "run_seconds": 4.957,
+      "run_seconds": 2.757,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -658,7 +658,7 @@
       "id": "kernel_ee_thread_wakeup",
       "matching_lines": 18,
       "regression": false,
-      "run_seconds": 5.03,
+      "run_seconds": 5.469,
       "status": "PASS",
       "subsystem": "kernel/ee"
     },
@@ -669,7 +669,7 @@
       "id": "memory_ee_default",
       "matching_lines": 13,
       "regression": false,
-      "run_seconds": 5.077,
+      "run_seconds": 1.385,
       "status": "PASS",
       "subsystem": "memory/ee"
     },
@@ -680,7 +680,7 @@
       "id": "vu_games_triace",
       "matching_lines": 5,
       "regression": false,
-      "run_seconds": 5.034,
+      "run_seconds": 1.261,
       "status": "PASS",
       "subsystem": "vu/games"
     },
@@ -691,7 +691,7 @@
       "id": "vu_lower_branch",
       "matching_lines": 4,
       "regression": false,
-      "run_seconds": 2.667,
+      "run_seconds": 5.146,
       "status": "PASS",
       "subsystem": "vu/lower"
     },
@@ -702,7 +702,7 @@
       "id": "vu_lower_efu",
       "matching_lines": 182,
       "regression": false,
-      "run_seconds": 5.682,
+      "run_seconds": 5.145,
       "status": "MISMATCH",
       "subsystem": "vu/lower"
     },
@@ -713,7 +713,7 @@
       "id": "vu_lower_fdivdelay",
       "matching_lines": 350,
       "regression": false,
-      "run_seconds": 8.764,
+      "run_seconds": 7.589,
       "status": "PASS",
       "subsystem": "vu/lower"
     },
@@ -724,7 +724,7 @@
       "id": "vu_lower_integer",
       "matching_lines": 167,
       "regression": false,
-      "run_seconds": 3.243,
+      "run_seconds": 2.92,
       "status": "PASS",
       "subsystem": "vu/lower"
     },
@@ -735,7 +735,7 @@
       "id": "vu_lower_random",
       "matching_lines": 53,
       "regression": false,
-      "run_seconds": 5.383,
+      "run_seconds": 1.894,
       "status": "PASS",
       "subsystem": "vu/lower"
     },
@@ -746,7 +746,7 @@
       "id": "vu_upper_clip",
       "matching_lines": 32,
       "regression": false,
-      "run_seconds": 1.551,
+      "run_seconds": 4.614,
       "status": "PASS",
       "subsystem": "vu/upper"
     }

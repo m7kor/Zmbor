@@ -64,7 +64,9 @@ reference; no GS behaviour is claimed hardware-correct from agreement between tw
 ## 3. SPU2 minimal functional architecture
 
 **Evidence today.** Audio is HLE (`Kernel/Stubs/Audio.cpp`, 90 TODO markers, named `sceSd*`/`sceSSyn_*` stubs). No
-SPU2 register model, no ADPCM decoder, no mixer.
+SPU2 register model, no voice engine, no mixer. A VAG/ADPCM decoder exists for HLE playback on the host
+(`ps2_audio_vag.cpp`, untested); the SPU2 model can reuse it once it has tests. (Corrected in the status-dashboard
+change: an earlier version of this paragraph said no ADPCM decoder existed.)
 
 **Minimal architecture.**
 - Register file for both cores (voice registers, ADSR, key on/off, transfer registers, IRQ address) at the IOP

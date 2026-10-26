@@ -1,0 +1,1463 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1400" viewBox="0 0 1000 1400" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" role="img" aria-labelledby="t-hardware">
+<title id="t-hardware">Zmbor — PS2 Hardware &amp; Runtime: component status (generated from docs/status/components.json at c7e5960)</title>
+<rect width="1000" height="1400" fill="#0d1117"/>
+<text x="16" y="30" fill="#e6edf3" font-size="20" font-weight="600">PS2 Hardware &amp; Runtime</text>
+<text x="16" y="50" fill="#8b949e" font-size="12">174 components · statuses written by hand, checked against cited evidence · evidence commit c7e5960</text>
+<rect x="16" y="64" width="12" height="12" rx="2" fill="#2ea043" stroke="#30363d"/>
+<text x="33" y="74" fill="#e6edf3" font-size="11">verified complete 18</text>
+<rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
+<text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 47</text>
+<rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 57</text>
+<rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
+<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 23</text>
+<rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
+<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 25</text>
+<rect x="676.0600000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
+<text x="693.0600000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
+<rect x="796.72" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
+<text x="813.72" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
+<rect x="16" y="88" width="104.2" height="18" fill="#30363d"/>
+<text x="22" y="101" fill="#e6edf3" font-size="10">ps2autotests lines</text>
+<rect x="120.2" y="88" width="116.2" height="18" fill="#1f6feb"/>
+<text x="126.2" y="101" fill="#ffffff" font-size="10">8202/8250 · 99.4%</text>
+<rect x="244.4" y="88" width="125" height="18" fill="#30363d"/>
+<text x="250.4" y="101" fill="#e6edf3" font-size="10">ps2autotests programs</text>
+<rect x="369.4" y="88" width="89" height="18" fill="#1f6feb"/>
+<text x="375.4" y="101" fill="#ffffff" font-size="10">53/55 · 96.3%</text>
+<rect x="466.4" y="88" width="142.2" height="18" fill="#30363d"/>
+<text x="472.4" y="101" fill="#e6edf3" font-size="10">EE core ISA hw-confirmed</text>
+<rect x="608.6" y="88" width="89.4" height="18" fill="#1f6feb"/>
+<text x="614.6" y="101" fill="#ffffff" font-size="10">89/115 · 77.3%</text>
+<rect x="706" y="88" width="143.2" height="18" fill="#30363d"/>
+<text x="712" y="101" fill="#e6edf3" font-size="10">EE MMI ISA hw-confirmed</text>
+<rect x="849.2" y="88" width="96.2" height="18" fill="#1f6feb"/>
+<text x="855.2" y="101" fill="#ffffff" font-size="10">103/105 · 98.0%</text>
+<rect x="16" y="110" width="145.2" height="18" fill="#30363d"/>
+<text x="22" y="123" fill="#e6edf3" font-size="10">EE COP1 ISA hw-confirmed</text>
+<rect x="161.2" y="110" width="85.8" height="18" fill="#1f6feb"/>
+<text x="167.2" y="123" fill="#ffffff" font-size="10">32/58 · 55.1%</text>
+<rect x="255" y="110" width="188.4" height="18" fill="#30363d"/>
+<text x="261" y="123" fill="#e6edf3" font-size="10">VU0 macro mode ISA hw-confirmed</text>
+<rect x="443.4" y="110" width="79.4" height="18" fill="#1f6feb"/>
+<text x="449.4" y="123" fill="#ffffff" font-size="10">11/132 · 8.3%</text>
+<rect x="17" y="141" width="966" height="286.7" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="155" fill="#e6edf3" font-size="12" font-weight="600">A · EMOTION ENGINE (R5900)  (41 · 16 ok · 12 part)</text>
+<rect x="20" y="162" width="368.3" height="160.8" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="172" fill="#8b949e" font-size="10" font-weight="500">Integer core  (10 · 5 ok · 3 part)</text>
+<g><title>ee.alu — Integer ALU, shifts, moves (35 ops)
+status: VERIFIED_COMPLETE
+implemented: Emitted as C++ on the 64-bit GPR file; 32-bit results sign-extended
+hardware programs: cpu_ee_alu</title>
+<rect x="23" y="179" width="107.3" height="45.6" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="193" fill="#ffffff" font-size="10">Integer ALU, shifts,</text>
+<text x="27" y="205" fill="#ffffff" font-size="10">moves (35 ops)</text>
+<text x="126.3" y="220.6" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>ee.trap_arith — Overflow-trapping ADD/ADDI/SUB/DADD/DADDI/DSUB
+status: VERIFIED_PARTIAL
+implemented: Unsigned arithmetic + sign-bit overflow predicate; overflow raises EXCEPTION_INTEGER_OVERFLOW
+missing: No hardware program names these; exception delivery on overflow only unit-tested</title>
+<rect x="23" y="226.6" width="107.3" height="45.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="241.6" fill="#0d1117" font-size="11">Trapping</text>
+<text x="27" y="254.6" fill="#0d1117" font-size="11">ADD/SUB</text>
+<text x="126.3" y="268.2" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>ee.branch — Branches, branch-likely, J/JAL/JR/JALR
+status: VERIFIED_COMPLETE
+implemented: Exact 64-bit compares, likely-branch delay slots, link registers
+hardware programs: cpu_ee_branch</title>
+<rect x="23" y="274.2" width="107.3" height="45.6" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="288.2" fill="#ffffff" font-size="10">Branches,</text>
+<text x="27" y="300.2" fill="#ffffff" font-size="10">branch-likely,</text>
+<text x="27" y="312.2" fill="#ffffff" font-size="10">J/JAL/JR/JALR</text>
+</g>
+<g><title>ee.branchdelay — Branch and jump in a delay slot
+status: VERIFIED_PARTIAL
+implemented: The seven cases ps2autotests measures on hardware
+missing: Architecturally undefined; only the measured combinations are known
+hardware programs: cpu_ee_branchdelay, cpu_ee_fpu_branchdelay</title>
+<rect x="132.3" y="179" width="125.5" height="38.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="136.3" y="194" fill="#0d1117" font-size="11">Branch and jump in a</text>
+<text x="136.3" y="207" fill="#0d1117" font-size="11">delay slot</text>
+</g>
+<g><title>ee.lsu — Loads and stores, 8 to 128 bit, unaligned forms
+status: VERIFIED_COMPLETE
+implemented: LWL/LWR/LDL/LDR/SWL/SWR/SDL/SDR, LQ/SQ alignment, PREF
+hardware programs: cpu_ee_lsu, cpu_ee_lsudelay</title>
+<rect x="259.8" y="179" width="125.5" height="38.8" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="263.8" y="192" fill="#ffffff" font-size="9">Loads and stores, 8 to</text>
+<text x="263.8" y="203" fill="#ffffff" font-size="9">128 bit, unaligned forms</text>
+</g>
+<g><title>ee.muldiv — MULT/DIV, MADD, HI/LO and pipeline 1
+status: VERIFIED_COMPLETE
+implemented: Both pipelines (MULT1, DIV1, ...), rd write rules, DIV by zero and INT_MIN/-1
+hardware programs: cpu_ee_muldiv</title>
+<rect x="132.3" y="219.8" width="100" height="49" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="136.3" y="234.8" fill="#ffffff" font-size="11">MULT/DIV,</text>
+<text x="136.3" y="247.8" fill="#ffffff" font-size="11">MADD, HI/LO</text>
+<text x="136.3" y="260.8" fill="#ffffff" font-size="11">and pipeline 1</text>
+</g>
+<g><title>ee.sa — SA register and QFSRV funnel shift
+status: VERIFIED_COMPLETE
+implemented: MTSA/MTSAB/MTSAH/MFSA byte counts; QFSRV helper
+hardware programs: cpu_ee_simd_funnel</title>
+<rect x="132.3" y="270.8" width="100" height="49" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="136.3" y="285.8" fill="#ffffff" font-size="11">SA register and</text>
+<text x="136.3" y="298.8" fill="#ffffff" font-size="11">QFSRV funnel</text>
+<text x="136.3" y="311.8" fill="#ffffff" font-size="11">shift</text>
+</g>
+<g><title>ee.traps — Conditional traps (TEQ, TGE, TLTI, ...)
+status: IMPLEMENTED_UNVERIFIED
+implemented: Decoded and translated
+missing: No test and no hardware program</title>
+<rect x="234.3" y="219.8" width="151" height="32" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="238.3" y="232.8" fill="#f0f6fc" font-size="9">Conditional traps (TEQ, TGE,</text>
+<text x="238.3" y="243.8" fill="#f0f6fc" font-size="9">TLTI, ...)</text>
+</g>
+<g><title>ee.llsc — LL/SC, SYNC, BREAK, CACHE
+status: IMPLEMENTED_UNVERIFIED
+implemented: Translated; SC checks the LL reservation; CACHE optionally patched by config
+missing: No hardware program names them</title>
+<rect x="234.3" y="253.8" width="151" height="32" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="238.3" y="266.8" fill="#f0f6fc" font-size="9">LL/SC, SYNC, BREAK, CACHE</text>
+<text x="381.3" y="281.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>ee.decode — R5900 decode tables
+status: VERIFIED_PARTIAL
+implemented: All 55 ps2autotests ELFs decode and recompile; decoder fuzzed
+missing: Most decoded mnemonics outside MMI are not named by a hardware program (see Measurements)
+hardware programs: cpu_ee_alu, cpu_ee_lsu, cpu_ee_simd_shuffle, cpu_ee_fpu_arithmetic, cpu_vu0_macro_transfer</title>
+<rect x="234.3" y="287.8" width="151" height="32" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="238.3" y="302.8" fill="#0d1117" font-size="11">R5900 decode tables</text>
+<text x="381.3" y="315.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<rect x="20" y="324.8" width="368.3" height="99.9" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="334.8" fill="#8b949e" font-size="10" font-weight="500">MMI / 128-bit SIMD  (6 · 5 ok · 0 part)</text>
+<g><title>mmi.arith — Parallel add, subtract, saturate, abs, min/max
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_simd_arithmetic</title>
+<rect x="23" y="341.8" width="119.4" height="39" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="354.8" fill="#ffffff" font-size="9">Parallel add, subtract,</text>
+<text x="27" y="365.8" fill="#ffffff" font-size="9">saturate, abs, min/max</text>
+</g>
+<g><title>mmi.compare — Parallel compare
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_simd_compare</title>
+<rect x="23" y="382.7" width="119.4" height="39" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="397.7" fill="#ffffff" font-size="11">Parallel compare</text>
+<text x="138.4" y="417.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>mmi.logic — Parallel logic, shifts, PLZCW
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_simd_logic</title>
+<rect x="144.4" y="341.8" width="119.4" height="39" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="148.4" y="356.8" fill="#ffffff" font-size="11">Parallel logic,</text>
+<text x="148.4" y="369.8" fill="#ffffff" font-size="11">shifts, PLZCW</text>
+</g>
+<g><title>mmi.muldiv — Parallel multiply/divide, 128-bit HI/LO
+status: VERIFIED_COMPLETE
+implemented: PMULTH family, PMADD/PMSUB accumulators, PDIV*, PMFHL/PMTHL forms
+hardware programs: cpu_ee_simd_muldiv
+real-PS2 vectors: MMI halfword and word multiplies match real-PS2 results; PDIVW, PDIVUW and PDIVBW match real-PS2 results</title>
+<rect x="144.4" y="382.7" width="119.4" height="39" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="148.4" y="395.7" fill="#ffffff" font-size="9">Parallel multiply/divide,</text>
+<text x="148.4" y="406.7" fill="#ffffff" font-size="9">128-bit HI/LO</text>
+</g>
+<g><title>mmi.shuffle — Pack, extend, interleave, shuffle
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_simd_shuffle</title>
+<rect x="265.9" y="341.8" width="119.4" height="39" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="269.9" y="356.8" fill="#ffffff" font-size="11">Pack, extend,</text>
+<text x="269.9" y="369.8" fill="#ffffff" font-size="11">interleave, shuffle</text>
+</g>
+<g><title>mmi.unexercised — MMI MSUB/MSUBU
+status: IMPLEMENTED_UNVERIFIED
+implemented: Decoded and translated
+missing: Not named by any hardware program</title>
+<rect x="265.9" y="382.7" width="119.4" height="39" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="269.9" y="397.7" fill="#f0f6fc" font-size="11">MMI MSUB/MSUBU</text>
+<text x="381.3" y="417.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="390.3" y="162" width="293.8" height="182.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="395.3" y="172" fill="#8b949e" font-size="10" font-weight="500">COP0, exceptions, interrupts  (9 · 0 ok · 3 part)</text>
+<g><title>cop0.regs — COP0 registers (MFC0/MTC0)
+status: IMPLEMENTED_UNVERIFIED
+implemented: Status, Cause, EPC, Count, Compare, BadVAddr, Config, ...
+missing: No hardware program for the register file</title>
+<rect x="393.3" y="179" width="94.6" height="52.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="397.3" y="194" fill="#f0f6fc" font-size="11">COP0 registers</text>
+<text x="397.3" y="207" fill="#f0f6fc" font-size="11">(MFC0/MTC0)</text>
+<text x="483.9" y="227.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>cop0.perf — Performance counters (PCCR, PCR0/1)
+status: VERIFIED_PARTIAL
+implemented: Masks, CTE, events and modes as the hardware program reads them
+missing: Event counts are derived from the runtime's cycle model, not measured hardware timing
+hardware programs: cpu_ee_cop0_performance</title>
+<rect x="489.9" y="179" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="493.9" y="194" fill="#0d1117" font-size="11">Performance</text>
+<text x="493.9" y="207" fill="#0d1117" font-size="11">counters</text>
+<text x="493.9" y="220" fill="#0d1117" font-size="11">(PCCR, PCR0/1)</text>
+</g>
+<g><title>cop0.count — Count/Compare timer interrupt
+status: IMPLEMENTED_UNVERIFIED
+missing: No test of the Compare interrupt</title>
+<rect x="586.6" y="179" width="94.6" height="52.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="590.6" y="194" fill="#f0f6fc" font-size="11">Count/Compare</text>
+<text x="590.6" y="207" fill="#f0f6fc" font-size="11">timer interrupt</text>
+<text x="677.2" y="227.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>cop0.exc — Exception entry, EPC/BD, BEV vectors
+status: IMPLEMENTED_UNVERIFIED
+implemented: raiseCop0Exception sets Cause, EPC (branch PC + BD in delay slots), vectors
+missing: No hardware program for exception entry</title>
+<rect x="393.3" y="233.9" width="94.6" height="52.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="397.3" y="248.9" fill="#f0f6fc" font-size="11">Exception</text>
+<text x="397.3" y="261.9" fill="#f0f6fc" font-size="11">entry, EPC/BD,</text>
+<text x="397.3" y="274.9" fill="#f0f6fc" font-size="11">BEV vectors</text>
+</g>
+<g><title>cop0.adderr — Address-error exceptions
+status: IMPLEMENTED_UNVERIFIED
+implemented: Misaligned runtime loads raise EXCEPTION_ADDRESS_ERROR_LOAD/STORE
+missing: Fast-path memory helpers do not check alignment; no hardware program</title>
+<rect x="393.3" y="288.8" width="94.6" height="52.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="397.3" y="303.8" fill="#f0f6fc" font-size="11">Address-error</text>
+<text x="397.3" y="316.8" fill="#f0f6fc" font-size="11">exceptions</text>
+<text x="483.9" y="337.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>cop0.intr — Interrupt enable, ERET, INTC dispatch order
+status: VERIFIED_PARTIAL
+implemented: EI/DI/ERET; INTC and DMAC handler chains in kernel order
+hardware programs: kernel_ee_interrupt_intc_order, kernel_ee_interrupt_dmac_order</title>
+<rect x="489.9" y="233.9" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="493.9" y="247.9" fill="#0d1117" font-size="10">Interrupt enable,</text>
+<text x="493.9" y="259.9" fill="#0d1117" font-size="10">ERET, INTC</text>
+<text x="493.9" y="271.9" fill="#0d1117" font-size="10">dispatch order</text>
+</g>
+<g><title>cop0.bc0 — BC0F/BC0T (DMAC CPCOND)
+status: VERIFIED_PARTIAL
+missing: COP0 instructions are not in the automated measurement; branch-likely forms not shown to be exercised
+hardware programs: dma_dmac_cpcond</title>
+<rect x="586.6" y="233.9" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="590.6" y="248.9" fill="#0d1117" font-size="11">BC0F/BC0T</text>
+<text x="590.6" y="261.9" fill="#0d1117" font-size="11">(DMAC</text>
+<text x="590.6" y="274.9" fill="#0d1117" font-size="11">CPCOND)</text>
+</g>
+<g><title>cop0.tlb — TLB (48 entries)
+status: IMPLEMENTED_UNVERIFIED
+implemented: TLBR/TLBWI/TLBWR/TLBP read and write the entry table
+missing: No TLB-mapped address translation or refill/invalid exceptions; no test</title>
+<rect x="489.9" y="288.8" width="94.6" height="52.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="493.9" y="303.8" fill="#f0f6fc" font-size="11">TLB (48</text>
+<text x="493.9" y="316.8" fill="#f0f6fc" font-size="11">entries)</text>
+<text x="580.6" y="337.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>cop0.cache — Instruction/data cache model
+status: MISSING
+missing: CACHE ops are translated without a cache model; coherency effects are not emulated</title>
+<rect x="586.6" y="288.8" width="94.6" height="52.9" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="590.6" y="303.8" fill="#ffffff" font-size="11">Instruction/data</text>
+<text x="590.6" y="316.8" fill="#ffffff" font-size="11">cache model</text>
+<text x="677.2" y="337.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<rect x="686.2" y="162" width="293.8" height="182.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="691.2" y="172" fill="#8b949e" font-size="10" font-weight="500">COP1 / FPU  (9 · 6 ok · 3 part)</text>
+<g><title>fpu.arith — ADD/SUB/ABS/NEG/MOV/MAX/MIN, ADDA/SUBA
+status: VERIFIED_COMPLETE
+implemented: PS2 float format: exponent 255 is a number, saturation to 0x7FFFFFFF, flush below 2^-126
+hardware programs: cpu_ee_fpu_arithmetic
+real-PS2 vectors: FPU results match the PS2 hardware results from ps2autotests</title>
+<rect x="689.2" y="179" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="693.2" y="193" fill="#ffffff" font-size="10">FPU</text>
+<text x="693.2" y="205" fill="#ffffff" font-size="10">add/sub/minmax</text>
+<text x="779.8" y="227.9" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.muldiv — MUL/DIV, MADD/MSUB, MULA/MADDA/MSUBA
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_fpu_muldiv</title>
+<rect x="785.8" y="179" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="789.8" y="194" fill="#ffffff" font-size="11">FPU</text>
+<text x="789.8" y="207" fill="#ffffff" font-size="11">mul/div/madd</text>
+<text x="876.4" y="227.9" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.sqrt — SQRT.S
+status: VERIFIED_PARTIAL
+implemented: SQRT.S rows of the program match
+missing: Its program also contains the RSQRT.S rows that mismatch
+hardware programs: cpu_ee_fpu_sqrt</title>
+<rect x="882.4" y="179" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="886.4" y="194" fill="#0d1117" font-size="11">SQRT.S</text>
+<text x="973" y="227.9" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>fpu.rsqrt — RSQRT.S rounding
+status: VERIFIED_PARTIAL
+implemented: Sign and special cases as hardware; most rows exact
+missing: 7 of 66 program lines differ by 1 ulp; no pre-registered datapath model fits
+hardware programs: cpu_ee_fpu_sqrt
+blocker: Needs new hardware rows: probe P3 run on a physical PS2</title>
+<rect x="689.2" y="233.9" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="693.2" y="248.9" fill="#0d1117" font-size="11">RSQRT.S</text>
+<text x="693.2" y="261.9" fill="#0d1117" font-size="11">rounding</text>
+<text x="779.8" y="282.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>fpu.compare — C.F/C.EQ/C.LT/C.LE
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_fpu_compare</title>
+<rect x="689.2" y="288.8" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="693.2" y="303.8" fill="#ffffff" font-size="11">FPU compare</text>
+<text x="779.8" y="337.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.branch — BC1F/BC1T/BC1FL/BC1TL
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_fpu_branch, cpu_ee_fpu_branchdelay</title>
+<rect x="785.8" y="233.9" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="789.8" y="248.9" fill="#ffffff" font-size="11">BC1 branches</text>
+<text x="876.4" y="282.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.convert — CVT.S.W / CVT.W.S
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_fpu_convert</title>
+<rect x="882.4" y="233.9" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="886.4" y="248.9" fill="#ffffff" font-size="11">CVT.S.W /</text>
+<text x="886.4" y="261.9" fill="#ffffff" font-size="11">CVT.W.S</text>
+<text x="973" y="282.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.transfer — MFC1/MTC1/CFC1/CTC1/LWC1/SWC1
+status: VERIFIED_COMPLETE
+hardware programs: cpu_ee_fpu_transfer</title>
+<rect x="785.8" y="288.8" width="94.6" height="52.9" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="789.8" y="303.8" fill="#ffffff" font-size="11">FPU moves</text>
+<text x="876.4" y="337.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>fpu.flags — FCR31 flags and non-IEEE rounding
+status: VERIFIED_PARTIAL
+implemented: Reset value, writable bits, O/U/D/I flag situations as measured
+missing: RSQRT.S rounding unknown (fpu.rsqrt)
+hardware programs: cpu_ee_fpu_fcr</title>
+<rect x="882.4" y="288.8" width="94.6" height="52.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="886.4" y="303.8" fill="#0d1117" font-size="11">FCR31 flags</text>
+<text x="886.4" y="316.8" fill="#0d1117" font-size="11">and non-IEEE</text>
+<text x="886.4" y="329.8" fill="#0d1117" font-size="11">rounding</text>
+</g>
+<rect x="390.3" y="346.7" width="117.7" height="78" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="395.3" y="356.7" fill="#8b949e" font-size="10" font-weight="500">Timers</text>
+<g><title>ee.timer03 — EE timers T0-T3 (COUNT/MODE/COMP/HOLD)
+status: IMPLEMENTED_UNVERIFIED
+implemented: Counters advance from scheduler cycles; compare/overflow raise INTC
+missing: No hardware program; host-time driven</title>
+<rect x="393.3" y="363.7" width="111.7" height="58" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="397.3" y="378.7" fill="#f0f6fc" font-size="11">EE timers T0-T3</text>
+<text x="501.1" y="417.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="510.1" y="346.7" width="469.9" height="78" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="515.1" y="356.7" fill="#8b949e" font-size="10" font-weight="500">EE kernel (BIOS syscalls, HLE)  (6 · 0 ok · 3 part)</text>
+<g><title>k.threads — Threads: create, start, sleep, suspend, terminate
+status: VERIFIED_PARTIAL
+implemented: Cooperative scheduler with absolute priority and FIFO; all tested syscalls match hardware
+missing: Preemption timing is not cycle-exact
+hardware programs: kernel_ee_thread_delete, kernel_ee_thread_exit, kernel_ee_thread_resume, kernel_ee_thread_sleep, kernel_ee_thread_stat, kernel_ee_thread_suspend, kernel_ee_thread_terminate, kernel_ee_thread_wakeup</title>
+<rect x="513.1" y="363.7" width="75.7" height="58" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="517.1" y="378.7" fill="#0d1117" font-size="11">Threads</text>
+<text x="584.7" y="417.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>k.sync — Semaphores and event flags
+status: IMPLEMENTED_UNVERIFIED
+missing: No hardware program for semaphores or event flags</title>
+<rect x="590.7" y="363.7" width="75.7" height="58" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="594.7" y="378.7" fill="#f0f6fc" font-size="11">Semaphores</text>
+<text x="594.7" y="391.7" fill="#f0f6fc" font-size="11">and event</text>
+<text x="594.7" y="404.7" fill="#f0f6fc" font-size="11">flags</text>
+<text x="662.4" y="417.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>k.irqh — Interrupt handler syscalls (AddIntcHandler, ...)
+status: VERIFIED_PARTIAL
+hardware programs: kernel_ee_interrupt_intc_order, kernel_ee_interrupt_dmac_order</title>
+<rect x="668.4" y="363.7" width="75.7" height="58" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="672.4" y="378.7" fill="#0d1117" font-size="11">IRQ handler</text>
+<text x="672.4" y="391.7" fill="#0d1117" font-size="11">syscalls</text>
+<text x="740" y="417.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>k.heap — Heap: SetupHeap, EndOfHeap
+status: VERIFIED_PARTIAL
+hardware programs: memory_ee_default</title>
+<rect x="746" y="363.7" width="75.7" height="58" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="750" y="378.7" fill="#0d1117" font-size="11">Heap:</text>
+<text x="750" y="391.7" fill="#0d1117" font-size="11">SetupHeap,</text>
+<text x="750" y="404.7" fill="#0d1117" font-size="11">EndOfHeap</text>
+<text x="817.7" y="417.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>k.syscalltab — Syscall dispatch and SetSyscall overrides
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="823.7" y="363.7" width="75.7" height="58" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="827.7" y="377.7" fill="#f0f6fc" font-size="10">Syscall</text>
+<text x="827.7" y="389.7" fill="#f0f6fc" font-size="10">dispatch and</text>
+<text x="827.7" y="401.7" fill="#f0f6fc" font-size="10">SetSyscall</text>
+<text x="827.7" y="413.7" fill="#f0f6fc" font-size="10">overrides</text>
+</g>
+<g><title>k.alarm — Alarms, DelayThread, VSync waits
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="901.3" y="363.7" width="75.7" height="58" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="905.3" y="377.7" fill="#f0f6fc" font-size="10">Alarms,</text>
+<text x="905.3" y="389.7" fill="#f0f6fc" font-size="10">DelayThread,</text>
+<text x="905.3" y="401.7" fill="#f0f6fc" font-size="10">VSync waits</text>
+<text x="973" y="417.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="17" y="429.7" width="422.3" height="339.5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="443.7" fill="#e6edf3" font-size="12" font-weight="600">B · VECTOR UNITS  (21 · 2 ok · 9 part)</text>
+<rect x="20" y="450.7" width="416.3" height="90.1" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="460.7" fill="#8b949e" font-size="10" font-weight="500">VU0 macro mode (COP2)  (6 · 2 ok · 1 part)</text>
+<g><title>vu0.fmac — Macro FMAC arithmetic (VADD, VMUL, VMADD, ...)
+status: VERIFIED_PARTIAL
+implemented: Shared FMAC contract with micro mode, anchored on real-PS2 results
+missing: Most macro FMAC mnemonics are not named by a hardware program (9 of 128 confirmed)
+real-PS2 vectors: FMAC contract anchors from real-PS2 results</title>
+<rect x="23" y="467.7" width="135.4" height="34" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="480.7" fill="#0d1117" font-size="9">Macro FMAC arithmetic</text>
+<text x="27" y="491.7" fill="#0d1117" font-size="9">(VADD, VMUL, VMADD, ...)</text>
+</g>
+<g><title>vu0.int — Macro integer ops (VIADD, VIAND, ...)
+status: VERIFIED_COMPLETE
+hardware programs: cpu_vu0_macro_integer</title>
+<rect x="23" y="503.7" width="135.4" height="34" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="518.7" fill="#ffffff" font-size="11">Macro integer ops</text>
+<text x="27" y="531.7" fill="#ffffff" font-size="11">(VIADD, VIAND, ...)</text>
+</g>
+<g><title>vu0.xfer — QMFC2/QMTC2/CFC2/CTC2/LQC2/SQC2
+status: VERIFIED_COMPLETE
+hardware programs: cpu_vu0_macro_transfer</title>
+<rect x="160.4" y="467.7" width="135.4" height="34" fill="#2ea043" stroke="#0d1117" stroke-width="1"/>
+<text x="164.4" y="482.7" fill="#ffffff" font-size="11">COP2 transfers</text>
+<text x="291.9" y="497.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">OK</text>
+</g>
+<g><title>vu0.mem — Macro VU memory ops (VLQI, VSQD, VILWR, ...)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="160.4" y="503.7" width="135.4" height="34" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="164.4" y="517.7" fill="#f0f6fc" font-size="10">Macro VU memory ops</text>
+<text x="164.4" y="529.7" fill="#f0f6fc" font-size="10">(VLQI, VSQD, VILWR, ...)</text>
+</g>
+<g><title>vu0.flags — Macro MAC/STATUS/CLIP flags
+status: IMPLEMENTED_UNVERIFIED
+missing: Probe P5 prepared, never run on hardware
+blocker: Physical PS2 + ps2sdk to run probe P5</title>
+<rect x="297.9" y="467.7" width="135.4" height="34" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="301.9" y="481.7" fill="#f0f6fc" font-size="10">Macro</text>
+<text x="301.9" y="493.7" fill="#f0f6fc" font-size="10">MAC/STATUS/CLIP flags</text>
+</g>
+<g><title>vu0.fdiv — Macro VDIV/VSQRT/VRSQRT
+status: IMPLEMENTED_UNVERIFIED
+missing: No hardware program in macro mode</title>
+<rect x="297.9" y="503.7" width="135.4" height="34" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="301.9" y="518.7" fill="#f0f6fc" font-size="11">Macro</text>
+<text x="301.9" y="531.7" fill="#f0f6fc" font-size="11">VDIV/VSQRT/VRSQRT</text>
+</g>
+<rect x="20" y="542.8" width="416.3" height="145.1" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="552.8" fill="#8b949e" font-size="10" font-weight="500">Micro mode (VU0 and VU1)  (10 · 0 ok · 8 part)</text>
+<g><title>vu.upper — Upper (FMAC) instructions
+status: VERIFIED_PARTIAL
+implemented: FMAC contract, broadcast/Q/I/ACC/OPMULA forms, flags
+hardware programs: vu_upper_clip, vu_lower_random</title>
+<rect x="23" y="559.8" width="121.7" height="40.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="574.8" fill="#0d1117" font-size="11">Upper (FMAC)</text>
+<text x="27" y="587.8" fill="#0d1117" font-size="11">instructions</text>
+</g>
+<g><title>vu.lowerint — Lower integer ALU (IADD ... ISUBIU)
+status: VERIFIED_PARTIAL
+missing: The program names all seven ops (checked by hand); VU micro instructions are not in the automated measurement
+hardware programs: vu_lower_integer</title>
+<rect x="23" y="602.1" width="121.7" height="40.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="617.1" fill="#0d1117" font-size="11">Lower integer ALU</text>
+<text x="27" y="630.1" fill="#0d1117" font-size="11">(IADD ... ISUBIU)</text>
+</g>
+<g><title>vu.branch — Branches, JR/JALR
+status: VERIFIED_PARTIAL
+implemented: Delay slot, VI forwarding to branches
+missing: Hardware program covers JALR only
+hardware programs: vu_lower_branch</title>
+<rect x="23" y="644.5" width="121.7" height="40.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="659.5" fill="#0d1117" font-size="11">Branches, JR/JALR</text>
+<text x="140.7" y="680.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vu.fdiv — FDIV (DIV/SQRT/RSQRT) and Q pipeline
+status: VERIFIED_PARTIAL
+hardware programs: vu_lower_fdivdelay</title>
+<rect x="146.7" y="559.8" width="94.2" height="52.5" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="150.7" y="572.8" fill="#0d1117" font-size="9">FDIV</text>
+<text x="150.7" y="583.8" fill="#0d1117" font-size="9">(DIV/SQRT/RSQRT)</text>
+<text x="150.7" y="594.8" fill="#0d1117" font-size="9">and Q pipeline</text>
+<text x="236.9" y="608.2" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vu.efu — EFU (EATAN, ESIN, EEXP, ...) and P pipeline
+status: VERIFIED_PARTIAL
+implemented: Series model fitted to 208 hardware vectors; latencies
+missing: 41 of 223 program lines differ in the last bit
+hardware programs: vu_lower_efu
+real-PS2 vectors: EFU results match real-PS2 results
+blocker: Exact term rounding unknown; needs an EFU probe run on hardware</title>
+<rect x="242.9" y="559.8" width="94.2" height="52.5" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="246.9" y="573.8" fill="#0d1117" font-size="10">EFU (EATAN,</text>
+<text x="246.9" y="585.8" fill="#0d1117" font-size="10">ESIN, EEXP, ...)</text>
+<text x="246.9" y="597.8" fill="#0d1117" font-size="10">and P pipeline</text>
+</g>
+<g><title>vu.flags — MAC/STATUS/CLIP flag pipeline
+status: VERIFIED_PARTIAL
+implemented: Four-cycle flag pipeline, FSSET, CLIP history
+hardware programs: vu_upper_clip</title>
+<rect x="339.1" y="559.8" width="94.2" height="52.5" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="343.1" y="572.8" fill="#0d1117" font-size="9">MAC/STATUS/CLIP</text>
+<text x="343.1" y="583.8" fill="#0d1117" font-size="9">flag pipeline</text>
+<text x="429.3" y="608.2" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vu.hazards — Data hazards, stalls, cycle counts
+status: VERIFIED_PARTIAL
+implemented: Per-pipeline commit index; lane-precise FMAC stalls
+missing: Only the random program checks cycle-level results on hardware
+hardware programs: vu_lower_random</title>
+<rect x="146.7" y="614.2" width="142.3" height="34.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="150.7" y="629.2" fill="#0d1117" font-size="11">Data hazards, stalls,</text>
+<text x="150.7" y="642.2" fill="#0d1117" font-size="11">cycle counts</text>
+</g>
+<g><title>vu.rng — Random unit (RINIT/RGET/RNEXT/RXOR)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="146.7" y="650.5" width="142.3" height="34.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="150.7" y="664.5" fill="#f0f6fc" font-size="10">Random unit</text>
+<text x="150.7" y="676.5" fill="#f0f6fc" font-size="10">(RINIT/RGET/RNEXT/RXOR)</text>
+</g>
+<g><title>vu.decode — VU instruction decode, reserved opcodes
+status: VERIFIED_PARTIAL
+hardware programs: vu_games_triace, vu_lower_random</title>
+<rect x="291" y="614.2" width="142.3" height="34.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="295" y="629.2" fill="#0d1117" font-size="11">VU instruction decode,</text>
+<text x="295" y="642.2" fill="#0d1117" font-size="11">reserved opcodes</text>
+</g>
+<g><title>vu.ebit — E/D/T bit stops, FBRST
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="291" y="650.5" width="142.3" height="34.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="295" y="665.5" fill="#f0f6fc" font-size="11">E/D/T bit stops, FBRST</text>
+<text x="429.3" y="680.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="20" y="689.8" width="416.3" height="76.3" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="699.8" fill="#8b949e" font-size="10" font-weight="500">Memory, scheduling, XGKICK  (5 · 0 ok · 0 part)</text>
+<g><title>vu.mem — VU0/VU1 micro and data memory, EE mapping
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="23" y="706.8" width="80.5" height="56.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="720.8" fill="#f0f6fc" font-size="10">VU0/VU1</text>
+<text x="27" y="732.8" fill="#f0f6fc" font-size="10">micro and</text>
+<text x="27" y="744.8" fill="#f0f6fc" font-size="10">data memory,</text>
+<text x="27" y="756.8" fill="#f0f6fc" font-size="10">EE mapping</text>
+</g>
+<g><title>vu.load — Microprogram loading and decode cache
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="105.5" y="706.8" width="80.5" height="56.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="109.5" y="720.8" fill="#f0f6fc" font-size="10">Microprogram</text>
+<text x="109.5" y="732.8" fill="#f0f6fc" font-size="10">loading and</text>
+<text x="109.5" y="744.8" fill="#f0f6fc" font-size="10">decode cache</text>
+<text x="181.9" y="759.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>vu0.micro — VU0 micro mode (VCALLMS/VCALLMSR)
+status: IMPLEMENTED_UNVERIFIED
+missing: No hardware program runs VU0 micro code</title>
+<rect x="187.9" y="706.8" width="80.5" height="56.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="191.9" y="721.8" fill="#f0f6fc" font-size="11">VU0 micro</text>
+<text x="264.4" y="759.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>vu.sched — VU execution relative to the EE
+status: IMPLEMENTED_UNVERIFIED
+implemented: Microprograms run when started by MSCAL/VCALLMS
+missing: Concurrency timing against the EE is not measured</title>
+<rect x="270.4" y="706.8" width="80.5" height="56.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="274.4" y="721.8" fill="#f0f6fc" font-size="11">VU execution</text>
+<text x="274.4" y="734.8" fill="#f0f6fc" font-size="11">relative to</text>
+<text x="274.4" y="747.8" fill="#f0f6fc" font-size="11">the EE</text>
+</g>
+<g><title>vu.xgkick — XGKICK (PATH1)
+status: IMPLEMENTED_UNVERIFIED
+implemented: Incremental transfer, stall of a second XGKICK, buffer reuse
+missing: No hardware program</title>
+<rect x="352.8" y="706.8" width="80.5" height="56.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="356.8" y="721.8" fill="#f0f6fc" font-size="11">XGKICK</text>
+<text x="356.8" y="734.8" fill="#f0f6fc" font-size="11">(PATH1)</text>
+<text x="429.3" y="759.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="441.3" y="429.7" width="541.7" height="339.5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="446.3" y="443.7" fill="#e6edf3" font-size="12" font-weight="600">C · GRAPHICS (GIF AND GS)  (27 · 0 ok · 4 part)</text>
+<rect x="444.3" y="450.7" width="245.2" height="130.1" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="449.3" y="460.7" fill="#8b949e" font-size="10" font-weight="500">GIF  (5 · 0 ok · 2 part)</text>
+<g><title>gif.tags — GIFtag formats (PACKED, REGLIST, IMAGE)
+status: VERIFIED_PARTIAL
+hardware programs: gs_signal, gs_label</title>
+<rect x="447.3" y="467.7" width="118.6" height="42.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="480.7" fill="#0d1117" font-size="9">GIFtag formats</text>
+<text x="451.3" y="491.7" fill="#0d1117" font-size="9">(PACKED, REGLIST,</text>
+<text x="451.3" y="502.7" fill="#0d1117" font-size="9">IMAGE)</text>
+</g>
+<g><title>gif.path1 — PATH1 (VU1 XGKICK)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="567.9" y="467.7" width="118.6" height="42.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="571.9" y="482.7" fill="#f0f6fc" font-size="11">PATH1 (VU1 XGKICK)</text>
+<text x="682.5" y="506.5" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gif.path2 — PATH2 (VIF1 DIRECT/DIRECTHL)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="447.3" y="512.5" width="158.8" height="31.6" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="525.5" fill="#f0f6fc" font-size="9">PATH2 (VIF1 DIRECT/DIRECTHL)</text>
+<text x="602.1" y="540.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gif.path3 — PATH3 (GIF DMA) and MSKPATH3
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_mskpath3</title>
+<rect x="447.3" y="546.2" width="158.8" height="31.6" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="559.2" fill="#0d1117" font-size="9">PATH3 (GIF DMA) and</text>
+<text x="451.3" y="570.2" fill="#0d1117" font-size="9">MSKPATH3</text>
+</g>
+<g><title>gif.arb — Path arbitration and GIF_STAT
+status: IMPLEMENTED_UNVERIFIED
+missing: Priority and IMAGE-packet interleaving not measured on hardware</title>
+<rect x="608.1" y="512.5" width="78.4" height="65.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="612.1" y="527.5" fill="#f0f6fc" font-size="11">Path</text>
+<text x="612.1" y="540.5" fill="#f0f6fc" font-size="11">arbitration</text>
+<text x="612.1" y="553.5" fill="#f0f6fc" font-size="11">and</text>
+<text x="612.1" y="566.5" fill="#f0f6fc" font-size="11">GIF_STAT</text>
+</g>
+<rect x="691.5" y="450.7" width="288.5" height="130.1" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="696.5" y="460.7" fill="#8b949e" font-size="10" font-weight="500">GS registers and VRAM  (6 · 0 ok · 2 part)</text>
+<g><title>gs.priv — Privileged registers (CSR, IMR, SMODE, DISPFB, ...)
+status: VERIFIED_PARTIAL
+hardware programs: gs_signal, gs_label</title>
+<rect x="694.5" y="467.7" width="92.8" height="54.1" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="698.5" y="480.7" fill="#0d1117" font-size="9">Privileged</text>
+<text x="698.5" y="491.7" fill="#0d1117" font-size="9">registers (CSR,</text>
+<text x="698.5" y="502.7" fill="#0d1117" font-size="9">IMR, SMODE,</text>
+<text x="698.5" y="513.7" fill="#0d1117" font-size="9">DISPFB, ...)</text>
+</g>
+<g><title>gs.events — SIGNAL, FINISH, LABEL
+status: VERIFIED_PARTIAL
+missing: FINISH has no hardware program
+hardware programs: gs_signal, gs_label</title>
+<rect x="694.5" y="523.7" width="92.8" height="54.1" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="698.5" y="538.7" fill="#0d1117" font-size="11">SIGNAL,</text>
+<text x="698.5" y="551.7" fill="#0d1117" font-size="11">FINISH, LABEL</text>
+<text x="783.3" y="573.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>gs.genregs — General registers (PRIM, TEX0/1/2, ALPHA, TEST, ...)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="789.3" y="467.7" width="92.8" height="54.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="793.3" y="480.7" fill="#f0f6fc" font-size="9">General registers</text>
+<text x="793.3" y="491.7" fill="#f0f6fc" font-size="9">(PRIM, TEX0/1/2,</text>
+<text x="793.3" y="502.7" fill="#f0f6fc" font-size="9">ALPHA, TEST, ...)</text>
+<text x="878.2" y="517.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.vram — 4 MB local memory, pages and blocks
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="884.2" y="467.7" width="92.8" height="54.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="888.2" y="482.7" fill="#f0f6fc" font-size="11">4 MB local</text>
+<text x="888.2" y="495.7" fill="#f0f6fc" font-size="11">memory, pages</text>
+<text x="888.2" y="508.7" fill="#f0f6fc" font-size="11">and blocks</text>
+</g>
+<g><title>gs.swizzle — Swizzling (PSMCT32/24/16/16S, PSMT8/4/8H/4HL/4HH, PSMZ)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="789.3" y="523.7" width="92.8" height="54.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="793.3" y="538.7" fill="#f0f6fc" font-size="11">Swizzling</text>
+<text x="878.2" y="573.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.xfer — Image transfers (host-local, local-host, local-local)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="884.2" y="523.7" width="92.8" height="54.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="888.2" y="536.7" fill="#f0f6fc" font-size="9">Image transfers</text>
+<text x="888.2" y="547.7" fill="#f0f6fc" font-size="9">(host-local,</text>
+<text x="888.2" y="558.7" fill="#f0f6fc" font-size="9">local-host,</text>
+<text x="888.2" y="569.7" fill="#f0f6fc" font-size="9">local-local)</text>
+</g>
+<rect x="444.3" y="582.8" width="359.6" height="183.4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="449.3" y="592.8" fill="#8b949e" font-size="10" font-weight="500">Rasterisation (CPU backend)  (11 · 0 ok · 0 part)</text>
+<g><title>gs.prims — Points, lines, triangles, strips, fans, sprites
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="447.3" y="599.8" width="116.5" height="43.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="612.8" fill="#f0f6fc" font-size="9">Points, lines, triangles,</text>
+<text x="451.3" y="623.8" fill="#f0f6fc" font-size="9">strips, fans, sprites</text>
+<text x="559.8" y="638.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.tex — Texture sampling, STQ/UV, CLAMP, TEX1 filtering
+status: IMPLEMENTED_UNVERIFIED
+missing: Mipmapping (LOD, MIPTBP) has no test</title>
+<rect x="565.8" y="599.8" width="116.5" height="43.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="569.8" y="612.8" fill="#f0f6fc" font-size="9">Texture sampling,</text>
+<text x="569.8" y="623.8" fill="#f0f6fc" font-size="9">STQ/UV, CLAMP, TEX1</text>
+<text x="569.8" y="634.8" fill="#f0f6fc" font-size="9">filtering</text>
+</g>
+<g><title>gs.clut — CLUT (CSM1/CSM2, CSA, TEXCLUT, TEXA)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="684.3" y="599.8" width="116.5" height="43.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="688.3" y="612.8" fill="#f0f6fc" font-size="9">CLUT (CSM1/CSM2,</text>
+<text x="688.3" y="623.8" fill="#f0f6fc" font-size="9">CSA, TEXCLUT, TEXA)</text>
+<text x="796.9" y="638.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.alpha — Alpha blending (ALPHA, PABE, FBA)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="447.3" y="644.9" width="131.3" height="38.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="659.9" fill="#f0f6fc" font-size="11">Alpha blending</text>
+<text x="451.3" y="672.9" fill="#f0f6fc" font-size="11">(ALPHA, PABE, FBA)</text>
+</g>
+<g><title>gs.tests — Alpha, destination-alpha and depth tests
+status: IMPLEMENTED_UNVERIFIED
+implemented: ATST/AFAIL, DATE/DATM, ZTST, ZMSK (the GS has no stencil buffer)</title>
+<rect x="447.3" y="685" width="131.3" height="38.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="699" fill="#f0f6fc" font-size="10">Alpha, destination-alpha</text>
+<text x="451.3" y="711" fill="#f0f6fc" font-size="10">and depth tests</text>
+</g>
+<g><title>gs.fog — Fog (FOG, FOGCOL)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="447.3" y="725.1" width="131.3" height="38.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="451.3" y="740.1" fill="#f0f6fc" font-size="11">Fog (FOG, FOGCOL)</text>
+<text x="574.6" y="759.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.mask — Scissor, FBMSK, XYOFFSET
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="580.6" y="644.9" width="109.1" height="46.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="584.6" y="659.9" fill="#f0f6fc" font-size="11">Scissor, FBMSK,</text>
+<text x="584.6" y="672.9" fill="#f0f6fc" font-size="11">XYOFFSET</text>
+<text x="685.7" y="687" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.dither — Dithering (DTHE, DIMX)
+status: MISSING
+implemented: Registers are latched
+missing: The rasteriser does not apply the dither matrix</title>
+<rect x="691.7" y="644.9" width="109.1" height="46.1" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="695.7" y="659.9" fill="#ffffff" font-size="11">Dithering (DTHE,</text>
+<text x="695.7" y="672.9" fill="#ffffff" font-size="11">DIMX)</text>
+<text x="796.9" y="687" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>gs.aa — Antialiasing (AA1)
+status: MISSING
+missing: Not implemented</title>
+<rect x="580.6" y="693" width="146.2" height="34.1" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="584.6" y="708" fill="#ffffff" font-size="11">Antialiasing (AA1)</text>
+<text x="722.8" y="723.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>gs.cpu — CPU rasteriser backend (reference path)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="580.6" y="729.1" width="146.2" height="34.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="584.6" y="744.1" fill="#f0f6fc" font-size="11">CPU rasteriser backend</text>
+<text x="584.6" y="757.1" fill="#f0f6fc" font-size="11">(reference path)</text>
+</g>
+<g><title>gs.cache — Texture and CLUT page caches
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="728.8" y="693" width="72.1" height="70.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="732.8" y="708" fill="#f0f6fc" font-size="11">Texture and</text>
+<text x="732.8" y="721" fill="#f0f6fc" font-size="11">CLUT page</text>
+<text x="732.8" y="734" fill="#f0f6fc" font-size="11">caches</text>
+<text x="796.9" y="759.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="805.9" y="582.8" width="174.1" height="183.4" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="810.9" y="592.8" fill="#8b949e" font-size="10" font-weight="500">Display and backends</text>
+<g><title>gs.fb — Framebuffers, PMODE circuit merge
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="808.9" y="599.8" width="83.1" height="64.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="812.9" y="613.8" fill="#f0f6fc" font-size="10">Framebuffers,</text>
+<text x="812.9" y="625.8" fill="#f0f6fc" font-size="10">PMODE circuit</text>
+<text x="812.9" y="637.8" fill="#f0f6fc" font-size="10">merge</text>
+<text x="887.9" y="659.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.interlace — Interlace and field mode (SMODE2, FIELD)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="893.9" y="599.8" width="83.1" height="64.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="897.9" y="614.8" fill="#f0f6fc" font-size="11">Interlace and</text>
+<text x="897.9" y="627.8" fill="#f0f6fc" font-size="11">field mode</text>
+<text x="897.9" y="640.8" fill="#f0f6fc" font-size="11">(SMODE2,</text>
+<text x="897.9" y="653.8" fill="#f0f6fc" font-size="11">FIELD)</text>
+</g>
+<g><title>gs.present — Frame presentation and VSync
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="808.9" y="665.9" width="83.1" height="64.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="812.9" y="680.9" fill="#f0f6fc" font-size="11">Frame</text>
+<text x="812.9" y="693.9" fill="#f0f6fc" font-size="11">presentation</text>
+<text x="812.9" y="706.9" fill="#f0f6fc" font-size="11">and VSync</text>
+<text x="887.9" y="726.1" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>gs.vulkan — Vulkan backend
+status: MISSING
+missing: No GPU backend exists</title>
+<rect x="893.9" y="665.9" width="83.1" height="64.2" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="897.9" y="680.9" fill="#ffffff" font-size="11">Vulkan</text>
+<text x="897.9" y="693.9" fill="#ffffff" font-size="11">backend</text>
+<text x="973" y="726.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>gs.pgs — parallel-gs integration
+status: MISSING
+missing: Spike planned (docs/architecture/phase8-roadmap.md, item 2)
+blocker: Vulkan-capable test host and GS trace capture</title>
+<rect x="808.9" y="732.1" width="168.1" height="31.1" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="812.9" y="747.1" fill="#ffffff" font-size="11">parallel-gs integration</text>
+<text x="973" y="759.2" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<rect x="17" y="771.2" width="617.2" height="261.5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="785.2" fill="#e6edf3" font-size="12" font-weight="600">D · DMA AND MEMORY  (24 · 0 ok · 11 part)</text>
+<rect x="20" y="792.2" width="477.2" height="123.6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="802.2" fill="#8b949e" font-size="10" font-weight="500">DMAC channels  (10 · 0 ok · 4 part)</text>
+<g><title>dma.c0 — Ch 0 VIF0
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_basic, dma_vif_unpack</title>
+<rect x="23" y="809.2" width="92.6" height="50.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="824.2" fill="#0d1117" font-size="11">Ch 0 VIF0</text>
+<text x="111.6" y="856" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dma.c1 — Ch 1 VIF1
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_basic, dma_vif_unpack, dma_vif_intstall, dma_vif_stcycl, dma_vif_stmod</title>
+<rect x="23" y="862" width="92.6" height="50.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="877" fill="#0d1117" font-size="11">Ch 1 VIF1</text>
+<text x="111.6" y="908.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dma.c2 — Ch 2 GIF
+status: IMPLEMENTED_UNVERIFIED
+missing: No hardware program checks GIF-channel DMA directly</title>
+<rect x="117.6" y="809.2" width="92.6" height="50.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="121.6" y="824.2" fill="#f0f6fc" font-size="11">Ch 2 GIF</text>
+<text x="206.3" y="856" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>dma.c3 — Ch 3 fromIPU
+status: MISSING
+missing: Channel not modelled (IPU is HLE)
+blocker: IPU hardware model (E)</title>
+<rect x="117.6" y="862" width="92.6" height="50.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="121.6" y="877" fill="#ffffff" font-size="11">Ch 3 fromIPU</text>
+<text x="206.3" y="908.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dma.c4 — Ch 4 toIPU
+status: MISSING
+missing: Channel not modelled (IPU is HLE)
+blocker: IPU hardware model (E)</title>
+<rect x="212.3" y="809.2" width="92.6" height="50.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="216.3" y="824.2" fill="#ffffff" font-size="11">Ch 4 toIPU</text>
+<text x="300.9" y="856" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dma.c5 — Ch 5 SIF0 (IOP to EE)
+status: HLE_OR_STUB
+implemented: Served by the SIF HLE (sceSifGetOtherData, RPC replies)
+missing: No DMAC channel model</title>
+<rect x="212.3" y="862" width="92.6" height="50.8" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="216.3" y="877" fill="#ffffff" font-size="11">Ch 5 SIF0 (IOP</text>
+<text x="216.3" y="890" fill="#ffffff" font-size="11">to EE)</text>
+<text x="300.9" y="908.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>dma.c6 — Ch 6 SIF1 (EE to IOP)
+status: HLE_OR_STUB
+implemented: sceSifSetDma HLE copies descriptors
+missing: No DMAC channel model</title>
+<rect x="306.9" y="809.2" width="92.6" height="50.8" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="310.9" y="824.2" fill="#ffffff" font-size="11">Ch 6 SIF1 (EE</text>
+<text x="310.9" y="837.2" fill="#ffffff" font-size="11">to IOP)</text>
+<text x="395.6" y="856" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>dma.c7 — Ch 7 SIF2
+status: MISSING
+missing: Not modelled</title>
+<rect x="401.6" y="809.2" width="92.6" height="50.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="405.6" y="824.2" fill="#ffffff" font-size="11">Ch 7 SIF2</text>
+<text x="490.2" y="856" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dma.c8 — Ch 8 fromSPR
+status: VERIFIED_PARTIAL
+hardware programs: dma_spr_normal, dma_spr_chain, dma_spr_interleave</title>
+<rect x="306.9" y="862" width="92.6" height="50.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="310.9" y="877" fill="#0d1117" font-size="11">Ch 8 fromSPR</text>
+<text x="395.6" y="908.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dma.c9 — Ch 9 toSPR
+status: VERIFIED_PARTIAL
+hardware programs: dma_spr_normal, dma_spr_chain, dma_spr_interleave, dma_dmac_tagintr</title>
+<rect x="401.6" y="862" width="92.6" height="50.8" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="405.6" y="877" fill="#0d1117" font-size="11">Ch 9 toSPR</text>
+<text x="490.2" y="908.8" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<rect x="20" y="917.8" width="477.2" height="111.9" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="927.8" fill="#8b949e" font-size="10" font-weight="500">Transfer modes and control  (9 · 0 ok · 5 part)</text>
+<g><title>dma.normal — Normal (burst) mode, MADR/QWC write-back
+status: VERIFIED_PARTIAL
+hardware programs: dma_spr_normal</title>
+<rect x="23" y="934.8" width="103.2" height="44.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="948.8" fill="#0d1117" font-size="10">Normal (burst)</text>
+<text x="27" y="960.8" fill="#0d1117" font-size="10">mode, MADR/QWC</text>
+<text x="27" y="972.8" fill="#0d1117" font-size="10">write-back</text>
+</g>
+<g><title>dma.chain — Source chain tags (REFE, CNT, NEXT, REF, REFS, END)
+status: VERIFIED_PARTIAL
+implemented: Tag walk, TTE, terminal-tag latching, cycle detection (F2)
+hardware programs: dma_spr_chain, dma_dmac_tagintr</title>
+<rect x="23" y="981.7" width="103.2" height="44.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="994.7" fill="#0d1117" font-size="9">Source chain tags</text>
+<text x="27" y="1005.7" fill="#0d1117" font-size="9">(REFE, CNT, NEXT,</text>
+<text x="27" y="1016.7" fill="#0d1117" font-size="9">REF, REFS, END)</text>
+</g>
+<g><title>dma.callret — CALL/RET and ASR0/ASR1
+status: IMPLEMENTED_UNVERIFIED
+missing: No hardware program uses CALL/RET</title>
+<rect x="128.2" y="934.8" width="103.2" height="44.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="132.2" y="949.8" fill="#f0f6fc" font-size="11">CALL/RET and</text>
+<text x="132.2" y="962.8" fill="#f0f6fc" font-size="11">ASR0/ASR1</text>
+<text x="227.3" y="975.7" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>dma.interleave — Interleave mode (SQWC/TQWC)
+status: VERIFIED_PARTIAL
+implemented: Skip/transfer qword counts for both scratchpad directions
+missing: Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked
+hardware programs: dma_spr_interleave</title>
+<rect x="128.2" y="981.7" width="103.2" height="44.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="132.2" y="996.7" fill="#0d1117" font-size="11">Interleave mode</text>
+<text x="132.2" y="1009.7" fill="#0d1117" font-size="11">(SQWC/TQWC)</text>
+<text x="227.3" y="1022.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dma.irq — DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE)
+status: VERIFIED_PARTIAL
+hardware programs: dma_dmac_tagintr, kernel_ee_interrupt_dmac_order</title>
+<rect x="233.3" y="934.8" width="103.2" height="44.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="237.3" y="948.8" fill="#0d1117" font-size="10">DMA interrupts</text>
+<text x="237.3" y="960.8" fill="#0d1117" font-size="10">(D_STAT CIS/SIS,</text>
+<text x="237.3" y="972.8" fill="#0d1117" font-size="10">tag IRQ, TIE)</text>
+</g>
+<g><title>dma.ctrl — D_CTRL, D_PCR, D_ENABLER/W
+status: VERIFIED_PARTIAL
+hardware programs: dma_dmac_cpcond</title>
+<rect x="233.3" y="981.7" width="103.2" height="44.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="237.3" y="996.7" fill="#0d1117" font-size="11">D_CTRL, D_PCR,</text>
+<text x="237.3" y="1009.7" fill="#0d1117" font-size="11">D_ENABLER/W</text>
+<text x="332.5" y="1022.7" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>dma.stall — Stall control (STS/STD, D_STADR)
+status: MISSING
+missing: Not implemented</title>
+<rect x="338.5" y="934.8" width="76.9" height="60.6" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="342.5" y="949.8" fill="#ffffff" font-size="11">Stall control</text>
+<text x="342.5" y="962.8" fill="#ffffff" font-size="11">(STS/STD,</text>
+<text x="342.5" y="975.8" fill="#ffffff" font-size="11">D_STADR)</text>
+<text x="411.4" y="991.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dma.mfifo — MFIFO ring (D_RBOR/D_RBSR)
+status: MISSING
+implemented: Ring registers can be written
+missing: No MFIFO transfer behaviour</title>
+<rect x="417.4" y="934.8" width="76.9" height="60.6" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="421.4" y="949.8" fill="#ffffff" font-size="11">MFIFO</text>
+<text x="490.2" y="991.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>dma.timing — Bus arbitration, priority, timing
+status: HLE_OR_STUB
+implemented: Transfers complete synchronously when started
+missing: No bus arbitration or transfer timing</title>
+<rect x="338.5" y="997.4" width="155.7" height="29.3" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="342.5" y="1010.4" fill="#ffffff" font-size="9">Bus arbitration, priority, timing</text>
+<text x="490.2" y="1022.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<rect x="499.2" y="792.2" width="131.9" height="237.5" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="504.2" y="802.2" fill="#8b949e" font-size="10" font-weight="500">Memory</text>
+<g><title>mem.rdram — 32 MB RDRAM, kseg aliases, uncached mirrors
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="502.2" y="809.2" width="125.9" height="41.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="506.2" y="822.2" fill="#f0f6fc" font-size="9">32 MB RDRAM, kseg</text>
+<text x="506.2" y="833.2" fill="#f0f6fc" font-size="9">aliases, uncached mirrors</text>
+<text x="624.2" y="847.1" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>mem.spr — Scratchpad RAM (16 KB)
+status: VERIFIED_PARTIAL
+hardware programs: dma_spr_normal, dma_spr_chain</title>
+<rect x="502.2" y="853.1" width="125.9" height="41.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="506.2" y="868.1" fill="#0d1117" font-size="11">Scratchpad RAM (16</text>
+<text x="506.2" y="881.1" fill="#0d1117" font-size="11">KB)</text>
+</g>
+<g><title>mem.fast — Recompiled fast-path memory access
+status: VERIFIED_PARTIAL
+implemented: Masked RDRAM access with wrap-around paths</title>
+<rect x="502.2" y="897" width="125.9" height="41.9" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="506.2" y="912" fill="#0d1117" font-size="11">Recompiled fast-path</text>
+<text x="506.2" y="925" fill="#0d1117" font-size="11">memory access</text>
+</g>
+<g><title>mem.io — I/O register map
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="502.2" y="940.9" width="125.9" height="41.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="506.2" y="955.9" fill="#f0f6fc" font-size="11">I/O register map</text>
+<text x="624.2" y="978.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>mem.reserved — Runtime-reserved kernel area and arena
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="502.2" y="984.8" width="125.9" height="41.9" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="506.2" y="999.8" fill="#f0f6fc" font-size="11">Runtime-reserved</text>
+<text x="506.2" y="1012.8" fill="#f0f6fc" font-size="11">kernel area and arena</text>
+</g>
+<rect x="636.2" y="771.2" width="346.8" height="261.5" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="641.2" y="785.2" fill="#e6edf3" font-size="12" font-weight="600">E · VIF AND IPU  (13 · 0 ok · 5 part)</text>
+<rect x="639.2" y="792.2" width="340.8" height="176" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="644.2" y="802.2" fill="#8b949e" font-size="10" font-weight="500">VIF0 / VIF1  (10 · 0 ok · 5 part)</text>
+<g><title>vif.unpack — UNPACK formats (S, V2, V3, V4, V4-5)
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_unpack</title>
+<rect x="642.2" y="809.2" width="110.3" height="45.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="646.2" y="823.2" fill="#0d1117" font-size="10">UNPACK formats (S,</text>
+<text x="646.2" y="835.2" fill="#0d1117" font-size="10">V2, V3, V4, V4-5)</text>
+<text x="748.4" y="850.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vif.stcycl — STCYCL skip and fill (CL/WL)
+status: VERIFIED_PARTIAL
+missing: Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked
+hardware programs: dma_vif_stcycl</title>
+<rect x="754.4" y="809.2" width="110.3" height="45.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="758.4" y="824.2" fill="#0d1117" font-size="11">STCYCL skip and</text>
+<text x="758.4" y="837.2" fill="#0d1117" font-size="11">fill (CL/WL)</text>
+<text x="860.7" y="850.6" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vif.stmod — STMOD offset/difference/row modes
+status: VERIFIED_PARTIAL
+missing: Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked
+hardware programs: dma_vif_stmod</title>
+<rect x="866.7" y="809.2" width="110.3" height="45.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="870.7" y="822.2" fill="#0d1117" font-size="9">STMOD</text>
+<text x="870.7" y="833.2" fill="#0d1117" font-size="9">offset/difference/row</text>
+<text x="870.7" y="844.2" fill="#0d1117" font-size="9">modes</text>
+</g>
+<g><title>vif.mask — Masking (STMASK, ROW, COL)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="642.2" y="856.6" width="94.2" height="53.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="646.2" y="871.6" fill="#f0f6fc" font-size="11">Masking</text>
+<text x="646.2" y="884.6" fill="#f0f6fc" font-size="11">(STMASK,</text>
+<text x="646.2" y="897.6" fill="#f0f6fc" font-size="11">ROW, COL)</text>
+</g>
+<g><title>vif.stall — I-bit stalls and VIF interrupts
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_intstall</title>
+<rect x="642.2" y="911.9" width="94.2" height="53.3" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="646.2" y="926.9" fill="#0d1117" font-size="11">I-bit stalls and</text>
+<text x="646.2" y="939.9" fill="#0d1117" font-size="11">VIF interrupts</text>
+<text x="732.4" y="961.2" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>vif.regs — VIF registers, FBRST, STAT
+status: VERIFIED_PARTIAL
+hardware programs: dma_vif_basic</title>
+<rect x="738.4" y="856.6" width="118.3" height="42.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="742.4" y="871.6" fill="#0d1117" font-size="11">VIF registers,</text>
+<text x="742.4" y="884.6" fill="#0d1117" font-size="11">FBRST, STAT</text>
+</g>
+<g><title>vif.mpg — MPG microprogram upload
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="858.7" y="856.6" width="118.3" height="42.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="862.7" y="871.6" fill="#f0f6fc" font-size="11">MPG microprogram</text>
+<text x="862.7" y="884.6" fill="#f0f6fc" font-size="11">upload</text>
+</g>
+<g><title>vif.dbf — Double buffering (BASE, OFFSET, TOPS, ITOPS)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="738.4" y="900.8" width="78.2" height="64.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="742.4" y="913.8" fill="#f0f6fc" font-size="9">Double</text>
+<text x="742.4" y="924.8" fill="#f0f6fc" font-size="9">buffering</text>
+<text x="742.4" y="935.8" fill="#f0f6fc" font-size="9">(BASE,</text>
+<text x="742.4" y="946.8" fill="#f0f6fc" font-size="9">OFFSET,</text>
+<text x="742.4" y="957.8" fill="#f0f6fc" font-size="9">TOPS, ITOPS)</text>
+</g>
+<g><title>vif.mscal — MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="818.6" y="900.8" width="78.2" height="64.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="822.6" y="915.8" fill="#f0f6fc" font-size="11">MSCAL /</text>
+<text x="822.6" y="928.8" fill="#f0f6fc" font-size="11">FLUSH</text>
+<text x="892.8" y="961.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>vif.direct — DIRECT/DIRECTHL to PATH2
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="898.8" y="900.8" width="78.2" height="64.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="902.8" y="915.8" fill="#f0f6fc" font-size="11">DIRECT</text>
+<text x="973" y="961.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<rect x="639.2" y="970.2" width="340.8" height="59.5" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="644.2" y="980.2" fill="#8b949e" font-size="10" font-weight="500">IPU  (3 · 0 ok · 0 part)</text>
+<g><title>ipu.dma — IPU0/IPU1 FIFOs and DMA
+status: MISSING
+missing: Not modelled</title>
+<rect x="642.2" y="987.2" width="110.3" height="39.5" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="646.2" y="1002.2" fill="#ffffff" font-size="11">IPU0/IPU1 FIFOs</text>
+<text x="646.2" y="1015.2" fill="#ffffff" font-size="11">and DMA</text>
+</g>
+<g><title>ipu.cmd — IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)
+status: MISSING
+implemented: sceIpuInit/Stop/RestartDMA return without decoding
+missing: No command decoding</title>
+<rect x="754.4" y="987.2" width="110.3" height="39.5" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="758.4" y="1002.2" fill="#ffffff" font-size="11">IPU commands</text>
+<text x="860.7" y="1022.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>ipu.mpeg — MPEG playback (libmpeg HLE)
+status: HLE_OR_STUB
+implemented: sceMpeg* replaced; optional FFmpeg decode (PS2X_ENABLE_FFMPEG)</title>
+<rect x="866.7" y="987.2" width="110.3" height="39.5" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="870.7" y="1002.2" fill="#ffffff" font-size="11">MPEG playback</text>
+<text x="870.7" y="1015.2" fill="#ffffff" font-size="11">(libmpeg HLE)</text>
+</g>
+<rect x="17" y="1034.7" width="604.5" height="196.7" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">F · IOP AND SYSTEM SERVICES  (17 · 0 ok · 4 part)</text>
+<rect x="20" y="1055.7" width="240.1" height="172.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">IOP core  (7 · 0 ok · 0 part)</text>
+<g><title>iop.cpu — R3000A instruction execution
+status: IMPLEMENTED_UNVERIFIED
+missing: ps2autotests cpu/iop programs exist but are not run</title>
+<rect x="23" y="1072.7" width="116" height="42.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1087.7" fill="#f0f6fc" font-size="11">R3000A instruction</text>
+<text x="27" y="1100.7" fill="#f0f6fc" font-size="11">execution</text>
+</g>
+<g><title>iop.mem — IOP memory map (2 MB, hardware ranges)
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="141" y="1072.7" width="116" height="42.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="145" y="1085.7" fill="#f0f6fc" font-size="9">IOP memory map (2</text>
+<text x="145" y="1096.7" fill="#f0f6fc" font-size="9">MB, hardware ranges)</text>
+<text x="253.1" y="1110.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>iop.intr — Interrupts (intrman)
+status: HLE_OR_STUB</title>
+<rect x="23" y="1116.9" width="116" height="42.2" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1131.9" fill="#ffffff" font-size="11">Interrupts (intrman)</text>
+<text x="135" y="1155.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>iop.kernel — Threads, semaphores, events (thbase, ...)
+status: HLE_OR_STUB</title>
+<rect x="141" y="1116.9" width="116" height="42.2" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="145" y="1129.9" fill="#ffffff" font-size="9">Threads, semaphores,</text>
+<text x="145" y="1140.9" fill="#ffffff" font-size="9">events (thbase, ...)</text>
+<text x="253.1" y="1155.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>iop.timers — Timers (timrman)
+status: HLE_OR_STUB</title>
+<rect x="23" y="1161.1" width="155.4" height="31.2" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1176.1" fill="#ffffff" font-size="11">Timers (timrman)</text>
+<text x="174.4" y="1188.3" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>iop.irx — IRX loading, relocation, versioned imports
+status: IMPLEMENTED_UNVERIFIED</title>
+<rect x="23" y="1194.3" width="155.4" height="31.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1207.3" fill="#f0f6fc" font-size="9">IRX loading, relocation,</text>
+<text x="27" y="1218.3" fill="#f0f6fc" font-size="9">versioned imports</text>
+</g>
+<g><title>iop.sched — IOP scheduling against the EE
+status: IMPLEMENTED_UNVERIFIED
+missing: No ordering tests between IOP and EE progress (roadmap item 4)</title>
+<rect x="180.4" y="1161.1" width="76.7" height="64.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="184.4" y="1176.1" fill="#f0f6fc" font-size="11">IOP</text>
+<text x="184.4" y="1189.1" fill="#f0f6fc" font-size="11">scheduling</text>
+<text x="184.4" y="1202.1" fill="#f0f6fc" font-size="11">against the</text>
+<text x="184.4" y="1215.1" fill="#f0f6fc" font-size="11">EE</text>
+</g>
+<rect x="262.1" y="1055.7" width="356.4" height="54.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="267.1" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">SIF  (3 · 0 ok · 2 part)</text>
+<g><title>sif.cmd — SIFCMD
+status: VERIFIED_PARTIAL
+implemented: Packet-level IOP SIFCMD responder
+missing: Hardware evidence is indirect: every program's printf travels this path
+hardware programs: kernel_ee_thread_stat, cpu_ee_alu</title>
+<rect x="265.1" y="1072.7" width="115.5" height="34.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="269.1" y="1087.7" fill="#0d1117" font-size="11">SIFCMD</text>
+<text x="376.6" y="1103.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>sif.rpc — SIFRPC
+status: VERIFIED_PARTIAL
+missing: Hardware evidence is indirect (tty output path)
+hardware programs: kernel_ee_thread_stat, cpu_ee_alu</title>
+<rect x="382.6" y="1072.7" width="115.5" height="34.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="386.6" y="1087.7" fill="#0d1117" font-size="11">SIFRPC</text>
+<text x="494" y="1103.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>sif.dma — SIF DMA (sceSifSetDma)
+status: HLE_OR_STUB</title>
+<rect x="500" y="1072.7" width="115.5" height="34.7" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="504" y="1087.7" fill="#ffffff" font-size="11">SIF DMA</text>
+<text x="504" y="1100.7" fill="#ffffff" font-size="11">(sceSifSetDma)</text>
+</g>
+<rect x="262.1" y="1112.4" width="356.4" height="116" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="267.1" y="1122.4" fill="#8b949e" font-size="10" font-weight="500">Services and modules  (7 · 0 ok · 2 part)</text>
+<g><title>svc.fileio — FILEIO
+status: VERIFIED_PARTIAL
+missing: Only the tty write path has hardware evidence
+hardware programs: cpu_ee_alu</title>
+<rect x="265.1" y="1129.4" width="98.7" height="47" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="269.1" y="1144.4" fill="#0d1117" font-size="11">FILEIO</text>
+<text x="359.8" y="1172.4" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>svc.ioman — IOMAN/IOMANX
+status: HLE_OR_STUB</title>
+<rect x="265.1" y="1178.4" width="98.7" height="47" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="269.1" y="1193.4" fill="#ffffff" font-size="11">IOMAN/IOMANX</text>
+<text x="359.8" y="1221.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>svc.cdvdman — CDVDMAN
+status: HLE_OR_STUB</title>
+<rect x="365.8" y="1129.4" width="98.7" height="47" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="369.8" y="1144.4" fill="#ffffff" font-size="11">CDVDMAN</text>
+<text x="460.5" y="1172.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>svc.cdvdfsv — CDVDFSV
+status: HLE_OR_STUB
+implemented: Module load accepted; EE sceCd* calls served by HLE</title>
+<rect x="365.8" y="1178.4" width="98.7" height="47" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="369.8" y="1193.4" fill="#ffffff" font-size="11">CDVDFSV</text>
+<text x="460.5" y="1221.4" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>svc.rpcsrv — RPC servers (MCSERV, DBCMAN, LIBSD routing)
+status: HLE_OR_STUB</title>
+<rect x="466.5" y="1129.4" width="149" height="30.7" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="470.5" y="1142.4" fill="#ffffff" font-size="9">RPC servers (MCSERV,</text>
+<text x="470.5" y="1153.4" fill="#ffffff" font-size="9">DBCMAN, LIBSD routing)</text>
+</g>
+<g><title>svc.modload — Module loading (SifLoadModule, MODLOAD)
+status: HLE_OR_STUB</title>
+<rect x="466.5" y="1162.1" width="149" height="30.7" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="470.5" y="1175.1" fill="#ffffff" font-size="9">Module loading</text>
+<text x="470.5" y="1186.1" fill="#ffffff" font-size="9">(SifLoadModule, MODLOAD)</text>
+</g>
+<g><title>sys.boot — System init and shutdown (no-BIOS boot, exit)
+status: VERIFIED_PARTIAL
+implemented: ELF load into a no-BIOS environment, IOP reset, ExitDeleteThread
+hardware programs: kernel_ee_thread_exit</title>
+<rect x="466.5" y="1194.8" width="149" height="30.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="470.5" y="1207.8" fill="#0d1117" font-size="9">System init and shutdown</text>
+<text x="470.5" y="1218.8" fill="#0d1117" font-size="9">(no-BIOS boot, exit)</text>
+</g>
+<rect x="17" y="1233.4" width="604.5" height="149.6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="22" y="1247.4" fill="#e6edf3" font-size="12" font-weight="600">G · SPU2 AND SOUND  (13 · 0 ok · 0 part)</text>
+<rect x="20" y="1254.4" width="402.5" height="125.6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="25" y="1264.4" fill="#8b949e" font-size="10" font-weight="500">SPU2 hardware  (9 · 0 ok · 0 part)</text>
+<g><title>spu.cores — SPU2 cores and registers
+status: MISSING
+missing: Register range mapped on the IOP side, no register model</title>
+<rect x="23" y="1271.4" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1286.4" fill="#ffffff" font-size="11">SPU2 cores</text>
+<text x="27" y="1299.4" fill="#ffffff" font-size="11">and registers</text>
+<text x="105.6" y="1319.2" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>spu.ram — Sound RAM (2 MB)
+status: MISSING
+missing: No sound RAM model</title>
+<rect x="23" y="1325.2" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1340.2" fill="#ffffff" font-size="11">Sound RAM (2</text>
+<text x="27" y="1353.2" fill="#ffffff" font-size="11">MB)</text>
+<text x="105.6" y="1373" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>spu.voices — Voice engine (48 voices)
+status: MISSING
+missing: No voice engine; libsd calls play decoded clips</title>
+<rect x="111.6" y="1271.4" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="115.6" y="1286.4" fill="#ffffff" font-size="11">Voice engine</text>
+<text x="115.6" y="1299.4" fill="#ffffff" font-size="11">(48 voices)</text>
+<text x="194.1" y="1319.2" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>spu.adsr — ADSR envelopes
+status: MISSING
+missing: No envelope generator</title>
+<rect x="111.6" y="1325.2" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="115.6" y="1340.2" fill="#ffffff" font-size="11">ADSR</text>
+<text x="115.6" y="1353.2" fill="#ffffff" font-size="11">envelopes</text>
+<text x="194.1" y="1373" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>spu.pitch — Pitch and interpolation
+status: MISSING
+missing: No pitch counter or interpolation</title>
+<rect x="200.1" y="1271.4" width="108.7" height="41" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="204.1" y="1286.4" fill="#ffffff" font-size="11">Pitch and</text>
+<text x="204.1" y="1299.4" fill="#ffffff" font-size="11">interpolation</text>
+</g>
+<g><title>spu.mix — Core mixing, volumes
+status: MISSING
+missing: No SPU2 mixer</title>
+<rect x="310.8" y="1271.4" width="108.7" height="41" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="314.8" y="1286.4" fill="#ffffff" font-size="11">Core mixing,</text>
+<text x="314.8" y="1299.4" fill="#ffffff" font-size="11">volumes</text>
+</g>
+<g><title>spu.reverb — Reverb
+status: MISSING
+missing: No reverb</title>
+<rect x="200.1" y="1314.5" width="145.6" height="30.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="204.1" y="1329.5" fill="#ffffff" font-size="11">Reverb</text>
+</g>
+<g><title>spu.irq — SPU2 IRQ (address match)
+status: MISSING
+missing: No SPU2 interrupts</title>
+<rect x="200.1" y="1346.7" width="145.6" height="30.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="204.1" y="1360.7" fill="#ffffff" font-size="10">SPU2 IRQ (address match)</text>
+<text x="341.7" y="1373" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>spu.dma — Sound DMA (IOP channels 4/7)
+status: HLE_OR_STUB
+implemented: sceSdVoiceTrans/BlockTrans return byte counts</title>
+<rect x="347.7" y="1314.5" width="71.8" height="62.5" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="351.7" y="1329.5" fill="#ffffff" font-size="11">Sound DMA</text>
+<text x="351.7" y="1342.5" fill="#ffffff" font-size="11">(IOP</text>
+<text x="351.7" y="1355.5" fill="#ffffff" font-size="11">channels</text>
+<text x="351.7" y="1368.5" fill="#ffffff" font-size="11">4/7)</text>
+</g>
+<rect x="424.5" y="1254.4" width="194" height="125.6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="429.5" y="1264.4" fill="#8b949e" font-size="10" font-weight="500">Audio libraries and host output</text>
+<g><title>spu.libsd — libsd / sceSd* HLE
+status: HLE_OR_STUB
+missing: Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders</title>
+<rect x="427.5" y="1271.4" width="93" height="51.8" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="431.5" y="1286.4" fill="#ffffff" font-size="11">libsd / sceSd*</text>
+<text x="431.5" y="1299.4" fill="#ffffff" font-size="11">HLE</text>
+<text x="516.5" y="1319.2" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>spu.adpcm — VAG/ADPCM decoding
+status: IMPLEMENTED_UNVERIFIED
+missing: No test</title>
+<rect x="522.5" y="1271.4" width="93" height="51.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="526.5" y="1286.4" fill="#f0f6fc" font-size="11">VAG/ADPCM</text>
+<text x="526.5" y="1299.4" fill="#f0f6fc" font-size="11">decoding</text>
+<text x="611.5" y="1319.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>spu.host — Host audio output
+status: IMPLEMENTED_UNVERIFIED
+missing: No test; plays decoded clips through raylib</title>
+<rect x="427.5" y="1325.2" width="93" height="51.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="431.5" y="1340.2" fill="#f0f6fc" font-size="11">Host audio</text>
+<text x="431.5" y="1353.2" fill="#f0f6fc" font-size="11">output</text>
+<text x="516.5" y="1373" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+</g>
+<g><title>spu.sync — Audio synchronisation with emulated time
+status: UNKNOWN
+missing: Not characterised</title>
+<rect x="522.5" y="1325.2" width="93" height="51.8" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
+<text x="526.5" y="1340.2" fill="#c9d1d9" font-size="11">Audio sync</text>
+<text x="611.5" y="1373" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
+</g>
+<rect x="623.5" y="1034.7" width="359.5" height="348.3" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="628.5" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">H · PERIPHERALS AND SYSTEM  (18 · 0 ok · 2 part)</text>
+<rect x="626.5" y="1055.7" width="353.5" height="106.8" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="631.5" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">Controllers and storage  (6 · 0 ok · 0 part)</text>
+<g><title>per.sio2 — SIO2 controller hardware
+status: MISSING
+missing: Pads and cards are served at library level</title>
+<rect x="629.5" y="1072.7" width="114.5" height="42.4" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1087.7" fill="#ffffff" font-size="11">SIO2 controller</text>
+<text x="633.5" y="1100.7" fill="#ffffff" font-size="11">hardware</text>
+</g>
+<g><title>per.pad — Digital/analog pads (libpad HLE)
+status: HLE_OR_STUB</title>
+<rect x="629.5" y="1117.1" width="114.5" height="42.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1132.1" fill="#ffffff" font-size="11">Digital/analog pads</text>
+<text x="633.5" y="1145.1" fill="#ffffff" font-size="11">(libpad HLE)</text>
+</g>
+<g><title>per.ds2 — DualShock 2 pressure and actuators
+status: HLE_OR_STUB
+missing: Actuator (vibration) output not tested</title>
+<rect x="746" y="1072.7" width="114.5" height="42.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="750" y="1085.7" fill="#ffffff" font-size="9">DualShock 2 pressure</text>
+<text x="750" y="1096.7" fill="#ffffff" font-size="9">and actuators</text>
+<text x="856.5" y="1111.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>per.mc — Memory cards (libmc HLE on host files)
+status: HLE_OR_STUB</title>
+<rect x="746" y="1117.1" width="114.5" height="42.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="750" y="1131.1" fill="#ffffff" font-size="10">Memory cards (libmc</text>
+<text x="750" y="1143.1" fill="#ffffff" font-size="10">HLE on host files)</text>
+<text x="856.5" y="1155.5" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>per.save — Save/load persistence across runs
+status: HLE_OR_STUB
+implemented: mc0 maps to a host directory
+missing: No restart-and-read-back test</title>
+<rect x="862.5" y="1072.7" width="114.5" height="42.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="866.5" y="1085.7" fill="#ffffff" font-size="9">Save/load persistence</text>
+<text x="866.5" y="1096.7" fill="#ffffff" font-size="9">across runs</text>
+<text x="973" y="1111.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>per.cdvd — CD/DVD reads (host files, disc image)
+status: HLE_OR_STUB</title>
+<rect x="862.5" y="1117.1" width="114.5" height="42.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="866.5" y="1132.1" fill="#ffffff" font-size="11">CD/DVD reads (host</text>
+<text x="866.5" y="1145.1" fill="#ffffff" font-size="11">files, disc image)</text>
+</g>
+<rect x="626.5" y="1164.5" width="353.5" height="74.3" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="631.5" y="1174.5" fill="#8b949e" font-size="10" font-weight="500">Expansion devices  (4 · 0 ok · 0 part)</text>
+<g><title>per.usb — USB (usbd)
+status: MISSING
+implemented: Module load accepted
+missing: No USB device emulation</title>
+<rect x="629.5" y="1181.5" width="85.4" height="54.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1196.5" fill="#ffffff" font-size="11">USB (usbd)</text>
+<text x="710.9" y="1231.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>per.dev9 — DEV9 expansion bay
+status: MISSING
+implemented: Module load accepted
+missing: No DEV9 emulation</title>
+<rect x="716.9" y="1181.5" width="85.4" height="54.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="720.9" y="1196.5" fill="#ffffff" font-size="11">DEV9</text>
+<text x="720.9" y="1209.5" fill="#ffffff" font-size="11">expansion</text>
+<text x="720.9" y="1222.5" fill="#ffffff" font-size="11">bay</text>
+</g>
+<g><title>per.hdd — HDD (ATA, APA/PFS)
+status: MISSING
+missing: Not implemented</title>
+<rect x="804.3" y="1181.5" width="85.4" height="54.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="808.3" y="1196.5" fill="#ffffff" font-size="11">HDD (ATA,</text>
+<text x="808.3" y="1209.5" fill="#ffffff" font-size="11">APA/PFS)</text>
+<text x="885.6" y="1231.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+</g>
+<g><title>per.netif — Network (SMAP, ps2ip)
+status: MISSING
+implemented: Module load accepted
+missing: No network adapter emulation</title>
+<rect x="891.6" y="1181.5" width="85.4" height="54.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
+<text x="895.6" y="1196.5" fill="#ffffff" font-size="11">Network</text>
+<text x="895.6" y="1209.5" fill="#ffffff" font-size="11">(SMAP,</text>
+<text x="895.6" y="1222.5" fill="#ffffff" font-size="11">ps2ip)</text>
+</g>
+<rect x="626.5" y="1240.8" width="353.5" height="139.2" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<text x="631.5" y="1250.8" fill="#8b949e" font-size="10" font-weight="500">System  (8 · 0 ok · 2 part)</text>
+<g><title>per.intc — Interrupt controller (INTC)
+status: VERIFIED_PARTIAL
+hardware programs: kernel_ee_interrupt_intc_order</title>
+<rect x="629.5" y="1257.8" width="129.1" height="38.4" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1272.8" fill="#0d1117" font-size="11">Interrupt controller</text>
+<text x="633.5" y="1285.8" fill="#0d1117" font-size="11">(INTC)</text>
+</g>
+<g><title>per.rtc — RTC (sceCdReadClock)
+status: HLE_OR_STUB</title>
+<rect x="629.5" y="1298.2" width="129.1" height="38.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1313.2" fill="#ffffff" font-size="11">RTC</text>
+<text x="633.5" y="1326.2" fill="#ffffff" font-size="11">(sceCdReadClock)</text>
+</g>
+<g><title>per.biossvc — BIOS-dependent services (ROMVER, OSD config)
+status: HLE_OR_STUB</title>
+<rect x="629.5" y="1338.6" width="129.1" height="38.4" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="633.5" y="1351.6" fill="#ffffff" font-size="9">BIOS-dependent services</text>
+<text x="633.5" y="1362.6" fill="#ffffff" font-size="9">(ROMVER, OSD config)</text>
+</g>
+<g><title>per.boot — ELF boot without a BIOS
+status: VERIFIED_PARTIAL
+implemented: All 55 ps2autotests programs boot this way
+hardware programs: cpu_ee_alu, kernel_ee_thread_exit</title>
+<rect x="760.6" y="1257.8" width="107.2" height="46.5" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="764.6" y="1272.8" fill="#0d1117" font-size="11">ELF boot without</text>
+<text x="764.6" y="1285.8" fill="#0d1117" font-size="11">a BIOS</text>
+<text x="863.8" y="1300.3" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
+</g>
+<g><title>per.deci2 — DECI2 debug channel
+status: HLE_OR_STUB</title>
+<rect x="869.8" y="1257.8" width="107.2" height="46.5" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
+<text x="873.8" y="1272.8" fill="#ffffff" font-size="11">DECI2 debug</text>
+<text x="873.8" y="1285.8" fill="#ffffff" font-size="11">channel</text>
+<text x="973" y="1300.3" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+</g>
+<g><title>per.bios — BIOS ROM execution
+status: NOT_APPLICABLE
+implemented: Declared design: Zmbor ships and needs no BIOS (README); ROM modules are provided by HLE</title>
+<rect x="760.6" y="1306.3" width="143.6" height="34.4" fill="#21262d" stroke="#0d1117" stroke-width="1"/>
+<text x="764.6" y="1321.3" fill="#8b949e" font-size="11">BIOS ROM execution</text>
+<text x="900.2" y="1336.6" fill="#8b949e" font-size="8" text-anchor="end" opacity="0.8">N/A</text>
+</g>
+<g><title>per.ps1 — PS1 compatibility mode
+status: NOT_APPLICABLE
+implemented: Proposed out of scope: PS2 software only</title>
+<rect x="760.6" y="1342.6" width="143.6" height="34.4" fill="#21262d" stroke="#0d1117" stroke-width="1"/>
+<text x="764.6" y="1357.6" fill="#8b949e" font-size="11">PS1 compatibility mode</text>
+<text x="900.2" y="1373" fill="#8b949e" font-size="8" text-anchor="end" opacity="0.8">N/A</text>
+</g>
+<g><title>per.dvdv — DVD-Video playback
+status: NOT_APPLICABLE
+implemented: Proposed out of scope: not PS2 software</title>
+<rect x="906.2" y="1306.3" width="70.8" height="70.7" fill="#21262d" stroke="#0d1117" stroke-width="1"/>
+<text x="910.2" y="1321.3" fill="#8b949e" font-size="11">DVD-Video</text>
+<text x="910.2" y="1334.3" fill="#8b949e" font-size="11">playback</text>
+<text x="973" y="1373" fill="#8b949e" font-size="8" text-anchor="end" opacity="0.8">N/A</text>
+</g>
+</svg>

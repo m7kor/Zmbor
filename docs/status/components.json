@@ -1,0 +1,6080 @@
+{
+ "schema": 1,
+ "evidence_commit": "c7e5960",
+ "methodology": {
+  "intro": "Every PS2 subsystem and every significant part of Zmbor, with a status written by hand and checked by `tools/status/validate_dashboard.py` against the evidence it cites. The two diagrams are generated from `docs/status/components.json` by `tools/status/generate_dashboard.py`. A component's colour says how far its behaviour is known to be correct, not how much code exists.",
+  "rules": [
+   "Hardware evidence means a ps2autotests program whose output matches the `.expected` file printed by a real PS2, a unit test whose expected values are real-PS2 results (`hwvec`), or a formal proof (Z3). Unit tests written from documentation, PCSX2 or the GS manual are tests, not hardware evidence.",
+   "A hardware component is `VERIFIED_COMPLETE` only if its scope is enumerated in a form the validator checks (an instruction list against the hardware-confirmed set, or a proof) and every item is covered by a matching hardware program, with no mismatching program touching it. One passing program without an enumerated scope gives `VERIFIED_PARTIAL`.",
+   "A framework component (recompiler, tools) is `VERIFIED_COMPLETE` when its stated scope is fully covered by tests or proofs that run in CI.",
+   "HLE components (`implementation: hle`) replace a library or IOP module at call level. They are `HLE_OR_STUB` unless hardware programs exercise them, in which case they are `VERIFIED_PARTIAL`, never complete.",
+   "Group and section states are not stored: they are the counts of their components. Passing tests never upgrade a status automatically; a status change is an edit of components.json with matching evidence.",
+   "Percentages appear only where a numerator and a denominator are enumerated: ps2autotests output lines and programs, and hardware-confirmed instructions per decoded instruction class. Each is truncated, never rounded up.",
+   "`NOT_APPLICABLE` entries are scope proposals that the owner must confirm; `UNKNOWN` means no measurement exists."
+  ],
+  "statuses": {
+   "VERIFIED_COMPLETE": "defined scope fully implemented and independently verified (rules above)",
+   "VERIFIED_PARTIAL": "some behaviour verified, relevant gaps remain",
+   "IMPLEMENTED_UNVERIFIED": "implementation exists without sufficient correctness evidence",
+   "HLE_OR_STUB": "approximate or placeholder behaviour (high-level emulation or stub)",
+   "MISSING": "required feature has no functional implementation",
+   "NOT_APPLICABLE": "deliberately outside the declared scope (proposed; owner confirms)",
+   "UNKNOWN": "insufficient information to classify"
+  }
+ },
+ "measurements": {
+  "hardware_source": {
+   "path": "docs/hwtest/dashboard.json",
+   "sha256": "dd5ee3003c6ab14a0f3d7cbc5f8c469f1523a9faaf4d317468e802f5cd9c0056",
+   "description": "the hardware matrix of the acceptance gate run on c7e5960 (p7_gate4); main a13b47a (merge of PR #5) has the identical tree b79613e."
+  },
+  "hardware": {
+   "programs_pass": 53,
+   "programs": 55,
+   "lines_match": 8202,
+   "lines": 8250,
+   "crash": 0,
+   "timeout": 0,
+   "by_area": {
+    "cpu/ee": {
+     "programs_pass": 6,
+     "programs": 6,
+     "lines_match": 1798,
+     "lines": 1798
+    },
+    "cpu/ee_cop0": {
+     "programs_pass": 1,
+     "programs": 1,
+     "lines_match": 13,
+     "lines": 13
+    },
+    "cpu/ee_fpu": {
+     "programs_pass": 8,
+     "programs": 9,
+     "lines_match": 1061,
+     "lines": 1068
+    },
+    "cpu/ee_simd": {
+     "programs_pass": 6,
+     "programs": 6,
+     "lines_match": 2768,
+     "lines": 2768
+    },
+    "cpu/vu0_macro": {
+     "programs_pass": 2,
+     "programs": 2,
+     "lines_match": 154,
+     "lines": 154
+    },
+    "dma/dmac": {
+     "programs_pass": 2,
+     "programs": 2,
+     "lines_match": 18,
+     "lines": 18
+    },
+    "dma/spr": {
+     "programs_pass": 3,
+     "programs": 3,
+     "lines_match": 690,
+     "lines": 690
+    },
+    "dma/vif": {
+     "programs_pass": 6,
+     "programs": 6,
+     "lines_match": 735,
+     "lines": 735
+    },
+    "gs": {
+     "programs_pass": 2,
+     "programs": 2,
+     "lines_match": 8,
+     "lines": 8
+    },
+    "kernel/ee": {
+     "programs_pass": 10,
+     "programs": 10,
+     "lines_match": 151,
+     "lines": 151
+    },
+    "memory/ee": {
+     "programs_pass": 1,
+     "programs": 1,
+     "lines_match": 13,
+     "lines": 13
+    },
+    "vu/games": {
+     "programs_pass": 1,
+     "programs": 1,
+     "lines_match": 5,
+     "lines": 5
+    },
+    "vu/lower": {
+     "programs_pass": 4,
+     "programs": 5,
+     "lines_match": 756,
+     "lines": 797
+    },
+    "vu/upper": {
+     "programs_pass": 1,
+     "programs": 1,
+     "lines_match": 32,
+     "lines": 32
+    }
+   },
+   "tests": {
+    "cpu_ee_alu": {
+     "status": "PASS",
+     "lines_match": 787,
+     "lines": 787
+    },
+    "cpu_ee_branch": {
+     "status": "PASS",
+     "lines_match": 326,
+     "lines": 326
+    },
+    "cpu_ee_branchdelay": {
+     "status": "PASS",
+     "lines_match": 13,
+     "lines": 13
+    },
+    "cpu_ee_cop0_performance": {
+     "status": "PASS",
+     "lines_match": 13,
+     "lines": 13
+    },
+    "cpu_ee_fpu_arithmetic": {
+     "status": "PASS",
+     "lines_match": 293,
+     "lines": 293
+    },
+    "cpu_ee_fpu_branch": {
+     "status": "PASS",
+     "lines_match": 26,
+     "lines": 26
+    },
+    "cpu_ee_fpu_branchdelay": {
+     "status": "PASS",
+     "lines_match": 4,
+     "lines": 4
+    },
+    "cpu_ee_fpu_compare": {
+     "status": "PASS",
+     "lines_match": 170,
+     "lines": 170
+    },
+    "cpu_ee_fpu_convert": {
+     "status": "PASS",
+     "lines_match": 70,
+     "lines": 70
+    },
+    "cpu_ee_fpu_fcr": {
+     "status": "PASS",
+     "lines_match": 53,
+     "lines": 53
+    },
+    "cpu_ee_fpu_muldiv": {
+     "status": "PASS",
+     "lines_match": 360,
+     "lines": 360
+    },
+    "cpu_ee_fpu_sqrt": {
+     "status": "MISMATCH",
+     "lines_match": 59,
+     "lines": 66
+    },
+    "cpu_ee_fpu_transfer": {
+     "status": "PASS",
+     "lines_match": 26,
+     "lines": 26
+    },
+    "cpu_ee_lsu": {
+     "status": "PASS",
+     "lines_match": 171,
+     "lines": 171
+    },
+    "cpu_ee_lsudelay": {
+     "status": "PASS",
+     "lines_match": 3,
+     "lines": 3
+    },
+    "cpu_ee_muldiv": {
+     "status": "PASS",
+     "lines_match": 498,
+     "lines": 498
+    },
+    "cpu_ee_simd_arithmetic": {
+     "status": "PASS",
+     "lines_match": 744,
+     "lines": 744
+    },
+    "cpu_ee_simd_compare": {
+     "status": "PASS",
+     "lines_match": 182,
+     "lines": 182
+    },
+    "cpu_ee_simd_funnel": {
+     "status": "PASS",
+     "lines_match": 46,
+     "lines": 46
+    },
+    "cpu_ee_simd_logic": {
+     "status": "PASS",
+     "lines_match": 400,
+     "lines": 400
+    },
+    "cpu_ee_simd_muldiv": {
+     "status": "PASS",
+     "lines_match": 770,
+     "lines": 770
+    },
+    "cpu_ee_simd_shuffle": {
+     "status": "PASS",
+     "lines_match": 626,
+     "lines": 626
+    },
+    "cpu_vu0_macro_integer": {
+     "status": "PASS",
+     "lines_match": 118,
+     "lines": 118
+    },
+    "cpu_vu0_macro_transfer": {
+     "status": "PASS",
+     "lines_match": 36,
+     "lines": 36
+    },
+    "dma_dmac_cpcond": {
+     "status": "PASS",
+     "lines_match": 8,
+     "lines": 8
+    },
+    "dma_dmac_tagintr": {
+     "status": "PASS",
+     "lines_match": 10,
+     "lines": 10
+    },
+    "dma_spr_chain": {
+     "status": "PASS",
+     "lines_match": 25,
+     "lines": 25
+    },
+    "dma_spr_interleave": {
+     "status": "PASS",
+     "lines_match": 629,
+     "lines": 629
+    },
+    "dma_spr_normal": {
+     "status": "PASS",
+     "lines_match": 36,
+     "lines": 36
+    },
+    "dma_vif_basic": {
+     "status": "PASS",
+     "lines_match": 12,
+     "lines": 12
+    },
+    "dma_vif_intstall": {
+     "status": "PASS",
+     "lines_match": 18,
+     "lines": 18
+    },
+    "dma_vif_mskpath3": {
+     "status": "PASS",
+     "lines_match": 5,
+     "lines": 5
+    },
+    "dma_vif_stcycl": {
+     "status": "PASS",
+     "lines_match": 510,
+     "lines": 510
+    },
+    "dma_vif_stmod": {
+     "status": "PASS",
+     "lines_match": 134,
+     "lines": 134
+    },
+    "dma_vif_unpack": {
+     "status": "PASS",
+     "lines_match": 56,
+     "lines": 56
+    },
+    "gs_label": {
+     "status": "PASS",
+     "lines_match": 4,
+     "lines": 4
+    },
+    "gs_signal": {
+     "status": "PASS",
+     "lines_match": 4,
+     "lines": 4
+    },
+    "kernel_ee_interrupt_dmac_order": {
+     "status": "PASS",
+     "lines_match": 9,
+     "lines": 9
+    },
+    "kernel_ee_interrupt_intc_order": {
+     "status": "PASS",
+     "lines_match": 10,
+     "lines": 10
+    },
+    "kernel_ee_thread_delete": {
+     "status": "PASS",
+     "lines_match": 21,
+     "lines": 21
+    },
+    "kernel_ee_thread_exit": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "kernel_ee_thread_resume": {
+     "status": "PASS",
+     "lines_match": 17,
+     "lines": 17
+    },
+    "kernel_ee_thread_sleep": {
+     "status": "PASS",
+     "lines_match": 4,
+     "lines": 4
+    },
+    "kernel_ee_thread_stat": {
+     "status": "PASS",
+     "lines_match": 23,
+     "lines": 23
+    },
+    "kernel_ee_thread_suspend": {
+     "status": "PASS",
+     "lines_match": 18,
+     "lines": 18
+    },
+    "kernel_ee_thread_terminate": {
+     "status": "PASS",
+     "lines_match": 20,
+     "lines": 20
+    },
+    "kernel_ee_thread_wakeup": {
+     "status": "PASS",
+     "lines_match": 18,
+     "lines": 18
+    },
+    "memory_ee_default": {
+     "status": "PASS",
+     "lines_match": 13,
+     "lines": 13
+    },
+    "vu_games_triace": {
+     "status": "PASS",
+     "lines_match": 5,
+     "lines": 5
+    },
+    "vu_lower_branch": {
+     "status": "PASS",
+     "lines_match": 4,
+     "lines": 4
+    },
+    "vu_lower_efu": {
+     "status": "MISMATCH",
+     "lines_match": 182,
+     "lines": 223
+    },
+    "vu_lower_fdivdelay": {
+     "status": "PASS",
+     "lines_match": 350,
+     "lines": 350
+    },
+    "vu_lower_integer": {
+     "status": "PASS",
+     "lines_match": 167,
+     "lines": 167
+    },
+    "vu_lower_random": {
+     "status": "PASS",
+     "lines_match": 53,
+     "lines": 53
+    },
+    "vu_upper_clip": {
+     "status": "PASS",
+     "lines_match": 32,
+     "lines": 32
+    }
+   }
+  },
+  "isa_coverage": {
+   "method": "Instruction coverage: the denominator is every mnemonic the recompiler's decode tables name for a class (`ps2xRecomp/include/ps2recomp/instructions.h`; it includes MIPS encodings the EE does not implement, which can only lower the value). An instruction counts as hardware-confirmed when a ps2autotests program that matches real-PS2 output exactly names it in its output and no mismatching program does. Instructions a program executes without naming them (for example SYNC) are not counted. VU micro-mode and COP0 programs do not name instructions, so those classes are not measured.",
+   "autotests_commit": "97469ffb",
+   "classes": {
+    "ee_core": {
+     "title": "EE core (R5900 base ISA)",
+     "decoded": [
+      "add",
+      "addi",
+      "addiu",
+      "addu",
+      "and",
+      "andi",
+      "beq",
+      "beql",
+      "bgez",
+      "bgezal",
+      "bgezall",
+      "bgezl",
+      "bgtz",
+      "bgtzl",
+      "blez",
+      "blezl",
+      "bltz",
+      "bltzal",
+      "bltzall",
+      "bltzl",
+      "bne",
+      "bnel",
+      "break",
+      "cache",
+      "dadd",
+      "daddi",
+      "daddiu",
+      "daddu",
+      "div",
+      "divu",
+      "dsll",
+      "dsll32",
+      "dsllv",
+      "dsra",
+      "dsra32",
+      "dsrav",
+      "dsrl",
+      "dsrl32",
+      "dsrlv",
+      "dsub",
+      "dsubu",
+      "j",
+      "jal",
+      "jalr",
+      "jr",
+      "lb",
+      "lbu",
+      "ld",
+      "ldl",
+      "ldr",
+      "lh",
+      "lhu",
+      "ll",
+      "lld",
+      "lq",
+      "lui",
+      "lw",
+      "lwl",
+      "lwr",
+      "lwu",
+      "mfhi",
+      "mflo",
+      "mfsa",
+      "movn",
+      "movz",
+      "mthi",
+      "mtlo",
+      "mtsa",
+      "mtsab",
+      "mtsah",
+      "mult",
+      "multu",
+      "nor",
+      "or",
+      "ori",
+      "pref",
+      "sb",
+      "sc",
+      "scd",
+      "sd",
+      "sdl",
+      "sdr",
+      "sh",
+      "sll",
+      "sllv",
+      "slt",
+      "slti",
+      "sltiu",
+      "sltu",
+      "sq",
+      "sra",
+      "srav",
+      "srl",
+      "srlv",
+      "sub",
+      "subu",
+      "sw",
+      "swl",
+      "swr",
+      "sync",
+      "syscall",
+      "teq",
+      "teqi",
+      "tge",
+      "tgei",
+      "tgeiu",
+      "tgeu",
+      "tlt",
+      "tlti",
+      "tltiu",
+      "tltu",
+      "tne",
+      "tnei",
+      "xor",
+      "xori"
+     ],
+     "confirmed": [
+      "addiu",
+      "addu",
+      "and",
+      "andi",
+      "beq",
+      "beql",
+      "bgez",
+      "bgezal",
+      "bgezall",
+      "bgezl",
+      "bgtz",
+      "bgtzl",
+      "blez",
+      "blezl",
+      "bltz",
+      "bltzal",
+      "bltzall",
+      "bltzl",
+      "bne",
+      "bnel",
+      "daddiu",
+      "daddu",
+      "div",
+      "divu",
+      "dsll",
+      "dsll32",
+      "dsllv",
+      "dsra",
+      "dsra32",
+      "dsrav",
+      "dsrl",
+      "dsrl32",
+      "dsrlv",
+      "dsubu",
+      "j",
+      "jal",
+      "jalr",
+      "jr",
+      "lb",
+      "lbu",
+      "ld",
+      "ldl",
+      "ldr",
+      "lh",
+      "lhu",
+      "lq",
+      "lui",
+      "lw",
+      "lwl",
+      "lwr",
+      "lwu",
+      "mfhi",
+      "mflo",
+      "mfsa",
+      "movn",
+      "movz",
+      "mthi",
+      "mtlo",
+      "mtsa",
+      "mtsab",
+      "mtsah",
+      "mult",
+      "multu",
+      "nor",
+      "or",
+      "ori",
+      "pref",
+      "sb",
+      "sd",
+      "sdl",
+      "sdr",
+      "sh",
+      "sll",
+      "sllv",
+      "slt",
+      "slti",
+      "sltiu",
+      "sltu",
+      "sq",
+      "sra",
+      "srav",
+      "srl",
+      "srlv",
+      "subu",
+      "sw",
+      "swl",
+      "swr",
+      "xor",
+      "xori"
+     ],
+     "exercised_by_mismatching_program": [],
+     "not_exercised": [
+      "add",
+      "addi",
+      "break",
+      "cache",
+      "dadd",
+      "daddi",
+      "dsub",
+      "ll",
+      "lld",
+      "sc",
+      "scd",
+      "sub",
+      "sync",
+      "syscall",
+      "teq",
+      "teqi",
+      "tge",
+      "tgei",
+      "tgeiu",
+      "tgeu",
+      "tlt",
+      "tlti",
+      "tltiu",
+      "tltu",
+      "tne",
+      "tnei"
+     ],
+     "numerator": 89,
+     "denominator": 115
+    },
+    "mmi": {
+     "title": "EE MMI (128-bit SIMD)",
+     "decoded": [
+      "div1",
+      "divu1",
+      "madd",
+      "madd1",
+      "maddu",
+      "maddu1",
+      "mfhi1",
+      "mflo1",
+      "msub",
+      "msubu",
+      "mthi1",
+      "mtlo1",
+      "mult1",
+      "multu1",
+      "pabsh",
+      "pabsw",
+      "paddb",
+      "paddh",
+      "paddsb",
+      "paddsh",
+      "paddsw",
+      "paddub",
+      "padduh",
+      "padduw",
+      "paddw",
+      "padsbh",
+      "pand",
+      "pceqb",
+      "pceqh",
+      "pceqw",
+      "pcgtb",
+      "pcgth",
+      "pcgtw",
+      "pcpyh",
+      "pcpyld",
+      "pcpyud",
+      "pdivbw",
+      "pdivuw",
+      "pdivw",
+      "pexch",
+      "pexcw",
+      "pexeh",
+      "pexew",
+      "pext5",
+      "pextlb",
+      "pextlh",
+      "pextlw",
+      "pextub",
+      "pextuh",
+      "pextuw",
+      "phmadh",
+      "phmsbh",
+      "pinteh",
+      "pinth",
+      "plzcw",
+      "pmaddh",
+      "pmadduw",
+      "pmaddw",
+      "pmaxh",
+      "pmaxw",
+      "pmfhi",
+      "pmfhl.lh",
+      "pmfhl.lw",
+      "pmfhl.sh",
+      "pmfhl.slw",
+      "pmfhl.uw",
+      "pmflo",
+      "pminh",
+      "pminw",
+      "pmsubh",
+      "pmsubw",
+      "pmthi",
+      "pmthl.lw",
+      "pmtlo",
+      "pmulth",
+      "pmultuw",
+      "pmultw",
+      "pnor",
+      "por",
+      "ppac5",
+      "ppacb",
+      "ppach",
+      "ppacw",
+      "prevh",
+      "prot3w",
+      "psllh",
+      "psllvw",
+      "psllw",
+      "psrah",
+      "psravw",
+      "psraw",
+      "psrlh",
+      "psrlvw",
+      "psrlw",
+      "psubb",
+      "psubh",
+      "psubsb",
+      "psubsh",
+      "psubsw",
+      "psubub",
+      "psubuh",
+      "psubuw",
+      "psubw",
+      "pxor",
+      "qfsrv"
+     ],
+     "confirmed": [
+      "div1",
+      "divu1",
+      "madd",
+      "madd1",
+      "maddu",
+      "maddu1",
+      "mfhi1",
+      "mflo1",
+      "mthi1",
+      "mtlo1",
+      "mult1",
+      "multu1",
+      "pabsh",
+      "pabsw",
+      "paddb",
+      "paddh",
+      "paddsb",
+      "paddsh",
+      "paddsw",
+      "paddub",
+      "padduh",
+      "padduw",
+      "paddw",
+      "padsbh",
+      "pand",
+      "pceqb",
+      "pceqh",
+      "pceqw",
+      "pcgtb",
+      "pcgth",
+      "pcgtw",
+      "pcpyh",
+      "pcpyld",
+      "pcpyud",
+      "pdivbw",
+      "pdivuw",
+      "pdivw",
+      "pexch",
+      "pexcw",
+      "pexeh",
+      "pexew",
+      "pext5",
+      "pextlb",
+      "pextlh",
+      "pextlw",
+      "pextub",
+      "pextuh",
+      "pextuw",
+      "phmadh",
+      "phmsbh",
+      "pinteh",
+      "pinth",
+      "plzcw",
+      "pmaddh",
+      "pmadduw",
+      "pmaddw",
+      "pmaxh",
+      "pmaxw",
+      "pmfhi",
+      "pmfhl.lh",
+      "pmfhl.lw",
+      "pmfhl.sh",
+      "pmfhl.slw",
+      "pmfhl.uw",
+      "pmflo",
+      "pminh",
+      "pminw",
+      "pmsubh",
+      "pmsubw",
+      "pmthi",
+      "pmthl.lw",
+      "pmtlo",
+      "pmulth",
+      "pmultuw",
+      "pmultw",
+      "pnor",
+      "por",
+      "ppac5",
+      "ppacb",
+      "ppach",
+      "ppacw",
+      "prevh",
+      "prot3w",
+      "psllh",
+      "psllvw",
+      "psllw",
+      "psrah",
+      "psravw",
+      "psraw",
+      "psrlh",
+      "psrlvw",
+      "psrlw",
+      "psubb",
+      "psubh",
+      "psubsb",
+      "psubsh",
+      "psubsw",
+      "psubub",
+      "psubuh",
+      "psubuw",
+      "psubw",
+      "pxor",
+      "qfsrv"
+     ],
+     "exercised_by_mismatching_program": [],
+     "not_exercised": [
+      "msub",
+      "msubu"
+     ],
+     "numerator": 103,
+     "denominator": 105
+    },
+    "cop1": {
+     "title": "EE COP1 (FPU)",
+     "decoded": [
+      "abs",
+      "add",
+      "adda",
+      "bc1f",
+      "bc1fl",
+      "bc1t",
+      "bc1tl",
+      "c.eq",
+      "c.f",
+      "c.le",
+      "c.lt",
+      "c.nge",
+      "c.ngl",
+      "c.ngle",
+      "c.ngt",
+      "c.ole",
+      "c.olt",
+      "c.seq",
+      "c.sf",
+      "c.ueq",
+      "c.ule",
+      "c.ult",
+      "c.un",
+      "ceil.l.s",
+      "ceil.w.s",
+      "cfc1",
+      "ctc1",
+      "cvt.d.s",
+      "cvt.l.s",
+      "cvt.s.w",
+      "cvt.w.s",
+      "div",
+      "floor.l.s",
+      "floor.w.s",
+      "ldc1",
+      "lwc1",
+      "madd",
+      "madda",
+      "max",
+      "mfc1",
+      "min",
+      "mov",
+      "msub",
+      "msuba",
+      "mtc1",
+      "mul",
+      "mula",
+      "neg",
+      "round.l.s",
+      "round.w.s",
+      "rsqrt",
+      "sdc1",
+      "sqrt",
+      "sub",
+      "suba",
+      "swc1",
+      "trunc.l.s",
+      "trunc.w.s"
+     ],
+     "confirmed": [
+      "abs",
+      "add",
+      "adda",
+      "bc1f",
+      "bc1fl",
+      "bc1t",
+      "bc1tl",
+      "c.eq",
+      "c.f",
+      "c.le",
+      "c.lt",
+      "cfc1",
+      "ctc1",
+      "cvt.s.w",
+      "cvt.w.s",
+      "div",
+      "lwc1",
+      "madd",
+      "madda",
+      "max",
+      "mfc1",
+      "min",
+      "mov",
+      "msub",
+      "msuba",
+      "mtc1",
+      "mul",
+      "mula",
+      "neg",
+      "sub",
+      "suba",
+      "swc1"
+     ],
+     "exercised_by_mismatching_program": [
+      "rsqrt",
+      "sqrt"
+     ],
+     "not_exercised": [
+      "c.nge",
+      "c.ngl",
+      "c.ngle",
+      "c.ngt",
+      "c.ole",
+      "c.olt",
+      "c.seq",
+      "c.sf",
+      "c.ueq",
+      "c.ule",
+      "c.ult",
+      "c.un",
+      "ceil.l.s",
+      "ceil.w.s",
+      "cvt.d.s",
+      "cvt.l.s",
+      "floor.l.s",
+      "floor.w.s",
+      "ldc1",
+      "round.l.s",
+      "round.w.s",
+      "sdc1",
+      "trunc.l.s",
+      "trunc.w.s"
+     ],
+     "numerator": 32,
+     "denominator": 58
+    },
+    "cop2_macro": {
+     "title": "VU0 macro mode (COP2)",
+     "decoded": [
+      "bc2f",
+      "bc2fl",
+      "bc2t",
+      "bc2tl",
+      "cfc2",
+      "ctc2",
+      "lqc2",
+      "lwc2",
+      "qmfc2",
+      "qmtc2",
+      "sqc2",
+      "swc2",
+      "vabs",
+      "vadd",
+      "vadda",
+      "vaddai",
+      "vaddaq",
+      "vaddaw",
+      "vaddax",
+      "vadday",
+      "vaddaz",
+      "vaddi",
+      "vaddq",
+      "vaddw",
+      "vaddx",
+      "vaddy",
+      "vaddz",
+      "vcallms",
+      "vcallmsr",
+      "vclipw",
+      "vdiv",
+      "vftoi0",
+      "vftoi12",
+      "vftoi15",
+      "vftoi4",
+      "viadd",
+      "viaddi",
+      "viand",
+      "vilwr",
+      "vior",
+      "visub",
+      "viswr",
+      "vitof0",
+      "vitof12",
+      "vitof15",
+      "vitof4",
+      "vlqd",
+      "vlqi",
+      "vmadd",
+      "vmadda",
+      "vmaddai",
+      "vmaddaq",
+      "vmaddaw",
+      "vmaddax",
+      "vmadday",
+      "vmaddaz",
+      "vmaddi",
+      "vmaddq",
+      "vmaddw",
+      "vmaddx",
+      "vmaddy",
+      "vmaddz",
+      "vmax",
+      "vmaxi",
+      "vmaxw",
+      "vmaxx",
+      "vmaxy",
+      "vmaxz",
+      "vmfir",
+      "vmini",
+      "vminii",
+      "vminiw",
+      "vminix",
+      "vminiy",
+      "vminiz",
+      "vmove",
+      "vmr32",
+      "vmsub",
+      "vmsuba",
+      "vmsubai",
+      "vmsubaq",
+      "vmsubaw",
+      "vmsubax",
+      "vmsubay",
+      "vmsubaz",
+      "vmsubi",
+      "vmsubq",
+      "vmsubw",
+      "vmsubx",
+      "vmsuby",
+      "vmsubz",
+      "vmtir",
+      "vmul",
+      "vmula",
+      "vmulai",
+      "vmulaq",
+      "vmulaw",
+      "vmulax",
+      "vmulay",
+      "vmulaz",
+      "vmuli",
+      "vmulq",
+      "vmulw",
+      "vmulx",
+      "vmuly",
+      "vmulz",
+      "vnop",
+      "vopmsub",
+      "vopmula",
+      "vrget",
+      "vrinit",
+      "vrnext",
+      "vrsqrt",
+      "vrxor",
+      "vsqd",
+      "vsqi",
+      "vsqrt",
+      "vsub",
+      "vsuba",
+      "vsubai",
+      "vsubaq",
+      "vsubaw",
+      "vsubax",
+      "vsubay",
+      "vsubaz",
+      "vsubi",
+      "vsubq",
+      "vsubw",
+      "vsubx",
+      "vsuby",
+      "vsubz",
+      "vwaitq"
+     ],
+     "confirmed": [
+      "cfc2",
+      "ctc2",
+      "lqc2",
+      "qmfc2",
+      "qmtc2",
+      "sqc2",
+      "viadd",
+      "viaddi",
+      "viand",
+      "vior",
+      "visub"
+     ],
+     "exercised_by_mismatching_program": [],
+     "not_exercised": [
+      "bc2f",
+      "bc2fl",
+      "bc2t",
+      "bc2tl",
+      "lwc2",
+      "swc2",
+      "vabs",
+      "vadd",
+      "vadda",
+      "vaddai",
+      "vaddaq",
+      "vaddaw",
+      "vaddax",
+      "vadday",
+      "vaddaz",
+      "vaddi",
+      "vaddq",
+      "vaddw",
+      "vaddx",
+      "vaddy",
+      "vaddz",
+      "vcallms",
+      "vcallmsr",
+      "vclipw",
+      "vdiv",
+      "vftoi0",
+      "vftoi12",
+      "vftoi15",
+      "vftoi4",
+      "vilwr",
+      "viswr",
+      "vitof0",
+      "vitof12",
+      "vitof15",
+      "vitof4",
+      "vlqd",
+      "vlqi",
+      "vmadd",
+      "vmadda",
+      "vmaddai",
+      "vmaddaq",
+      "vmaddaw",
+      "vmaddax",
+      "vmadday",
+      "vmaddaz",
+      "vmaddi",
+      "vmaddq",
+      "vmaddw",
+      "vmaddx",
+      "vmaddy",
+      "vmaddz",
+      "vmax",
+      "vmaxi",
+      "vmaxw",
+      "vmaxx",
+      "vmaxy",
+      "vmaxz",
+      "vmfir",
+      "vmini",
+      "vminii",
+      "vminiw",
+      "vminix",
+      "vminiy",
+      "vminiz",
+      "vmove",
+      "vmr32",
+      "vmsub",
+      "vmsuba",
+      "vmsubai",
+      "vmsubaq",
+      "vmsubaw",
+      "vmsubax",
+      "vmsubay",
+      "vmsubaz",
+      "vmsubi",
+      "vmsubq",
+      "vmsubw",
+      "vmsubx",
+      "vmsuby",
+      "vmsubz",
+      "vmtir",
+      "vmul",
+      "vmula",
+      "vmulai",
+      "vmulaq",
+      "vmulaw",
+      "vmulax",
+      "vmulay",
+      "vmulaz",
+      "vmuli",
+      "vmulq",
+      "vmulw",
+      "vmulx",
+      "vmuly",
+      "vmulz",
+      "vnop",
+      "vopmsub",
+      "vopmula",
+      "vrget",
+      "vrinit",
+      "vrnext",
+      "vrsqrt",
+      "vrxor",
+      "vsqd",
+      "vsqi",
+      "vsqrt",
+      "vsub",
+      "vsuba",
+      "vsubai",
+      "vsubaq",
+      "vsubaw",
+      "vsubax",
+      "vsubay",
+      "vsubaz",
+      "vsubi",
+      "vsubq",
+      "vsubw",
+      "vsubx",
+      "vsuby",
+      "vsubz",
+      "vwaitq"
+     ],
+     "numerator": 11,
+     "denominator": 132
+    }
+   }
+  }
+ },
+ "sections": [
+  {
+   "id": "hardware",
+   "title": "PS2 Hardware & Runtime",
+   "svg": "docs/status/ps2-hardware.svg",
+   "layout": {
+    "width": 1000,
+    "height": 1400
+   },
+   "children": [
+    {
+     "id": "ee",
+     "title": "Emotion Engine (R5900)",
+     "category": "A",
+     "scope": "The R5900 core as the recompiled code sees it: the base ISA, MMI, COP0 and COP1. Instruction groups are VERIFIED_COMPLETE only when every mnemonic in the group is named by a ps2autotests program that matches real-PS2 output exactly and by no program that mismatches.",
+     "children": [
+      {
+       "id": "ee.int",
+       "title": "Integer core",
+       "children": [
+        {
+         "id": "ee.alu",
+         "name": "Integer ALU, shifts, moves (35 ops)",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Integer ALU",
+         "implemented": "Emitted as C++ on the 64-bit GPR file; 32-bit results sign-extended",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/special_translator.cpp",
+          "ps2xRecomp/src/lib/instruction_translator.cpp",
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::scalar logical register ops emit low64 operations",
+          "ps2xTest/src/code_generator_tests.cpp::MOVZ and MOVN move only the low doubleword"
+         ],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "isa": {
+          "class": "ee_core",
+          "mnemonics": [
+           "addiu",
+           "addu",
+           "and",
+           "andi",
+           "daddiu",
+           "daddu",
+           "dsll",
+           "dsll32",
+           "dsllv",
+           "dsra",
+           "dsra32",
+           "dsrav",
+           "dsrl",
+           "dsrl32",
+           "dsrlv",
+           "dsubu",
+           "lui",
+           "movn",
+           "movz",
+           "nor",
+           "or",
+           "ori",
+           "sll",
+           "sllv",
+           "slt",
+           "slti",
+           "sltiu",
+           "sltu",
+           "sra",
+           "srav",
+           "srl",
+           "srlv",
+           "subu",
+           "xor",
+           "xori"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.trap_arith",
+         "name": "Overflow-trapping ADD/ADDI/SUB/DADD/DADDI/DSUB",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Trapping ADD/SUB",
+         "implemented": "Unsigned arithmetic + sign-bit overflow predicate; overflow raises EXCEPTION_INTEGER_OVERFLOW",
+         "missing": "No hardware program names these; exception delivery on overflow only unit-tested",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h",
+          "ps2xRecomp/src/lib/special_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::integer overflow helpers"
+         ],
+         "hw": [],
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::ADD",
+          "tools/semantics/z3_int_semantics.py::DADDI flag with sign-extended imm16"
+         ],
+         "blocker": "",
+         "target": "8",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.branch",
+         "name": "Branches, branch-likely, J/JAL/JR/JALR",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Branches",
+         "implemented": "Exact 64-bit compares, likely-branch delay slots, link registers",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+          "ps2xRecomp/src/lib/regimm_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::signed branches compare the full 64-bit EE register",
+          "ps2xTest/src/code_generator_tests.cpp::branch-likely places delay slot only in taken path"
+         ],
+         "hw": [
+          "cpu_ee_branch"
+         ],
+         "isa": {
+          "class": "ee_core",
+          "mnemonics": [
+           "beq",
+           "beql",
+           "bgez",
+           "bgezal",
+           "bgezall",
+           "bgezl",
+           "bgtz",
+           "bgtzl",
+           "blez",
+           "blezl",
+           "bltz",
+           "bltzal",
+           "bltzall",
+           "bltzl",
+           "bne",
+           "bnel",
+           "j",
+           "jal",
+           "jalr",
+           "jr"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.branchdelay",
+         "name": "Branch and jump in a delay slot",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Branch in delay slot",
+         "implemented": "The seven cases ps2autotests measures on hardware",
+         "missing": "Architecturally undefined; only the measured combinations are known",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_branchdelay",
+          "cpu_ee_fpu_branchdelay"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.lsu",
+         "name": "Loads and stores, 8 to 128 bit, unaligned forms",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Loads/stores",
+         "implemented": "LWL/LWR/LDL/LDR/SWL/SWR/SDL/SDR, LQ/SQ alignment, PREF",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/instruction_translator.cpp",
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::quadword loads and stores ignore the low four address bits",
+          "ps2xTest/src/code_generator_tests.cpp::unsigned integer loads use explicit zero extension"
+         ],
+         "hw": [
+          "cpu_ee_lsu",
+          "cpu_ee_lsudelay"
+         ],
+         "isa": {
+          "class": "ee_core",
+          "mnemonics": [
+           "lb",
+           "lbu",
+           "ld",
+           "ldl",
+           "ldr",
+           "lh",
+           "lhu",
+           "lq",
+           "lw",
+           "lwl",
+           "lwr",
+           "lwu",
+           "pref",
+           "sb",
+           "sd",
+           "sdl",
+           "sdr",
+           "sh",
+           "sq",
+           "sw",
+           "swl",
+           "swr"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.muldiv",
+         "name": "MULT/DIV, MADD, HI/LO and pipeline 1",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MULT/DIV, HI/LO",
+         "implemented": "Both pipelines (MULT1, DIV1, ...), rd write rules, DIV by zero and INT_MIN/-1",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/special_translator.cpp",
+          "ps2xRecomp/src/lib/mmi_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::differential decoder/codegen gpr-write contract for MULT and DIV families"
+         ],
+         "hw": [
+          "cpu_ee_muldiv"
+         ],
+         "isa": {
+          "class": "ee_core+mmi",
+          "mnemonics": [
+           "div",
+           "div1",
+           "divu",
+           "divu1",
+           "madd",
+           "madd1",
+           "maddu",
+           "maddu1",
+           "mfhi",
+           "mfhi1",
+           "mflo",
+           "mflo1",
+           "mthi",
+           "mthi1",
+           "mtlo",
+           "mtlo1",
+           "mult",
+           "mult1",
+           "multu",
+           "multu1"
+          ]
+         },
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::DIV: C"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.sa",
+         "name": "SA register and QFSRV funnel shift",
+         "status": "VERIFIED_COMPLETE",
+         "short": "SA / QFSRV",
+         "implemented": "MTSA/MTSAB/MTSAH/MFSA byte counts; QFSRV helper",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h",
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA"
+         ],
+         "hw": [
+          "cpu_ee_simd_funnel"
+         ],
+         "isa": {
+          "class": "ee_core+mmi",
+          "mnemonics": [
+           "mfsa",
+           "mtsa",
+           "mtsab",
+           "mtsah",
+           "qfsrv"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "ee.traps",
+         "name": "Conditional traps (TEQ, TGE, TLTI, ...)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Traps",
+         "implemented": "Decoded and translated",
+         "missing": "No test and no hardware program",
+         "src": [
+          "ps2xRecomp/src/lib/special_translator.cpp",
+          "ps2xRecomp/src/lib/regimm_translator.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "ee.llsc",
+         "name": "LL/SC, SYNC, BREAK, CACHE",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "LL/SC, SYNC, BREAK",
+         "implemented": "Translated; SC checks the LL reservation; CACHE optionally patched by config",
+         "missing": "No hardware program names them",
+         "src": [
+          "ps2xRecomp/src/lib/special_translator.cpp",
+          "ps2xRecomp/src/lib/instruction_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::SC requires matching LL reservation address"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "ee.decode",
+         "name": "R5900 decode tables",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Decode tables",
+         "implemented": "All 55 ps2autotests ELFs decode and recompile; decoder fuzzed",
+         "missing": "Most decoded mnemonics outside MMI are not named by a hardware program (see Measurements)",
+         "src": [
+          "ps2xRecomp/src/lib/r5900_decoder.cpp",
+          "ps2xRecomp/include/ps2recomp/instructions.h"
+         ],
+         "tests": [
+          "ps2xTest/src/r5900_decoder_tests.cpp::decodes JAL with jump target and call flag",
+          "tools/fuzz/fuzz_recompiler.cpp"
+         ],
+         "hw": [
+          "cpu_ee_alu",
+          "cpu_ee_lsu",
+          "cpu_ee_simd_shuffle",
+          "cpu_ee_fpu_arithmetic",
+          "cpu_vu0_macro_transfer"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        }
+       ]
+      },
+      {
+       "id": "ee.mmi",
+       "title": "MMI / 128-bit SIMD",
+       "children": [
+        {
+         "id": "mmi.arith",
+         "name": "Parallel add, subtract, saturate, abs, min/max",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MMI arithmetic",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::MMI shuffles, absolutes, saturating adds"
+         ],
+         "hw": [
+          "cpu_ee_simd_arithmetic"
+         ],
+         "isa": {
+          "class": "mmi",
+          "mnemonics": [
+           "pabsh",
+           "pabsw",
+           "paddb",
+           "paddh",
+           "paddsb",
+           "paddsh",
+           "paddsw",
+           "paddub",
+           "padduh",
+           "padduw",
+           "paddw",
+           "padsbh",
+           "pmaxh",
+           "pmaxw",
+           "pminh",
+           "pminw",
+           "psubb",
+           "psubh",
+           "psubsb",
+           "psubsh",
+           "psubsw",
+           "psubub",
+           "psubuh",
+           "psubuw",
+           "psubw"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mmi.compare",
+         "name": "Parallel compare",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MMI compare",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_simd_compare"
+         ],
+         "isa": {
+          "class": "mmi",
+          "mnemonics": [
+           "pceqb",
+           "pceqh",
+           "pceqw",
+           "pcgtb",
+           "pcgth",
+           "pcgtw"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mmi.logic",
+         "name": "Parallel logic, shifts, PLZCW",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MMI logic/shifts",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_simd_logic"
+         ],
+         "isa": {
+          "class": "mmi",
+          "mnemonics": [
+           "pand",
+           "plzcw",
+           "pnor",
+           "por",
+           "psllh",
+           "psllvw",
+           "psllw",
+           "psrah",
+           "psravw",
+           "psraw",
+           "psrlh",
+           "psrlvw",
+           "psrlw",
+           "pxor"
+          ]
+         },
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::ps2_plzcw32 == leading sign-bit copies"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mmi.muldiv",
+         "name": "Parallel multiply/divide, 128-bit HI/LO",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MMI mul/div, HI/LO",
+         "implemented": "PMULTH family, PMADD/PMSUB accumulators, PDIV*, PMFHL/PMTHL forms",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp",
+          "ps2xRecomp/src/lib/mmi_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::PMFHL/PMTHL and PMTHI/PMTLO use all four HI/LO words"
+         ],
+         "hw": [
+          "cpu_ee_simd_muldiv"
+         ],
+         "isa": {
+          "class": "mmi",
+          "mnemonics": [
+           "pdivbw",
+           "pdivuw",
+           "pdivw",
+           "phmadh",
+           "phmsbh",
+           "pmaddh",
+           "pmadduw",
+           "pmaddw",
+           "pmfhi",
+           "pmfhl.lh",
+           "pmfhl.lw",
+           "pmfhl.sh",
+           "pmfhl.slw",
+           "pmfhl.uw",
+           "pmflo",
+           "pmsubh",
+           "pmsubw",
+           "pmthi",
+           "pmthl.lw",
+           "pmtlo",
+           "pmulth",
+           "pmultuw",
+           "pmultw"
+          ]
+         },
+         "hwvec": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::MMI halfword and word multiplies match real-PS2 results",
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::PDIVW, PDIVUW and PDIVBW match real-PS2 results"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mmi.shuffle",
+         "name": "Pack, extend, interleave, shuffle",
+         "status": "VERIFIED_COMPLETE",
+         "short": "MMI shuffle",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translation_helpers.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::PEXEW swaps words 0 and 2"
+         ],
+         "hw": [
+          "cpu_ee_simd_shuffle"
+         ],
+         "isa": {
+          "class": "mmi",
+          "mnemonics": [
+           "pcpyh",
+           "pcpyld",
+           "pcpyud",
+           "pexch",
+           "pexcw",
+           "pexeh",
+           "pexew",
+           "pext5",
+           "pextlb",
+           "pextlh",
+           "pextlw",
+           "pextub",
+           "pextuh",
+           "pextuw",
+           "pinteh",
+           "pinth",
+           "ppac5",
+           "ppacb",
+           "ppach",
+           "ppacw",
+           "prevh",
+           "prot3w"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mmi.unexercised",
+         "name": "MMI MSUB/MSUBU",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "MSUB/MSUBU",
+         "implemented": "Decoded and translated",
+         "missing": "Not named by any hardware program",
+         "src": [
+          "ps2xRecomp/src/lib/mmi_translator.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "ee.cop0",
+       "title": "COP0, exceptions, interrupts",
+       "children": [
+        {
+         "id": "cop0.regs",
+         "name": "COP0 registers (MFC0/MTC0)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "COP0 registers",
+         "implemented": "Status, Cause, EPC, Count, Compare, BadVAddr, Config, ...",
+         "missing": "No hardware program for the register file",
+         "src": [
+          "ps2xRecomp/src/lib/cop0_translator.cpp",
+          "ps2xRuntime/include/ps2_runtime.h"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::COP0 MFC0/MTC0 translate to COP0 register access"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "cop0.perf",
+         "name": "Performance counters (PCCR, PCR0/1)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Perf counters",
+         "implemented": "Masks, CTE, events and modes as the hardware program reads them",
+         "missing": "Event counts are derived from the runtime's cycle model, not measured hardware timing",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::COP0 performance counters follow PCCR masks"
+         ],
+         "hw": [
+          "cpu_ee_cop0_performance"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "cop0.count",
+         "name": "Count/Compare timer interrupt",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Count/Compare",
+         "implemented": "",
+         "missing": "No test of the Compare interrupt",
+         "src": [
+          "ps2xRecomp/src/lib/cop0_translator.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "cop0.exc",
+         "name": "Exception entry, EPC/BD, BEV vectors",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Exceptions",
+         "implemented": "raiseCop0Exception sets Cause, EPC (branch PC + BD in delay slots), vectors",
+         "missing": "No hardware program for exception entry",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::SignalException marks EPC and BD for delay-slot exceptions"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "cop0.adderr",
+         "name": "Address-error exceptions",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Address errors",
+         "implemented": "Misaligned runtime loads raise EXCEPTION_ADDRESS_ERROR_LOAD/STORE",
+         "missing": "Fast-path memory helpers do not check alignment; no hardware program",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::unaligned accesses throw"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "cop0.intr",
+         "name": "Interrupt enable, ERET, INTC dispatch order",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Interrupt dispatch",
+         "implemented": "EI/DI/ERET; INTC and DMAC handler chains in kernel order",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Interrupt.cpp",
+          "ps2xRecomp/src/lib/cop0_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::interrupt handlers are ordered by AddDmacHandler"
+         ],
+         "hw": [
+          "kernel_ee_interrupt_intc_order",
+          "kernel_ee_interrupt_dmac_order"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "cop0.bc0",
+         "name": "BC0F/BC0T (DMAC CPCOND)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "BC0 (CPCOND)",
+         "implemented": "",
+         "missing": "COP0 instructions are not in the automated measurement; branch-likely forms not shown to be exercised",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+          "ps2xRuntime/include/runtime/ps2_memory.h"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::BC0T and BC0F test the DMAC CPCOND0",
+          "ps2xTest/src/ps2_memory_tests.cpp::COP0 condition follows D_PCR.CPC and D_STAT.CIS"
+         ],
+         "hw": [
+          "dma_dmac_cpcond"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "cop0.tlb",
+         "name": "TLB (48 entries)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "TLB",
+         "implemented": "TLBR/TLBWI/TLBWR/TLBP read and write the entry table",
+         "missing": "No TLB-mapped address translation or refill/invalid exceptions; no test",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp",
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "cop0.cache",
+         "name": "Instruction/data cache model",
+         "status": "MISSING",
+         "short": "Cache model",
+         "implemented": "",
+         "missing": "CACHE ops are translated without a cache model; coherency effects are not emulated",
+         "src": [
+          "ps2xRecomp/src/lib/instruction_translator.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "ee.fpu",
+       "title": "COP1 / FPU",
+       "children": [
+        {
+         "id": "fpu.arith",
+         "name": "ADD/SUB/ABS/NEG/MOV/MAX/MIN, ADDA/SUBA",
+         "status": "VERIFIED_COMPLETE",
+         "short": "FPU add/sub/minmax",
+         "implemented": "PS2 float format: exponent 255 is a number, saturation to 0x7FFFFFFF, flush below 2^-126",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h",
+          "ps2xRecomp/src/lib/fpu_translator.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_fpu_arithmetic"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "abs",
+           "add",
+           "adda",
+           "max",
+           "min",
+           "mov",
+           "neg",
+           "sub",
+           "suba"
+          ]
+         },
+         "hwvec": [
+          "ps2xTest/src/ps2_float_semantics_tests.cpp::FPU results match the PS2 hardware results from ps2autotests"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.muldiv",
+         "name": "MUL/DIV, MADD/MSUB, MULA/MADDA/MSUBA",
+         "status": "VERIFIED_COMPLETE",
+         "short": "FPU mul/div/madd",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_float_semantics_tests.cpp::EE FPU MUL.S truncates and is not commutative"
+         ],
+         "hw": [
+          "cpu_ee_fpu_muldiv"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "div",
+           "madd",
+           "madda",
+           "msub",
+           "msuba",
+           "mul",
+           "mula"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.sqrt",
+         "name": "SQRT.S",
+         "status": "VERIFIED_PARTIAL",
+         "short": "SQRT.S",
+         "implemented": "SQRT.S rows of the program match",
+         "missing": "Its program also contains the RSQRT.S rows that mismatch",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_float_semantics_tests.cpp::FPU SQRT.S takes the square root of the magnitude"
+         ],
+         "hw": [
+          "cpu_ee_fpu_sqrt"
+         ],
+         "blocker": "",
+         "target": "8",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.rsqrt",
+         "name": "RSQRT.S rounding",
+         "status": "VERIFIED_PARTIAL",
+         "short": "RSQRT.S",
+         "implemented": "Sign and special cases as hardware; most rows exact",
+         "missing": "7 of 66 program lines differ by 1 ulp; no pre-registered datapath model fits",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h",
+          "tools/semantics/ee_rsqrt_models.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_fpu_sqrt"
+         ],
+         "blocker": "Needs new hardware rows: probe P3 run on a physical PS2",
+         "target": "8",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.compare",
+         "name": "C.F/C.EQ/C.LT/C.LE",
+         "status": "VERIFIED_COMPLETE",
+         "short": "FPU compare",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/fpu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_float_semantics_tests.cpp::C.EQ/C.LT/C.LE and MAX/MIN compare encodings like the EE"
+         ],
+         "hw": [
+          "cpu_ee_fpu_compare"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "c.eq",
+           "c.f",
+           "c.le",
+           "c.lt"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.branch",
+         "name": "BC1F/BC1T/BC1FL/BC1TL",
+         "status": "VERIFIED_COMPLETE",
+         "short": "BC1 branches",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_fpu_branch",
+          "cpu_ee_fpu_branchdelay"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "bc1f",
+           "bc1fl",
+           "bc1t",
+           "bc1tl"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.convert",
+         "name": "CVT.S.W / CVT.W.S",
+         "status": "VERIFIED_COMPLETE",
+         "short": "FPU convert",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/fpu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::CVT.W.S truncates toward zero and saturates by sign"
+         ],
+         "hw": [
+          "cpu_ee_fpu_convert"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "cvt.s.w",
+           "cvt.w.s"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.transfer",
+         "name": "MFC1/MTC1/CFC1/CTC1/LWC1/SWC1",
+         "status": "VERIFIED_COMPLETE",
+         "short": "FPU moves",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/fpu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::CFC1 and CTC1 follow the EE FPU control registers"
+         ],
+         "hw": [
+          "cpu_ee_fpu_transfer"
+         ],
+         "isa": {
+          "class": "cop1",
+          "mnemonics": [
+           "cfc1",
+           "ctc1",
+           "lwc1",
+           "mfc1",
+           "mtc1",
+           "swc1"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "fpu.flags",
+         "name": "FCR31 flags and non-IEEE rounding",
+         "status": "VERIFIED_PARTIAL",
+         "short": "FCR31 / rounding",
+         "implemented": "Reset value, writable bits, O/U/D/I flag situations as measured",
+         "missing": "RSQRT.S rounding unknown (fpu.rsqrt)",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_float_semantics_tests.cpp::COP1 arithmetic sets the FCR31 flags real hardware sets"
+         ],
+         "hw": [
+          "cpu_ee_fpu_fcr"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        }
+       ]
+      },
+      {
+       "id": "ee.timers",
+       "title": "Timers",
+       "children": [
+        {
+         "id": "ee.timer03",
+         "name": "EE timers T0-T3 (COUNT/MODE/COMP/HOLD)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "EE timers T0-T3",
+         "implemented": "Counters advance from scheduler cycles; compare/overflow raise INTC",
+         "missing": "No hardware program; host-time driven",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::EE timers 0 through 3 expose independent COUNT MODE and COMP registers",
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::EE Timer2 compare IRQ wakes a DelayThread-style semaphore wait"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "ee.kernel",
+       "title": "EE kernel (BIOS syscalls, HLE)",
+       "children": [
+        {
+         "id": "k.threads",
+         "name": "Threads: create, start, sleep, suspend, terminate",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Threads",
+         "implementation": "hle",
+         "implemented": "Cooperative scheduler with absolute priority and FIFO; all tested syscalls match hardware",
+         "missing": "Preemption timing is not cycle-exact",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp",
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Thread.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::EE scheduler selects absolute priority then FIFO"
+         ],
+         "hw": [
+          "kernel_ee_thread_delete",
+          "kernel_ee_thread_exit",
+          "kernel_ee_thread_resume",
+          "kernel_ee_thread_sleep",
+          "kernel_ee_thread_stat",
+          "kernel_ee_thread_suspend",
+          "kernel_ee_thread_terminate",
+          "kernel_ee_thread_wakeup"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "k.sync",
+         "name": "Semaphores and event flags",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Semaphores, events",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "No hardware program for semaphores or event flags",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Sync.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::semaphore waiters are FIFO"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "k.irqh",
+         "name": "Interrupt handler syscalls (AddIntcHandler, ...)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "IRQ handler syscalls",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Interrupt.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::a negative handler result ends the interrupt's handler chain"
+         ],
+         "hw": [
+          "kernel_ee_interrupt_intc_order",
+          "kernel_ee_interrupt_dmac_order"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "k.heap",
+         "name": "Heap: SetupHeap, EndOfHeap",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Heap",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::setup heap and allocator primitives track end-of-heap"
+         ],
+         "hw": [
+          "memory_ee_default"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "k.syscalltab",
+         "name": "Syscall dispatch and SetSyscall overrides",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Syscall dispatch",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Dispatcher.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::SetSyscall override runs as a scheduler invocation"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "k.alarm",
+         "name": "Alarms, DelayThread, VSync waits",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Alarms, VSync waits",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Thread.cpp",
+          "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::VBlank deadline resumes the waiter"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "vu",
+     "title": "Vector Units",
+     "category": "B",
+     "children": [
+      {
+       "id": "vu.macro",
+       "title": "VU0 macro mode (COP2)",
+       "children": [
+        {
+         "id": "vu0.fmac",
+         "name": "Macro FMAC arithmetic (VADD, VMUL, VMADD, ...)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Macro FMAC",
+         "implemented": "Shared FMAC contract with micro mode, anchored on real-PS2 results",
+         "missing": "Most macro FMAC mnemonics are not named by a hardware program (9 of 128 confirmed)",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translation_helpers.cpp",
+          "ps2xRuntime/include/ps2_vu_fmac.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu_fmac_tests.cpp::COP2 macro VADD/VSUB/VMUL use the FMAC contract in every lane"
+         ],
+         "hw": [],
+         "hwvec": [
+          "ps2xTest/src/ps2_vu_fmac_tests.cpp::FMAC contract anchors from real-PS2 results"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu0.int",
+         "name": "Macro integer ops (VIADD, VIAND, ...)",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Macro integer",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::VU0 macro integer ops discard writes to vi0"
+         ],
+         "hw": [
+          "cpu_vu0_macro_integer"
+         ],
+         "isa": {
+          "class": "cop2_macro",
+          "mnemonics": [
+           "viadd",
+           "viaddi",
+           "viand",
+           "vior",
+           "visub"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu0.xfer",
+         "name": "QMFC2/QMTC2/CFC2/CTC2/LQC2/SQC2",
+         "status": "VERIFIED_COMPLETE",
+         "short": "COP2 transfers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::CTC2/CFC2 vi24 keep the written bits 0x0C0C"
+         ],
+         "hw": [
+          "cpu_vu0_macro_transfer"
+         ],
+         "isa": {
+          "class": "cop2_macro",
+          "mnemonics": [
+           "cfc2",
+           "ctc2",
+           "lqc2",
+           "qmfc2",
+           "qmtc2",
+           "sqc2"
+          ]
+         },
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu0.mem",
+         "name": "Macro VU memory ops (VLQI, VSQD, VILWR, ...)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Macro VU memory ops",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::VU0 LQI/LQD/SQI/SQD decode fields and use VU0 data memory"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu0.flags",
+         "name": "Macro MAC/STATUS/CLIP flags",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Macro flags",
+         "implemented": "",
+         "missing": "Probe P5 prepared, never run on hardware",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "Physical PS2 + ps2sdk to run probe P5",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "vu0.fdiv",
+         "name": "Macro VDIV/VSQRT/VRSQRT",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Macro FDIV",
+         "implemented": "",
+         "missing": "No hardware program in macro mode",
+         "src": [
+          "ps2xRecomp/src/lib/vu_translation_helpers.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::VU0 macro DIV/SQRT/RSQRT follow the FDIV-unit rules"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "vu.micro",
+       "title": "Micro mode (VU0 and VU1)",
+       "children": [
+        {
+         "id": "vu.upper",
+         "name": "Upper (FMAC) instructions",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Upper FMAC ops",
+         "implemented": "FMAC contract, broadcast/Q/I/ACC/OPMULA forms, flags",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_upper.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::VU micro FMAC broadcast/Q/I/accumulator/outer-product forms follow the FMAC contract"
+         ],
+         "hw": [
+          "vu_upper_clip",
+          "vu_lower_random"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.lowerint",
+         "name": "Lower integer ALU (IADD ... ISUBIU)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Lower integer ALU",
+         "implemented": "",
+         "missing": "The program names all seven ops (checked by hand); VU micro instructions are not in the automated measurement",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::integer lower ops keep VI0 hardwired to zero"
+         ],
+         "hw": [
+          "vu_lower_integer"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.branch",
+         "name": "Branches, JR/JALR",
+         "status": "VERIFIED_PARTIAL",
+         "short": "VU branches",
+         "implemented": "Delay slot, VI forwarding to branches",
+         "missing": "Hardware program covers JALR only",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::conditional branch sees the previous VI value for one instruction"
+         ],
+         "hw": [
+          "vu_lower_branch"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.fdiv",
+         "name": "FDIV (DIV/SQRT/RSQRT) and Q pipeline",
+         "status": "VERIFIED_PARTIAL",
+         "short": "FDIV / Q",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp",
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::FDIV resource serializes back-to-back scalar operations"
+         ],
+         "hw": [
+          "vu_lower_fdivdelay"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.efu",
+         "name": "EFU (EATAN, ESIN, EEXP, ...) and P pipeline",
+         "status": "VERIFIED_PARTIAL",
+         "short": "EFU",
+         "implemented": "Series model fitted to 208 hardware vectors; latencies",
+         "missing": "41 of 223 program lines differ in the last bit",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "vu_lower_efu"
+         ],
+         "hwvec": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::EFU results match real-PS2 results"
+         ],
+         "blocker": "Exact term rounding unknown; needs an EFU probe run on hardware",
+         "target": "8",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.flags",
+         "name": "MAC/STATUS/CLIP flag pipeline",
+         "status": "VERIFIED_PARTIAL",
+         "short": "VU flags",
+         "implemented": "Four-cycle flag pipeline, FSSET, CLIP history",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::VU1 CLIP and FCGET share the four-cycle flag timeline"
+         ],
+         "hw": [
+          "vu_upper_clip"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.hazards",
+         "name": "Data hazards, stalls, cycle counts",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Hazards / stalls",
+         "implemented": "Per-pipeline commit index; lane-precise FMAC stalls",
+         "missing": "Only the random program checks cycle-level results on hardware",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::FMAC dependency stalls only the lanes that are read",
+          "ps2xTest/src/ps2_vu1_tests.cpp::VU1 commit index matches the reference cycle by cycle"
+         ],
+         "hw": [
+          "vu_lower_random"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.rng",
+         "name": "Random unit (RINIT/RGET/RNEXT/RXOR)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Random unit",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_lower.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::EFU WAITP and RNG execute with architectural latency and state"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu.decode",
+         "name": "VU instruction decode, reserved opcodes",
+         "status": "VERIFIED_PARTIAL",
+         "short": "VU decode",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::reserved opcodes stop before executing or corrupting state"
+         ],
+         "hw": [
+          "vu_games_triace",
+          "vu_lower_random"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vu.ebit",
+         "name": "E/D/T bit stops, FBRST",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "E/D/T stops",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::E and enabled D/T stop with their architectural delay rules"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "vu.sys",
+       "title": "Memory, scheduling, XGKICK",
+       "children": [
+        {
+         "id": "vu.mem",
+         "name": "VU0/VU1 micro and data memory, EE mapping",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "VU memory",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VU0 code and data windows map through EE addresses"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu.load",
+         "name": "Microprogram loading and decode cache",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Microprogram load",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp",
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::MPG upload invalidates cached VU1 decode before MSCAL"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu0.micro",
+         "name": "VU0 micro mode (VCALLMS/VCALLMSR)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "VU0 micro",
+         "implemented": "",
+         "missing": "No hardware program runs VU0 micro code",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::VU0 microprogram executes against VU0 code and data memory"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu.sched",
+         "name": "VU execution relative to the EE",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "VU/EE scheduling",
+         "implemented": "Microprograms run when started by MSCAL/VCALLMS",
+         "missing": "Concurrency timing against the EE is not measured",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp",
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vu.xgkick",
+         "name": "XGKICK (PATH1)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "XGKICK",
+         "implemented": "Incremental transfer, stall of a second XGKICK, buffer reuse",
+         "missing": "No hardware program",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::XGKICK sends a VU memory GIF packet through PATH1",
+          "ps2xTest/src/ps2_vu1_tests.cpp::a second XGKICK stalls until the active PATH1 transfer completes"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "gfx",
+     "title": "Graphics (GIF and GS)",
+     "category": "C",
+     "scope": "Only GS SIGNAL/LABEL behaviour has hardware results (ps2autotests gs/*). Everything else is checked by unit tests written from the GS manual and by an e2e frame painted from the program's own geometry.",
+     "children": [
+      {
+       "id": "gfx.gif",
+       "title": "GIF",
+       "children": [
+        {
+         "id": "gif.tags",
+         "name": "GIFtag formats (PACKED, REGLIST, IMAGE)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "GIFtags",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GIF REGLIST with odd register count consumes 128-bit padding before next tag",
+          "ps2xTest/src/ps2_gs_tests.cpp::GIF FLG=3 (IMAGE2) packet writes host-to-local data like IMAGE"
+         ],
+         "hw": [
+          "gs_signal",
+          "gs_label"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "gif.path1",
+         "name": "PATH1 (VU1 XGKICK)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "PATH1",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::XGKICK sends a VU memory GIF packet through PATH1"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gif.path2",
+         "name": "PATH2 (VIF1 DIRECT/DIRECTHL)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "PATH2",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF1 DMA DIRECT forwards payload to GIF callback and clears channel"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gif.path3",
+         "name": "PATH3 (GIF DMA) and MSKPATH3",
+         "status": "VERIFIED_PARTIAL",
+         "short": "PATH3 / MSKPATH3",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::PATH3 mask queues packets until unmask"
+         ],
+         "hw": [
+          "dma_vif_mskpath3"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "gif.arb",
+         "name": "Path arbitration and GIF_STAT",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "GIF arbitration",
+         "implemented": "",
+         "missing": "Priority and IMAGE-packet interleaving not measured on hardware",
+         "src": [
+          "ps2xRuntime/src/lib/gs/ps2_gif_arbiter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF arbiter prioritizes PATH1 then PATH2 then PATH3"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "gfx.gsregs",
+       "title": "GS registers and VRAM",
+       "children": [
+        {
+         "id": "gs.priv",
+         "name": "Privileged registers (CSR, IMR, SMODE, DISPFB, ...)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Privileged regs",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp",
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS CSR/IMR support coherent 64-bit and 32-bit access"
+         ],
+         "hw": [
+          "gs_signal",
+          "gs_label"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "gs.events",
+         "name": "SIGNAL, FINISH, LABEL",
+         "status": "VERIFIED_PARTIAL",
+         "short": "SIGNAL/FINISH/LABEL",
+         "implemented": "",
+         "missing": "FINISH has no hardware program",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS SIGNAL and FINISH set CSR bits that clear by CSR write-one acknowledge"
+         ],
+         "hw": [
+          "gs_signal",
+          "gs_label"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "gs.genregs",
+         "name": "General registers (PRIM, TEX0/1/2, ALPHA, TEST, ...)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "General regs",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp",
+          "ps2xRuntime/include/runtime/gs/gs_types.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::PRMODE supplies primitive attributes while PRMODECONT AC is clear"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.vram",
+         "name": "4 MB local memory, pages and blocks",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "VRAM",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/ps2_gs_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/gs_cache/gs_memory_cache_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.swizzle",
+         "name": "Swizzling (PSMCT32/24/16/16S, PSMT8/4/8H/4HL/4HH, PSMZ)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Swizzling",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/runtime/gs/ps2_gs_psmt4.h",
+          "ps2xRuntime/include/runtime/gs/ps2_gs_psmct16.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::PSMT4 address mapping matches GS manual layout",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS T4HL/T4HH shared-plane upload preserves both index planes via RMW"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.xfer",
+         "name": "Image transfers (host-local, local-host, local-local)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Image transfers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS local-to-host transfer supports partial incremental reads",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS PSMT4 local-local copy respects swizzled page layout"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "gfx.raster",
+       "title": "Rasterisation (CPU backend)",
+       "children": [
+        {
+         "id": "gs.prims",
+         "name": "Points, lines, triangles, strips, fans, sprites",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Primitives",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS triangle fan subpixel quad fills rows without interior holes",
+          "ps2xTest/src/ps2_gs_tests.cpp::XYZ3 culls a triangle strip primitive without desynchronizing the vertex queue",
+          "ps2xTest/e2e/e2e_programs.py"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.tex",
+         "name": "Texture sampling, STQ/UV, CLAMP, TEX1 filtering",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Texturing",
+         "implemented": "",
+         "missing": "Mipmapping (LOD, MIPTBP) has no test",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS STQ triangle interpolation divides homogeneous coordinates after DDA",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS TEX1 linear filter blends T4 STQ triangle samples",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS CLAMP modes transform texture coordinates before sampling"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.clut",
+         "name": "CLUT (CSM1/CSM2, CSA, TEXCLUT, TEXA)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "CLUT",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS T8 CSM1 applies CSA and masks CSA bit 4 for CT32 CLUTs",
+          "ps2xTest/gs_cache/gs_clut_cache_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.alpha",
+         "name": "Alpha blending (ALPHA, PABE, FBA)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Alpha blending",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::PABE bypasses alpha blend for low-alpha source pixels",
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.tests",
+         "name": "Alpha, destination-alpha and depth tests",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "ATST/DATE/ZTST",
+         "implemented": "ATST/AFAIL, DATE/DATM, ZTST, ZMSK (the GS has no stencil buffer)",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS alpha-test AFAIL independently masks framebuffer and depth",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS DATE and DATM inspect the framebuffer-format alpha bit",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS ZMSK suppresses depth without suppressing framebuffer writes"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.fog",
+         "name": "Fog (FOG, FOGCOL)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Fog",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS fog blends the shaded color toward FOGCOL before framebuffer blending"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.mask",
+         "name": "Scissor, FBMSK, XYOFFSET",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Scissor/masks",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS sprite draw applies XYOFFSET and fully-outside scissor should not render"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.dither",
+         "name": "Dithering (DTHE, DIMX)",
+         "status": "MISSING",
+         "short": "Dithering",
+         "implemented": "Registers are latched",
+         "missing": "The rasteriser does not apply the dither matrix",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "gs.aa",
+         "name": "Antialiasing (AA1)",
+         "status": "MISSING",
+         "short": "AA1",
+         "implemented": "",
+         "missing": "Not implemented",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "gs.cpu",
+         "name": "CPU rasteriser backend (reference path)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "CPU backend",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+          "ps2xRuntime/include/runtime/gs/gs_backend.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS backend replacement preserves canonical local memory"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.cache",
+         "name": "Texture and CLUT page caches",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Page caches",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/runtime/gs/gs_texture_page_cache.h"
+         ],
+         "tests": [
+          "ps2xTest/gs_cache/gs_texture_cache_tests.cpp",
+          "ps2xTest/gs_cache/gs_clut_cache_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "gfx.out",
+       "title": "Display and backends",
+       "children": [
+        {
+         "id": "gs.fb",
+         "name": "Framebuffers, PMODE circuit merge",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Framebuffers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::latched host presentation merges both enabled PMODE circuits"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.interlace",
+         "name": "Interlace and field mode (SMODE2, FIELD)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Interlace",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
+          "ps2xRuntime/src/lib/Kernel/EeScheduler.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::latched host presentation line-doubles interlaced field output"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.present",
+         "name": "Frame presentation and VSync",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Presentation",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_frontend.cpp",
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::latched host presentation frame stays stable until the next latch",
+          "ps2xTest/src/ps2_gs_tests.cpp::sceGsSyncV resumes through the scheduler with deterministic field parity"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "gs.vulkan",
+         "name": "Vulkan backend",
+         "status": "MISSING",
+         "short": "Vulkan",
+         "implemented": "",
+         "missing": "No GPU backend exists",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "gs.pgs",
+         "name": "parallel-gs integration",
+         "status": "MISSING",
+         "short": "parallel-gs",
+         "implemented": "",
+         "missing": "Spike planned (docs/architecture/phase8-roadmap.md, item 2)",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "Vulkan-capable test host and GS trace capture",
+         "target": "8",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "dma",
+     "title": "DMA and memory",
+     "category": "D",
+     "children": [
+      {
+       "id": "dma.ch",
+       "title": "DMAC channels",
+       "children": [
+        {
+         "id": "dma.c0",
+         "name": "Ch 0 VIF0",
+         "status": "VERIFIED_PARTIAL",
+         "short": "0 VIF0",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF0 I bit stalls until VIF0_FBRST.STC"
+         ],
+         "hw": [
+          "dma_vif_basic",
+          "dma_vif_unpack"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.c1",
+         "name": "Ch 1 VIF1",
+         "status": "VERIFIED_PARTIAL",
+         "short": "1 VIF1",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF1 DMA DIRECT forwards payload to GIF callback and clears channel"
+         ],
+         "hw": [
+          "dma_vif_basic",
+          "dma_vif_unpack",
+          "dma_vif_intstall",
+          "dma_vif_stcycl",
+          "dma_vif_stmod"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.c2",
+         "name": "Ch 2 GIF",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "2 GIF",
+         "implemented": "",
+         "missing": "No hardware program checks GIF-channel DMA directly",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA mode0 copies RDRAM packet and clears channel",
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain longer than 4096 tags"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c3",
+         "name": "Ch 3 fromIPU",
+         "status": "MISSING",
+         "short": "3 fromIPU",
+         "implemented": "",
+         "missing": "Channel not modelled (IPU is HLE)",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "IPU hardware model (E)",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c4",
+         "name": "Ch 4 toIPU",
+         "status": "MISSING",
+         "short": "4 toIPU",
+         "implemented": "",
+         "missing": "Channel not modelled (IPU is HLE)",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "IPU hardware model (E)",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c5",
+         "name": "Ch 5 SIF0 (IOP to EE)",
+         "status": "HLE_OR_STUB",
+         "short": "5 SIF0",
+         "implemented": "Served by the SIF HLE (sceSifGetOtherData, RPC replies)",
+         "missing": "No DMAC channel model",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifGetOtherData copies payload"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c6",
+         "name": "Ch 6 SIF1 (EE to IOP)",
+         "status": "HLE_OR_STUB",
+         "short": "6 SIF1",
+         "implemented": "sceSifSetDma HLE copies descriptors",
+         "missing": "No DMAC channel model",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c7",
+         "name": "Ch 7 SIF2",
+         "status": "MISSING",
+         "short": "7 SIF2",
+         "implemented": "",
+         "missing": "Not modelled",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "dma.c8",
+         "name": "Ch 8 fromSPR",
+         "status": "VERIFIED_PARTIAL",
+         "short": "8 fromSPR",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::DMAC SPR_FROM copies scratchpad to RDRAM and completes channel 8"
+         ],
+         "hw": [
+          "dma_spr_normal",
+          "dma_spr_chain",
+          "dma_spr_interleave"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.c9",
+         "name": "Ch 9 toSPR",
+         "status": "VERIFIED_PARTIAL",
+         "short": "9 toSPR",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::toSPR chain stops at a tag IRQ under TIE and still raises CIS9"
+         ],
+         "hw": [
+          "dma_spr_normal",
+          "dma_spr_chain",
+          "dma_spr_interleave",
+          "dma_dmac_tagintr"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        }
+       ]
+      },
+      {
+       "id": "dma.modes",
+       "title": "Transfer modes and control",
+       "children": [
+        {
+         "id": "dma.normal",
+         "name": "Normal (burst) mode, MADR/QWC write-back",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Normal mode",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::normal-mode GIF and VIF1 DMA leave MADR past the data and QWC at zero"
+         ],
+         "hw": [
+          "dma_spr_normal"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.chain",
+         "name": "Source chain tags (REFE, CNT, NEXT, REF, REFS, END)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Chain tags",
+         "implemented": "Tag walk, TTE, terminal-tag latching, cycle detection (F2)",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::a source chain that loops without an end tag stops after one lap",
+          "ps2xTest/src/ps2_memory_tests.cpp::chain cycle detection does not stop finite chains that transfer the same data repeatedly"
+         ],
+         "hw": [
+          "dma_spr_chain",
+          "dma_dmac_tagintr"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.callret",
+         "name": "CALL/RET and ASR0/ASR1",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "CALL/RET",
+         "implemented": "",
+         "missing": "No hardware program uses CALL/RET",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain CALL sources payload from TADR+16",
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain RET transfers payload and resumes after CALL",
+          "ps2xTest/src/ps2_memory_tests.cpp::chain cycle detection does not stop a chain that CALLs the same subroutine twice"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dma.interleave",
+         "name": "Interleave mode (SQWC/TQWC)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Interleave",
+         "implemented": "Skip/transfer qword counts for both scratchpad directions",
+         "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::toSPR interleave skips SQWC memory qwords after every TQWC"
+         ],
+         "hw": [
+          "dma_spr_interleave"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.irq",
+         "name": "DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "DMA interrupts",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_STAT toggles masks and clears channel status on write-one",
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set"
+         ],
+         "hw": [
+          "dma_dmac_tagintr",
+          "kernel_ee_interrupt_dmac_order"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.ctrl",
+         "name": "D_CTRL, D_PCR, D_ENABLER/W",
+         "status": "VERIFIED_PARTIAL",
+         "short": "DMAC control regs",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_ENABLEW writes are visible at D_ENABLER",
+          "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_CTRL DMAE gates GIF DMA start"
+         ],
+         "hw": [
+          "dma_dmac_cpcond"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dma.stall",
+         "name": "Stall control (STS/STD, D_STADR)",
+         "status": "MISSING",
+         "short": "Stall control",
+         "implemented": "",
+         "missing": "Not implemented",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "dma.mfifo",
+         "name": "MFIFO ring (D_RBOR/D_RBSR)",
+         "status": "MISSING",
+         "short": "MFIFO",
+         "implemented": "Ring registers can be written",
+         "missing": "No MFIFO transfer behaviour",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/DMA.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "dma.timing",
+         "name": "Bus arbitration, priority, timing",
+         "status": "HLE_OR_STUB",
+         "short": "DMA timing",
+         "implemented": "Transfers complete synchronously when started",
+         "missing": "No bus arbitration or transfer timing",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "dma.mem",
+       "title": "Memory",
+       "children": [
+        {
+         "id": "mem.rdram",
+         "name": "32 MB RDRAM, kseg aliases, uncached mirrors",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Main RAM / aliases",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/include/runtime/ps2_address.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::uncached aliases map to same RDRAM bytes",
+          "ps2xTest/src/ps2_memory_tests.cpp::translateAddress handles kseg and uncached aliases"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "mem.spr",
+         "name": "Scratchpad RAM (16 KB)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Scratchpad",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::scratchpad alias accesses the same bytes as base"
+         ],
+         "hw": [
+          "dma_spr_normal",
+          "dma_spr_chain"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mem.fast",
+         "name": "Recompiled fast-path memory access",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Fast memory path",
+         "implemented": "Masked RDRAM access with wrap-around paths",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/include/ps2_runtime_macros.h"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::fast memory helpers wrap safely at RAM boundary"
+         ],
+         "hw": [],
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::contiguous => offset"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "mem.io",
+         "name": "I/O register map",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "I/O map",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::unknown GS privileged offsets are no-op and read as zero"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "mem.reserved",
+         "name": "Runtime-reserved kernel area and arena",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Reserved area",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/System.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::runtime-owned allocations never come from the guest heap"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "vif",
+     "title": "VIF and IPU",
+     "category": "E",
+     "children": [
+      {
+       "id": "vif.vif",
+       "title": "VIF0 / VIF1",
+       "children": [
+        {
+         "id": "vif.unpack",
+         "name": "UNPACK formats (S, V2, V3, V4, V4-5)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "UNPACK",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF UNPACK V4-16 sign and zero extension follow immediate bit14",
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF UNPACK V2 repeats x and y into z and w"
+         ],
+         "hw": [
+          "dma_vif_unpack"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vif.stcycl",
+         "name": "STCYCL skip and fill (CL/WL)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "STCYCL",
+         "implemented": "",
+         "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF STCYCL skip mode advances destination by CL when CL>=WL",
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF fill write uses STMASK and STROW when WL>CL"
+         ],
+         "hw": [
+          "dma_vif_stcycl"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vif.stmod",
+         "name": "STMOD offset/difference/row modes",
+         "status": "VERIFIED_PARTIAL",
+         "short": "STMOD",
+         "implemented": "",
+         "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF STMOD offset and difference modes apply to UNPACK data"
+         ],
+         "hw": [
+          "dma_vif_stmod"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vif.mask",
+         "name": "Masking (STMASK, ROW, COL)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Masking",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF masked UNPACK uses data row col and protect selectors"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vif.stall",
+         "name": "I-bit stalls and VIF interrupts",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Stalls / IRQ",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF1 I bit stalls the VIF after its command until FBRST.STC",
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::VIF1 I-bit IRQ runs the INTC_VIF1 handler and wakes its waiter"
+         ],
+         "hw": [
+          "dma_vif_intstall"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vif.regs",
+         "name": "VIF registers, FBRST, STAT",
+         "status": "VERIFIED_PARTIAL",
+         "short": "VIF registers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF FBRST RST clears VIF1 command state"
+         ],
+         "hw": [
+          "dma_vif_basic"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "vif.mpg",
+         "name": "MPG microprogram upload",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "MPG",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF MPG num zero uploads 256 instructions"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vif.dbf",
+         "name": "Double buffering (BASE, OFFSET, TOPS, ITOPS)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Double buffer",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF double-buffer OFFSET BASE and MSCAL update TOPS and ITOPS"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vif.mscal",
+         "name": "MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "MSCAL / FLUSH",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::VIF MSCAL and MSCNT toggle DBF and keep TOPS/ITOPS coherent"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "vif.direct",
+         "name": "DIRECT/DIRECTHL to PATH2",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "DIRECT",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::VIF DIRECTHL stalls behind queued PATH3 IMAGE packets"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "vif.ipu",
+       "title": "IPU",
+       "children": [
+        {
+         "id": "ipu.dma",
+         "name": "IPU0/IPU1 FIFOs and DMA",
+         "status": "MISSING",
+         "short": "IPU FIFOs/DMA",
+         "implemented": "",
+         "missing": "Not modelled",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "ipu.cmd",
+         "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
+         "status": "MISSING",
+         "short": "IPU commands",
+         "implemented": "sceIpuInit/Stop/RestartDMA return without decoding",
+         "missing": "No command decoding",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "ipu.mpeg",
+         "name": "MPEG playback (libmpeg HLE)",
+         "status": "HLE_OR_STUB",
+         "short": "MPEG (HLE)",
+         "implemented": "sceMpeg* replaced; optional FFmpeg decode (PS2X_ENABLE_FFMPEG)",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::sceMpegDemuxPssRing dispatches registered video and audio stream callbacks"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "iop",
+     "title": "IOP and system services",
+     "category": "F",
+     "scope": "The IOP runs physical IRX modules on an R3000A interpreter with an HLE kernel, or replaces them with HLE services. ps2autotests has IOP CPU programs (cpu/iop/*) that are not yet run.",
+     "children": [
+      {
+       "id": "iop.core",
+       "title": "IOP core",
+       "children": [
+        {
+         "id": "iop.cpu",
+         "name": "R3000A instruction execution",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "R3000A CPU",
+         "implemented": "",
+         "missing": "ps2autotests cpu/iop programs exist but are not run",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_cpu.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_emulator_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "iop.mem",
+         "name": "IOP memory map (2 MB, hardware ranges)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "IOP memory",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::IOP heap DMA uses private backing instead of aliasing EE RDRAM"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "iop.intr",
+         "name": "Interrupts (intrman)",
+         "status": "HLE_OR_STUB",
+         "short": "IOP interrupts",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/imports/iop_intrman.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "iop.kernel",
+         "name": "Threads, semaphores, events (thbase, ...)",
+         "status": "HLE_OR_STUB",
+         "short": "IOP kernel",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_kernel.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_emulator_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "iop.timers",
+         "name": "Timers (timrman)",
+         "status": "HLE_OR_STUB",
+         "short": "IOP timers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/imports/iop_timrman.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "iop.irx",
+         "name": "IRX loading, relocation, versioned imports",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "IRX loading",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/services/iop_module_loader.cpp",
+          "ps2xIOP/src/emulator/imports/iop_imports.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_import_version_tests.cpp::Physical IRX consumer links correct version end to end"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "iop.sched",
+         "name": "IOP scheduling against the EE",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "IOP scheduling",
+         "implemented": "",
+         "missing": "No ordering tests between IOP and EE progress (roadmap item 4)",
+         "src": [
+          "ps2xIOP/src/emulator/iop_emulator.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "iop.sif",
+       "title": "SIF",
+       "children": [
+        {
+         "id": "sif.cmd",
+         "name": "SIFCMD",
+         "status": "VERIFIED_PARTIAL",
+         "short": "SIFCMD",
+         "implemented": "Packet-level IOP SIFCMD responder",
+         "missing": "Hardware evidence is indirect: every program's printf travels this path",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::IOP SIFCMD publishes a command buffer"
+         ],
+         "hw": [
+          "kernel_ee_thread_stat",
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "sif.rpc",
+         "name": "SIFRPC",
+         "status": "VERIFIED_PARTIAL",
+         "short": "SIFRPC",
+         "implemented": "",
+         "missing": "Hardware evidence is indirect (tty output path)",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/RPC.cpp",
+          "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_rpc_tests.cpp::emulated RPC bind waits for a registered IOP server"
+         ],
+         "hw": [
+          "kernel_ee_thread_stat",
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "sif.dma",
+         "name": "SIF DMA (sceSifSetDma)",
+         "status": "HLE_OR_STUB",
+         "short": "SIF DMA",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma rejects invalid descriptors without partial writes"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "iop.svc",
+       "title": "Services and modules",
+       "children": [
+        {
+         "id": "svc.fileio",
+         "name": "FILEIO",
+         "status": "VERIFIED_PARTIAL",
+         "short": "FILEIO",
+         "implementation": "hle",
+         "implemented": "",
+         "missing": "Only the tty write path has hardware evidence",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/FileIO.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::IOP SIFRPC binds the ROM FILEIO server"
+         ],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "svc.ioman",
+         "name": "IOMAN/IOMANX",
+         "status": "HLE_OR_STUB",
+         "short": "IOMAN",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/imports/iop_ioman.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "svc.cdvdman",
+         "name": "CDVDMAN",
+         "status": "HLE_OR_STUB",
+         "short": "CDVDMAN",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/imports/iop_cdvd.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "svc.cdvdfsv",
+         "name": "CDVDFSV",
+         "status": "HLE_OR_STUB",
+         "short": "CDVDFSV",
+         "implemented": "Module load accepted; EE sceCd* calls served by HLE",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp",
+          "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "svc.rpcsrv",
+         "name": "RPC servers (MCSERV, DBCMAN, LIBSD routing)",
+         "status": "HLE_OR_STUB",
+         "short": "RPC servers",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/modules/mcserv.cpp",
+          "ps2xIOP/src/modules/dbcman.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_compatibility_tests.cpp::MCSERV response bounds for both dialects"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "svc.modload",
+         "name": "Module loading (SifLoadModule, MODLOAD)",
+         "status": "HLE_OR_STUB",
+         "short": "Module loading",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_rpc_tests.cpp::SifLoadModule validates ROM modules and activates their HLE service"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "sys.boot",
+         "name": "System init and shutdown (no-BIOS boot, exit)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Init / shutdown",
+         "implementation": "hle",
+         "implemented": "ELF load into a no-BIOS environment, IOP reset, ExitDeleteThread",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::EE scheduler ends the run once every thread is dormant"
+         ],
+         "hw": [
+          "kernel_ee_thread_exit"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "spu",
+     "title": "SPU2 and sound",
+     "category": "G",
+     "scope": "There is no SPU2 hardware model. Audio libraries (libsd, audsrv) are replaced at call level and VAG data is decoded for host playback.",
+     "children": [
+      {
+       "id": "spu.hw",
+       "title": "SPU2 hardware",
+       "children": [
+        {
+         "id": "spu.cores",
+         "name": "SPU2 cores and registers",
+         "status": "MISSING",
+         "short": "Cores / registers",
+         "implemented": "",
+         "missing": "Register range mapped on the IOP side, no register model",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_memory.h"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.ram",
+         "name": "Sound RAM (2 MB)",
+         "status": "MISSING",
+         "short": "Sound RAM",
+         "implemented": "",
+         "missing": "No sound RAM model",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.voices",
+         "name": "Voice engine (48 voices)",
+         "status": "MISSING",
+         "short": "Voice engine",
+         "implemented": "",
+         "missing": "No voice engine; libsd calls play decoded clips",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.adsr",
+         "name": "ADSR envelopes",
+         "status": "MISSING",
+         "short": "ADSR",
+         "implemented": "",
+         "missing": "No envelope generator",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.pitch",
+         "name": "Pitch and interpolation",
+         "status": "MISSING",
+         "short": "Pitch / interp.",
+         "implemented": "",
+         "missing": "No pitch counter or interpolation",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.mix",
+         "name": "Core mixing, volumes",
+         "status": "MISSING",
+         "short": "Mixing",
+         "implemented": "",
+         "missing": "No SPU2 mixer",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.reverb",
+         "name": "Reverb",
+         "status": "MISSING",
+         "short": "Reverb",
+         "implemented": "",
+         "missing": "No reverb",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "spu.irq",
+         "name": "SPU2 IRQ (address match)",
+         "status": "MISSING",
+         "short": "SPU2 IRQ",
+         "implemented": "",
+         "missing": "No SPU2 interrupts",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "spu.dma",
+         "name": "Sound DMA (IOP channels 4/7)",
+         "status": "HLE_OR_STUB",
+         "short": "Sound DMA",
+         "implemented": "sceSdVoiceTrans/BlockTrans return byte counts",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/Audio.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::sceSdRemote isolates voice transfers from block streaming state"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "spu.lib",
+       "title": "Audio libraries and host output",
+       "children": [
+        {
+         "id": "spu.libsd",
+         "name": "libsd / sceSd* HLE",
+         "status": "HLE_OR_STUB",
+         "short": "libsd HLE",
+         "implemented": "",
+         "missing": "Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/Audio.cpp",
+          "ps2xIOP/src/modules/libsd.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_sif_rpc_tests.cpp::LIBSD RPC routes through the IOP audio service"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "spu.adpcm",
+         "name": "VAG/ADPCM decoding",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "ADPCM decode",
+         "implemented": "",
+         "missing": "No test",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_audio_vag.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "spu.host",
+         "name": "Host audio output",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Host audio",
+         "implemented": "",
+         "missing": "No test; plays decoded clips through raylib",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_audio.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "spu.sync",
+         "name": "Audio synchronisation with emulated time",
+         "status": "UNKNOWN",
+         "short": "Audio sync",
+         "implemented": "",
+         "missing": "Not characterised",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "per",
+     "title": "Peripherals and system",
+     "category": "H",
+     "scope": "Out-of-scope entries (NOT_APPLICABLE) are proposed by this inventory and need the owner's confirmation.",
+     "children": [
+      {
+       "id": "per.io",
+       "title": "Controllers and storage",
+       "children": [
+        {
+         "id": "per.sio2",
+         "name": "SIO2 controller hardware",
+         "status": "MISSING",
+         "short": "SIO2",
+         "implemented": "",
+         "missing": "Pads and cards are served at library level",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "per.pad",
+         "name": "Digital/analog pads (libpad HLE)",
+         "status": "HLE_OR_STUB",
+         "short": "Pads",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/Pad.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/pad_input_tests.cpp::pads open in digital mode and switch to analog on scePadSetMainMode"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.ds2",
+         "name": "DualShock 2 pressure and actuators",
+         "status": "HLE_OR_STUB",
+         "short": "DualShock 2",
+         "implemented": "",
+         "missing": "Actuator (vibration) output not tested",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/Pad.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/pad_input_tests.cpp::scePadRead fills pressure bytes and honors button info mask"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.mc",
+         "name": "Memory cards (libmc HLE on host files)",
+         "status": "HLE_OR_STUB",
+         "short": "Memory cards",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/MemoryCard.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_io_tests.cpp::sceMc open write read and close roundtrip through sync"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.save",
+         "name": "Save/load persistence across runs",
+         "status": "HLE_OR_STUB",
+         "short": "Save persistence",
+         "implemented": "mc0 maps to a host directory",
+         "missing": "No restart-and-read-back test",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_vfs.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_io_tests.cpp::mc0 file write operations"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.cdvd",
+         "name": "CD/DVD reads (host files, disc image)",
+         "status": "HLE_OR_STUB",
+         "short": "CD/DVD reads",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_io_tests.cpp::sceCdRead reads from explicit cdImage path"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "per.net",
+       "title": "Expansion devices",
+       "children": [
+        {
+         "id": "per.usb",
+         "name": "USB (usbd)",
+         "status": "MISSING",
+         "short": "USB",
+         "implemented": "Module load accepted",
+         "missing": "No USB device emulation",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "per.dev9",
+         "name": "DEV9 expansion bay",
+         "status": "MISSING",
+         "short": "DEV9",
+         "implemented": "Module load accepted",
+         "missing": "No DEV9 emulation",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "per.hdd",
+         "name": "HDD (ATA, APA/PFS)",
+         "status": "MISSING",
+         "short": "HDD",
+         "implemented": "",
+         "missing": "Not implemented",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        },
+        {
+         "id": "per.netif",
+         "name": "Network (SMAP, ps2ip)",
+         "status": "MISSING",
+         "short": "Network",
+         "implemented": "Module load accepted",
+         "missing": "No network adapter emulation",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "unscheduled",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "per.sys",
+       "title": "System",
+       "children": [
+        {
+         "id": "per.intc",
+         "name": "Interrupt controller (INTC)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "INTC",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_interrupt_tests.cpp::a VIFcode with the I bit latches INTC VIF0/VIF1 only for its own VIF"
+         ],
+         "hw": [
+          "kernel_ee_interrupt_intc_order"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "per.rtc",
+         "name": "RTC (sceCdReadClock)",
+         "status": "HLE_OR_STUB",
+         "short": "RTC",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Stubs/CD.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.biossvc",
+         "name": "BIOS-dependent services (ROMVER, OSD config)",
+         "status": "HLE_OR_STUB",
+         "short": "BIOS services",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_rom_device.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_io_tests.cpp::ROM0 ROMVER is exposed as the 14-byte firmware pseudo-file",
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp::OSD config2 syscalls round-trip extended config"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.boot",
+         "name": "ELF boot without a BIOS",
+         "status": "VERIFIED_PARTIAL",
+         "short": "No-BIOS boot",
+         "implementation": "hle",
+         "implemented": "All 55 ps2autotests programs boot this way",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu",
+          "kernel_ee_thread_exit"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "per.deci2",
+         "name": "DECI2 debug channel",
+         "status": "HLE_OR_STUB",
+         "short": "DECI2",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/Kernel/Syscalls/Deci2.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.bios",
+         "name": "BIOS ROM execution",
+         "status": "NOT_APPLICABLE",
+         "short": "BIOS ROM",
+         "implemented": "Declared design: Zmbor ships and needs no BIOS (README); ROM modules are provided by HLE",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/iop_module_manager.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.ps1",
+         "name": "PS1 compatibility mode",
+         "status": "NOT_APPLICABLE",
+         "short": "PS1 mode",
+         "implemented": "Proposed out of scope: PS2 software only",
+         "missing": "",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "per.dvdv",
+         "name": "DVD-Video playback",
+         "status": "NOT_APPLICABLE",
+         "short": "DVD-Video",
+         "implemented": "Proposed out of scope: not PS2 software",
+         "missing": "",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "framework",
+   "title": "Recompiler, Tools & Compatibility",
+   "svg": "docs/status/zmbor-framework.svg",
+   "layout": {
+    "width": 1000,
+    "height": 760
+   },
+   "children": [
+    {
+     "id": "rec",
+     "title": "Static recompilation",
+     "category": "I",
+     "children": [
+      {
+       "id": "rec.front",
+       "title": "Front end",
+       "children": [
+        {
+         "id": "rc.elf",
+         "name": "ELF parsing (sections, symbols, relocations)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ELF parsing",
+         "implemented": "55/55 ps2autotests ELFs parsed; malformed tables skipped (F3)",
+         "missing": "No commercial ELF parsed in tests",
+         "src": [
+          "ps2xRecomp/src/lib/elf_parser.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_recompiler_tests.cpp::elf parser skips relocation sections whose data did not load",
+          "tools/fuzz/fuzz_recompiler.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.discovery",
+         "name": "Function discovery (symbols, stripped ELFs, Ghidra map)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Function discovery",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/elf_parser.cpp",
+          "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_recompiler_tests.cpp::elf parser discovers address-taken callbacks in stripped ELFs",
+          "ps2xTest/src/ps2_recompiler_tests.cpp::ghidra map replaces JAL fallback-only auto starts"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.cfg",
+         "name": "Control-flow graph, labels, resume entries",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Control flow",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_analyzer.cpp",
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::control-flow analysis promotes JALR fallthrough as a resumable entry",
+          "ps2xTest/src/code_generator_tests.cpp::emits labels and gotos for internal branches"
+         ],
+         "hw": [
+          "cpu_ee_branch",
+          "cpu_ee_branchdelay"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.decoder",
+         "name": "Decoder robustness (fuzzed)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Decoder robustness",
+         "implemented": "",
+         "missing": "Smoke-length fuzzing only",
+         "src": [
+          "ps2xRecomp/src/lib/r5900_decoder.cpp"
+         ],
+         "tests": [
+          "tools/fuzz/fuzz_recompiler.cpp",
+          "ps2xTest/src/r5900_decoder_tests.cpp::decodes BEQ sets branch flags and target"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.config",
+         "name": "TOML configuration (stubs, skip, patches, jump tables)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Configuration",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/config_manager.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_recompiler_tests.cpp::config manager parses jump_tables table entries"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.relocs",
+         "name": "Relocation symbol auto-binding at call sites",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Relocation binding",
+         "implemented": "",
+         "missing": "No test of the auto-binding",
+         "src": [
+          "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "rec.back",
+       "title": "Translation and output",
+       "children": [
+        {
+         "id": "rc.translate",
+         "name": "Instruction translation to C++",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Translation",
+         "implemented": "53/55 hardware programs match exactly when recompiled",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/instruction_translator.cpp",
+          "ps2xRecomp/src/lib/code_generator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::R5900 MULT writes rd when rd is non-zero"
+         ],
+         "hw": [
+          "cpu_ee_alu",
+          "cpu_ee_simd_muldiv"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.ub",
+         "name": "No signed-overflow UB in trapping arithmetic (F1)",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Overflow UB (F1)",
+         "implemented": "Emitted forms proved, mutation-checked, run under UBSan in CI",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/special_translator.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::overflow-trapping adds and subtracts emit unsigned arithmetic"
+         ],
+         "hw": [],
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::ADD",
+          "tools/semantics/z3_int_semantics.py::DADDIU wraps as rs + sign_extend(imm16)"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.emitter",
+         "name": "Function emitter and generated sources",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Emitter",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/function_emitter.cpp",
+          "ps2xRecomp/src/lib/function_table_emitter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::Generated sources cannot be shadowed by stale local declaration headers",
+          "tools/fuzz/fuzz_recompiler.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.indirect",
+         "name": "Indirect jumps and calls (JR, JALR, jump tables)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Indirect calls",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_emitter.cpp",
+          "ps2xRecomp/src/lib/jump_table_switch_emitter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::unresolved JALR uses runtime dispatch without broad local switch",
+          "ps2xTest/src/code_generator_tests.cpp::configured jump table addresses drive JR dispatch targets"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.resume",
+         "name": "JALR/JAL resume entries",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Resume entries",
+         "implemented": "",
+         "missing": "JALR-wide promotion measured and rejected (docs/architecture/indirect-call-entry-analysis.md)",
+         "src": [
+          "ps2xRecomp/src/lib/control_flow_analyzer.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_recompiler_tests.cpp::JAL return addresses get resumable entry wrappers"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.dispatch",
+         "name": "Runtime function dispatch (lookupFunction)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Dispatch",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::lookupFunction rejects internal resume PCs without exact registration"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.native",
+         "name": "Native compilation and linking with the runtime",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Native build / link",
+         "implemented": "55 hardware programs and 4 e2e programs built (MSVC local; e2e also GCC/Clang in CI)",
+         "missing": "",
+         "src": [
+          "ps2xTest/e2e/CMakeLists.txt",
+          "tools/hwtest/hwtest.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "rc.opt",
+         "name": "Generated-code optimisation",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Optimisation",
+         "implemented": "Fast memory paths, native GIF DMA kick helper",
+         "missing": "Hardware programs build at /Od by default; no optimised-build gate",
+         "src": [
+          "ps2xRecomp/src/lib/gif_dma_kick_analyzer.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::known GIF DMA MMIO sequence emits native kick helper"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "rc.stubs",
+         "name": "Stub and skip binding (handler@address)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Stub binding",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/code_generator_tests.cpp::resolveStubTarget allows leading underscore alias"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "rc.overrides",
+         "name": "Game-specific override registry",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Game overrides",
+         "implemented": "",
+         "missing": "No test",
+         "src": [
+          "ps2xRuntime/src/lib/game_overrides.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "rc.diag",
+         "name": "Diagnostics and reporter",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Diagnostics",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/recompiler_reporter.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "dev",
+     "title": "Developer platform",
+     "category": "J",
+     "children": [
+      {
+       "id": "dev.mod",
+       "title": "Modules",
+       "children": [
+        {
+         "id": "dv.analyzer",
+         "name": "ps2xAnalyzer",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ps2xAnalyzer",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xAnalyzer/src/elf_analyzer.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/elf_analyzer_tests.cpp::jump-table detection finds canonical sltiu/bne/lw/jr pattern"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.recomp",
+         "name": "ps2xRecomp",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ps2xRecomp",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRecomp/src/lib/ps2_recompiler.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_recompiler_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.runtime",
+         "name": "ps2xRuntime",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ps2xRuntime",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_runtime.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_runtime_kernel_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.iop",
+         "name": "ps2xIOP",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ps2xIOP",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xIOP/src/emulator/iop_emulator.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_emulator_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.studio",
+         "name": "ps2xStudio GUI",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "ps2xStudio",
+         "implemented": "",
+         "missing": "Built by the Windows CI job; no tests",
+         "src": [
+          "ps2xStudio/src/GUI.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dv.debug",
+         "name": "Runtime debug panel and trace tools",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Debug / trace",
+         "implemented": "",
+         "missing": "No tests",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_debug_panel.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "dv.ports",
+         "name": "Android and PS Vita ports",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Android / Vita",
+         "implemented": "",
+         "missing": "Not built in CI",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_android_runtime.cpp",
+          "ps2xRuntime/src/lib/ps2_vita_runtime.cpp"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "dev.build",
+       "title": "Build and CI",
+       "children": [
+        {
+         "id": "dv.cmake",
+         "name": "CMake build (MSVC, GCC, Clang)",
+         "status": "VERIFIED_COMPLETE",
+         "short": "CMake build",
+         "implemented": "Scope: the three compiler jobs of .github/workflows/build.yml build cleanly (runs 40257464815 and 40257466538 on c7e5960)",
+         "missing": "",
+         "src": [
+          "CMakeLists.txt",
+          ".github/workflows/build.yml"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.ci",
+         "name": "CI: build, unit, e2e, sanitizers, fuzz smoke",
+         "status": "VERIFIED_COMPLETE",
+         "short": "CI pipeline",
+         "implemented": "Scope: every job in build.yml passes on the PR head (runs 40257464815 and 40257466538 on c7e5960: 10/10)",
+         "missing": "",
+         "src": [
+          ".github/workflows/build.yml"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.gate",
+         "name": "Acceptance gate with identity manifest",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Acceptance gate",
+         "implemented": "Used for every Phase 6-7 release decision",
+         "missing": "No automated test of the gate itself; Windows/PowerShell only; needs local ps2autotests",
+         "src": [
+          "tools/acceptance/gate.ps1"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      },
+      {
+       "id": "dev.test",
+       "title": "Verification tools",
+       "children": [
+        {
+         "id": "dv.unit",
+         "name": "Unit tests (MiniTest)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Unit tests",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xTest/src/main.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.hwtest",
+         "name": "Hardware result pipeline (hwtest.py)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "hwtest pipeline",
+         "implemented": "",
+         "missing": "Not run in CI (ps2autotests not vendored)",
+         "src": [
+          "tools/hwtest/hwtest.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.e2e",
+         "name": "End-to-end ELF to native tests",
+         "status": "VERIFIED_PARTIAL",
+         "short": "e2e tests",
+         "implemented": "",
+         "missing": "Not run on the Windows CI runner (no OpenGL)",
+         "src": [
+          "ps2xTest/e2e/e2e_programs.py"
+         ],
+         "tests": [
+          "ps2xTest/e2e/e2e_programs.py"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.diff",
+         "name": "Differential testing (VU reference mode)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Differential tests",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "ps2xRuntime/src/lib/vu/ps2_vu1_core.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_vu1_tests.cpp::VU1 commit index matches the full-scan reference on random programs"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.fuzz",
+         "name": "Fuzzing (6 libFuzzer harnesses)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Fuzzing",
+         "implemented": "",
+         "missing": "Smoke runs only (60 s per target in CI)",
+         "src": [
+          "tools/fuzz/fuzz_runtime.cpp",
+          "tools/fuzz/fuzz_recompiler.cpp"
+         ],
+         "tests": [
+          "tools/fuzz/regressions/dma/cyclic_next_chain.bin",
+          "tools/fuzz/regressions/elf/null_reloc_data.bin"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.san",
+         "name": "Sanitizers (ASan, UBSan)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Sanitizers",
+         "implemented": "",
+         "missing": "UBSan only with Clang/GCC; MSVC ASan run locally",
+         "src": [
+          "CMakeLists.txt"
+         ],
+         "tests": [
+          ".github/workflows/build.yml"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.z3",
+         "name": "Z3 integer proofs",
+         "status": "VERIFIED_COMPLETE",
+         "short": "Z3 proofs",
+         "implemented": "Scope: the 29 properties of z3_int_semantics.py, each with a negative control",
+         "missing": "",
+         "src": [
+          "tools/semantics/z3_int_semantics.py"
+         ],
+         "tests": [],
+         "hw": [],
+         "proof": [
+          "tools/semantics/z3_int_semantics.py::hold"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.mutation",
+         "name": "Committed mutation-testing runner",
+         "status": "MISSING",
+         "short": "Mutation runner",
+         "implemented": "",
+         "missing": "Mutation checks were run by hand; no runner in the repository",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "dv.prof",
+         "name": "Profiling and benchmarks",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Profiling",
+         "implemented": "",
+         "missing": "No performance gate (roadmap item 6)",
+         "src": [
+          "tools/bench/sampling_profiler.cpp"
+         ],
+         "tests": [
+          ".github/workflows/build.yml"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.compat",
+         "name": "Compatibility matrix (tools/compat)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Compat matrix",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "tools/compat/compat.py"
+         ],
+         "tests": [
+          "ps2xTest/CMakeLists.txt"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.probes",
+         "name": "Hardware probe lab (P1-P5)",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Probe lab",
+         "implemented": "",
+         "missing": "No probe has run on hardware",
+         "src": [
+          "tools/hwprobes/probe_lab.py"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "Physical PS2 and ps2sdk",
+         "target": "8",
+         "verified_at": null
+        },
+        {
+         "id": "dv.research",
+         "name": "Community research database",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Research DB",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "tools/research/validate_research.py"
+         ],
+         "tests": [
+          "ps2xTest/CMakeLists.txt"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.status",
+         "name": "Status dashboard pipeline",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Status dashboard",
+         "implemented": "",
+         "missing": "Statuses are reviewed by hand; the validator checks evidence links, not semantics",
+         "src": [
+          "tools/status/generate_dashboard.py",
+          "tools/status/validate_dashboard.py"
+         ],
+         "tests": [
+          "tools/status/validate_dashboard.py::def selftest"
+         ],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "dv.docs",
+         "name": "Developer documentation",
+         "status": "IMPLEMENTED_UNVERIFIED",
+         "short": "Documentation",
+         "implemented": "",
+         "missing": "",
+         "src": [
+          "TESTING.md",
+          "docs/architecture/acceptance-gate.md"
+         ],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "cmp",
+     "title": "Game compatibility",
+     "category": "K",
+     "scope": "Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs and 4 synthetic e2e programs; no commercial game and no homebrew game has been run, so every game-level stage is UNKNOWN.",
+     "children": [
+      {
+       "id": "cmp.stages",
+       "title": "Stages",
+       "children": [
+        {
+         "id": "c.elf",
+         "name": "ELF loading (stage 0)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "ELF loading",
+         "implemented": "55/55 test programs",
+         "missing": "No game ELF",
+         "src": [
+          "tools/compat/compat.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "c.native",
+         "name": "Native executable generation (stages 1-2)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Native generation",
+         "implemented": "55/55 test programs",
+         "missing": "No game ELF",
+         "src": [
+          "tools/compat/compat.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "c.init",
+         "name": "Initialisation (stage 3)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Initialisation",
+         "implemented": "55/55 test programs produce output",
+         "missing": "No game",
+         "src": [
+          "tools/compat/compat.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "c.checkpoint",
+         "name": "Stable checkpoint (stage 4)",
+         "status": "VERIFIED_PARTIAL",
+         "short": "Stable checkpoint",
+         "implemented": "55/55 test programs reach their end marker",
+         "missing": "Test programs, not games",
+         "src": [
+          "tools/compat/compat.py"
+         ],
+         "tests": [],
+         "hw": [
+          "cpu_ee_alu"
+         ],
+         "blocker": "",
+         "target": "",
+         "verified_at": "c7e5960"
+        },
+        {
+         "id": "c.mainloop",
+         "name": "Main loop execution",
+         "status": "UNKNOWN",
+         "short": "Main loop",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.render",
+         "name": "Rendering",
+         "status": "UNKNOWN",
+         "short": "Rendering",
+         "implemented": "",
+         "missing": "Only a synthetic e2e frame is checked",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.input",
+         "name": "Controller input (stage 5)",
+         "status": "UNKNOWN",
+         "short": "Input",
+         "implemented": "",
+         "missing": "No scripted input runs",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.sound",
+         "name": "Sound",
+         "status": "UNKNOWN",
+         "short": "Sound",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.scenes",
+         "name": "Scene transitions (stage 6)",
+         "status": "UNKNOWN",
+         "short": "Scenes",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.save",
+         "name": "Save and load (stage 8)",
+         "status": "UNKNOWN",
+         "short": "Save / load",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.extended",
+         "name": "Extended execution (stage 7)",
+         "status": "UNKNOWN",
+         "short": "Extended run",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        },
+        {
+         "id": "c.complete",
+         "name": "Full completion (stage 9)",
+         "status": "UNKNOWN",
+         "short": "Completion",
+         "implemented": "",
+         "missing": "No game run",
+         "src": [],
+         "tests": [],
+         "hw": [],
+         "blocker": "",
+         "target": "",
+         "verified_at": null
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

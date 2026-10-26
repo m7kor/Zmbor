@@ -621,11 +621,12 @@ def render_readme_block(inv):
     L.append(f"<p align=\"center\"><img src=\"docs/status/zmbor-framework.svg\" alt=\"Recompiler, tools and "
              f"compatibility component status\" width=\"100%\"></p>")
     L.append("")
-    L.append("| | " + " | ".join(STATUS_STYLE[st][3] for st in STATUSES) + " | total |")
-    L.append("|---|" + "---|" * (len(STATUSES) + 1))
-    for sec in inv["sections"]:
-        c = s["sections"][sec["id"]]
-        L.append(f"| {sec['title']} | " + " | ".join(str(c["by_status"][st]) for st in STATUSES) + f" | {c['leaves']} |")
+    L.append("| status | " + " | ".join(sec["title"] for sec in inv["sections"]) + " |")
+    L.append("|---|" + "---|" * len(inv["sections"]))
+    for st in STATUSES:
+        L.append(f"| {STATUS_STYLE[st][3]} | " + " | ".join(str(s["sections"][sec["id"]]["by_status"][st])
+                                                        for sec in inv["sections"]) + " |")
+    L.append("| **total** | " + " | ".join(f"**{s['sections'][sec['id']]['leaves']}**" for sec in inv["sections"]) + " |")
     L.append("")
     L.append(f"Every component, its evidence and the method are listed in [docs/status](docs/status/README.md). "
              f"Colours are statuses written by hand and checked against cited evidence; they are not code coverage.")

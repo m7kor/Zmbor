@@ -55,10 +55,16 @@ flowchart LR
 
 <p align="center"><img src="docs/status/zmbor-framework.svg" alt="Recompiler, tools and compatibility component status" width="100%"></p>
 
-| | verified complete | verified partial | implemented, unverified | HLE / stub | missing | not applicable | unknown | total |
-|---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 18 | 47 | 57 | 23 | 25 | 3 | 1 | 174 |
-| Recompiler, Tools & Compatibility | 4 | 29 | 11 | 0 | 1 | 0 | 8 | 53 |
+| status | PS2 Hardware & Runtime | Recompiler, Tools & Compatibility |
+|---|---|---|
+| verified complete | 18 | 4 |
+| verified partial | 47 | 29 |
+| implemented, unverified | 57 | 11 |
+| HLE / stub | 23 | 0 |
+| missing | 25 | 1 |
+| not applicable | 3 | 0 |
+| unknown | 1 | 8 |
+| **total** | **174** | **53** |
 
 Every component, its evidence and the method are listed in [docs/status](docs/status/README.md). Colours are statuses written by hand and checked against cited evidence; they are not code coverage.
 

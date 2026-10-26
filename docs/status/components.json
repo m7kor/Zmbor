@@ -25,7 +25,7 @@
  "measurements": {
   "hardware_source": {
    "path": "docs/hwtest/dashboard.json",
-   "sha256": "1234ed7156e78ed35f8c1b69b4042588e2c33c23a49958e19ab45ae82579dbf0",
+   "sha256": "dd5ee3003c6ab14a0f3d7cbc5f8c469f1523a9faaf4d317468e802f5cd9c0056",
    "description": "the hardware matrix of the acceptance gate run on c7e5960 (p7_gate4); main a13b47a (merge of PR #5) has the identical tree b79613e."
   },
   "hardware": {

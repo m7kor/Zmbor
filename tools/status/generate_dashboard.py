@@ -186,7 +186,9 @@ def measure_hw(hw_dashboard):
 
 
 def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """SHA-256 of the file with line endings normalised to LF, so a Windows checkout (CRLF) and a Linux checkout
+    of the same commit agree."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 # --------------------------------------------------------------------------------------------------------------

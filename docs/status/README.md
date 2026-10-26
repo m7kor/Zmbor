@@ -29,7 +29,7 @@ Every PS2 subsystem and every significant part of Zmbor, with a status written b
 
 ## Measurements
 
-Hardware results: `docs/hwtest/dashboard.json` (sha256 `1234ed7156e78ed3…`), the hardware matrix of the acceptance gate run on c7e5960 (p7_gate4); main a13b47a (merge of PR #5) has the identical tree b79613e.
+Hardware results: `docs/hwtest/dashboard.json` (sha256 `dd5ee3003c6ab14a…`), the hardware matrix of the acceptance gate run on c7e5960 (p7_gate4); main a13b47a (merge of PR #5) has the identical tree b79613e.
 
 | measurement | numerator / denominator | value |
 |---|---|---|

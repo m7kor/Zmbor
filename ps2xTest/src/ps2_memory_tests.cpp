@@ -1557,6 +1557,35 @@ void register_ps2_memory_tests()
             t.Equals(total, static_cast<size_t>((1u + 2u + 1u + 2u + 1u) * 16u), "both calls and the END are transferred");
         });
 
+        tc.Run("chain cycle detection does not stop finite chains that transfer the same data repeatedly", [](TestCase &t)
+        {
+            // Three REF tags reading one data block, then REFE on the same block: the payload repeats, the tags do not.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kGifCh = 0x1000A000u;
+            constexpr uint32_t kTags = 0x00100000u;
+            constexpr uint32_t kData = 0x00120000u;
+            uint8_t *rdram = mem.getRDRAM();
+            for (uint32_t i = 0; i < 32u; ++i)
+                rdram[kData + i] = static_cast<uint8_t>(0xA0u + i);
+            writeDmaTag(rdram, kTags + 0x00u, makeDmaTag(2u, 3u, kData)); // REF
+            writeDmaTag(rdram, kTags + 0x10u, makeDmaTag(2u, 3u, kData)); // REF
+            writeDmaTag(rdram, kTags + 0x20u, makeDmaTag(2u, 3u, kData)); // REF
+            writeDmaTag(rdram, kTags + 0x30u, makeDmaTag(2u, 0u, kData)); // REFE
+            std::vector<uint8_t> received;
+            mem.setGifPacketCallback([&](const uint8_t *data, uint32_t sizeBytes) { received.insert(received.end(), data, data + sizeBytes); });
+            mem.writeIORegister(kGifCh + 0x30u, kTags);
+            mem.writeIORegister(kGifCh + 0x20u, 0u);
+            mem.writeIORegister(kGifCh + 0x00u, 0x105u);
+            mem.processPendingTransfers();
+            t.Equals(received.size(), static_cast<size_t>(4u * 32u), "all four transfers of the shared block arrive");
+            bool repeated = received.size() == 128u;
+            for (size_t i = 0; repeated && i < received.size(); ++i)
+                repeated = received[i] == static_cast<uint8_t>(0xA0u + (i % 32u));
+            t.IsTrue(repeated, "each transfer carries the shared block");
+            t.Equals(mem.readIORegister(kGifCh + 0x30u), kTags + 0x40u, "REFE leaves TADR past the last tag");
+        });
+
         tc.Run("GIF DMA chain can source tags and payload from 0xF000 scratchpad alias", [](TestCase &t)
         {
             PS2Memory mem;

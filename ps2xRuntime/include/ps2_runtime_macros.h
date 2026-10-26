@@ -89,7 +89,7 @@ static inline uint32_t ps2_plzcw32(uint32_t x)
 // Basic MIPS arithmetic operations
 // The _OV forms compute in unsigned arithmetic: a signed add that overflows is undefined behaviour in C++, and
 // overflow is exactly the case they must detect. The predicates are proved equal to "the exact sum is outside the
-// signed range" by tools/smt/int_semantics.py.
+// signed range" by tools/semantics/z3_int_semantics.py.
 #define ADD32(a, b) ((uint32_t)((a) + (b)))
 #define ADD32_OV(rs, rt, result32, overflow)                        \
     do                                                              \

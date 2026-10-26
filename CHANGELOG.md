@@ -313,3 +313,6 @@ Baseline (main `d4310f1`, reproduced): hardware 53/55, 8202/8250 lines; `ps2x_te
 - Not changed: RSQRT.S and EFU stay at 59/66 and 182/223. A post-hoc RSQRT.S datapath fits 34/34 rows but was chosen
   after seeing them and has no held-out confirmation, so it is not adopted.
 - Phase 7.1: test for finite chains that repeat the same data; mutation checks of the F1/F2 tests (one weak test found and strengthened: DADDI/DADDIU immediate extension); `phase8-roadmap.md`. `ps2x_tests` 550/550.
+- Fix (found by the CI fuzz smoke job): a REL section whose data did not load (sh_size past end of file) made
+  ELFIO's relocation accessor dereference null. ElfParser now skips such symbol/relocation tables. `ps2x_tests`
+  551/551.

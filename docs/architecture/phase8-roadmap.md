@@ -6,7 +6,7 @@ result: it is a plan. Hardware correctness is claimed only from real-PS2 output;
 claimed at all.
 
 Starting point (Phase 7 gate): ps2autotests 53/55 programs, 8202/8250 lines; open divergences `cpu_ee_fpu_sqrt`
-(59/66, RSQRT.S) and `vu_lower_efu` (182/223); `ps2x_tests` 550/550; ctest 54/54 (Z3 proofs executed); e2e 4/4;
+(59/66, RSQRT.S) and `vu_lower_efu` (182/223); `ps2x_tests` 551/551; ctest 54/54 (Z3 proofs executed); e2e 4/4;
 `ps2xIOP` 4/4. Gap matrix: `phase7-gap-matrix.md`.
 
 ## Order and dependencies

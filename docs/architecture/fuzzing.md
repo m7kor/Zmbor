@@ -64,6 +64,24 @@ of payload (a guard, not a hardware limit). Regression: `tools/fuzz/regressions/
 (replayed by CI; 56 ms after the fix), unit tests "a source chain that loops without an end tag stops after one lap"
 and "chain cycle detection does not stop a chain that CALLs the same subroutine twice".
 
+### F3 — ELF relocation table with unloaded data: null dereference in ELFIO (fixed)
+
+Found by the CI job `linux-clang-fuzz-smoke` (`ps2x_fuzz_elf`, push run 40254475913 on `0a157fe`; the PR run of
+the same commit did not hit it — fuzzing is random): ASan SEGV on address 0 in
+`ELFIO::relocation_section_accessor::get_entry`, called from `ElfParser::loadRelocations`. The 240-byte input (a
+mutation of the hand-built seed ELF) has a REL section whose `sh_size` runs past the end of the file: ELFIO then
+leaves the section data null but keeps `sh_size`, and the accessor reads `get_data() + index * sh_entsize`
+unchecked. Reproduced locally with MSVC ASan. The same accessor reads past the buffer if `sh_entsize` is smaller
+than one record; the symbol accessor checks for null data but not the record size. Fix (in Zmbor, ELFIO unchanged):
+symbol and relocation tables are read only if they have no entries, or their data loaded and `sh_entsize` is at
+least one record for the ELF class; otherwise the section is skipped with a warning. Regression:
+`tools/fuzz/regressions/elf/null_reloc_data.bin` (replayed by CI) and the unit test "elf parser skips relocation
+sections whose data did not load"; mutant M6 (check disabled) crashes `ps2x_tests`.
+
+Local fuzz runs at `0a157fe` (300 s per target, MSVC): gif 54,029 / vif0 18,065,087 / vif1 2,835,457 / dma 34,308
+/ elf 7,350 / decoder 137,923 executions, no finding — including elf, which the CI run then found F3 in. Short
+runs on one platform are not evidence of absence.
+
 ## Local fuzz runs (2026-10-25, MSVC 14.44 ASan + libFuzzer, i5-10400F, single process per target)
 
 | target | time | executions | exec/s | result |
@@ -96,3 +114,4 @@ Each mutant was applied to the source, `ps2x_tests` rebuilt and run, and the fil
 | M4 cycle key without ASR0, in `operator==` only | survived: not a valid mutant (the hash still separated the states, so they were never compared) | — |
 | M4b cycle key without ASR0, in equality and hash | — | killed ("CALLs the same subroutine twice") |
 | M5 no cycle detection | — | killed ("loops without an end tag stops after one lap") |
+| M6 ELF table check disabled | killed (`ps2x_tests` crashes on the F3 regression test) | — |

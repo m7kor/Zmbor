@@ -70,6 +70,9 @@ jobs:
       - name: Hardware coverage report and gap matrix are up to date
         run: python3 -I tools/hwcoverage/hwcoverage.py report --check
 
+      - name: Contract checker self-test (each rule rejects a crafted bad contract set)
+        run: python3 -I tools/hwcoverage/hwcoverage.py selftest
+
   # Unit suite, Z3 proofs and the e2e programs (generated code included) under AddressSanitizer + UBSan.
   # Any sanitizer report fails the job (-fno-sanitize-recover=all, halt_on_error).
   linux-clang-sanitizers:

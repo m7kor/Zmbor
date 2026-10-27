@@ -34,6 +34,17 @@ namespace
         return (r | (g << 5) | (b << 10) | (a << 15));
     }
 
+    // DIMX element DMyx for pixel (x, y): 3-bit field at bit 4 * (4 * (y & 3) + (x & 3)), read as two's
+    // complement (-4..3) as PCSX2 does (GSRegs.h GIFRegDIMX, s32 DMyx : 3). DobieStation decodes the same bits
+    // differently (bit 2 set means -(low two bits + 1)); which is right needs a hardware capture
+    // (docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md, D-GS-1).
+    int ditherMatrixValue(uint64_t dimx, int x, int y)
+    {
+        const unsigned shift = 4u * (4u * static_cast<unsigned>(y & 3) + static_cast<unsigned>(x & 3));
+        const int field = static_cast<int>((dimx >> shift) & 0x7u);
+        return field >= 4 ? field - 8 : field;
+    }
+
     u32 Rgba5551ToRgba8888(u16 c)
     {
         u32 r = ((c >> 0) & 0x1F) << 3;
@@ -936,9 +947,12 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
 
     if (writeMask.writesFramebuffer())
     {
-        const u8 srcR = r;
-        const u8 srcG = g;
-        const u8 srcB = b;
+        // Post-blend colour stage (GS: blend -> dither -> COLCLAMP): blending and dithering work on signed values
+        // wider than 8 bits; COLCLAMP then saturates them to 0..255 (CLAMP=1) or keeps the low 8 bits (CLAMP=0).
+        // References: PCSX2 GSDrawScanline WriteFrame and DobieStation gsthread (both wrap with CLAMP=0).
+        int cr = r;
+        int cg = g;
+        int cb = b;
 
         if (state.prim.abe)
         {
@@ -968,16 +982,31 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
                 int cAlpha = (csel == 0) ? a : (csel == 1) ? da
                                                            : fix;
 
-                r = clampU8(((pickRGB(asel, r, dr) - pickRGB(bsel, r, dr)) * cAlpha >> 7) + pickRGB(dsel, r, dr));
-                g = clampU8(((pickRGB(asel, g, dg) - pickRGB(bsel, g, dg)) * cAlpha >> 7) + pickRGB(dsel, g, dg));
-                b = clampU8(((pickRGB(asel, b, db) - pickRGB(bsel, b, db)) * cAlpha >> 7) + pickRGB(dsel, b, db));
+                cr = ((pickRGB(asel, r, dr) - pickRGB(bsel, r, dr)) * cAlpha >> 7) + pickRGB(dsel, r, dr);
+                cg = ((pickRGB(asel, g, dg) - pickRGB(bsel, g, dg)) * cAlpha >> 7) + pickRGB(dsel, g, dg);
+                cb = ((pickRGB(asel, b, db) - pickRGB(bsel, b, db)) * cAlpha >> 7) + pickRGB(dsel, b, db);
             }
-            else
-            {
-                r = srcR;
-                g = srcG;
-                b = srcB;
-            }
+        }
+
+        if ((state.dthe & 0x1ull) != 0ull && bitsPerPixel(fpsm) == 16)
+        {
+            const int dm = ditherMatrixValue(state.dimx, x, y);
+            cr += dm;
+            cg += dm;
+            cb += dm;
+        }
+
+        if ((state.colclamp & 0x1ull) != 0ull)
+        {
+            r = clampU8(cr);
+            g = clampU8(cg);
+            b = clampU8(cb);
+        }
+        else
+        {
+            r = static_cast<uint8_t>(cr & 0xFF);
+            g = static_cast<uint8_t>(cg & 0xFF);
+            b = static_cast<uint8_t>(cb & 0xFF);
         }
 
         if (writeMask.writeAlpha && (ctx.fba & 0x1ull) != 0ull && ctx.frame.psm != GS_PSM_CT24)

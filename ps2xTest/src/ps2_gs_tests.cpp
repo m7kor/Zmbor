@@ -908,6 +908,90 @@ void register_ps2_gs_tests()
                      "with PABE enabled, high-alpha source pixels should still use the configured ALPHA blend");
         });
 
+        // Post-blend colour stage. Expected values are computed by hand from the GS register definitions; the
+        // behaviour follows PCSX2 (GSDrawScanline WriteFrame) and DobieStation (gsthread), which agree on COLCLAMP.
+        // No hardware capture exists for these yet (docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md, D-GS-1/2).
+        tc.Run("GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour", [](TestCase &t)
+        {
+            auto blendOnce = [](uint64_t alphaReg, uint32_t destination, uint8_t source, uint64_t colclamp) {
+                std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+                GS gs;
+                gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+                gs.writeRegister(GS_REG_FRAME_1, (1ull << 16));
+                gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+                gs.writeRegister(GS_REG_SCISSOR_1, 0ull);
+                gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                gs.writeRegister(GS_REG_ALPHA_1, alphaReg);
+                gs.writeRegister(GS_REG_COLCLAMP, colclamp);
+                std::memcpy(vram.data(), &destination, sizeof(destination));
+                gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_POINT) | (1ull << 6));
+                gs.writeRegister(GS_REG_RGBAQ, 0x80000000ull | source | (source << 8) | (static_cast<uint64_t>(source) << 16));
+                gs.writeRegister(GS_REG_XYZ2, 0ull);
+                uint32_t pixel = 0u;
+                std::memcpy(&pixel, vram.data(), sizeof(pixel));
+                return pixel;
+            };
+            // A=Cs, B=0, C=FIX(0x80), D=Cd: Cs + Cd = 0x80 + 0xC0 = 0x140.
+            const uint64_t add = (0x80ull << 32) | 0x68ull;
+            t.Equals(blendOnce(add, 0x00C0C0C0u, 0x80u, 1ull), 0x80FFFFFFu, "COLCLAMP=1 saturates 0x140 to 0xFF");
+            t.Equals(blendOnce(add, 0x00C0C0C0u, 0x80u, 0ull), 0x80404040u, "COLCLAMP=0 keeps the low 8 bits of 0x140");
+            // A=0, B=Cs, C=FIX(0x80), D=0: -Cs = -0x40.
+            const uint64_t negate = (0x80ull << 32) | 0xA2ull;
+            t.Equals(blendOnce(negate, 0u, 0x40u, 1ull), 0x80000000u, "COLCLAMP=1 saturates -0x40 to 0");
+            t.Equals(blendOnce(negate, 0u, 0x40u, 0ull), 0x80C0C0C0u, "COLCLAMP=0 keeps the low 8 bits of -0x40");
+        });
+
+        tc.Run("GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only", [](TestCase &t)
+        {
+            // DIMX: (0,0)=+3, (1,0)=-4, (2,0)=-1, (3,0)=+1, (0,1)=-2, everything else 0 (3-bit two's complement).
+            auto element = [](uint32_t x, uint32_t y, uint64_t v) { return (v & 0x7ull) << (4u * (4u * y + x)); };
+            const uint64_t dimx = element(0, 0, 3) | element(1, 0, 4) | element(2, 0, 7) | element(3, 0, 1) | element(0, 1, 6);
+
+            struct Run
+            {
+                uint32_t psm;
+                uint64_t dthe;
+                uint64_t colclamp;
+            };
+            // Returns the stored red value: 5 bits for CT16, 8 bits for CT32.
+            auto drawRed = [&](const Run &run, uint32_t x, uint32_t y, uint8_t c) {
+                std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+                GS gs;
+                gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+                gs.writeRegister(GS_REG_FRAME_1, (1ull << 16) | (static_cast<uint64_t>(run.psm) << 24));
+                gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+                gs.writeRegister(GS_REG_SCISSOR_1, (63ull << 16) | (63ull << 48));
+                gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                gs.writeRegister(GS_REG_DIMX, dimx);
+                gs.writeRegister(GS_REG_DTHE, run.dthe);
+                gs.writeRegister(GS_REG_COLCLAMP, run.colclamp);
+                gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_POINT));
+                gs.writeRegister(GS_REG_RGBAQ, 0x80000000ull | c | (c << 8) | (static_cast<uint64_t>(c) << 16));
+                gs.writeRegister(GS_REG_XYZ2, (static_cast<uint64_t>(x) << 4) | (static_cast<uint64_t>(y) << 20));
+                const uint32_t raw = gs.ReadVram(run.psm, 0u, 1u, x, y);
+                return run.psm == GS_PSM_CT32 ? (raw & 0xFFu) : (raw & 0x1Fu);
+            };
+            const Run ct16{GS_PSM_CT16, 1ull, 1ull};
+            // 0x7F = 127: +3 -> 130 (16), -4 -> 123 (15), -1 -> 126 (15), +1 -> 128 (16), -2 -> 125 (15), 0 -> 15.
+            t.Equals(drawRed(ct16, 0, 0, 0x7F), 16u, "(0,0) adds +3");
+            t.Equals(drawRed(ct16, 1, 0, 0x7F), 15u, "(1,0) adds -4");
+            t.Equals(drawRed(ct16, 3, 0, 0x7F), 16u, "(3,0) adds +1");
+            t.Equals(drawRed(ct16, 1, 1, 0x7F), 15u, "(1,1) adds 0");
+            // 0x81 = 129: -4 -> 125 (15), -1 -> 128 (16), -2 -> 127 (15), 0 -> 16.
+            t.Equals(drawRed(ct16, 1, 0, 0x81), 15u, "(1,0) adds -4, not -1");
+            t.Equals(drawRed(ct16, 2, 0, 0x81), 16u, "(2,0) adds -1, not -4");
+            t.Equals(drawRed(ct16, 0, 1, 0x81), 15u, "(0,1) adds -2");
+            // The matrix repeats every 4 pixels in both directions.
+            t.Equals(drawRed(ct16, 4, 4, 0x7F), 16u, "(4,4) uses (0,0) = +3");
+            t.Equals(drawRed(ct16, 5, 0, 0x81), 15u, "(5,0) uses (1,0) = -4");
+            // Dither is applied before COLCLAMP: 0xFE + 3 = 0x101.
+            t.Equals(drawRed(ct16, 0, 0, 0xFE), 31u, "COLCLAMP=1 saturates the dithered value");
+            t.Equals(drawRed(Run{GS_PSM_CT16, 1ull, 0ull}, 0, 0, 0xFE), 0u, "COLCLAMP=0 wraps the dithered value");
+            // No dithering when DTHE=0, and none for a 32-bit frame buffer.
+            t.Equals(drawRed(Run{GS_PSM_CT16, 0ull, 1ull}, 1, 0, 0x81), 16u, "DTHE=0 leaves 0x81 at 16");
+            t.Equals(drawRed(Run{GS_PSM_CT32, 1ull, 1ull}, 1, 0, 0x81), 0x81u, "CT32 frame buffers are not dithered");
+        });
+
         tc.Run("FBA forces the framebuffer alpha high bit on CT32 writes", [](TestCase &t)
         {
             std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);

@@ -20,12 +20,19 @@
    "interrupts": "none",
    "dma": "none (values arrive in GIF packets)",
    "timing": "no timing obligation beyond pixel order",
-   "dependencies": ["gs.alpha", "gs.genregs", "gs.swizzle"],
+   "dependencies": [
+    "gs.alpha",
+    "gs.genregs",
+    "gs.swizzle"
+   ],
    "acceptance": [
     "Unit test: every matrix position, sign handling (-4 vs -1), 4-pixel repetition, order relative to COLCLAMP, no effect with DTHE=0",
     "Hardware: GS frame captures of a dither probe (flat colour quads in PSMCT16 and PSMCT32 over a known DIMX) match bit for bit"
    ],
-   "references": ["PCSX2 f0523f8: GSRegs.h GIFRegDIMX, GSState.h ExpandDIMX, GSDrawScanline.cpp WriteFrame", "DobieStation gsthread.cpp (dither_mtx)"],
+   "references": [
+    "PCSX2 f0523f8: GSRegs.h GIFRegDIMX, GSState.h ExpandDIMX, GSDrawScanline.cpp WriteFrame",
+    "DobieStation gsthread.cpp (dither_mtx)"
+   ],
    "known_divergences": "PCSX2 and DobieStation disagree on the element encoding and on whether 32-bit buffers are dithered (decision D-GS-1); unresolved without hardware"
   },
   "gs.alpha": {
@@ -47,13 +54,58 @@
    "interrupts": "none",
    "dma": "none",
    "timing": "none beyond pixel order",
-   "dependencies": ["gs.genregs", "gs.tests"],
+   "dependencies": [
+    "gs.genregs",
+    "gs.tests"
+   ],
    "acceptance": [
     "Unit tests: saturation and wrap in both directions, PABE, FBA",
     "Hardware: GS frame captures of blend probes"
    ],
-   "references": ["PCSX2 f0523f8 GSDrawScanline.cpp WriteFrame", "DobieStation gsthread.cpp"],
+   "references": [
+    "PCSX2 f0523f8 GSDrawScanline.cpp WriteFrame",
+    "DobieStation gsthread.cpp"
+   ],
    "known_divergences": "none between the two references for COLCLAMP"
+  },
+  "dma.mfifo": {
+   "block": "EE DMAC, memory FIFO between fromSPR (channel 8) and the VIF1 or GIF source chain",
+   "registers": {
+    "D_CTRL (0x1000E000)": "MFD bits 2-3: 0 none, 2 VIF1, 3 GIF (1 reserved)",
+    "D_RBSR (0x1000E040)": "ring mask; the ring holds RBSR + 16 bytes",
+    "D_RBOR (0x1000E050)": "ring base address",
+    "D_STAT (0x1000E010)": "MEIS bit 14 (MFIFO empty), MEIM bit 30"
+   },
+   "functional_requirements": [
+    "fromSPR writes each qword at RBOR + (MADR & RBSR) and wraps MADR",
+    "The drain channel reads tags at RBOR + (TADR & RBSR); data that follows a tag (CNT, NEXT, CALL, RET, END) is read with the same wrap; REF/REFE/REFS data is read in place",
+    "The drain stops when it reaches fromSPR's MADR and stays active; MEIS is raised; it continues when fromSPR writes more",
+    "Normal completion (END, TIE with IRQ) raises CIS of the drain channel"
+   ],
+   "reset_state": "D_RBOR, D_RBSR zero after sceDmaReset (existing test); hardware power-on values unknown",
+   "read_write_semantics": "D_RBOR/D_RBSR read back as written; D_STAT status bits clear on write-one, masks toggle on write-one",
+   "error_behavior": "unknown for a ring that crosses invalid memory or a non power-of-two size",
+   "interrupts": "MEIS through INT1 when MEIM is set (DMAC handler cause 14)",
+   "dma": "channel 8 (fromSPR) source; channel 1 (VIF1) or 2 (GIF) drain in source-chain mode",
+   "timing": "unknown: the hardware can stall inside a tag's data; this implementation stalls at tag granularity (D-DMA-2)",
+   "dependencies": [
+    "dma.c8",
+    "dma.c1",
+    "dma.c2",
+    "dma.chain",
+    "dma.irq",
+    "mem.spr"
+   ],
+   "acceptance": [
+    "Unit tests: GIF and VIF1 drains, empty stall with MEIS, resume, END completion, ring wrap of tags and data, REF data in place, fromSPR linear without MFD or outside the ring",
+    "Fuzz: DMA harness with MFIFO enabled under ASan",
+    "Hardware: MFIFO probe on a physical PS2 (stall point, MEIS timing, MADR/TADR after stall)"
+   ],
+   "references": [
+    "PCSX2 f0523f8: SPR.cpp _SPR0chain, Hw.cpp hwMFIFOWrite/hwMFIFOResume, Dmac.h",
+    "DobieStation 68dd073: dmac.cpp mfifo_handler, SPR_FROM transfer"
+   ],
+   "known_divergences": "fromSPR wrap condition differs (D-DMA-1); stall granularity (D-DMA-2)"
   }
  }
 }

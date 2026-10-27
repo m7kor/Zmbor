@@ -67,6 +67,9 @@ jobs:
       - name: Validator self-test (each rule rejects a crafted bad inventory)
         run: python3 -I tools/status/validate_dashboard.py --selftest
 
+      - name: Hardware coverage report and gap matrix are up to date
+        run: python3 -I tools/hwcoverage/hwcoverage.py report --check
+
   # Unit suite, Z3 proofs and the e2e programs (generated code included) under AddressSanitizer + UBSan.
   # Any sanitizer report fails the job (-fno-sanitize-recover=all, halt_on_error).
   linux-clang-sanitizers:

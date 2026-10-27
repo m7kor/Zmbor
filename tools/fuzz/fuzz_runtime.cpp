@@ -61,10 +61,23 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     // First 4 bytes: tag address (qword aligned, inside the first 1 MB); the rest is copied to RDRAM at 0x100000.
     if (n < 8u)
         return 0;
-    uint32_t tadr = 0;
-    std::memcpy(&tadr, data, 4);
-    tadr = (tadr & 0x000FFFF0u) | 0x00100000u;
+    uint32_t control = 0;
+    std::memcpy(&control, data, 4);
+    const uint32_t tadr = (control & 0x000FFFF0u) | 0x00100000u;
     std::memcpy(m.mem.getRDRAM() + 0x100000u, data + 4, std::min<uint32_t>(n - 4u, 0x100000u));
+    // Bit 0 selects an MFIFO drain on the GIF channel: a 64 KB ring at 0x100000 whose fromSPR write position comes
+    // from bits 16-27, so the walk meets empty, partial and wrapping rings. Otherwise MFIFO is off.
+    if ((control & 1u) != 0u)
+    {
+        m.mem.writeIORegister(0x1000E050u, 0x00100000u);                                  // D_RBOR
+        m.mem.writeIORegister(0x1000E040u, 0x0000FFF0u);                                  // D_RBSR
+        m.mem.writeIORegister(0x1000D010u, 0x00100000u | ((control >> 12) & 0xFFF0u));     // fromSPR MADR
+        m.mem.writeIORegister(0x1000E000u, 1u | (3u << 2));                                // D_CTRL: DMAE, MFD=GIF
+    }
+    else
+    {
+        m.mem.writeIORegister(0x1000E000u, 1u);
+    }
     m.mem.writeIORegister(0x1000A030u, tadr);                // D2_TADR
     m.mem.writeIORegister(0x1000A020u, 0u);                  // D2_QWC
     m.mem.writeIORegister(0x1000A000u, 0x00000105u);         // D2_CHCR: DIR from memory, chain mode, STR

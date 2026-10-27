@@ -1,12 +1,12 @@
 {
- "commit": "734c40cfe57417f2a2dc10c9130dc5ee15bcefc6",
+ "commit": "c64f357fd4418753ad24e5e65a82f151a97782b2",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "824d095f84a7086f270fe409a755060e733596b29851400eeb7cde82059b23ec",
+ "binary_sha256": "82dd798b35314f8d9a37bc9514ffa5c248a47c07da74f77c08be6d9ea582410a",
  "exit_code": 0,
  "totals": {
-  "PASS": 558,
+  "PASS": 563,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -544,6 +544,11 @@
   "signed branches compare the full 64-bit EE register": "PASS",
   "sprintf consumes EE varargs from a2 a3 t0 and preserves width formatting": "PASS",
   "stale MMIO annotation does not replace the guest effective address": "PASS",
+  "stall control applies only to the STD drain's REFS tags, up to and including D_STADR": "PASS",
+  "stall control: a GIF REFS drain waits with SIS until fromSPR (STS) moves D_STADR past its data": "PASS",
+  "stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once": "PASS",
+  "stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM": "PASS",
+  "stall control: changing D_CTRL.STD releases a waiting drain": "PASS",
   "standalone VU1 code honors the nullable PS2Memory API": "PASS",
   "standalone entry_ blocks register resume points for their JAL return addresses": "PASS",
   "starting a strictly higher-priority thread preempts immediately": "PASS",

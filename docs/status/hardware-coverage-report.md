@@ -3,19 +3,19 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `734c40cfe574`, binary sha256 `824d095f84a7086f`.
+Unit-test run: commit `c64f357fd441`, binary sha256 `82dd798b35314f8d`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|
 | A | 41 | 41 | 31 | 31 | 31 | 2 | 25 | 0 |
 | B | 21 | 21 | 19 | 19 | 19 | 2 | 9 | 0 |
 | C | 27 | 27 | 24 | 22 | 22 | 0 | 4 | 0 |
-| D | 24 | 24 | 20 | 19 | 18 | 0 | 10 | 0 |
+| D | 24 | 24 | 20 | 20 | 20 | 0 | 10 | 0 |
 | E | 13 | 13 | 11 | 11 | 11 | 0 | 5 | 0 |
 | F | 17 | 17 | 13 | 7 | 7 | 0 | 4 | 0 |
 | G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **127** | **118** | **117** | **4** | **59** | **0** |
+| **all** | **174** | **174** | **127** | **119** | **119** | **4** | **59** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -122,9 +122,9 @@ Unit-test run: commit `734c40cfe574`, binary sha256 `824d095f84a7086f`.
 | `dma.chain` | `VERIFIED_PARTIAL` | 2 / 2 / 2 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.callret` | `IMPLEMENTED_UNVERIFIED` | 3 / 3 / 3 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.interleave` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 1 / 1 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `dma.irq` | `VERIFIED_PARTIAL` | 3 / 3 / 4 | 2 / 2 | contract_specified, test_exists, test_executed, hardware_verified |
+| `dma.irq` | `VERIFIED_PARTIAL` | 4 / 4 / 4 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.ctrl` | `VERIFIED_PARTIAL` | 2 / 2 / 2 | 1 / 1 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `dma.stall` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 5 | 0 / 0 | contract_specified, test_exists |
+| `dma.stall` | `IMPLEMENTED_UNVERIFIED` | 5 / 5 / 5 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.mfifo` | `IMPLEMENTED_UNVERIFIED` | 4 / 4 / 4 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.timing` | `HLE_OR_STUB` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `mem.rdram` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |

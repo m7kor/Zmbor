@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "734c40cfe57417f2a2dc10c9130dc5ee15bcefc6",
-  "unit_results_binary_sha256": "824d095f84a7086f270fe409a755060e733596b29851400eeb7cde82059b23ec"
+  "unit_results_commit": "c64f357fd4418753ad24e5e65a82f151a97782b2",
+  "unit_results_binary_sha256": "82dd798b35314f8d9a37bc9514ffa5c248a47c07da74f77c08be6d9ea582410a"
  },
  "levels": [
   "contract_specified",
@@ -19,8 +19,8 @@
  "totals": {
   "contract_specified": 174,
   "test_exists": 127,
-  "test_executed": 118,
-  "test_passed": 117,
+  "test_executed": 119,
+  "test_passed": 119,
   "vectors_passed": 4,
   "hardware_verified": 59,
   "timing_verified": 0
@@ -60,8 +60,8 @@
    "components": 24,
    "contract_specified": 24,
    "test_exists": 20,
-   "test_executed": 19,
-   "test_passed": 18,
+   "test_executed": 20,
+   "test_passed": 20,
    "vectors_passed": 0,
    "hardware_verified": 10,
    "timing_verified": 0
@@ -3429,7 +3429,7 @@
     "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
-    "test_passed": false,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": true,
     "timing_verified": false
@@ -3440,8 +3440,8 @@
    ],
    "named_tests": {
     "cited": 4,
-    "executed": 3,
-    "passed": 3
+    "executed": 4,
+    "passed": 4
    },
    "hardware_programs": {
     "cited": 2,
@@ -3489,8 +3489,8 @@
    "levels": {
     "contract_specified": true,
     "test_exists": true,
-    "test_executed": false,
-    "test_passed": false,
+    "test_executed": true,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -3509,8 +3509,8 @@
    ],
    "named_tests": {
     "cited": 5,
-    "executed": 0,
-    "passed": 0
+    "executed": 5,
+    "passed": 5
    },
    "hardware_programs": {
     "cited": 0,

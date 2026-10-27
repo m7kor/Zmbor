@@ -55,6 +55,44 @@ namespace
         std::memcpy(rdram + tagAddr, &tagLo, sizeof(tagLo));
     }
 
+    struct MfifoRig
+    {
+        static constexpr uint32_t kRing = 0x00100000u;
+        static constexpr uint32_t kGif = 0x1000A000u;
+        static constexpr uint32_t kSprFrom = 0x1000D000u;
+        static constexpr uint32_t kDStat = 0x1000E010u;
+        // received outlives mem: the GIF callback writes into it.
+        std::vector<uint8_t> received;
+        PS2Memory mem;
+        bool ok = false;
+
+        MfifoRig(uint32_t ringMask, uint32_t mfd = 3u)
+        {
+            ok = mem.initialize();
+            mem.setGifPacketCallback([this](const uint8_t *data, uint32_t size) { received.insert(received.end(), data, data + size); });
+            mem.writeIORegister(0x1000E050u, kRing);    // D_RBOR
+            mem.writeIORegister(0x1000E040u, ringMask); // D_RBSR
+            mem.writeIORegister(0x1000E000u, 1u | (mfd << 2u));
+            mem.writeIORegister(kSprFrom + 0x10u, kRing); // fromSPR MADR: the write position starts at the base
+        }
+        // Copies qwords to the scratchpad at offset 0 and runs fromSPR (normal mode) from there.
+        void fromSpr(const std::vector<uint64_t> &qwordHalves)
+        {
+            std::memcpy(mem.getScratchpad(), qwordHalves.data(), qwordHalves.size() * 8u);
+            mem.writeIORegister(kSprFrom + 0x80u, 0u);
+            mem.writeIORegister(kSprFrom + 0x20u, static_cast<uint32_t>(qwordHalves.size() / 2u));
+            mem.writeIORegister(kSprFrom + 0x00u, 0x100u);
+        }
+        void startGifChain(uint32_t tadr)
+        {
+            mem.writeIORegister(kGif + 0x30u, tadr);
+            mem.writeIORegister(kGif + 0x20u, 0u);
+            mem.writeIORegister(kGif + 0x00u, 0x105u);
+        }
+        bool gifActive() { return (mem.readIORegister(kGif) & 0x100u) != 0u; }
+        uint32_t dstat() { return mem.readIORegister(kDStat); }
+    };
+
     void writeU64(uint8_t *rdram, uint32_t addr, uint64_t value)
     {
         std::memcpy(rdram + addr, &value, sizeof(value));
@@ -2572,6 +2610,109 @@ void register_ps2_memory_tests()
             t.Equals(causes.size(), static_cast<size_t>(1u), "SPR_TO should queue one DMAC completion");
             if (!causes.empty())
                 t.Equals(causes[0], 9u, "SPR_TO completion should use DMAC cause 9");
+        });
+
+        // MFIFO: fromSPR fills the ring D_RBOR/D_RBSR, the GIF (MFD=3) or VIF1 (MFD=2) source chain drains it.
+        // Expected behaviour from PCSX2 (SPR.cpp, Hw.cpp hwMFIFOWrite/Resume) and DobieStation (dmac.cpp
+        // mfifo_handler); no hardware program covers MFIFO (docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md D-DMA-1/2).
+
+        tc.Run("MFIFO GIF drain stalls on an empty ring with MEIS and resumes when fromSPR adds data", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u); // 4 KB ring
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.startGifChain(MfifoRig::kRing);
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "nothing is transferred from an empty ring");
+            t.IsTrue(rig.gifActive(), "the drain stays active (STR) while the ring is empty");
+            t.IsTrue((rig.dstat() & (1u << 14)) != 0u, "D_STAT.MEIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 while the drain waits");
+
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x1111111111111111ull, 0x2222222222222222ull}); // CNT qwc 1 + data
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the CNT data is transferred once it is in the ring");
+            t.IsTrue(rig.gifActive(), "the drain waits again for its next tag");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), MfifoRig::kRing + 0x20u, "TADR points at the next tag");
+
+            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, 0x3333333333333333ull, 0x4444444444444444ull}); // END qwc 1 + data
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the END data is transferred");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+            t.IsTrue((rig.dstat() & (1u << 2)) != 0u, "CIS2 is raised at completion");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x1111111111111111ull && words[1] == 0x2222222222222222ull &&
+                         words[2] == 0x3333333333333333ull && words[3] == 0x4444444444444444ull,
+                     "the payload arrives unchanged and in order");
+        });
+
+        tc.Run("MFIFO VIF1 drain (MFD=2) waits for fromSPR and then executes the VIF codes it drains", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u, 2u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kVif1 = 0x10009000u;
+            rig.mem.writeIORegister(kVif1 + 0x30u, MfifoRig::kRing);
+            rig.mem.writeIORegister(kVif1 + 0x20u, 0u);
+            rig.mem.writeIORegister(kVif1 + 0x00u, 0x105u);
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain stays active while the ring is empty");
+            // END qwc 1 carrying MARK 0x1234 and three NOPs.
+            const uint64_t markAndNop = 0x07001234ull;
+            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, markAndNop, 0ull});
+            t.Equals(rig.mem.vif1_regs.mark, 0x1234u, "the drained MARK reaches VIF1");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) == 0u, "END completes the VIF1 channel");
+        });
+
+        tc.Run("MFIFO tags and following data wrap at the ring end; REF data is read in place", [](TestCase &t)
+        {
+            MfifoRig rig(0x70u); // 8-qword ring (a completely full ring reads as empty, as on both references)
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kOutside = 0x00200000u;
+            const uint64_t refData[2] = {0x5555555555555555ull, 0x6666666666666666ull};
+            std::memcpy(rig.mem.getRDRAM() + kOutside, refData, sizeof(refData));
+            // Move the write position to the last ring slot, then write CNT(1) at +0x70 whose data wraps to +0x00,
+            // REF(1) at +0x10 pointing outside the ring, and END(0) at +0x20.
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, MfifoRig::kRing + 0x70u);
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x7777777777777777ull, 0x8888888888888888ull,
+                         makeDmaTag(1u, 3u, kOutside), 0ull, makeDmaTag(0u, 7u, 0u), 0ull});
+            t.Equals(rig.mem.readIORegister(MfifoRig::kSprFrom + 0x10u), MfifoRig::kRing + 0x30u,
+                     "fromSPR MADR wraps around the ring (0x70 + 4 qwords)");
+            rig.startGifChain(MfifoRig::kRing + 0x70u);
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "CNT data and REF data are transferred");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x7777777777777777ull && words[1] == 0x8888888888888888ull,
+                     "the CNT data is read from the wrapped position +0x00");
+            t.IsTrue(words[2] == 0x5555555555555555ull && words[3] == 0x6666666666666666ull,
+                     "the REF data is read from its own address, outside the ring");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+        });
+
+        tc.Run("fromSPR writes linearly when MFD selects no drain or MADR is outside the ring", [](TestCase &t)
+        {
+            for (const bool mfdOff : {true, false})
+            {
+                MfifoRig rig(0x30u, mfdOff ? 0u : 3u);
+                t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+                const uint32_t start = mfdOff ? MfifoRig::kRing + 0x30u : 0x00300000u;
+                rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, start);
+                rig.fromSpr({1ull, 2ull, 3ull, 4ull, 5ull, 6ull});
+                t.Equals(rig.mem.readIORegister(MfifoRig::kSprFrom + 0x10u), start + 0x30u, "MADR advances without wrapping");
+                uint64_t last = 0u;
+                std::memcpy(&last, rig.mem.getRDRAM() + start + 0x20u, sizeof(last));
+                t.Equals(last, 5ull, "the third qword lands at MADR + 0x20");
+            }
+        });
+
+        tc.Run("D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.startGifChain(MfifoRig::kRing);
+            t.IsTrue((rig.dstat() & (1u << 14)) != 0u, "MEIS is raised by the empty ring");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "no INT1 while MEIM is clear");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 30); // toggle MEIM on
+            t.IsTrue((rig.dstat() & (1u << 30)) != 0u, "MEIM toggles on");
+            t.IsTrue((rig.dstat() & (1u << 31)) != 0u, "MEIS with MEIM raises INT1");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 14); // clear MEIS
+            t.IsTrue((rig.dstat() & (1u << 14)) == 0u, "MEIS clears on write-one");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with MEIS cleared");
+            t.IsTrue((rig.dstat() & (1u << 30)) != 0u, "MEIM stays set");
         });
 
         tc.Run("sceDmaReset re-enables DMAC DMAE", [](TestCase &t)

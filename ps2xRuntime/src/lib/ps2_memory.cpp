@@ -13,6 +13,22 @@
 
 namespace
 {
+    // D_STAT: CIS0-9 (bits 0-9), SIS (13, stall), MEIS (14, MFIFO empty), BEIS (15, bus error) are status bits
+    // cleared by writing 1; CIM0-9 (16-25), SIM (29) and MEIM (30) are masks toggled by writing 1 (PCSX2 Dmac.h
+    // DMACh_STAT, DobieStation dmac.cpp). Bit 31 is this runtime's INT1 line: some masked status bit is set.
+    constexpr uint32_t kDStatSis = 1u << 13;
+    constexpr uint32_t kDStatMeis = 1u << 14;
+    constexpr uint32_t kDStatBeis = 1u << 15;
+    constexpr uint32_t kDStatMaskable = 0x3FFu | kDStatSis | kDStatMeis;
+    constexpr uint32_t kDStatStatusBits = kDStatMaskable | kDStatBeis;
+
+    inline uint32_t withDStatInt1Line(uint32_t dstat)
+    {
+        if ((dstat & kDStatMaskable & (dstat >> 16)) != 0u)
+            return dstat | (1u << 31);
+        return dstat & ~(1u << 31);
+    }
+
     inline void inRange(uint32_t offset, size_t bytes, size_t regionSize, const char *op, uint32_t address)
     {
         if (static_cast<uint64_t>(offset) + static_cast<uint64_t>(bytes) > static_cast<uint64_t>(regionSize))
@@ -334,6 +350,8 @@ bool PS2Memory::initialize(size_t ramSize)
         std::lock_guard<std::mutex> lock(m_completedDmacMutex);
         m_completedDmacCauses.clear();
     }
+    m_mfifoDrainStalled = false;
+    m_mfifoEmptyRaised = false;
     m_codeRegions.clear();
     m_path3Masked = false;
     m_path3MaskedFifo.clear();
@@ -1222,18 +1240,14 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
     if (address == 0x1000E010u)
     {
         const uint32_t current = m_ioRegisters.count(address) ? m_ioRegisters[address] : 0u;
-        uint32_t status = current & 0x3FFu;
-        uint32_t mask = (current >> 16) & 0x3FFu;
+        uint32_t status = current & kDStatStatusBits;
+        uint32_t mask = (current >> 16) & kDStatMaskable;
 
-        // D_STAT low bits are W1C status, high bits [16..25] toggle masks on write-one.
-        status &= ~(value & 0x3FFu);
-        mask ^= ((value >> 16) & 0x3FFu);
+        // Status bits (CIS, SIS, MEIS, BEIS) clear on write-one; mask bits (CIM, SIM, MEIM) toggle on write-one.
+        status &= ~(value & kDStatStatusBits);
+        mask ^= ((value >> 16) & kDStatMaskable);
 
-        uint32_t next = (current & ~((0x3FFu) | (0x3FFu << 16) | (1u << 31)));
-        next |= status | (mask << 16);
-        if ((status & mask) != 0u)
-            next |= (1u << 31);
-        m_ioRegisters[address] = next;
+        m_ioRegisters[address] = withDStatInt1Line(status | (mask << 16));
         return true;
     }
 
@@ -1373,8 +1387,6 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
             }
 
             const uint32_t channelBase = address & 0xFFFFFF00;
-            const uint32_t madr = m_ioRegisters[channelBase + 0x10];
-            const uint32_t qwc = m_ioRegisters[channelBase + 0x20];
             m_dmaStartCount.fetch_add(1, std::memory_order_relaxed);
 
             if (tryProcessScratchpadDma(channelBase, value))
@@ -1382,83 +1394,7 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
                 return true;
             }
 
-            if ((channelBase == 0x1000A000u || channelBase == 0x10009000u || channelBase == 0x10008000u) && (m_gsVRAM || channelBase == 0x10008000u))
-            {
-                auto enqueueTransfer = [&](uint32_t srcAddr, uint32_t qwCount)
-                {
-                    if (qwCount == 0)
-                        return;
-                    const bool scratch = isScratchpad(srcAddr);
-                    PendingTransfer pt;
-                    pt.fromScratchpad = scratch;
-                    pt.srcAddr = srcAddr;
-                    pt.qwc = qwCount;
-                    if (channelBase == 0x1000A000u)
-                        m_pendingGifTransfers.push_back(pt);
-                    else if (channelBase == 0x10009000u)
-                        m_pendingVif1Transfers.push_back(pt);
-                    else if (channelBase == 0x10008000u)
-                        m_pendingVif0Transfers.push_back(pt);
-                };
-
-                uint32_t chcr = value;
-                uint32_t mode = (chcr >> 2) & 0x3;
-
-                // A normal-mode transfer leaves MADR just past the data (dma/dmasend.cpp checks
-                // madr == start + size; QWC reaches 0 when the transfer completes).
-                const auto advanceMadr = [&]()
-                { m_ioRegisters[channelBase + 0x10] = (madr & 0x80000000u) | ((madr + (qwc & 0xFFFFu) * 16u) & 0x7FFFFFF0u); };
-                if (mode == 0 && qwc > 0)
-                {
-                    enqueueTransfer(madr, qwc);
-                    advanceMadr();
-                }
-                else if (mode == 1)
-                {
-                    const bool isVifChannel =
-                        channelBase == 0x10009000u || channelBase == 0x10008000u;
-                    std::vector<uint8_t> chainBuf;
-                    walkSourceChain(channelBase, chcr, isVifChannel && (chcr & 0x40u) != 0u, chainBuf);
-                    chcr = m_ioRegisters[channelBase + 0x00];
-
-                    if (!chainBuf.empty())
-                    {
-                        PendingTransfer pt;
-                        pt.fromScratchpad = false;
-                        pt.srcAddr = 0;
-                        pt.qwc = 0;
-                        pt.chainData = std::move(chainBuf);
-                        if (channelBase == 0x1000A000)
-                        {
-                            m_pendingGifTransfers.push_back(std::move(pt));
-                        }
-                        else if (channelBase == 0x10009000u)
-                        {
-                            m_pendingVif1Transfers.push_back(std::move(pt));
-                        }
-                        else if (channelBase == 0x10008000u)
-                        {
-                            m_pendingVif0Transfers.push_back(std::move(pt));
-                        }
-                    }
-                    // else if (channelBase == 0x10009000u)
-                    // {
-
-                    // }
-                }
-                else if (qwc > 0)
-                {
-                    enqueueTransfer(madr, qwc);
-                    advanceMadr();
-                }
-
-                const bool autoProcessTransfers =
-                    (channelBase == 0x1000A000u) ? (m_gifPacketCallback || m_gifArbiter != nullptr) : true;
-                if (autoProcessTransfers)
-                {
-                    processPendingTransfers();
-                }
-            }
+            startEeChannelTransfer(channelBase, value);
         }
         return true;
     }
@@ -1478,6 +1414,91 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
     return false;
 }
 
+// Starts a VIF0/VIF1/GIF channel whose CHCR was written with STR set: normal mode queues MADR/QWC, source-chain mode
+// walks the tags (an MFIFO drain stops where fromSPR has not written yet and stays active).
+void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
+{
+    const uint32_t madr = m_ioRegisters[channelBase + 0x10];
+    const uint32_t qwc = m_ioRegisters[channelBase + 0x20];
+    if ((channelBase == 0x1000A000u || channelBase == 0x10009000u || channelBase == 0x10008000u) && (m_gsVRAM || channelBase == 0x10008000u))
+    {
+        auto enqueueTransfer = [&](uint32_t srcAddr, uint32_t qwCount)
+        {
+            if (qwCount == 0)
+                return;
+            const bool scratch = isScratchpad(srcAddr);
+            PendingTransfer pt;
+            pt.fromScratchpad = scratch;
+            pt.srcAddr = srcAddr;
+            pt.qwc = qwCount;
+            if (channelBase == 0x1000A000u)
+                m_pendingGifTransfers.push_back(pt);
+            else if (channelBase == 0x10009000u)
+                m_pendingVif1Transfers.push_back(pt);
+            else if (channelBase == 0x10008000u)
+                m_pendingVif0Transfers.push_back(pt);
+        };
+
+        uint32_t chcr = value;
+        uint32_t mode = (chcr >> 2) & 0x3;
+
+        // A normal-mode transfer leaves MADR just past the data (dma/dmasend.cpp checks
+        // madr == start + size; QWC reaches 0 when the transfer completes).
+        const auto advanceMadr = [&]()
+        { m_ioRegisters[channelBase + 0x10] = (madr & 0x80000000u) | ((madr + (qwc & 0xFFFFu) * 16u) & 0x7FFFFFF0u); };
+        if (mode == 0 && qwc > 0)
+        {
+            enqueueTransfer(madr, qwc);
+            advanceMadr();
+        }
+        else if (mode == 1)
+        {
+            const bool isVifChannel =
+                channelBase == 0x10009000u || channelBase == 0x10008000u;
+            std::vector<uint8_t> chainBuf;
+            walkSourceChain(channelBase, chcr, isVifChannel && (chcr & 0x40u) != 0u, chainBuf);
+            chcr = m_ioRegisters[channelBase + 0x00];
+
+            if (!chainBuf.empty())
+            {
+                PendingTransfer pt;
+                pt.fromScratchpad = false;
+                pt.srcAddr = 0;
+                pt.qwc = 0;
+                pt.chainData = std::move(chainBuf);
+                if (channelBase == 0x1000A000)
+                {
+                    m_pendingGifTransfers.push_back(std::move(pt));
+                }
+                else if (channelBase == 0x10009000u)
+                {
+                    m_pendingVif1Transfers.push_back(std::move(pt));
+                }
+                else if (channelBase == 0x10008000u)
+                {
+                    m_pendingVif0Transfers.push_back(std::move(pt));
+                }
+            }
+            // else if (channelBase == 0x10009000u)
+            // {
+
+            // }
+        }
+        else if (qwc > 0)
+        {
+            enqueueTransfer(madr, qwc);
+            advanceMadr();
+        }
+
+        const bool autoProcessTransfers =
+            (channelBase == 0x1000A000u) ? (m_gifPacketCallback || m_gifArbiter != nullptr) : true;
+        if (autoProcessTransfers)
+        {
+            processPendingTransfers();
+        }
+    }
+}
+
 // Walks a source chain from TADR (CNT, NEXT, REF, REFS, REFE, CALL, RET, END; CHCR.TIE with a tag IRQ bit stops after
 // that tag), appending each tag's data (and with transferTagData its upper 64 bits first) to chainBuf. Leaves
 // TADR, MADR, ASR0/1, CHCR.ASP and CHCR[31:16] (the last tag) as the channel would.
@@ -1488,6 +1509,9 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
     uint32_t asr1 = m_ioRegisters[channelBase + 0x50];
     uint32_t asp = (chcr >> 4) & 0x3u;
     const bool tieEnabled = (chcr & (1u << 7)) != 0u;
+    const bool mfifo = channelBase == mfifoDrainChannel();
+    if (mfifo)
+        m_mfifoDrainStalled = false;
     // Only a guard against a malformed (looping) chain: hardware has no tag limit, and heavy frames
     // exceed 4096 tags (4190-4600 measured in Shadow of the Colossus), losing the chain's tail.
     const int kMaxChainTags = 1 << 20;
@@ -1578,6 +1602,8 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
 
     while (tagsProcessed < kMaxChainTags)
     {
+        if (mfifo)
+            tagAddr = mfifoWrap(tagAddr);
         if (!visited.insert(ChainState{tagAddr, asr0, asr1, asp}).second)
         {
             cycleDetected = true;
@@ -1615,6 +1641,23 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
         uint32_t id = static_cast<uint32_t>((tag >> 28) & 0x7);
         const bool irq = ((tag >> 31) & 0x1ull) != 0ull;
         uint32_t addr = static_cast<uint32_t>((tag >> 32) & 0x7FFFFFFF);
+        // CNT, NEXT, CALL, RET and END carry their data right after the tag, inside the MFIFO ring; REFE, REF and
+        // REFS point outside it (DobieStation mfifo_handler does not wrap their MADR either).
+        const bool dataFollowsTag = id == 1u || id == 2u || id == 5u || id == 6u || id == 7u;
+        if (mfifo)
+        {
+            // The tag is consumed only when it and the data that follows it have been written by fromSPR; the
+            // walk stops before it otherwise and the channel stays active (stall granularity is one tag: the
+            // hardware can also stop inside the data, D-DMA-2).
+            const uint64_t needed = 16ull + (dataFollowsTag ? static_cast<uint64_t>(tagQwc) * 16ull : 0ull);
+            if (mfifoAvailableBytes(tagAddr) < needed)
+            {
+                m_mfifoDrainStalled = true;
+                raiseMfifoEmpty();
+                break;
+            }
+            m_mfifoEmptyRaised = false;
+        }
         lastTagUpper = static_cast<uint32_t>((tag >> 16) & 0xFFFFu);
         ++tagsProcessed;
 
@@ -1690,9 +1733,21 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
             appendVifTagData(currentTagAddr);
 
         if (hasPayload)
-            appendData(dataAddr, tagQwc);
+        {
+            if (mfifo && dataFollowsTag)
+            {
+                for (uint32_t q = 0u; q < tagQwc; ++q)
+                    appendData(mfifoWrap(dataAddr + q * 16u), 1u);
+            }
+            else
+            {
+                appendData(dataAddr, tagQwc);
+            }
+        }
         // MADR is left just past the tag's data (ps2autotests dma/spr/chain: REFE of 1 qword leaves MADR = ADDR + 0x10).
         madr = dataAddr + static_cast<uint32_t>(tagQwc) * 16u;
+        if (mfifo && dataFollowsTag)
+            madr = mfifoWrap(madr);
         if (irq && tieEnabled)
             endChain = true;
         if (endChain)
@@ -1723,7 +1778,7 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
     }
 
     m_ioRegisters[channelBase + 0x10] = madr;
-    m_ioRegisters[channelBase + 0x30] = tagAddr;
+    m_ioRegisters[channelBase + 0x30] = mfifo ? mfifoWrap(tagAddr) : tagAddr;
     m_ioRegisters[channelBase + 0x40] = asr0;
     m_ioRegisters[channelBase + 0x50] = asr1;
     chcr = (chcr & ~(0x3u << 4)) | ((asp & 0x3u) << 4);
@@ -1782,6 +1837,37 @@ bool PS2Memory::tryProcessScratchpadDma(uint32_t channelBase, uint32_t chcr)
     const uint32_t originalMadr = m_ioRegisters[channelBase + 0x10u] & 0x7FFFFFF0u;
     const uint32_t originalSadr = m_ioRegisters[channelBase + 0x80u] & 0x3FF0u;
 
+    // fromSPR into the MFIFO ring: each qword lands at RBOR + (MADR & RBSR) and MADR wraps the same way; the drain
+    // channel continues if it was waiting for data. Only when MFD selects a drain and MADR is inside the ring
+    // (DobieStation requires MFD, PCSX2 _SPR0chain requires the ring range; D-DMA-1).
+    if (channelBase == kSprFromChannel && !interleave && mfifoDrainChannel() != 0u && mfifoRingContains(originalMadr))
+    {
+        uint32_t scratchOffset = originalSadr;
+        for (uint32_t i = 0u; i < qwc; ++i)
+        {
+            uint32_t dest = 0u;
+            try
+            {
+                dest = translateAddress(mfifoWrap(originalMadr + i * 16u));
+            }
+            catch (const std::exception &)
+            {
+                return false;
+            }
+            if (dest > PS2_RAM_SIZE - 16u)
+                return false;
+            std::memcpy(m_rdram + dest, m_scratchpad + scratchOffset, 16u);
+            markModified(dest, 16u);
+            scratchOffset = (scratchOffset + 16u) & (PS2_SCRATCHPAD_SIZE - 1u);
+        }
+        m_ioRegisters[channelBase + 0x10u] = mfifoWrap(originalMadr + qwc * 16u);
+        m_ioRegisters[channelBase + 0x20u] = 0u;
+        m_ioRegisters[channelBase + 0x80u] = (originalSadr + qwc * 16u) & 0x3FF0u;
+        completeDmacChannel(channelBase, 8u);
+        resumeMfifoDrain();
+        return true;
+    }
+
     uint32_t mainOffset = 0u;
     try
     {
@@ -1827,16 +1913,82 @@ void PS2Memory::completeDmacChannel(uint32_t channelBase, uint32_t cause)
     static constexpr uint32_t kDStat = 0x1000E010u;
     m_ioRegisters[channelBase] &= ~0x100u;
 
-    uint32_t dstat = m_ioRegisters.count(kDStat) ? m_ioRegisters[kDStat] : 0u;
-    dstat |= 1u << cause;
-    const uint32_t status = dstat & 0x3FFu;
-    const uint32_t mask = (dstat >> 16u) & 0x3FFu;
-    if ((status & mask) != 0u)
-        dstat |= 1u << 31u;
-    else
-        dstat &= ~(1u << 31u);
-    m_ioRegisters[kDStat] = dstat;
+    const uint32_t dstat = m_ioRegisters.count(kDStat) ? m_ioRegisters[kDStat] : 0u;
+    m_ioRegisters[kDStat] = withDStatInt1Line(dstat | (1u << cause));
     queueCompletedDmacCause(cause);
+}
+
+uint32_t PS2Memory::mfifoDrainChannel() const
+{
+    const auto it = m_ioRegisters.find(0x1000E000u); // D_CTRL.MFD, bits 2-3
+    const uint32_t mfd = it != m_ioRegisters.end() ? (it->second >> 2u) & 0x3u : 0u;
+    return mfd == 2u ? 0x10009000u : mfd == 3u ? 0x1000A000u : 0u;
+}
+
+namespace
+{
+    uint32_t ioReg(const std::unordered_map<uint32_t, uint32_t> &regs, uint32_t address)
+    {
+        const auto it = regs.find(address);
+        return it != regs.end() ? it->second : 0u;
+    }
+}
+
+// D_RBOR (0x1000E050) is the ring base, D_RBSR (0x1000E040) its mask: the ring holds D_RBSR + 16 bytes.
+bool PS2Memory::mfifoRingContains(uint32_t address) const
+{
+    const uint32_t base = ioReg(m_ioRegisters, 0x1000E050u) & 0x7FFFFFF0u;
+    const uint64_t size = static_cast<uint64_t>(ioReg(m_ioRegisters, 0x1000E040u) & 0x7FFFFFF0u) + 16u;
+    const uint32_t a = address & 0x7FFFFFF0u;
+    return a >= base && a < base + size;
+}
+
+uint32_t PS2Memory::mfifoWrap(uint32_t address) const
+{
+    const uint32_t base = ioReg(m_ioRegisters, 0x1000E050u) & 0x7FFFFFF0u;
+    const uint32_t mask = ioReg(m_ioRegisters, 0x1000E040u) & 0x7FFFFFF0u;
+    return base + (address & mask);
+}
+
+// Bytes fromSPR has written ahead of readAddress: from the read position up to fromSPR's MADR, around the ring.
+// Equal positions mean empty (the hardware cannot tell a full ring from an empty one either). Before fromSPR has
+// pointed into the ring nothing is available.
+uint32_t PS2Memory::mfifoAvailableBytes(uint32_t readAddress) const
+{
+    const uint32_t writer = ioReg(m_ioRegisters, 0x1000D010u) & 0x7FFFFFF0u; // fromSPR MADR
+    if (!mfifoRingContains(writer))
+        return 0u;
+    const uint32_t base = ioReg(m_ioRegisters, 0x1000E050u) & 0x7FFFFFF0u;
+    const uint64_t size = static_cast<uint64_t>(ioReg(m_ioRegisters, 0x1000E040u) & 0x7FFFFFF0u) + 16u;
+    const uint64_t w = writer - base;
+    const uint64_t r = mfifoWrap(readAddress) - base;
+    return static_cast<uint32_t>((w + size - r) % size);
+}
+
+// D_STAT.MEIS is raised once when the drain catches up with fromSPR and is armed again once the drain consumes data
+// (DobieStation mfifo_empty_triggered). The DMAC handler for cause 14 runs only when MEIM unmasks it.
+void PS2Memory::raiseMfifoEmpty()
+{
+    if (m_mfifoEmptyRaised)
+        return;
+    m_mfifoEmptyRaised = true;
+    static constexpr uint32_t kDStat = 0x1000E010u;
+    const uint32_t dstat = withDStatInt1Line(ioReg(m_ioRegisters, kDStat) | kDStatMeis);
+    m_ioRegisters[kDStat] = dstat;
+    if (((dstat >> 16u) & kDStatMeis) != 0u)
+        queueCompletedDmacCause(14u);
+}
+
+// After fromSPR adds data to the ring, a drain channel that stopped at the empty ring continues from its TADR.
+void PS2Memory::resumeMfifoDrain()
+{
+    const uint32_t drain = mfifoDrainChannel();
+    if (!m_mfifoDrainStalled || drain == 0u)
+        return;
+    const uint32_t chcr = ioReg(m_ioRegisters, drain);
+    m_mfifoDrainStalled = false;
+    if ((chcr & 0x100u) != 0u)
+        startEeChannelTransfer(drain, chcr);
 }
 
 void PS2Memory::processPendingTransfers()
@@ -2048,20 +2200,12 @@ void PS2Memory::processPendingTransfers()
 
     auto raiseDStatChannel = [&](uint32_t channelBit)
     {
-        uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
-        dstat |= (1u << channelBit);
-
-        const uint32_t status = dstat & 0x3FFu;
-        const uint32_t mask = (dstat >> 16) & 0x3FFu;
-        if ((status & mask) != 0u)
-            dstat |= (1u << 31);
-        else
-            dstat &= ~(1u << 31);
-
-        m_ioRegisters[D_STAT] = dstat;
+        const uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
+        m_ioRegisters[D_STAT] = withDStatInt1Line(dstat | (1u << channelBit));
     };
 
-    if (hadGif)
+    // A GIF MFIFO drain stopped at the empty ring has delivered its data but stays active (STR set, no CIS2).
+    if (hadGif && !(m_mfifoDrainStalled && mfifoDrainChannel() == GIF_CHANNEL))
     {
         raiseDStatChannel(2u); // GIF channel
         queueCompletedDmacCause(2u);
@@ -2078,13 +2222,8 @@ void PS2Memory::completeVifDma(uint32_t vif)
 {
     constexpr uint32_t D_STAT = 0x1000E010u;
     const uint32_t channel = (vif & 1u) ? 0x10009000u : 0x10008000u;
-    uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
-    dstat |= (1u << (vif & 1u));
-    if (((dstat & 0x3FFu) & ((dstat >> 16) & 0x3FFu)) != 0u)
-        dstat |= (1u << 31);
-    else
-        dstat &= ~(1u << 31);
-    m_ioRegisters[D_STAT] = dstat;
+    const uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
+    m_ioRegisters[D_STAT] = withDStatInt1Line(dstat | (1u << (vif & 1u)));
     queueCompletedDmacCause(vif & 1u);
     m_ioRegisters[channel + 0x00] &= ~0x100u;
     m_ioRegisters[channel + 0x20] = 0;
@@ -2379,15 +2518,8 @@ bool PS2Memory::tryProcessNativeGifImageUploadChain(GS &gs, uint32_t tadr, uint3
     m_ioRegisters[GIF_CHANNEL + 0x00u] = ((chcr & 0x0000FFFFu) | (lastTagUpper << 16u)) & ~0x100u;
     m_ioRegisters[GIF_CHANNEL + 0x20u] = 0u;
 
-    uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
-    dstat |= (1u << 2u);
-    const uint32_t status = dstat & 0x3FFu;
-    const uint32_t mask = (dstat >> 16u) & 0x3FFu;
-    if ((status & mask) != 0u)
-        dstat |= (1u << 31u);
-    else
-        dstat &= ~(1u << 31u);
-    m_ioRegisters[D_STAT] = dstat;
+    const uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
+    m_ioRegisters[D_STAT] = withDStatInt1Line(dstat | (1u << 2u));
     queueCompletedDmacCause(2u);
     return true;
 }
@@ -2459,15 +2591,8 @@ bool PS2Memory::tryProcessNativeGifPackedChain(GS &gs, uint32_t tadr, uint32_t c
     m_ioRegisters[GIF_CHANNEL + 0x00u] = ((chcr & 0x0000FFFFu) | (tag.upper << 16u)) & ~0x100u;
     m_ioRegisters[GIF_CHANNEL + 0x20u] = 0u;
 
-    uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
-    dstat |= (1u << 2u);
-    const uint32_t status = dstat & 0x3FFu;
-    const uint32_t mask = (dstat >> 16u) & 0x3FFu;
-    if ((status & mask) != 0u)
-        dstat |= (1u << 31u);
-    else
-        dstat &= ~(1u << 31u);
-    m_ioRegisters[D_STAT] = dstat;
+    const uint32_t dstat = m_ioRegisters.count(D_STAT) ? m_ioRegisters[D_STAT] : 0u;
+    m_ioRegisters[D_STAT] = withDStatInt1Line(dstat | (1u << 2u));
     queueCompletedDmacCause(2u);
     return true;
 }
@@ -2570,6 +2695,9 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
             {
                 // A VIF DMA held behind a VIF stall is still running until FBRST.STC releases it.
                 if ((address == 0x10008000u && m_vifDmaHeld[0]) || (address == 0x10009000u && m_vifDmaHeld[1]))
+                    return m_ioRegisters[address] | 0x100u;
+                // So is an MFIFO drain waiting at the empty ring for fromSPR to add data.
+                if (m_mfifoDrainStalled && address == mfifoDrainChannel())
                     return m_ioRegisters[address] | 0x100u;
                 uint32_t channelStatus = m_ioRegisters[address] & ~0x100u;
                 m_ioRegisters[address] = channelStatus;

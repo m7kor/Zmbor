@@ -494,6 +494,20 @@ public:
     bool tryProcessScratchpadDma(uint32_t channelBase, uint32_t chcr);
     void completeDmacChannel(uint32_t channelBase, uint32_t cause);
     void queueCompletedDmacCause(uint32_t cause);
+    // Starts a VIF0/VIF1/GIF transfer for a CHCR with STR set (normal or source-chain mode).
+    void startEeChannelTransfer(uint32_t channelBase, uint32_t chcr);
+
+    // MFIFO (D_CTRL.MFD = 2 VIF1, 3 GIF): fromSPR writes into the ring D_RBOR..D_RBOR+D_RBSR+16 and the drain
+    // channel's source chain reads its tags (and data that follows them) from that ring, stalling with D_STAT.MEIS
+    // when it reaches fromSPR's MADR. Decisions D-DMA-1/2 in docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md.
+    uint32_t mfifoDrainChannel() const;
+    bool mfifoRingContains(uint32_t address) const;
+    uint32_t mfifoWrap(uint32_t address) const;
+    uint32_t mfifoAvailableBytes(uint32_t readAddress) const;
+    void raiseMfifoEmpty();
+    void resumeMfifoDrain();
+    bool m_mfifoDrainStalled = false;
+    bool m_mfifoEmptyRaised = false;
 };
 
 #endif // PS2_MEMORY_H

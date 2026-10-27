@@ -988,6 +988,9 @@ void PS2Memory::finishVifDma(uint32_t vif)
     // it fits (ps2autotests dma/vif/intstall: a 3-qword packet stalled by an I bit completes, no timeout). Only data
     // the FIFO cannot take keeps the DMA active until the stall releases it.
     const size_t fifoBytes = (vif & 1u) ? 16u * 16u : 8u * 16u;
+    // A VIF1 MFIFO drain stopped at the empty ring stays active until fromSPR adds data (resumeMfifoDrain).
+    if ((vif & 1u) != 0u && m_mfifoDrainStalled && mfifoDrainChannel() == 0x10009000u)
+        return;
     if (isVifStalled(vif) && m_vifStalledData[vif & 1u].size() > fifoBytes)
         m_vifDmaHeld[vif & 1u] = true;
     else

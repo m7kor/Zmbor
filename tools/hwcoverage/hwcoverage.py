@@ -77,8 +77,11 @@ def cmd_record(tests_exe):
     (ROOT / "ps2_log.txt").unlink(missing_ok=True)
     results = parse_run(proc.stdout + proc.stderr, known_test_names())
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
-                                capture_output=True, text=True).stdout.strip())
+    # The tree is clean when no tracked file other than this tool's own outputs is modified.
+    own_outputs = {p.relative_to(ROOT).as_posix() for p in (RESULTS, COVERAGE, REPORT, GAP_MATRIX)}
+    status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                            capture_output=True, text=True).stdout.splitlines()
+    dirty = any(line[3:].strip() not in own_outputs for line in status if line.strip())
     doc = {
         "commit": commit, "tree_clean": not dirty, "platform": platform.platform(terse=True),
         "binary": exe.name, "binary_sha256": hashlib.sha256(exe.read_bytes()).hexdigest(),

@@ -1273,6 +1273,151 @@
      "denominator": 132
     }
    }
+  },
+  "iop_hardware": {
+   "source": {
+    "path": "docs/hwtest/iop-dashboard.json",
+    "sha256": "c9f886faec5d20acea2b3918bd6813f85f9b2983c6955354abd1c98a6eae6cd1",
+    "evidence_commit": "00e1498",
+    "description": "the 23 ps2autotests IOP programs (.irx, real-PS2 .expected) run on ps2xIOP by tools/hwtest/iop_hwtest.py at 00e1498 (IRX relocation 2318aad, printf formatting 878f01a, JALR 00e1498)"
+   },
+   "programs_pass": 8,
+   "programs": 23,
+   "lines_match": 1168,
+   "lines": 1306,
+   "crash": 0,
+   "timeout": 0,
+   "by_area": {
+    "cpu/iop": {
+     "programs_pass": 7,
+     "programs": 7,
+     "lines_match": 981,
+     "lines": 981
+    },
+    "kernel/iop": {
+     "programs_pass": 1,
+     "programs": 16,
+     "lines_match": 187,
+     "lines": 325
+    }
+   },
+   "tests": {
+    "cpu_iop_alu": {
+     "status": "PASS",
+     "lines_match": 467,
+     "lines": 467
+    },
+    "cpu_iop_branch": {
+     "status": "PASS",
+     "lines_match": 170,
+     "lines": 170
+    },
+    "cpu_iop_branchdelay": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "cpu_iop_hilodelay": {
+     "status": "PASS",
+     "lines_match": 6,
+     "lines": 6
+    },
+    "cpu_iop_lsu": {
+     "status": "PASS",
+     "lines_match": 114,
+     "lines": 114
+    },
+    "cpu_iop_lsudelay": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "cpu_iop_muldiv": {
+     "status": "PASS",
+     "lines_match": 202,
+     "lines": 202
+    },
+    "kernel_iop_eventflag_delete": {
+     "status": "MISMATCH",
+     "lines_match": 8,
+     "lines": 11
+    },
+    "kernel_iop_eventflag_poll": {
+     "status": "MISMATCH",
+     "lines_match": 11,
+     "lines": 18
+    },
+    "kernel_iop_interrupt_register": {
+     "status": "MISMATCH",
+     "lines_match": 11,
+     "lines": 15
+    },
+    "kernel_iop_interrupt_release": {
+     "status": "MISMATCH",
+     "lines_match": 6,
+     "lines": 9
+    },
+    "kernel_iop_libc_sprintf": {
+     "status": "PASS",
+     "lines_match": 19,
+     "lines": 19
+    },
+    "kernel_iop_libc_strtok": {
+     "status": "MISMATCH",
+     "lines_match": 5,
+     "lines": 10
+    },
+    "kernel_iop_messagebox_poll": {
+     "status": "MISMATCH",
+     "lines_match": 4,
+     "lines": 9
+    },
+    "kernel_iop_messagebox_receive": {
+     "status": "MISMATCH",
+     "lines_match": 5,
+     "lines": 10
+    },
+    "kernel_iop_messagebox_send": {
+     "status": "MISMATCH",
+     "lines_match": 8,
+     "lines": 14
+    },
+    "kernel_iop_thread_cancelwakeup": {
+     "status": "MISMATCH",
+     "lines_match": 8,
+     "lines": 11
+    },
+    "kernel_iop_thread_create": {
+     "status": "MISMATCH",
+     "lines_match": 14,
+     "lines": 26
+    },
+    "kernel_iop_thread_delete": {
+     "status": "MISMATCH",
+     "lines_match": 7,
+     "lines": 15
+    },
+    "kernel_iop_thread_releasewait": {
+     "status": "MISMATCH",
+     "lines_match": 13,
+     "lines": 23
+    },
+    "kernel_iop_thread_stat": {
+     "status": "MISMATCH",
+     "lines_match": 6,
+     "lines": 17
+    },
+    "kernel_iop_vpool_create": {
+     "status": "MISMATCH",
+     "lines_match": 8,
+     "lines": 14
+    },
+    "kernel_iop_vpool_pallocate": {
+     "status": "MISMATCH",
+     "lines_match": 54,
+     "lines": 104
+    }
+   }
   }
  },
  "sections": [
@@ -4230,20 +4375,29 @@
         {
          "id": "iop.cpu",
          "name": "R3000A instruction execution",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "R3000A CPU",
-         "implemented": "",
-         "missing": "ps2autotests cpu/iop programs exist but are not run",
+         "implemented": "R3000A interpreter with load and branch delay slots; the seven ps2autotests cpu/iop programs (ALU, branches, branch delay, HI/LO delay, loads/stores, load delay, mul/div) match their real-PS2 output exactly",
+         "missing": "Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/core/iop_cpu.cpp"
          ],
          "tests": [
-          "ps2xIOP/tests/iop_emulator_tests.cpp"
+          "ps2xIOP/tests/iop_emulator_tests.cpp",
+          "ps2xIOP/tests/iop_import_tests.cpp"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_alu",
+          "cpu_iop_branch",
+          "cpu_iop_branchdelay",
+          "cpu_iop_hilodelay",
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay",
+          "cpu_iop_muldiv"
+         ],
          "blocker": "",
          "target": "8",
-         "verified_at": null
+         "verified_at": "00e1498"
         },
         {
          "id": "iop.mem",

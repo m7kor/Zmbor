@@ -22,7 +22,7 @@
   "test_executed": 119,
   "test_passed": 119,
   "vectors_passed": 4,
-  "hardware_verified": 59,
+  "hardware_verified": 60,
   "timing_verified": 0
  },
  "by_category": {
@@ -83,7 +83,7 @@
    "test_executed": 7,
    "test_passed": 7,
    "vectors_passed": 0,
-   "hardware_verified": 4,
+   "hardware_verified": 5,
    "timing_verified": 0
   },
   "G": {
@@ -4185,8 +4185,8 @@
    "id": "iop.cpu",
    "name": "R3000A instruction execution",
    "category": "F",
-   "status": "IMPLEMENTED_UNVERIFIED",
-   "missing": "ps2autotests cpu/iop programs exist but are not run",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program",
    "blocker": "",
    "target": "8",
    "levels": {
@@ -4195,7 +4195,7 @@
     "test_executed": false,
     "test_passed": false,
     "vectors_passed": false,
-    "hardware_verified": false,
+    "hardware_verified": true,
     "timing_verified": false
    },
    "dependencies": [
@@ -4207,8 +4207,8 @@
     "passed": 0
    },
    "hardware_programs": {
-    "cited": 0,
-    "matching": 0
+    "cited": 7,
+    "matching": 7
    },
    "unverified_dependencies": [
     "iop.mem"
@@ -4272,9 +4272,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.cpu"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "iop.kernel",
@@ -4408,9 +4406,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.cpu"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "sif.cmd",
@@ -4509,8 +4505,7 @@
    },
    "unverified_dependencies": [
     "dma.c5",
-    "dma.c6",
-    "iop.cpu"
+    "dma.c6"
    ]
   },
   {

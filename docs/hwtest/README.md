@@ -42,8 +42,9 @@ They are not added to the 55 EE programs above.
 | run | exact programs | matching lines |
 |---|---|---|
 | first run (printf formatting in place, before the IRX relocation fix) | 0 / 23 (no output) | 0 / 1306 |
-| current | 7 / 23 | 1167 / 1306 |
+| after the IRX relocation fix (`2318aad`) and printf formatting (`878f01a`) | 7 / 23 | 1167 / 1306 |
+| current (JALR fix `00e1498`) | 8 / 23 | 1168 / 1306 |
 
-Exact: `cpu/iop` alu, branch, hilodelay, lsu, lsudelay, muldiv; `kernel/iop/libc` sprintf. `cpu/iop/branchdelay`
-differs on 1 of 11 lines; the 15 other `kernel/iop` programs (event flags, message boxes, threads, vpool, strtok)
+Exact: all seven `cpu/iop` programs (alu, branch, branchdelay, hilodelay, lsu, lsudelay, muldiv) and `kernel/iop/libc`
+sprintf. The 15 other `kernel/iop` programs (event flags, message boxes, threads, vpool, strtok)
 differ where the HLE IOP kernel's results differ from the real kernel's.

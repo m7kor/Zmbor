@@ -50,6 +50,15 @@ Hardware results: `docs/hwtest/dashboard.json` (sha256 `dd5ee3003c6ab14a…`), t
 | `vu/lower` lines | 756 / 797 (4/5 programs) | 94.8% |
 | `vu/upper` lines | 32 / 32 (1/1 programs) | 100.0% |
 
+IOP programs (a separate measurement, not part of the counts above): `docs/hwtest/iop-dashboard.json` (sha256 `c9f886faec5d20ac…`), the 23 ps2autotests IOP programs (.irx, real-PS2 .expected) run on ps2xIOP by tools/hwtest/iop_hwtest.py at 00e1498 (IRX relocation 2318aad, printf formatting 878f01a, JALR 00e1498)
+
+| measurement | numerator / denominator | value |
+|---|---|---|
+| IOP output lines matching real-PS2 `.expected` | 1168 / 1306 | 89.4% |
+| IOP programs matching exactly | 8 / 23 | 34.7% |
+| `cpu/iop` lines | 981 / 981 (7/7 programs) | 100.0% |
+| `kernel/iop` lines | 187 / 325 (1/16 programs) | 57.5% |
+
 Instruction coverage: the denominator is every mnemonic the recompiler's decode tables name for a class (`ps2xRecomp/include/ps2recomp/instructions.h`; it includes MIPS encodings the EE does not implement, which can only lower the value). An instruction counts as hardware-confirmed when a ps2autotests program that matches real-PS2 output exactly names it in its output and no mismatching program does. Instructions a program executes without naming them (for example SYNC) are not counted. VU micro-mode and COP0 programs do not name instructions, so those classes are not measured.
 
 | instruction class | hardware-confirmed / decoded | value | exercised only by a mismatching program | not exercised by any program |
@@ -89,9 +98,9 @@ No overall completeness percentage is shown: the requirements of most components
 
 | section | components | `VERIFIED_COMPLETE` | `VERIFIED_PARTIAL` | `IMPLEMENTED_UNVERIFIED` | `HLE_OR_STUB` | `MISSING` | `NOT_APPLICABLE` | `UNKNOWN` |
 |---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 174 | 18 | 47 | 60 | 23 | 22 | 3 | 1 |
+| PS2 Hardware & Runtime | 174 | 18 | 48 | 59 | 23 | 22 | 3 | 1 |
 | Recompiler, Tools & Compatibility | 53 | 4 | 29 | 11 | 0 | 1 | 0 | 8 |
-| **all** | **227** | **22** | **76** | **71** | **23** | **23** | **3** | **9** |
+| **all** | **227** | **22** | **77** | **70** | **23** | **23** | **3** | **9** |
 
 ## PS2 Hardware & Runtime
 
@@ -256,7 +265,7 @@ The IOP runs physical IRX modules on an R3000A interpreter with an HLE kernel, o
 
 | id | component | status | implemented | missing / blocker | evidence | target |
 |---|---|---|---|---|---|---|
-| `iop.cpu` | R3000A instruction execution | `IMPLEMENTED_UNVERIFIED` |  | ps2autotests cpu/iop programs exist but are not run | 1 test ref(s) | 8 |
+| `iop.cpu` | R3000A instruction execution | `VERIFIED_PARTIAL` | R3000A interpreter with load and branch delay slots; the seven ps2autotests cpu/iop programs (ALU, branches, branch delay, HI/LO delay, loads/stores, load delay, mul/div) match their real-PS2 output exactly | Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program | hw: `cpu_iop_alu` 467/467, `cpu_iop_branch` 170/170, `cpu_iop_branchdelay` 11/11, `cpu_iop_hilodelay` 6/6, `cpu_iop_lsu` 114/114, `cpu_iop_lsudelay` 11/11, `cpu_iop_muldiv` 202/202; 2 test ref(s) | 8 |
 | `iop.mem` | IOP memory map (2 MB, hardware ranges) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `iop.intr` | Interrupts (intrman) | `HLE_OR_STUB` |  | — | — |  |
 | `iop.kernel` | Threads, semaphores, events (thbase, ...) | `HLE_OR_STUB` |  | — | 1 test ref(s) |  |
@@ -523,7 +532,7 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `ipu.dma` | — | — |
 | `ipu.cmd` | `ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp` | — |
 | `ipu.mpeg` | `ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::sceMpegDemuxPssRing dispatches registered video and audio stream callbacks` |
-| `iop.cpu` | `ps2xIOP/src/emulator/core/iop_cpu.cpp` | `ps2xIOP/tests/iop_emulator_tests.cpp` |
+| `iop.cpu` | `ps2xIOP/src/emulator/core/iop_cpu.cpp` | `ps2xIOP/tests/iop_emulator_tests.cpp`<br>`ps2xIOP/tests/iop_import_tests.cpp` |
 | `iop.mem` | `ps2xIOP/src/emulator/core/iop_memory.cpp` | `ps2xTest/src/ps2_sif_dma_tests.cpp::IOP heap DMA uses private backing instead of aliasing EE RDRAM` |
 | `iop.intr` | `ps2xIOP/src/emulator/imports/iop_intrman.cpp` | — |
 | `iop.kernel` | `ps2xIOP/src/emulator/core/iop_kernel.cpp` | `ps2xIOP/tests/iop_emulator_tests.cpp` |

@@ -2,10 +2,10 @@
   "by_subsystem": {
     "cpu/iop": {
       "CRASH": 0,
-      "MISMATCH": 1,
+      "MISMATCH": 0,
       "NOT_BUILT": 0,
       "NO_OUTPUT": 0,
-      "PASS": 6,
+      "PASS": 7,
       "RECOMPILE_FAIL": 0,
       "TIMEOUT": 0
     },
@@ -27,9 +27,9 @@
     "discovered": 23,
     "executed": 23,
     "expected_lines": 1306,
-    "matching": 7,
-    "matching_lines": 1167,
-    "mismatch": 16,
+    "matching": 8,
+    "matching_lines": 1168,
+    "mismatch": 15,
     "no_output": 0,
     "not_built": 0,
     "recompile_fail": 0,
@@ -44,7 +44,7 @@
       "id": "cpu_iop_alu",
       "matching_lines": 467,
       "regression": false,
-      "run_seconds": 0.017,
+      "run_seconds": 0.013,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -55,7 +55,7 @@
       "id": "cpu_iop_branch",
       "matching_lines": 170,
       "regression": false,
-      "run_seconds": 0.014,
+      "run_seconds": 0.013,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -64,10 +64,10 @@
       "exit_code": 0,
       "expected_lines": 11,
       "id": "cpu_iop_branchdelay",
-      "matching_lines": 10,
+      "matching_lines": 11,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "cpu/iop"
     },
     {
@@ -77,7 +77,7 @@
       "id": "cpu_iop_hilodelay",
       "matching_lines": 6,
       "regression": false,
-      "run_seconds": 0.011,
+      "run_seconds": 0.01,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -110,7 +110,7 @@
       "id": "cpu_iop_muldiv",
       "matching_lines": 202,
       "regression": false,
-      "run_seconds": 0.012,
+      "run_seconds": 0.013,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -121,7 +121,7 @@
       "id": "kernel_iop_eventflag_delete",
       "matching_lines": 8,
       "regression": false,
-      "run_seconds": 0.011,
+      "run_seconds": 0.013,
       "status": "MISMATCH",
       "subsystem": "kernel/iop"
     },
@@ -132,7 +132,7 @@
       "id": "kernel_iop_eventflag_poll",
       "matching_lines": 11,
       "regression": false,
-      "run_seconds": 0.012,
+      "run_seconds": 0.013,
       "status": "MISMATCH",
       "subsystem": "kernel/iop"
     },
@@ -143,7 +143,7 @@
       "id": "kernel_iop_interrupt_register",
       "matching_lines": 11,
       "regression": false,
-      "run_seconds": 0.011,
+      "run_seconds": 0.012,
       "status": "MISMATCH",
       "subsystem": "kernel/iop"
     },
@@ -154,7 +154,7 @@
       "id": "kernel_iop_interrupt_release",
       "matching_lines": 6,
       "regression": false,
-      "run_seconds": 0.011,
+      "run_seconds": 0.012,
       "status": "MISMATCH",
       "subsystem": "kernel/iop"
     },
@@ -176,7 +176,7 @@
       "id": "kernel_iop_libc_strtok",
       "matching_lines": 5,
       "regression": false,
-      "run_seconds": 0.01,
+      "run_seconds": 0.011,
       "status": "MISMATCH",
       "subsystem": "kernel/iop"
     },

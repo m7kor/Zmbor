@@ -2285,8 +2285,9 @@
     "iop.mem"
    ],
    "acceptance": [
-    "Unit: instruction semantics",
-    "Hardware: ps2autotests cpu/iop programs (exist, not run yet)"
+    "Unit: ps2xIOP emulator and import tests (JALR rs == rd, rd = 0)",
+    "Hardware: ps2autotests cpu/iop alu, branch, branchdelay, hilodelay, lsu, lsudelay, muldiv (7/7 exact on ps2xIOP, tools/hwtest/iop_hwtest.py)",
+    "Hardware still needed: an exception/interrupt/COP0 probe; an enumerated instruction list for VERIFIED_COMPLETE"
    ],
    "references": [
     "ps2tek: IOP",
@@ -2294,7 +2295,7 @@
     "DobieStation 68dd073: iop/iop.cpp, iop_dma.cpp, iop_timers.cpp, iop_intc.cpp",
     "ps2sdk: iop/kernel (intrman, thbase, thsemap, thevent, timrman, loadcore, modload, sifman, sifcmd)"
    ],
-   "known_divergences": "programs not run"
+   "known_divergences": "none known in the measured programs"
   },
   "iop.mem": {
    "block": "IOP memory map",

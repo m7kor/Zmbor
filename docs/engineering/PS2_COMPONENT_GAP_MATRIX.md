@@ -140,16 +140,16 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `iop.cpu` R3000A instruction execution | `IMPLEMENTED_UNVERIFIED` | ps2autotests cpu/iop programs exist but are not run | — | 8 | `iop.mem` | contract_specified, test_exists |
+| `iop.cpu` R3000A instruction execution | `VERIFIED_PARTIAL` | Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program | — | 8 | `iop.mem` | contract_specified, test_exists, hardware_verified |
 | `iop.mem` IOP memory map (2 MB, hardware ranges) | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
-| `iop.intr` Interrupts (intrman) | `HLE_OR_STUB` | — | — | — | `iop.cpu` | contract_specified |
+| `iop.intr` Interrupts (intrman) | `HLE_OR_STUB` | — | — | — | — | contract_specified |
 | `iop.kernel` Threads, semaphores, events (thbase, ...) | `HLE_OR_STUB` | — | — | — | `iop.intr`, `iop.timers` | contract_specified, test_exists |
 | `iop.timers` Timers (timrman) | `HLE_OR_STUB` | — | — | — | `iop.intr` | contract_specified, test_exists |
 | `iop.irx` IRX loading, relocation, versioned imports | `IMPLEMENTED_UNVERIFIED` | — | — | — | `iop.mem`, `iop.kernel` | contract_specified, test_exists |
-| `iop.sched` IOP scheduling against the EE | `IMPLEMENTED_UNVERIFIED` | No ordering tests between IOP and EE progress (roadmap item 4) | — | 8 | `iop.cpu` | contract_specified |
+| `iop.sched` IOP scheduling against the EE | `IMPLEMENTED_UNVERIFIED` | No ordering tests between IOP and EE progress (roadmap item 4) | — | 8 | — | contract_specified |
 | `sif.cmd` SIFCMD | `VERIFIED_PARTIAL` | Hardware evidence is indirect: every program's printf travels this path | — | — | `sif.dma` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `sif.rpc` SIFRPC | `VERIFIED_PARTIAL` | Hardware evidence is indirect (tty output path) | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `sif.dma` SIF DMA (sceSifSetDma) | `HLE_OR_STUB` | — | — | — | `dma.c5`, `dma.c6`, `iop.cpu` | contract_specified, test_exists, test_executed, test_passed |
+| `sif.dma` SIF DMA (sceSifSetDma) | `HLE_OR_STUB` | — | — | — | `dma.c5`, `dma.c6` | contract_specified, test_exists, test_executed, test_passed |
 | `svc.fileio` FILEIO | `VERIFIED_PARTIAL` | Only the tty write path has hardware evidence | — | — | `iop.kernel` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `svc.ioman` IOMAN/IOMANX | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified |
 | `svc.cdvdman` CDVDMAN | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified, test_exists |

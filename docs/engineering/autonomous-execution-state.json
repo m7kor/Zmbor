@@ -4,7 +4,10 @@
   "repository": "https://github.com/m7kor/Zmbor",
   "pull_request": "https://github.com/m7kor/Zmbor/pull/7",
   "branch": "ultimate/ps2-hardware-system-engineering",
-  "base": {"branch": "main", "commit": "ec4a32de4d77b41990591d87a36f475e7725099b"},
+  "base": {
+    "branch": "main",
+    "commit": "ec4a32de4d77b41990591d87a36f475e7725099b"
+  },
   "push_remote": "https://github.com/m7kor/Zmbor.git (in the worktrees 'origin' is upstream ran-j/PS2Recomp: never push there)",
   "rules": [
     "one PR (#7); no merge, no force-push, no history rewrite",
@@ -12,47 +15,99 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "c64f357",
+    "commit": "7181e0f",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
     "ps2x_tests": "563/563",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate2.manifest.json (local)",
-    "gate_note": "the gate flagged clean=False only for untracked new files that no build target includes"
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate3.manifest.json (local)",
+    "gate_note": "clean tree",
+    "iop_programs": "8/23 exact, 1168/1306 lines (separate measurement)"
   },
   "batches": [
     {
       "id": 1,
-      "commits": ["5fab12b", "4b58414", "77ea0dc", "d292229", "d92e313", "df62323", "4e2fd3d", "02672be", "734c40c", "0e47a2b"],
-      "components": {"gs.dither": "MISSING -> IMPLEMENTED_UNVERIFIED", "dma.mfifo": "MISSING -> IMPLEMENTED_UNVERIFIED"},
+      "commits": [
+        "5fab12b",
+        "4b58414",
+        "77ea0dc",
+        "d292229",
+        "d92e313",
+        "df62323",
+        "4e2fd3d",
+        "02672be",
+        "734c40c",
+        "0e47a2b"
+      ],
+      "components": {
+        "gs.dither": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "dma.mfifo": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
       "mutants": "GS 4/4, DMA 8/8 killed",
       "fuzz": "dma harness with MFIFO, 30,977 ASan executions, no finding"
     },
     {
       "id": 2,
-      "commits": ["78b17e6", "d025f87", "c545f1a", "059629f", "7274ffb", "c64f357"],
-      "components": {"dma.stall": "MISSING -> IMPLEMENTED_UNVERIFIED"},
+      "commits": [
+        "78b17e6",
+        "d025f87",
+        "c545f1a",
+        "059629f",
+        "7274ffb",
+        "c64f357"
+      ],
+      "components": {
+        "dma.stall": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
       "mutants": "stall control 10/10 killed (S9 survived the first run; test added in d025f87)",
       "fuzz": "dma harness with stall control, 26,801 ASan executions in 180 s, no finding",
       "contracts": "174/174 hardware components; checker with schema, dependency and cycle rules, selftest 9/9"
+    },
+    {
+      "id": 3,
+      "commits": [
+        "2318aad",
+        "878f01a",
+        "b3d8537",
+        "00e1498",
+        "607428b",
+        "7181e0f"
+      ],
+      "components": {
+        "iop.cpu": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (7 real-PS2 cpu/iop programs, verified at 00e1498)"
+      },
+      "fixes": [
+        "IRX relocation added the symbol value on top of the load base",
+        "IOP printf/sprintf/vsprintf did not format arguments",
+        "JALR wrote the link before reading the target"
+      ],
+      "evidence": "ps2autotests IOP programs 0/23 -> 8/23 exact; cpu/iop 7/7",
+      "gate": "7181e0f: 53/55, 8202/8250, 0 regressions; unit 563/563, ctest 54/54, e2e 4/4, IOP 4/4"
     }
   ],
-  "hardware_inventory": {"VERIFIED_COMPLETE": 18, "VERIFIED_PARTIAL": 47, "IMPLEMENTED_UNVERIFIED": 60, "HLE_OR_STUB": 23, "MISSING": 22, "NOT_APPLICABLE": 3, "UNKNOWN": 1},
+  "hardware_inventory": {
+    "VERIFIED_COMPLETE": 18,
+    "VERIFIED_PARTIAL": 48,
+    "IMPLEMENTED_UNVERIFIED": 59,
+    "HLE_OR_STUB": 23,
+    "MISSING": 22,
+    "NOT_APPLICABLE": 3,
+    "UNKNOWN": 1
+  },
   "hardware_blockers": [
     "no physical PS2, ps2link or ps2sdk toolchain in this environment: every hardware probe in PS2_HARDWARE_VERIFICATION.md is unrun",
     "SIF0, SIF1 and fromIPU have no DMA channel model in PS2Memory (HLE only): stall-control sources/drain on them are blocked on those models"
   ],
-  "known_failures": ["cpu_ee_fpu_sqrt 59/66 (RSQRT.S)", "vu_lower_efu 182/223 (EATAN/ESIN/EEXP last bits)"],
-  "pending_owner_decisions": ["3 NOT_APPLICABLE scope proposals in components.json", "merge of PR #7"],
-  "active_work": {
-    "batch": 3,
-    "goal": "run the real-PS2 ps2autotests IOP programs (tests/cpu/iop, tests/kernel/iop, prebuilt .irx + .expected) on the ps2xIOP emulator",
-    "root_cause": "IOP stdio printf and sysclib sprintf/vsprintf copy the format string without formatting arguments",
-    "uncommitted_drafts": ["ps2xIOP/src/emulator/imports/iop_format.{h,cpp}", "ps2xIOP/tests/iop_autotest_runner.cpp", "tools/hwtest/iop_hwtest.py"],
-    "remaining": ["IopHost::consoleWrite", "wire formatGuest into iop_stdio.cpp and iop_sysclib.cpp (o32 slots, va_list)", "CMake targets", "formatter unit tests from the real-PS2 sprintf rows", "run iop_hwtest.py, write docs/hwtest/iop-dashboard.json", "cite only matching programs in components.json"]
-  },
+  "known_failures": [
+    "cpu_ee_fpu_sqrt 59/66 (RSQRT.S)",
+    "vu_lower_efu 182/223 (EATAN/ESIN/EEXP last bits)"
+  ],
+  "pending_owner_decisions": [
+    "3 NOT_APPLICABLE scope proposals in components.json",
+    "merge of PR #7"
+  ],
   "reproduce": {
     "build": "MSVC 14.44 + Ninja, cmake -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=<Python310 with z3>, FETCHCONTENT_SOURCE_DIR_* from D:/Project/Zmbor/deps",
     "unit": "build/ps2xTest/ps2x_tests (from the repo root; delete ps2_log.txt afterwards)",
@@ -60,5 +115,6 @@
     "coverage": "python -I tools/hwcoverage/hwcoverage.py record --tests-exe build/ps2xTest/ps2x_tests.exe && python -I tools/hwcoverage/hwcoverage.py report",
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
-  }
+  },
+  "next_action": "kernel/iop programs (15 mismatching: event flags, message boxes, threads, vpool, strtok) against the HLE IOP kernel in ps2xIOP/src/emulator/core/iop_kernel.cpp: diff each program, fix root causes, then decide whether iop.kernel can cite them; afterwards SIF0/SIF1 channel models (unblocks dma.c5/c6 and stall sources/drain)"
 }

@@ -51,3 +51,21 @@ one stay unverified until the stated measurement exists.
 - **Kept:** bit 31 of D_STAT is this runtime's INT1 line (some masked status bit is set). The hardware register has no
   defined bit 31 (PCSX2 `Dmac.h` DMACh_STAT); a guest read sees it. Unchanged from earlier phases; noted so that it is
   not mistaken for hardware behaviour.
+
+## D-DMA-4 — Stall control (D_CTRL.STS/STD, D_STADR)
+
+- **Chosen:** with STS = fromSPR, a fromSPR normal or interleave transfer leaves its final MADR in D_STADR. The STD
+  drain (VIF1 or GIF) checks `MADR + QWC * 16 > D_STADR` before each REFS tag and before a normal-mode transfer; if
+  so it stops before the data, stays active (STR set, no CIS) and raises D_STAT.SIS once per stall. A write to D_STADR
+  or D_CTRL, or a fromSPR transfer that moves D_STADR, makes it check again from where it stopped.
+- **For:** PCSX2 (`Gif.cpp`, `Vif1_Dma.cpp`: REFS check, `tadr -= 16`; `SPR.cpp`: STADR = MADR in normal and
+  interleave mode) and DobieStation (`dmac.cpp`: `can_stall_drain` for non-chain modes and REFS, `update_stadr`
+  re-activates the stalled drain, `has_dma_stalled` raises SIS once) agree on the comparison, the source update and
+  the REFS rule.
+- **Against:** the references differ on granularity: PCSX2 stalls a whole tag, DobieStation per block of up to 8
+  qwords, so MADR observed during a stall can differ from hardware (same limitation as D-DMA-2). Normal-mode drain
+  stall follows DobieStation only (PCSX2 logs it as unimplemented). D_STADR updates during a fromSPR transfer are not
+  visible because the transfer is synchronous. SIF0 and fromIPU as sources, SIF1 as drain and the fromSPR
+  destination-chain CNTS tag are not modelled (those channels have no DMA model in `PS2Memory`).
+- **Settles it:** a stall-control probe on hardware reading drain MADR/QWC, D_STADR and SIS while a fromSPR source and
+  a GIF/VIF1 drain overlap, in normal mode and with REFS tags.

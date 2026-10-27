@@ -508,6 +508,19 @@ public:
     void resumeMfifoDrain();
     bool m_mfifoDrainStalled = false;
     bool m_mfifoEmptyRaised = false;
+
+    // Stall control (D_CTRL.STS bits 4-5, 2 = fromSPR is the source; D_CTRL.STD bits 6-7, 1 = VIF1, 2 = GIF is the
+    // drain): the source copies its MADR into D_STADR after a normal or interleave transfer, and the drain, in normal
+    // mode or at a REFS tag, waits with D_STAT.SIS while its transfer would read past D_STADR. SIF0/fromIPU sources
+    // and the SIF1 drain have no channel model here. Decision D-DMA-4 in docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md.
+    uint32_t stallDrainChannel() const;
+    bool stallDrainBlocked(uint32_t madr, uint32_t qwc) const;
+    void raiseStallInterrupt();
+    void resumeStallDrain();
+    // A drain held by MFIFO or stall control is still running: STR stays set and no CIS is raised.
+    bool isDrainChannelHeld(uint32_t channelBase) const;
+    uint32_t m_stallHeldChannel = 0u;
+    bool m_stallSisRaised = false;
 };
 
 #endif // PS2_MEMORY_H

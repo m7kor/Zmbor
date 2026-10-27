@@ -29,6 +29,12 @@ namespace
         return dstat & ~(1u << 31);
     }
 
+    uint32_t ioReg(const std::unordered_map<uint32_t, uint32_t> &regs, uint32_t address)
+    {
+        const auto it = regs.find(address);
+        return it != regs.end() ? it->second : 0u;
+    }
+
     inline void inRange(uint32_t offset, size_t bytes, size_t regionSize, const char *op, uint32_t address)
     {
         if (static_cast<uint64_t>(offset) + static_cast<uint64_t>(bytes) > static_cast<uint64_t>(regionSize))
@@ -352,6 +358,8 @@ bool PS2Memory::initialize(size_t ramSize)
     }
     m_mfifoDrainStalled = false;
     m_mfifoEmptyRaised = false;
+    m_stallHeldChannel = 0u;
+    m_stallSisRaised = false;
     m_codeRegions.clear();
     m_path3Masked = false;
     m_path3MaskedFifo.clear();
@@ -1251,6 +1259,16 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
         return true;
     }
 
+    if (address == 0x1000E000u || address == 0x1000E060u)
+    {
+        // D_CTRL (STD may no longer name the held drain) and D_STADR (the stall address moved): a drain waiting at
+        // the stall address checks again (DobieStation update_stadr; PCSX2 re-checks the stalled channel each time
+        // its DMA event runs).
+        m_ioRegisters[address] = value;
+        resumeStallDrain();
+        return true;
+    }
+
     if (address == kDEnableW)
     {
         // Writes to D_ENABLEW must read back at D_ENABLER: guests suspend the DMAC
@@ -1442,6 +1460,21 @@ void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
         uint32_t chcr = value;
         uint32_t mode = (chcr >> 2) & 0x3;
 
+        // A normal-mode drain waits, untouched, until its whole transfer lies below D_STADR (DobieStation
+        // can_stall_drain covers every non-chain mode; PCSX2 leaves GIF normal-mode stall unimplemented, D-DMA-4).
+        if (m_stallHeldChannel == channelBase)
+            m_stallHeldChannel = 0u;
+        if (mode != 1u && (qwc & 0xFFFFu) != 0u && channelBase == stallDrainChannel())
+        {
+            if (stallDrainBlocked(madr, qwc & 0xFFFFu))
+            {
+                m_stallHeldChannel = channelBase;
+                raiseStallInterrupt();
+                return;
+            }
+            m_stallSisRaised = false;
+        }
+
         // A normal-mode transfer leaves MADR just past the data (dma/dmasend.cpp checks
         // madr == start + size; QWC reaches 0 when the transfer completes).
         const auto advanceMadr = [&]()
@@ -1512,6 +1545,7 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
     const bool mfifo = channelBase == mfifoDrainChannel();
     if (mfifo)
         m_mfifoDrainStalled = false;
+    const bool stallDrain = channelBase == stallDrainChannel();
     // Only a guard against a malformed (looping) chain: hardware has no tag limit, and heavy frames
     // exceed 4096 tags (4190-4600 measured in Shadow of the Colossus), losing the chain's tail.
     const int kMaxChainTags = 1 << 20;
@@ -1657,6 +1691,18 @@ void PS2Memory::walkSourceChain(uint32_t channelBase, uint32_t chcr, bool transf
                 break;
             }
             m_mfifoEmptyRaised = false;
+        }
+        if (stallDrain && id == 4u)
+        {
+            // REFS: the tag is consumed only once its data lies below D_STADR; the walk stops before it otherwise
+            // and the channel stays active (PCSX2 rewinds TADR to re-read the tag; whole-tag granularity, D-DMA-4).
+            if (stallDrainBlocked(addr, tagQwc))
+            {
+                m_stallHeldChannel = channelBase;
+                raiseStallInterrupt();
+                break;
+            }
+            m_stallSisRaised = false;
         }
         lastTagUpper = static_cast<uint32_t>((tag >> 16) & 0xFFFFu);
         ++tagsProcessed;
@@ -1864,7 +1910,10 @@ bool PS2Memory::tryProcessScratchpadDma(uint32_t channelBase, uint32_t chcr)
         m_ioRegisters[channelBase + 0x20u] = 0u;
         m_ioRegisters[channelBase + 0x80u] = (originalSadr + qwc * 16u) & 0x3FF0u;
         completeDmacChannel(channelBase, 8u);
+        if (((ioReg(m_ioRegisters, 0x1000E000u) >> 4u) & 0x3u) == 2u) // D_CTRL.STS = fromSPR
+            m_ioRegisters[0x1000E060u] = m_ioRegisters[channelBase + 0x10u];
         resumeMfifoDrain();
+        resumeStallDrain();
         return true;
     }
 
@@ -1905,6 +1954,14 @@ bool PS2Memory::tryProcessScratchpadDma(uint32_t channelBase, uint32_t chcr)
     m_ioRegisters[channelBase + 0x20u] = 0u;
     m_ioRegisters[channelBase + 0x80u] = (originalSadr + qwc * 16u) & 0x3FF0u;
     completeDmacChannel(channelBase, fromScratchpad ? 8u : 9u);
+    // Stall source: fromSPR in normal or interleave mode leaves its MADR in D_STADR (PCSX2 SPR.cpp _SPR0chain and
+    // _SPR0interleave, DobieStation advance_dest_dma; both update it as the transfer advances, so the final value is
+    // MADR after the last qword).
+    if (fromScratchpad && ((ioReg(m_ioRegisters, 0x1000E000u) >> 4u) & 0x3u) == 2u)
+    {
+        m_ioRegisters[0x1000E060u] = m_ioRegisters[channelBase + 0x10u];
+        resumeStallDrain();
+    }
     return true;
 }
 
@@ -1923,15 +1980,6 @@ uint32_t PS2Memory::mfifoDrainChannel() const
     const auto it = m_ioRegisters.find(0x1000E000u); // D_CTRL.MFD, bits 2-3
     const uint32_t mfd = it != m_ioRegisters.end() ? (it->second >> 2u) & 0x3u : 0u;
     return mfd == 2u ? 0x10009000u : mfd == 3u ? 0x1000A000u : 0u;
-}
-
-namespace
-{
-    uint32_t ioReg(const std::unordered_map<uint32_t, uint32_t> &regs, uint32_t address)
-    {
-        const auto it = regs.find(address);
-        return it != regs.end() ? it->second : 0u;
-    }
 }
 
 // D_RBOR (0x1000E050) is the ring base, D_RBSR (0x1000E040) its mask: the ring holds D_RBSR + 16 bytes.
@@ -1989,6 +2037,52 @@ void PS2Memory::resumeMfifoDrain()
     m_mfifoDrainStalled = false;
     if ((chcr & 0x100u) != 0u)
         startEeChannelTransfer(drain, chcr);
+}
+
+uint32_t PS2Memory::stallDrainChannel() const
+{
+    const uint32_t std = (ioReg(m_ioRegisters, 0x1000E000u) >> 6u) & 0x3u; // D_CTRL.STD
+    return std == 1u ? 0x10009000u : std == 2u ? 0x1000A000u : 0u;
+}
+
+// The drain may read up to, but not past, D_STADR (PCSX2 Gif.cpp / Vif1_Dma.cpp and DobieStation dmac.cpp both stall
+// when MADR + QWC * 16 > STADR). Both sides compare the 31-bit address field.
+bool PS2Memory::stallDrainBlocked(uint32_t madr, uint32_t qwc) const
+{
+    const uint64_t end = static_cast<uint64_t>(madr & 0x7FFFFFFFu) + static_cast<uint64_t>(qwc) * 16ull;
+    return end > (ioReg(m_ioRegisters, 0x1000E060u) & 0x7FFFFFFFu);
+}
+
+// D_STAT.SIS is raised once per stall (DobieStation has_dma_stalled) and armed again once the drain gets past
+// D_STADR. The DMAC handler for cause 13 runs only when SIM unmasks it.
+void PS2Memory::raiseStallInterrupt()
+{
+    if (m_stallSisRaised)
+        return;
+    m_stallSisRaised = true;
+    static constexpr uint32_t kDStat = 0x1000E010u;
+    const uint32_t dstat = withDStatInt1Line(ioReg(m_ioRegisters, kDStat) | kDStatSis);
+    m_ioRegisters[kDStat] = dstat;
+    if (((dstat >> 16u) & kDStatSis) != 0u)
+        queueCompletedDmacCause(13u);
+}
+
+// After D_STADR or D_CTRL changes, a drain that stopped at the stall address checks again from where it stopped.
+void PS2Memory::resumeStallDrain()
+{
+    const uint32_t held = m_stallHeldChannel;
+    if (held == 0u)
+        return;
+    m_stallHeldChannel = 0u;
+    const uint32_t chcr = ioReg(m_ioRegisters, held);
+    if ((chcr & 0x100u) != 0u)
+        startEeChannelTransfer(held, chcr);
+}
+
+bool PS2Memory::isDrainChannelHeld(uint32_t channelBase) const
+{
+    return (m_mfifoDrainStalled && channelBase == mfifoDrainChannel()) ||
+           (m_stallHeldChannel != 0u && channelBase == m_stallHeldChannel);
 }
 
 void PS2Memory::processPendingTransfers()
@@ -2204,8 +2298,9 @@ void PS2Memory::processPendingTransfers()
         m_ioRegisters[D_STAT] = withDStatInt1Line(dstat | (1u << channelBit));
     };
 
-    // A GIF MFIFO drain stopped at the empty ring has delivered its data but stays active (STR set, no CIS2).
-    if (hadGif && !(m_mfifoDrainStalled && mfifoDrainChannel() == GIF_CHANNEL))
+    // A GIF drain stopped at the empty MFIFO ring or at D_STADR has delivered its data but stays active (STR set,
+    // no CIS2).
+    if (hadGif && !isDrainChannelHeld(GIF_CHANNEL))
     {
         raiseDStatChannel(2u); // GIF channel
         queueCompletedDmacCause(2u);
@@ -2696,8 +2791,8 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
                 // A VIF DMA held behind a VIF stall is still running until FBRST.STC releases it.
                 if ((address == 0x10008000u && m_vifDmaHeld[0]) || (address == 0x10009000u && m_vifDmaHeld[1]))
                     return m_ioRegisters[address] | 0x100u;
-                // So is an MFIFO drain waiting at the empty ring for fromSPR to add data.
-                if (m_mfifoDrainStalled && address == mfifoDrainChannel())
+                // So is a drain waiting at the empty MFIFO ring or at D_STADR.
+                if (isDrainChannelHeld(address))
                     return m_ioRegisters[address] | 0x100u;
                 uint32_t channelStatus = m_ioRegisters[address] & ~0x100u;
                 m_ioRegisters[address] = channelStatus;

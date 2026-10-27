@@ -93,6 +93,12 @@ namespace
         uint32_t dstat() { return mem.readIORegister(kDStat); }
     };
 
+    // Stall-control tests: D_STADR, the drain's data and its chain.
+    constexpr uint32_t kDStadr = 0x1000E060u;
+    constexpr uint32_t kStallData = 0x00300000u;
+    constexpr uint32_t kStallChain = 0x00200000u;
+    constexpr uint32_t kSis = 1u << 13;
+
     void writeU64(uint8_t *rdram, uint32_t addr, uint64_t value)
     {
         std::memcpy(rdram + addr, &value, sizeof(value));
@@ -2718,6 +2724,129 @@ void register_ps2_memory_tests()
             t.IsTrue((rig.dstat() & (1u << 14)) == 0u, "MEIS clears on write-one");
             t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with MEIS cleared");
             t.IsTrue((rig.dstat() & (1u << 30)) != 0u, "MEIM stays set");
+        });
+
+        // Stall control: D_CTRL.STS (bits 4-5) names the source whose MADR is copied into D_STADR, D_CTRL.STD
+        // (bits 6-7) the drain that may not read past D_STADR. Expected behaviour where PCSX2 (Gif.cpp, Vif1_Dma.cpp,
+        // SPR.cpp) and DobieStation (dmac.cpp) agree; no hardware program covers it (D-DMA-4).
+
+        tc.Run("stall control: a GIF REFS drain waits with SIS until fromSPR (STS) moves D_STADR past its data", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 4) | (2u << 6)); // STS = fromSPR, STD = GIF
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, kStallData);
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(2u, 4u, kStallData));      // REFS qwc 2
+            writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));      // END
+            rig.startGifChain(kStallChain);
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "nothing below D_STADR yet: no REFS data is read");
+            t.IsTrue(rig.gifActive(), "the drain stays active (STR) at the stall address");
+            t.IsTrue((rig.dstat() & kSis) != 0u, "D_STAT.SIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 while the drain waits");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), kStallChain, "TADR still points at the REFS tag");
+
+            rig.mem.writeIORegister(MfifoRig::kDStat, kSis); // clear SIS: the same stall must not raise it again
+            rig.fromSpr({0x1111111111111111ull, 0x2222222222222222ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), kStallData + 0x10u, "fromSPR (STS) leaves its MADR in D_STADR");
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "one qword below D_STADR is not enough for REFS qwc 2");
+            t.IsTrue(rig.gifActive(), "the drain still waits");
+            t.IsTrue((rig.dstat() & kSis) == 0u, "SIS is raised once per stall, not again on each check");
+
+            rig.fromSpr({0x3333333333333333ull, 0x4444444444444444ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), kStallData + 0x20u, "D_STADR follows fromSPR's MADR");
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the REFS data is read once it lies below D_STADR");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+            t.IsTrue((rig.dstat() & (1u << 2)) != 0u, "CIS2 is raised at completion");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x1111111111111111ull && words[1] == 0x2222222222222222ull &&
+                         words[2] == 0x3333333333333333ull && words[3] == 0x4444444444444444ull,
+                     "the drain reads what fromSPR wrote, in order");
+        });
+
+        tc.Run("stall control applies only to the STD drain's REFS tags, up to and including D_STADR", [](TestCase &t)
+        {
+            struct Case
+            {
+                const char *name;
+                uint32_t dctrl;
+                uint8_t tagId;
+                uint32_t stadr;
+            };
+            const Case cases[] = {
+                {"REFS ending exactly at D_STADR proceeds", 1u | (2u << 6), 4u, kStallData + 0x20u},
+                {"REF ignores D_STADR", 1u | (2u << 6), 3u, 0u},
+                {"STD = 0 disables stall control", 1u, 4u, 0u},
+                {"STD = VIF1 does not stall the GIF", 1u | (1u << 6), 4u, 0u},
+            };
+            for (const Case &c : cases)
+            {
+                MfifoRig rig(0x30u, 0u);
+                t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+                rig.mem.writeIORegister(0x1000E000u, c.dctrl);
+                rig.mem.writeIORegister(kDStadr, c.stadr);
+                uint8_t *rdram = rig.mem.getRDRAM();
+                writeDmaTag(rdram, kStallChain, makeDmaTag(2u, c.tagId, kStallData));
+                writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));
+                rig.startGifChain(kStallChain);
+                t.Equals(rig.received.size(), static_cast<size_t>(32u), c.name);
+                t.IsTrue(!rig.gifActive(), c.name);
+                t.IsTrue((rig.dstat() & kSis) == 0u, c.name);
+            }
+
+            // Without STS = fromSPR, a fromSPR transfer leaves D_STADR alone.
+            MfifoRig rig(0x30u, 0u);
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));
+            rig.mem.writeIORegister(kDStadr, 0x1230u);
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, kStallData);
+            rig.fromSpr({1ull, 2ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), 0x1230u, "STS = 0: D_STADR is not updated by fromSPR");
+        });
+
+        tc.Run("stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kVif1 = 0x10009000u;
+            rig.mem.writeIORegister(0x1000E000u, 1u | (1u << 6)); // STD = VIF1
+            rig.mem.writeIORegister(kDStadr, kStallData);
+            writeU64(rig.mem.getRDRAM(), kStallData, 0x07004321ull); // MARK 0x4321, NOP
+            writeU64(rig.mem.getRDRAM(), kStallData + 8u, 0ull);
+            rig.mem.writeIORegister(kVif1 + 0x10u, kStallData);
+            rig.mem.writeIORegister(kVif1 + 0x20u, 1u);
+            rig.mem.writeIORegister(kVif1 + 0x00u, 0x101u); // normal mode, from memory, STR
+            t.Equals(rig.mem.vif1_regs.mark, 0u, "the blocked transfer delivers nothing");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain stays active");
+            t.Equals(rig.mem.readIORegister(kVif1 + 0x10u), kStallData, "MADR is untouched while the drain waits");
+            t.IsTrue((rig.dstat() & kSis) != 0u, "SIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "no INT1 while SIM is clear");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 29); // toggle SIM on
+            t.IsTrue((rig.dstat() & (1u << 31)) != 0u, "SIS with SIM raises INT1");
+
+            rig.mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(rig.mem.vif1_regs.mark, 0x4321u, "the drain transfers once D_STADR covers its qword");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) == 0u, "the transfer completes");
+            t.IsTrue((rig.dstat() & (1u << 1)) != 0u, "CIS1 is raised");
+            t.Equals(rig.mem.readIORegister(kVif1 + 0x10u), kStallData + 0x10u, "MADR ends past the data");
+            rig.mem.writeIORegister(MfifoRig::kDStat, kSis);
+            t.IsTrue((rig.dstat() & kSis) == 0u, "SIS clears on write-one");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with SIS cleared");
+        });
+
+        tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 4u, kStallData));
+            writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));
+            rig.startGifChain(kStallChain);
+            t.IsTrue(rig.gifActive(), "the drain waits at D_STADR = 0");
+            rig.mem.writeIORegister(0x1000E000u, 1u); // STD = 0
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the REFS data is read once stall control is off");
+            t.IsTrue(!rig.gifActive(), "the chain completes");
         });
 
         tc.Run("sceDmaReset re-enables DMAC DMAE", [](TestCase &t)

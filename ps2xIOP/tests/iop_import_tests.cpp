@@ -433,8 +433,42 @@ namespace
     }
 }
 
+namespace
+{
+    // JALR reads its target before writing the link: `jalr $t0, $t0` jumps to the old $t0 (a real PS2 prints
+    // "jalr: rs/rd match: 00000002" in ps2autotests cpu/iop/branchdelay). rd = 0 discards the link.
+    bool testJalrReadsTargetBeforeLink()
+    {
+        IopMemory memory;
+        IopCpuCore core(memory);
+        constexpr uint32_t kPc = 0x1000u, kTarget = 0x2000u;
+        memory.write32(kPc, 0x01004009u);      // jalr $t0, $t0  (rs = 8, rd = 8)
+        memory.write32(kPc + 4u, 0u);          // nop (delay slot)
+        IopCpuState cpu{};
+        cpu.pc = kPc;
+        cpu.gpr[8] = kTarget;
+        (void)core.executeInstruction(cpu);
+        (void)core.executeInstruction(cpu);
+        if (!expect(cpu.pc == kTarget, "jalr rs == rd did not jump to the old rs value") ||
+            !expect(cpu.gpr[8] == kPc + 8u, "jalr rs == rd did not write the link to rd"))
+            return false;
+
+        memory.write32(kPc, 0x01000009u);      // jalr $zero, $t0 (rd = 0)
+        IopCpuState zero{};
+        zero.pc = kPc;
+        zero.gpr[8] = kTarget;
+        zero.gpr[31] = 0xABCDu;
+        (void)core.executeInstruction(zero);
+        (void)core.executeInstruction(zero);
+        return expect(zero.pc == kTarget, "jalr with rd = 0 did not jump") &&
+               expect(zero.gpr[31] == 0xABCDu && zero.gpr[0] == 0u, "jalr with rd = 0 wrote a link register");
+    }
+}
+
 int main()
 {
+    if (!testJalrReadsTargetBeforeLink())
+        return 1;
     if (!testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdvdSearchFile() ||
         !testTimrmanPeriodicCallback() || !testSprintfMatchesRealPs2Rows() || !testPrintfStackArgumentsAndVaList())
         return 1;

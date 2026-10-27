@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "5fab12b11af849e9b8f02356e682d7015506ab19",
-  "unit_results_binary_sha256": "c622a5424abde3eb75fc45823aaaccad02e0057275dd612d4c2234cc7802291f"
+  "unit_results_commit": "4e2fd3df95726a0ba85c9f985ad1f5ac18055e77",
+  "unit_results_binary_sha256": "824d095f84a7086f270fe409a755060e733596b29851400eeb7cde82059b23ec"
  },
  "levels": [
   "contract_specified",
@@ -17,10 +17,10 @@
  ],
  "components_total": 174,
  "totals": {
-  "contract_specified": 2,
-  "test_exists": 125,
-  "test_executed": 117,
-  "test_passed": 117,
+  "contract_specified": 3,
+  "test_exists": 126,
+  "test_executed": 118,
+  "test_passed": 118,
   "vectors_passed": 4,
   "hardware_verified": 59,
   "timing_verified": 0
@@ -58,10 +58,10 @@
   },
   "D": {
    "components": 24,
-   "contract_specified": 0,
-   "test_exists": 18,
-   "test_executed": 18,
-   "test_passed": 18,
+   "contract_specified": 1,
+   "test_exists": 19,
+   "test_executed": 19,
+   "test_passed": 19,
    "vectors_passed": 0,
    "hardware_verified": 10,
    "timing_verified": 0
@@ -2907,9 +2907,9 @@
     "timing_verified": false
    },
    "named_tests": {
-    "cited": 2,
-    "executed": 2,
-    "passed": 2
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
    },
    "hardware_programs": {
     "cited": 2,
@@ -2974,23 +2974,23 @@
    "id": "dma.mfifo",
    "name": "MFIFO ring (D_RBOR/D_RBSR)",
    "category": "D",
-   "status": "MISSING",
-   "missing": "No MFIFO transfer behaviour",
-   "blocker": "",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program; stall granularity is one tag (the hardware can stop inside the data, D-DMA-2); fromSPR interleave and chain modes into the ring are not wrapped",
+   "blocker": "MFIFO probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+   "target": "8",
    "levels": {
-    "contract_specified": false,
-    "test_exists": false,
-    "test_executed": false,
-    "test_passed": false,
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
    },
    "named_tests": {
-    "cited": 0,
-    "executed": 0,
-    "passed": 0
+    "cited": 4,
+    "executed": 4,
+    "passed": 4
    },
    "hardware_programs": {
     "cited": 0,

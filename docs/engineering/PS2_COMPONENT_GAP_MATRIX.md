@@ -110,7 +110,7 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 | `dma.irq` DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE) | `VERIFIED_PARTIAL` | — | — | — | test_exists, test_executed, test_passed, hardware_verified |
 | `dma.ctrl` D_CTRL, D_PCR, D_ENABLER/W | `VERIFIED_PARTIAL` | — | — | — | test_exists, test_executed, test_passed, hardware_verified |
 | `dma.stall` Stall control (STS/STD, D_STADR) | `MISSING` | Not implemented | — | unscheduled | — |
-| `dma.mfifo` MFIFO ring (D_RBOR/D_RBSR) | `MISSING` | No MFIFO transfer behaviour | — | unscheduled | — |
+| `dma.mfifo` MFIFO ring (D_RBOR/D_RBSR) | `IMPLEMENTED_UNVERIFIED` | No hardware program; stall granularity is one tag (the hardware can stop inside the data, D-DMA-2); fromSPR interleave and chain modes into the ring are not wrapped | MFIFO probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md) | 8 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.timing` Bus arbitration, priority, timing | `HLE_OR_STUB` | No bus arbitration or transfer timing | — | — | — |
 | `mem.rdram` 32 MB RDRAM, kseg aliases, uncached mirrors | `IMPLEMENTED_UNVERIFIED` | — | — | — | test_exists, test_executed, test_passed |
 | `mem.spr` Scratchpad RAM (16 KB) | `VERIFIED_PARTIAL` | — | — | — | test_exists, test_executed, test_passed, hardware_verified |

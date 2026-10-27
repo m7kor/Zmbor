@@ -4,6 +4,8 @@
 #include "emulator/imports/iop_cdvd.h"
 #include "emulator/imports/iop_imports.h"
 #include "emulator/imports/iop_loadcore.h"
+#include "emulator/imports/iop_stdio.h"
+#include "emulator/imports/iop_sysclib.h"
 #include "emulator/imports/iop_timrman.h"
 #include "emulator/services/iop_rpc.h"
 #include "ps2x/iop/iop_host.h"
@@ -328,10 +330,113 @@ namespace
     }
 }
 
+namespace
+{
+    class ConsoleHost final : public NullHost
+    {
+    public:
+        void consoleWrite(std::string_view text) override { tty.append(text); }
+        std::string tty;
+    };
+
+    void putString(IopMemory &memory, uint32_t address, std::string_view s)
+    {
+        (void)memory.writeRam(address, s.data(), s.size());
+        memory.write8(address + static_cast<uint32_t>(s.size()), 0u);
+    }
+
+    // sysclib sprintf against the output a real PS2 printed for the same calls (ps2autotests
+    // tests/kernel/iop/libc/sprintf.expected, transcribed row by row; the third-party file is not needed here).
+    bool testSprintfMatchesRealPs2Rows()
+    {
+        struct Row
+        {
+            const char *format;
+            uint32_t arg;
+            const char *expected;
+        };
+        const Row rows[] = {
+            {"%d", 32u, "32"}, {"%03d", 45u, "045"}, {"%3d", 12u, " 12"}, {"%3.3d", 87u, "087"},
+            {"%+6d", 948u, "  +948"}, {"%+6d", static_cast<uint32_t>(-948), "  -948"}, {"%6d", static_cast<uint32_t>(-948), "  -948"},
+            {"%06d", static_cast<uint32_t>(-948), "-00948"}, {"%+06d", 948u, "+00948"}, {"%u", static_cast<uint32_t>(-948), "4294966348"},
+            {"%x", 0xDEADBEEFu, "deadbeef"}, {"%X", 0xDEADBEEFu, "DEADBEEF"}, {"%08x", 23u, "00000017"}, {"%8x", 12u, "       c"},
+            {"%p", 0x01234567u, "1234567"}, {"%c", 'j', "j"},
+        };
+        IopMemory memory;
+        IopSysclib sysclib(memory);
+        constexpr uint32_t kBuffer = 0x10000u, kFormat = 0x11000u, kString = 0x12000u;
+        for (const Row &row : rows)
+        {
+            putString(memory, kFormat, row.format);
+            IopCpuState cpu{};
+            cpu.gpr[4] = kBuffer;
+            cpu.gpr[5] = kFormat;
+            cpu.gpr[6] = row.arg;
+            if (!expect(sysclib.dispatchImport(19u, cpu), "sysclib:19 sprintf not handled"))
+                return false;
+            const std::string got = memory.readString(kBuffer, 256u);
+            if (!expect(got == row.expected, std::string("sprintf(\"") + row.format + "\") gave \"" + got + "\", real PS2 \"" + row.expected + "\"") ||
+                !expect(cpu.gpr[2] == got.size(), "sprintf returned the wrong length"))
+                return false;
+        }
+        // "%s%3.3d" with "myfile", 0: two arguments (a2, a3).
+        putString(memory, kFormat, "%s%3.3d");
+        putString(memory, kString, "myfile");
+        IopCpuState cpu{};
+        cpu.gpr[4] = kBuffer;
+        cpu.gpr[5] = kFormat;
+        cpu.gpr[6] = kString;
+        cpu.gpr[7] = 0u;
+        return expect(sysclib.dispatchImport(19u, cpu), "sysclib:19 sprintf not handled") &&
+               expect(memory.readString(kBuffer, 256u) == "myfile000", "sprintf(\"%s%3.3d\") differs from the real PS2 row");
+    }
+
+    // stdio printf reads variadic arguments past a3 from the caller's stack (o32: slot n at sp + 4n) and writes the
+    // formatted text to the host console; vsprintf reads a va_list. Expected values computed by hand.
+    bool testPrintfStackArgumentsAndVaList()
+    {
+        IopMemory memory;
+        ConsoleHost host;
+        IopStdio stdio(host, memory);
+        constexpr uint32_t kFormat = 0x11000u, kSp = 0x20000u, kList = 0x21000u, kBuffer = 0x10000u;
+        putString(memory, kFormat, "%d %d %d %d %08x|%-4s|%5.2s|%%\n");
+        putString(memory, 0x12000u, "ab");
+        putString(memory, 0x12100u, "xyz");
+        IopCpuState cpu{};
+        cpu.gpr[4] = kFormat;
+        cpu.gpr[5] = 1u;
+        cpu.gpr[6] = 2u;
+        cpu.gpr[7] = 3u;
+        cpu.gpr[29] = kSp;
+        memory.write32(kSp + 16u, 4u);          // slot 4
+        memory.write32(kSp + 20u, 0xBEEFu);     // slot 5
+        memory.write32(kSp + 24u, 0x12000u);    // slot 6
+        memory.write32(kSp + 28u, 0x12100u);    // slot 7
+        const std::string want = "1 2 3 4 0000beef|ab  |   xy|%\n";
+        if (!expect(stdio.dispatchImport(4u, cpu), "stdio:4 printf not handled") ||
+            !expect(host.tty == want, "printf output \"" + host.tty + "\", expected \"" + want + "\"") ||
+            !expect(cpu.gpr[2] == want.size(), "printf returned the wrong length"))
+            return false;
+
+        putString(memory, kFormat, "%u-%lld-%x");
+        memory.write32(kList + 0u, 7u);
+        memory.write32(kList + 8u, 0x00000001u); // 64-bit value aligned to 8: low word first
+        memory.write32(kList + 12u, 0x00000002u);
+        memory.write32(kList + 16u, 0xABu);
+        IopSysclib sysclib(memory);
+        IopCpuState v{};
+        v.gpr[4] = kBuffer;
+        v.gpr[5] = kFormat;
+        v.gpr[6] = kList;
+        return expect(sysclib.dispatchImport(42u, v), "sysclib:42 vsprintf not handled") &&
+               expect(memory.readString(kBuffer, 256u) == "7-8589934593-ab", "vsprintf of a va_list with an aligned 64-bit value");
+    }
+}
+
 int main()
 {
     if (!testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdvdSearchFile() ||
-        !testTimrmanPeriodicCallback())
+        !testTimrmanPeriodicCallback() || !testSprintfMatchesRealPs2Rows() || !testPrintfStackArgumentsAndVaList())
         return 1;
     std::cout << "ps2xIOP import tests passed\n";
     return 0;

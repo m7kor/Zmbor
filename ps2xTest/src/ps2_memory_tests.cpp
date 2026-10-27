@@ -2834,6 +2834,34 @@ void register_ps2_memory_tests()
             t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with SIS cleared");
         });
 
+        tc.Run("stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));   // STD = GIF
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 29);    // SIM on before the stall
+            (void)rig.mem.consumeCompletedDmacCauses();
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 1u, 0u));                   // CNT qwc 1
+            writeU64(rdram, kStallChain + 0x10u, 0x5151515151515151ull);
+            writeU64(rdram, kStallChain + 0x18u, 0x5252525252525252ull);
+            writeDmaTag(rdram, kStallChain + 0x20u, makeDmaTag(1u, 4u, kStallData));   // REFS qwc 1 (blocked)
+            writeDmaTag(rdram, kStallChain + 0x30u, makeDmaTag(0u, 7u, 0u));           // END
+            rig.startGifChain(kStallChain);
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the CNT data before the REFS tag is delivered");
+            t.IsTrue(rig.gifActive(), "the drain is still active at the REFS tag");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 for the delivered part");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), kStallChain + 0x20u, "TADR points at the REFS tag");
+            const std::vector<uint32_t> causes = rig.mem.consumeCompletedDmacCauses();
+            t.Equals(static_cast<size_t>(std::count(causes.begin(), causes.end(), 13u)), static_cast<size_t>(1u),
+                     "SIS with SIM queues the DMAC handler for cause 13 once");
+            t.Equals(static_cast<size_t>(std::count(causes.begin(), causes.end(), 2u)), static_cast<size_t>(0u),
+                     "no cause 2 while the GIF drain is held");
+            rig.mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the REFS data follows once D_STADR covers it");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

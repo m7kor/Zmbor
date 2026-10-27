@@ -17,7 +17,7 @@
  ],
  "components_total": 174,
  "totals": {
-  "contract_specified": 3,
+  "contract_specified": 174,
   "test_exists": 126,
   "test_executed": 118,
   "test_passed": 118,
@@ -28,7 +28,7 @@
  "by_category": {
   "A": {
    "components": 41,
-   "contract_specified": 0,
+   "contract_specified": 41,
    "test_exists": 31,
    "test_executed": 31,
    "test_passed": 31,
@@ -38,7 +38,7 @@
   },
   "B": {
    "components": 21,
-   "contract_specified": 0,
+   "contract_specified": 21,
    "test_exists": 19,
    "test_executed": 19,
    "test_passed": 19,
@@ -48,7 +48,7 @@
   },
   "C": {
    "components": 27,
-   "contract_specified": 2,
+   "contract_specified": 27,
    "test_exists": 24,
    "test_executed": 22,
    "test_passed": 22,
@@ -58,7 +58,7 @@
   },
   "D": {
    "components": 24,
-   "contract_specified": 1,
+   "contract_specified": 24,
    "test_exists": 19,
    "test_executed": 19,
    "test_passed": 19,
@@ -68,7 +68,7 @@
   },
   "E": {
    "components": 13,
-   "contract_specified": 0,
+   "contract_specified": 13,
    "test_exists": 11,
    "test_executed": 11,
    "test_passed": 11,
@@ -78,7 +78,7 @@
   },
   "F": {
    "components": 17,
-   "contract_specified": 0,
+   "contract_specified": 17,
    "test_exists": 13,
    "test_executed": 7,
    "test_passed": 7,
@@ -88,7 +88,7 @@
   },
   "G": {
    "components": 13,
-   "contract_specified": 0,
+   "contract_specified": 13,
    "test_exists": 2,
    "test_executed": 2,
    "test_passed": 2,
@@ -98,7 +98,7 @@
   },
   "H": {
    "components": 18,
-   "contract_specified": 0,
+   "contract_specified": 18,
    "test_exists": 7,
    "test_executed": 7,
    "test_passed": 7,
@@ -117,7 +117,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -125,6 +125,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -133,7 +136,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.trap_arith",
@@ -144,7 +148,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -152,6 +156,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -160,7 +167,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "ee.branch",
@@ -171,7 +181,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -179,6 +189,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -187,7 +200,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.branchdelay",
@@ -198,7 +212,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -206,6 +220,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.branch"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -214,7 +231,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.lsu",
@@ -225,7 +243,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -233,6 +251,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "mem.rdram"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -241,7 +262,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
   },
   {
    "id": "ee.muldiv",
@@ -252,7 +276,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -260,6 +284,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -268,7 +295,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.sa",
@@ -279,7 +307,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -287,6 +315,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -295,7 +326,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.traps",
@@ -306,7 +338,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -314,6 +346,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -322,7 +357,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "ee.llsc",
@@ -333,7 +371,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -341,6 +379,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.cache",
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -349,7 +391,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.cache",
+    "cop0.exc"
+   ]
   },
   {
    "id": "ee.decode",
@@ -360,7 +406,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -368,6 +414,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -376,7 +423,8 @@
    "hardware_programs": {
     "cited": 5,
     "matching": 5
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.arith",
@@ -387,7 +435,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -395,6 +443,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -403,7 +454,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.compare",
@@ -414,7 +466,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -422,6 +474,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -430,7 +485,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.logic",
@@ -441,7 +497,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -449,6 +505,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -457,7 +516,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.muldiv",
@@ -468,7 +528,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -476,6 +536,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -484,7 +547,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.shuffle",
@@ -495,7 +559,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -503,6 +567,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -511,7 +578,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mmi.unexercised",
@@ -522,7 +590,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -530,6 +598,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.alu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -538,7 +609,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "cop0.regs",
@@ -549,7 +621,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -557,6 +629,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -565,7 +638,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "cop0.perf",
@@ -576,7 +650,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -584,6 +658,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.regs"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -592,7 +669,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.regs"
+   ]
   },
   {
    "id": "cop0.count",
@@ -603,7 +683,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -611,6 +691,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.intr"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -619,7 +702,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "cop0.exc",
@@ -630,7 +714,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -638,6 +722,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.regs"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -646,7 +733,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.regs"
+   ]
   },
   {
    "id": "cop0.adderr",
@@ -657,7 +747,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -665,6 +755,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -673,7 +766,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "cop0.intr",
@@ -684,7 +780,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -692,6 +788,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -700,7 +799,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "cop0.bc0",
@@ -711,7 +813,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -719,6 +821,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.ctrl",
+    "dma.irq"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -727,7 +833,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "cop0.tlb",
@@ -738,7 +845,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -746,6 +853,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -754,7 +864,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "cop0.cache",
@@ -765,7 +878,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -773,6 +886,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.regs",
+    "mem.rdram"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -781,7 +898,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.regs",
+    "mem.rdram"
+   ]
   },
   {
    "id": "fpu.arith",
@@ -792,7 +913,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -800,6 +921,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -808,7 +932,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.muldiv",
@@ -819,7 +944,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -827,6 +952,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -835,7 +963,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.sqrt",
@@ -846,7 +975,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -854,6 +983,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -862,7 +994,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.rsqrt",
@@ -873,7 +1006,7 @@
    "blocker": "Needs new hardware rows: probe P3 run on a physical PS2",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -881,6 +1014,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -889,7 +1025,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.compare",
@@ -900,7 +1037,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -908,6 +1045,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -916,7 +1056,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.branch",
@@ -927,7 +1068,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -935,6 +1076,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -943,7 +1087,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.convert",
@@ -954,7 +1099,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -962,6 +1107,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -970,7 +1118,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.transfer",
@@ -981,7 +1130,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -989,6 +1138,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -997,7 +1149,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "fpu.flags",
@@ -1008,7 +1161,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1016,6 +1169,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "ee.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1024,7 +1180,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ee.timer03",
@@ -1035,7 +1192,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1043,6 +1200,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -1051,7 +1211,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "k.threads",
@@ -1062,7 +1223,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1070,6 +1231,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1078,7 +1243,10 @@
    "hardware_programs": {
     "cited": 8,
     "matching": 8
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "k.sync",
@@ -1089,7 +1257,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1097,6 +1265,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1105,7 +1277,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "k.irqh",
@@ -1116,7 +1291,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1124,6 +1299,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1132,7 +1311,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "k.heap",
@@ -1143,7 +1325,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1151,6 +1333,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1159,7 +1345,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "k.syscalltab",
@@ -1170,7 +1359,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1178,6 +1367,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1186,7 +1379,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "k.alarm",
@@ -1197,7 +1393,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1205,6 +1401,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1213,7 +1413,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
   },
   {
    "id": "vu0.fmac",
@@ -1224,7 +1427,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1232,6 +1435,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.upper"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1240,7 +1446,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu0.int",
@@ -1251,7 +1458,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1259,6 +1466,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.lowerint"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1267,7 +1477,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu0.xfer",
@@ -1278,7 +1489,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1286,6 +1497,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu0.micro"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1294,7 +1508,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "vu0.micro"
+   ]
   },
   {
    "id": "vu0.mem",
@@ -1305,7 +1522,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1313,6 +1530,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.mem"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1321,7 +1541,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.mem"
+   ]
   },
   {
    "id": "vu0.flags",
@@ -1332,7 +1555,7 @@
    "blocker": "Physical PS2 + ps2sdk to run probe P5",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -1340,6 +1563,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.flags"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -1348,7 +1574,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu0.fdiv",
@@ -1359,7 +1586,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1367,6 +1594,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.fdiv"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1375,7 +1605,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.upper",
@@ -1386,7 +1617,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1394,6 +1625,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.flags"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1402,7 +1636,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.lowerint",
@@ -1413,7 +1648,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1421,6 +1656,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1429,7 +1667,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.branch",
@@ -1440,7 +1679,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1448,6 +1687,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1456,7 +1698,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.fdiv",
@@ -1467,7 +1710,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1475,6 +1718,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.hazards"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1483,7 +1729,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.efu",
@@ -1494,7 +1741,7 @@
    "blocker": "Exact term rounding unknown; needs an EFU probe run on hardware",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1502,6 +1749,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.hazards"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -1510,7 +1760,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.flags",
@@ -1521,7 +1772,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1529,6 +1780,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.hazards"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1537,7 +1791,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.hazards",
@@ -1548,7 +1803,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1556,6 +1811,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.decode"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -1564,7 +1822,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.rng",
@@ -1575,7 +1834,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1583,6 +1842,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.decode"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1591,7 +1853,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.decode",
@@ -1602,7 +1865,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1610,6 +1873,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1618,7 +1882,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.ebit",
@@ -1629,7 +1894,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1637,6 +1902,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.sched"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1645,7 +1913,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
   },
   {
    "id": "vu.mem",
@@ -1656,7 +1927,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1664,6 +1935,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "mem.io"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1672,7 +1946,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "mem.io"
+   ]
   },
   {
    "id": "vu.load",
@@ -1683,7 +1960,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1691,6 +1968,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.mpg"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1699,7 +1979,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vif.mpg"
+   ]
   },
   {
    "id": "vu0.micro",
@@ -1710,7 +1993,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1718,6 +2001,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.sched"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1726,7 +2012,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
   },
   {
    "id": "vu.sched",
@@ -1737,7 +2026,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -1745,6 +2034,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.hazards"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -1753,7 +2045,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vu.xgkick",
@@ -1764,7 +2057,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1772,6 +2065,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.mem",
+    "vu.sched"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -1780,7 +2077,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.mem",
+    "vu.sched"
+   ]
   },
   {
    "id": "gif.tags",
@@ -1791,7 +2092,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1799,6 +2100,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -1807,7 +2109,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "gif.path1",
@@ -1818,7 +2121,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1826,6 +2129,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vu.xgkick",
+    "gif.tags"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1834,7 +2141,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.xgkick"
+   ]
   },
   {
    "id": "gif.path2",
@@ -1845,7 +2155,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1853,6 +2163,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.direct"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1861,7 +2174,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vif.direct"
+   ]
   },
   {
    "id": "gif.path3",
@@ -1872,7 +2188,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1880,6 +2196,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c2",
+    "gif.tags"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1888,7 +2208,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c2"
+   ]
   },
   {
    "id": "gif.arb",
@@ -1899,7 +2222,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1907,6 +2230,11 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gif.path1",
+    "gif.path2",
+    "gif.path3"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1915,7 +2243,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gif.path1",
+    "gif.path2"
+   ]
   },
   {
    "id": "gs.priv",
@@ -1926,7 +2258,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1934,6 +2266,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1942,7 +2275,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "gs.events",
@@ -1953,7 +2287,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1961,6 +2295,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.priv",
+    "gs.genregs"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1969,7 +2307,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "gs.genregs"
+   ]
   },
   {
    "id": "gs.genregs",
@@ -1980,7 +2321,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -1988,6 +2329,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gif.tags"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -1996,7 +2340,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "gs.vram",
@@ -2007,7 +2352,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -2015,6 +2360,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2023,7 +2369,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "gs.swizzle",
@@ -2034,7 +2381,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2042,6 +2389,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.vram"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2050,7 +2400,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.vram"
+   ]
   },
   {
    "id": "gs.xfer",
@@ -2061,7 +2414,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2069,6 +2422,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.swizzle"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2077,7 +2433,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.swizzle"
+   ]
   },
   {
    "id": "gs.prims",
@@ -2088,7 +2447,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2096,6 +2455,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.genregs"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2104,7 +2466,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.genregs"
+   ]
   },
   {
    "id": "gs.tex",
@@ -2115,7 +2480,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2123,6 +2488,11 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.vram",
+    "gs.swizzle",
+    "gs.clut"
+   ],
    "named_tests": {
     "cited": 3,
     "executed": 3,
@@ -2131,7 +2501,12 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.vram",
+    "gs.swizzle",
+    "gs.clut"
+   ]
   },
   {
    "id": "gs.clut",
@@ -2142,7 +2517,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2150,6 +2525,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.vram",
+    "gs.swizzle"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2158,7 +2537,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.vram",
+    "gs.swizzle"
+   ]
   },
   {
    "id": "gs.alpha",
@@ -2177,6 +2560,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.genregs",
+    "gs.tests"
+   ],
    "named_tests": {
     "cited": 3,
     "executed": 3,
@@ -2185,7 +2572,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.genregs",
+    "gs.tests"
+   ]
   },
   {
    "id": "gs.tests",
@@ -2196,7 +2587,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2204,6 +2595,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.prims"
+   ],
    "named_tests": {
     "cited": 3,
     "executed": 3,
@@ -2212,7 +2606,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
   },
   {
    "id": "gs.fog",
@@ -2223,7 +2620,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2231,6 +2628,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.prims"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2239,7 +2639,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
   },
   {
    "id": "gs.mask",
@@ -2250,7 +2653,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2258,6 +2661,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.prims"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2266,7 +2672,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
   },
   {
    "id": "gs.dither",
@@ -2285,6 +2694,11 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.alpha",
+    "gs.genregs",
+    "gs.swizzle"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2293,7 +2707,12 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.alpha",
+    "gs.genregs",
+    "gs.swizzle"
+   ]
   },
   {
    "id": "gs.aa",
@@ -2304,7 +2723,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2312,6 +2731,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.alpha"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2320,7 +2742,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.alpha"
+   ]
   },
   {
    "id": "gs.cpu",
@@ -2331,7 +2756,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2339,6 +2764,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.prims"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2347,7 +2775,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
   },
   {
    "id": "gs.cache",
@@ -2358,7 +2789,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -2366,6 +2797,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.tex"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2374,7 +2808,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.tex"
+   ]
   },
   {
    "id": "gs.fb",
@@ -2385,7 +2822,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2393,6 +2830,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.priv"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2401,7 +2841,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "gs.interlace",
@@ -2412,7 +2853,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2420,6 +2861,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.fb"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2428,7 +2872,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.fb"
+   ]
   },
   {
    "id": "gs.present",
@@ -2439,7 +2886,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2447,6 +2894,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.fb"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2455,7 +2905,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.fb"
+   ]
   },
   {
    "id": "gs.vulkan",
@@ -2466,7 +2919,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2474,6 +2927,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.cpu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2482,7 +2938,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.cpu"
+   ]
   },
   {
    "id": "gs.pgs",
@@ -2493,7 +2952,7 @@
    "blocker": "Vulkan-capable test host and GS trace capture",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2501,6 +2960,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "gs.cpu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2509,7 +2971,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "gs.cpu"
+   ]
   },
   {
    "id": "dma.c0",
@@ -2520,7 +2985,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2528,6 +2993,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain",
+    "vif.stall"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2536,7 +3005,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c1",
@@ -2547,7 +3017,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2555,6 +3025,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain",
+    "vif.stall"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2563,7 +3037,8 @@
    "hardware_programs": {
     "cited": 5,
     "matching": 5
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c2",
@@ -2574,7 +3049,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2582,6 +3057,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2590,7 +3068,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c3",
@@ -2601,7 +3080,7 @@
    "blocker": "IPU hardware model (E)",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2609,6 +3088,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2617,7 +3099,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c4",
@@ -2628,7 +3111,7 @@
    "blocker": "IPU hardware model (E)",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2636,6 +3119,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2644,7 +3130,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c5",
@@ -2655,7 +3142,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2663,6 +3150,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2671,7 +3161,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c6",
@@ -2682,7 +3173,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2690,6 +3181,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2698,7 +3192,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c7",
@@ -2709,7 +3204,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2717,6 +3212,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2725,7 +3223,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c8",
@@ -2736,7 +3235,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2744,6 +3243,11 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal",
+    "dma.interleave",
+    "mem.spr"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2752,7 +3256,8 @@
    "hardware_programs": {
     "cited": 3,
     "matching": 3
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.c9",
@@ -2763,7 +3268,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2771,6 +3276,11 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain",
+    "dma.interleave",
+    "mem.spr"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2779,7 +3289,8 @@
    "hardware_programs": {
     "cited": 4,
     "matching": 4
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.normal",
@@ -2790,7 +3301,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2798,6 +3309,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.ctrl",
+    "dma.irq"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2806,7 +3321,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.chain",
@@ -2817,7 +3333,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2825,6 +3341,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2833,7 +3352,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.callret",
@@ -2844,7 +3364,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2852,6 +3372,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.chain"
+   ],
    "named_tests": {
     "cited": 3,
     "executed": 3,
@@ -2860,7 +3383,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.interleave",
@@ -2871,7 +3395,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2879,6 +3403,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -2887,7 +3414,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.irq",
@@ -2898,7 +3426,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2906,6 +3434,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.intr",
+    "dma.ctrl"
+   ],
    "named_tests": {
     "cited": 3,
     "executed": 3,
@@ -2914,7 +3446,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.ctrl",
@@ -2925,7 +3458,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -2933,6 +3466,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -2941,7 +3475,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "dma.stall",
@@ -2952,7 +3487,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -2960,6 +3495,18 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c8",
+    "dma.c1",
+    "dma.c2",
+    "dma.c5",
+    "dma.c6",
+    "dma.c3",
+    "dma.chain",
+    "dma.normal",
+    "dma.irq",
+    "dma.ctrl"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -2968,7 +3515,13 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c2",
+    "dma.c5",
+    "dma.c6",
+    "dma.c3"
+   ]
   },
   {
    "id": "dma.mfifo",
@@ -2987,6 +3540,14 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c8",
+    "dma.c1",
+    "dma.c2",
+    "dma.chain",
+    "dma.irq",
+    "mem.spr"
+   ],
    "named_tests": {
     "cited": 4,
     "executed": 4,
@@ -2995,7 +3556,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c2"
+   ]
   },
   {
    "id": "dma.timing",
@@ -3006,7 +3570,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3014,6 +3578,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.normal",
+    "dma.chain"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3022,7 +3590,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mem.rdram",
@@ -3033,7 +3602,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3041,6 +3610,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -3049,7 +3619,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mem.spr",
@@ -3060,7 +3631,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3068,6 +3639,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.tlb"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3076,7 +3650,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "cop0.tlb"
+   ]
   },
   {
    "id": "mem.fast",
@@ -3087,7 +3664,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3095,6 +3672,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "mem.rdram"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3103,7 +3683,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
   },
   {
    "id": "mem.io",
@@ -3114,7 +3697,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3122,6 +3705,11 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.ctrl",
+    "per.intc",
+    "gs.priv"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3130,7 +3718,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "mem.reserved",
@@ -3141,7 +3730,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3149,6 +3738,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "mem.rdram",
+    "k.heap"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3157,7 +3750,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
   },
   {
    "id": "vif.unpack",
@@ -3168,7 +3764,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3176,6 +3772,12 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.stcycl",
+    "vif.stmod",
+    "vif.mask",
+    "vu.mem"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -3184,7 +3786,11 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "vif.mask",
+    "vu.mem"
+   ]
   },
   {
    "id": "vif.stcycl",
@@ -3195,7 +3801,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3203,6 +3809,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -3211,7 +3820,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vif.stmod",
@@ -3222,7 +3832,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3230,6 +3840,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3238,7 +3851,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vif.mask",
@@ -3249,7 +3863,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3257,6 +3871,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs",
+    "vif.stcycl"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3265,7 +3883,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vif.stall",
@@ -3276,7 +3895,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3284,6 +3903,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs",
+    "per.intc"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -3292,7 +3915,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vif.regs",
@@ -3303,7 +3927,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3311,6 +3935,7 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3319,7 +3944,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "vif.mpg",
@@ -3330,7 +3956,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3338,6 +3964,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs",
+    "vu.mem"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3346,7 +3976,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.mem"
+   ]
   },
   {
    "id": "vif.dbf",
@@ -3357,7 +3990,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3365,6 +3998,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.mscal"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3373,7 +4009,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vif.mscal"
+   ]
   },
   {
    "id": "vif.mscal",
@@ -3384,7 +4023,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3392,6 +4031,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs",
+    "vu.sched"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3400,7 +4043,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
   },
   {
    "id": "vif.direct",
@@ -3411,7 +4057,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3419,6 +4065,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "vif.regs",
+    "gif.tags"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3427,7 +4077,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "ipu.dma",
@@ -3438,7 +4089,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3446,6 +4097,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c3",
+    "dma.c4"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3454,7 +4109,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c3",
+    "dma.c4"
+   ]
   },
   {
    "id": "ipu.cmd",
@@ -3465,7 +4124,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3473,6 +4132,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "ipu.dma"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3481,7 +4143,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "ipu.dma"
+   ]
   },
   {
    "id": "ipu.mpeg",
@@ -3492,7 +4157,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3500,6 +4165,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "ipu.cmd"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3508,7 +4176,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "ipu.cmd"
+   ]
   },
   {
    "id": "iop.cpu",
@@ -3519,7 +4190,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3527,6 +4198,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.mem"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3535,7 +4209,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.mem"
+   ]
   },
   {
    "id": "iop.mem",
@@ -3546,7 +4223,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3554,6 +4231,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3562,7 +4240,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "iop.intr",
@@ -3573,7 +4252,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3581,6 +4260,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.cpu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3589,7 +4271,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.cpu"
+   ]
   },
   {
    "id": "iop.kernel",
@@ -3600,7 +4285,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3608,6 +4293,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr",
+    "iop.timers"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3616,7 +4305,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr",
+    "iop.timers"
+   ]
   },
   {
    "id": "iop.timers",
@@ -3627,7 +4320,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3635,6 +4328,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3643,7 +4339,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr"
+   ]
   },
   {
    "id": "iop.irx",
@@ -3654,7 +4353,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3662,6 +4361,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.mem",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 0,
@@ -3670,7 +4373,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.mem",
+    "iop.kernel"
+   ]
   },
   {
    "id": "iop.sched",
@@ -3681,7 +4388,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3689,6 +4396,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.cpu"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3697,7 +4407,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.cpu"
+   ]
   },
   {
    "id": "sif.cmd",
@@ -3708,7 +4421,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3716,6 +4429,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.dma"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3724,7 +4440,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "sif.dma"
+   ]
   },
   {
    "id": "sif.rpc",
@@ -3735,7 +4454,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3743,6 +4462,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.cmd"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3751,7 +4473,8 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "sif.dma",
@@ -3762,7 +4485,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3770,6 +4493,11 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c5",
+    "dma.c6",
+    "iop.cpu"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3778,7 +4506,12 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c5",
+    "dma.c6",
+    "iop.cpu"
+   ]
   },
   {
    "id": "svc.fileio",
@@ -3789,7 +4522,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3797,6 +4530,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3805,7 +4542,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "svc.ioman",
@@ -3816,7 +4556,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3824,6 +4564,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3832,7 +4576,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "svc.cdvdman",
@@ -3843,7 +4590,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3851,6 +4598,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3859,7 +4610,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "svc.cdvdfsv",
@@ -3870,7 +4624,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3878,6 +4632,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3886,7 +4644,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "svc.rpcsrv",
@@ -3897,7 +4658,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": false,
     "test_passed": false,
@@ -3905,6 +4666,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 0,
@@ -3913,7 +4678,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "svc.modload",
@@ -3924,7 +4692,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3932,6 +4700,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3940,7 +4712,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "sys.boot",
@@ -3951,7 +4726,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -3959,6 +4734,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -3967,7 +4746,10 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": [
+    "iop.kernel"
+   ]
   },
   {
    "id": "spu.cores",
@@ -3978,7 +4760,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -3986,6 +4768,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.mem",
+    "iop.intr"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -3994,7 +4780,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.mem",
+    "iop.intr"
+   ]
   },
   {
    "id": "spu.ram",
@@ -4005,7 +4795,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4013,6 +4803,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.cores"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4021,7 +4814,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
   },
   {
    "id": "spu.voices",
@@ -4032,7 +4828,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4040,6 +4836,12 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.ram",
+    "spu.adpcm",
+    "spu.adsr",
+    "spu.pitch"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4048,7 +4850,13 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.ram",
+    "spu.adpcm",
+    "spu.adsr",
+    "spu.pitch"
+   ]
   },
   {
    "id": "spu.adsr",
@@ -4059,7 +4867,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4067,6 +4875,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.cores"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4075,7 +4886,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
   },
   {
    "id": "spu.pitch",
@@ -4086,7 +4900,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4094,6 +4908,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.cores"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4102,7 +4919,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
   },
   {
    "id": "spu.mix",
@@ -4113,7 +4933,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4121,6 +4941,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.voices",
+    "spu.reverb"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4129,7 +4953,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.voices",
+    "spu.reverb"
+   ]
   },
   {
    "id": "spu.reverb",
@@ -4140,7 +4968,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4148,6 +4976,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.ram",
+    "spu.voices"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4156,7 +4988,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.ram",
+    "spu.voices"
+   ]
   },
   {
    "id": "spu.irq",
@@ -4167,7 +5003,7 @@
    "blocker": "",
    "target": "8",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4175,6 +5011,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.cores",
+    "iop.intr"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4183,7 +5023,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.cores",
+    "iop.intr"
+   ]
   },
   {
    "id": "spu.dma",
@@ -4194,7 +5038,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4202,6 +5046,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.ram",
+    "iop.intr"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4210,7 +5058,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.ram",
+    "iop.intr"
+   ]
   },
   {
    "id": "spu.libsd",
@@ -4221,7 +5073,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4229,6 +5081,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.cores",
+    "spu.dma"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4237,7 +5093,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.cores",
+    "spu.dma"
+   ]
   },
   {
    "id": "spu.adpcm",
@@ -4248,7 +5108,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4256,6 +5116,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.ram"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4264,7 +5127,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.ram"
+   ]
   },
   {
    "id": "spu.host",
@@ -4275,7 +5141,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4283,6 +5149,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.mix",
+    "spu.sync"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4291,7 +5161,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.mix",
+    "spu.sync"
+   ]
   },
   {
    "id": "spu.sync",
@@ -4302,7 +5176,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4310,6 +5184,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "spu.mix"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4318,7 +5195,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "spu.mix"
+   ]
   },
   {
    "id": "per.sio2",
@@ -4329,7 +5209,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4337,6 +5217,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4345,7 +5229,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ]
   },
   {
    "id": "per.pad",
@@ -4356,7 +5244,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4364,6 +5252,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.sio2"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4372,7 +5263,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.sio2"
+   ]
   },
   {
    "id": "per.ds2",
@@ -4383,7 +5277,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4391,6 +5285,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.pad"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4399,7 +5296,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.pad"
+   ]
   },
   {
    "id": "per.mc",
@@ -4410,7 +5310,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4418,6 +5318,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.sio2"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4426,7 +5329,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.sio2"
+   ]
   },
   {
    "id": "per.save",
@@ -4437,7 +5343,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4445,6 +5351,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.mc"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4453,7 +5362,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.mc"
+   ]
   },
   {
    "id": "per.cdvd",
@@ -4464,7 +5376,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4472,6 +5384,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr",
+    "svc.cdvdman"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4480,7 +5396,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr",
+    "svc.cdvdman"
+   ]
   },
   {
    "id": "per.usb",
@@ -4491,7 +5411,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4499,6 +5419,10 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4507,7 +5431,11 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ]
   },
   {
    "id": "per.dev9",
@@ -4518,7 +5446,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4526,6 +5454,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "iop.intr"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4534,7 +5465,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "iop.intr"
+   ]
   },
   {
    "id": "per.hdd",
@@ -4545,7 +5479,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4553,6 +5487,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.dev9"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4561,7 +5498,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.dev9"
+   ]
   },
   {
    "id": "per.netif",
@@ -4572,7 +5512,7 @@
    "blocker": "",
    "target": "unscheduled",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4580,6 +5520,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.dev9"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4588,7 +5531,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.dev9"
+   ]
   },
   {
    "id": "per.intc",
@@ -4599,7 +5545,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4607,6 +5553,9 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "cop0.intr"
+   ],
    "named_tests": {
     "cited": 1,
     "executed": 1,
@@ -4615,7 +5564,8 @@
    "hardware_programs": {
     "cited": 1,
     "matching": 1
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "per.rtc",
@@ -4626,7 +5576,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4634,6 +5584,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.cdvd"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4642,7 +5595,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.cdvd"
+   ]
   },
   {
    "id": "per.biossvc",
@@ -4653,7 +5609,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
     "test_passed": true,
@@ -4661,6 +5617,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "per.rtc"
+   ],
    "named_tests": {
     "cited": 2,
     "executed": 2,
@@ -4669,7 +5628,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "per.rtc"
+   ]
   },
   {
    "id": "per.boot",
@@ -4680,7 +5642,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4688,6 +5650,10 @@
     "hardware_verified": true,
     "timing_verified": false
    },
+   "dependencies": [
+    "mem.reserved",
+    "sys.boot"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4696,7 +5662,10 @@
    "hardware_programs": {
     "cited": 2,
     "matching": 2
-   }
+   },
+   "unverified_dependencies": [
+    "mem.reserved"
+   ]
   },
   {
    "id": "per.deci2",
@@ -4707,7 +5676,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4715,6 +5684,9 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [
+    "dma.c7"
+   ],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4723,7 +5695,10 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": [
+    "dma.c7"
+   ]
   },
   {
    "id": "per.bios",
@@ -4734,7 +5709,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4742,6 +5717,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4750,7 +5726,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "per.ps1",
@@ -4761,7 +5738,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4769,6 +5746,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4777,7 +5755,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   },
   {
    "id": "per.dvdv",
@@ -4788,7 +5767,7 @@
    "blocker": "",
    "target": "",
    "levels": {
-    "contract_specified": false,
+    "contract_specified": true,
     "test_exists": false,
     "test_executed": false,
     "test_passed": false,
@@ -4796,6 +5775,7 @@
     "hardware_verified": false,
     "timing_verified": false
    },
+   "dependencies": [],
    "named_tests": {
     "cited": 0,
     "executed": 0,
@@ -4804,7 +5784,8 @@
    "hardware_programs": {
     "cited": 0,
     "matching": 0
-   }
+   },
+   "unverified_dependencies": []
   }
  ]
 }

@@ -3748,14 +3748,15 @@
          "name": "DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE)",
          "status": "VERIFIED_PARTIAL",
          "short": "DMA interrupts",
-         "implemented": "",
+         "implemented": "CIS0-9, SIS, MEIS, BEIS clear on write-one; CIM, SIM, MEIM toggle; INT1 when a masked status bit is set; tag IRQ and TIE",
          "missing": "",
          "src": [
           "ps2xRuntime/src/lib/ps2_memory.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_STAT toggles masks and clears channel status on write-one",
-          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set"
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set",
+          "ps2xTest/src/ps2_memory_tests.cpp::D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set"
          ],
          "hw": [
           "dma_dmac_tagintr",
@@ -3803,17 +3804,23 @@
         {
          "id": "dma.mfifo",
          "name": "MFIFO ring (D_RBOR/D_RBSR)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "MFIFO",
-         "implemented": "Ring registers can be written",
-         "missing": "No MFIFO transfer behaviour",
+         "implemented": "fromSPR writes into the D_RBOR/D_RBSR ring; the GIF (MFD=3) or VIF1 (MFD=2) source chain drains it with wrapping, stalls at the write position with D_STAT.MEIS and resumes when fromSPR adds data",
+         "missing": "No hardware program; stall granularity is one tag (the hardware can stop inside the data, D-DMA-2); fromSPR interleave and chain modes into the ring are not wrapped",
          "src": [
-          "ps2xRuntime/src/lib/Kernel/Stubs/DMA.cpp"
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO GIF drain stalls on an empty ring with MEIS and resumes when fromSPR adds data",
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO VIF1 drain (MFD=2) waits for fromSPR and then executes the VIF codes it drains",
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO tags and following data wrap at the ring end; REF data is read in place",
+          "ps2xTest/src/ps2_memory_tests.cpp::fromSPR writes linearly when MFD selects no drain or MADR is outside the ring"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "MFIFO probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+         "target": "8",
          "verified_at": null
         },
         {

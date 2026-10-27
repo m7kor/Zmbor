@@ -31,3 +31,19 @@ run fails in a later one.
 
 Fixed in Phase 4 (see `CHANGELOG.md`): branch in a delay slot, heap ownership (memory/ee/default), COP0 performance
 counters, MUL.S truncation and non-commutativity, VU0 vi24.
+
+## IOP programs (separate measurement)
+
+ps2autotests also ships 23 prebuilt IOP modules (`tests/cpu/iop`, `tests/kernel/iop`, `.irx`) with real-PS2 `.expected`
+output. They run on the ps2xIOP emulator through `tools/hwtest/iop_hwtest.py` (runner `ps2_iop_autotest_runner`, same
+BEGIN/END extraction and comparison as the EE programs) and are reported in `iop-dashboard.json` / `IOP_DASHBOARD.md`.
+They are not added to the 55 EE programs above.
+
+| run | exact programs | matching lines |
+|---|---|---|
+| first run (printf formatting in place, before the IRX relocation fix) | 0 / 23 (no output) | 0 / 1306 |
+| current | 7 / 23 | 1167 / 1306 |
+
+Exact: `cpu/iop` alu, branch, hilodelay, lsu, lsudelay, muldiv; `kernel/iop/libc` sprintf. `cpu/iop/branchdelay`
+differs on 1 of 11 lines; the 15 other `kernel/iop` programs (event flags, message boxes, threads, vpool, strtok)
+differ where the HLE IOP kernel's results differ from the real kernel's.

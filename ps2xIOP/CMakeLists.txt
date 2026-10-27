@@ -63,6 +63,11 @@ if(PS2X_IOP_BUILD_TESTS)
     target_include_directories(ps2_iop_import_version_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     add_test(NAME ps2_iop_import_version_tests COMMAND ps2_iop_import_version_tests)
 
+    # Runs one IRX and prints its console output; driven by tools/hwtest/iop_hwtest.py against the ps2autotests IOP
+    # programs (third-party data, not in this repository, so no add_test here).
+    add_executable(ps2_iop_autotest_runner tests/iop_autotest_runner.cpp)
+    target_link_libraries(ps2_iop_autotest_runner PRIVATE ps2_iop)
+
 endif()
 
 install(TARGETS ps2_iop

@@ -1,0 +1,294 @@
+{
+  "by_subsystem": {
+    "cpu/iop": {
+      "CRASH": 0,
+      "MISMATCH": 1,
+      "NOT_BUILT": 0,
+      "NO_OUTPUT": 0,
+      "PASS": 6,
+      "RECOMPILE_FAIL": 0,
+      "TIMEOUT": 0
+    },
+    "kernel/iop": {
+      "CRASH": 0,
+      "MISMATCH": 15,
+      "NOT_BUILT": 0,
+      "NO_OUTPUT": 0,
+      "PASS": 1,
+      "RECOMPILE_FAIL": 0,
+      "TIMEOUT": 0
+    }
+  },
+  "regressions": [],
+  "summary": {
+    "attempted": 23,
+    "built": 23,
+    "crash": 0,
+    "discovered": 23,
+    "executed": 23,
+    "expected_lines": 1306,
+    "matching": 7,
+    "matching_lines": 1167,
+    "mismatch": 16,
+    "no_output": 0,
+    "not_built": 0,
+    "recompile_fail": 0,
+    "recompiled": 23,
+    "timeout": 0
+  },
+  "tests": [
+    {
+      "elf": "cpu/iop/alu.irx",
+      "exit_code": 0,
+      "expected_lines": 467,
+      "id": "cpu_iop_alu",
+      "matching_lines": 467,
+      "regression": false,
+      "run_seconds": 0.017,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/branch.irx",
+      "exit_code": 0,
+      "expected_lines": 170,
+      "id": "cpu_iop_branch",
+      "matching_lines": 170,
+      "regression": false,
+      "run_seconds": 0.014,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/branchdelay.irx",
+      "exit_code": 0,
+      "expected_lines": 11,
+      "id": "cpu_iop_branchdelay",
+      "matching_lines": 10,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/hilodelay.irx",
+      "exit_code": 0,
+      "expected_lines": 6,
+      "id": "cpu_iop_hilodelay",
+      "matching_lines": 6,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/lsu.irx",
+      "exit_code": 0,
+      "expected_lines": 114,
+      "id": "cpu_iop_lsu",
+      "matching_lines": 114,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/lsudelay.irx",
+      "exit_code": 0,
+      "expected_lines": 11,
+      "id": "cpu_iop_lsudelay",
+      "matching_lines": 11,
+      "regression": false,
+      "run_seconds": 0.073,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "cpu/iop/muldiv.irx",
+      "exit_code": 0,
+      "expected_lines": 202,
+      "id": "cpu_iop_muldiv",
+      "matching_lines": 202,
+      "regression": false,
+      "run_seconds": 0.012,
+      "status": "PASS",
+      "subsystem": "cpu/iop"
+    },
+    {
+      "elf": "kernel/iop/eventflag/delete.irx",
+      "exit_code": 0,
+      "expected_lines": 11,
+      "id": "kernel_iop_eventflag_delete",
+      "matching_lines": 8,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/eventflag/poll.irx",
+      "exit_code": 0,
+      "expected_lines": 18,
+      "id": "kernel_iop_eventflag_poll",
+      "matching_lines": 11,
+      "regression": false,
+      "run_seconds": 0.012,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/interrupt/register.irx",
+      "exit_code": 0,
+      "expected_lines": 15,
+      "id": "kernel_iop_interrupt_register",
+      "matching_lines": 11,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/interrupt/release.irx",
+      "exit_code": 0,
+      "expected_lines": 9,
+      "id": "kernel_iop_interrupt_release",
+      "matching_lines": 6,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/libc/sprintf.irx",
+      "exit_code": 0,
+      "expected_lines": 19,
+      "id": "kernel_iop_libc_sprintf",
+      "matching_lines": 19,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "PASS",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/libc/strtok.irx",
+      "exit_code": 0,
+      "expected_lines": 10,
+      "id": "kernel_iop_libc_strtok",
+      "matching_lines": 5,
+      "regression": false,
+      "run_seconds": 0.01,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/messagebox/poll.irx",
+      "exit_code": 0,
+      "expected_lines": 9,
+      "id": "kernel_iop_messagebox_poll",
+      "matching_lines": 4,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/messagebox/receive.irx",
+      "exit_code": 0,
+      "expected_lines": 10,
+      "id": "kernel_iop_messagebox_receive",
+      "matching_lines": 5,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/messagebox/send.irx",
+      "exit_code": 0,
+      "expected_lines": 14,
+      "id": "kernel_iop_messagebox_send",
+      "matching_lines": 8,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/thread/cancelwakeup.irx",
+      "exit_code": 0,
+      "expected_lines": 11,
+      "id": "kernel_iop_thread_cancelwakeup",
+      "matching_lines": 8,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/thread/create.irx",
+      "exit_code": 0,
+      "expected_lines": 26,
+      "id": "kernel_iop_thread_create",
+      "matching_lines": 14,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/thread/delete.irx",
+      "exit_code": 0,
+      "expected_lines": 15,
+      "id": "kernel_iop_thread_delete",
+      "matching_lines": 7,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/thread/releasewait.irx",
+      "exit_code": 0,
+      "expected_lines": 23,
+      "id": "kernel_iop_thread_releasewait",
+      "matching_lines": 13,
+      "regression": false,
+      "run_seconds": 0.012,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/thread/stat.irx",
+      "exit_code": 0,
+      "expected_lines": 17,
+      "id": "kernel_iop_thread_stat",
+      "matching_lines": 6,
+      "regression": false,
+      "run_seconds": 0.012,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/vpool/create.irx",
+      "exit_code": 0,
+      "expected_lines": 14,
+      "id": "kernel_iop_vpool_create",
+      "matching_lines": 8,
+      "regression": false,
+      "run_seconds": 0.011,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    },
+    {
+      "elf": "kernel/iop/vpool/pallocate.irx",
+      "exit_code": 0,
+      "expected_lines": 104,
+      "id": "kernel_iop_vpool_pallocate",
+      "matching_lines": 54,
+      "regression": false,
+      "run_seconds": 0.013,
+      "status": "MISMATCH",
+      "subsystem": "kernel/iop"
+    }
+  ]
+}

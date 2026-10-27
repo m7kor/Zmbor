@@ -46,8 +46,11 @@ def dma_seeds():
     end_tag = struct.pack("<QQ", 1 | (7 << 28), 0)                      # END, QWC=1, followed by one data qword
     payload = giftag(0, 1, 0, 0, 0)
     ref_tag = struct.pack("<QQ", 1 | (3 << 28) | (0x100020 << 32), 0)   # REF to 0x100020, QWC=1
+    refs_tag = struct.pack("<QQ", 1 | (4 << 28) | (0x100020 << 32), 0)  # REFS to 0x100020, QWC=1
     return {"end": struct.pack("<I", 0) + end_tag + payload,
-            "ref_then_end": struct.pack("<I", 0) + ref_tag + end_tag + payload}
+            "ref_then_end": struct.pack("<I", 0) + ref_tag + end_tag + payload,
+            # control bit 1: stall control with D_STADR = 0x100000, so the REFS tag waits until the harness moves it.
+            "refs_stall": struct.pack("<I", 2) + refs_tag + end_tag + payload}
 
 
 def elf_seed():

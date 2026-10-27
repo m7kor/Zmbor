@@ -78,10 +78,26 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     {
         m.mem.writeIORegister(0x1000E000u, 1u);
     }
+    // Bit 1 adds stall control with the GIF as drain (STD=2, STS=fromSPR) and D_STADR from bits 20-31, so REFS tags
+    // meet blocked, boundary and free stall addresses; afterwards D_STADR moves and STD is cleared, resuming the drain.
+    const bool stall = (control & 2u) != 0u;
+    if (stall)
+    {
+        const uint32_t dctrl = m.mem.readIORegister(0x1000E000u);
+        m.mem.writeIORegister(0x1000E060u, 0x00100000u | ((control >> 20) << 8)); // D_STADR
+        m.mem.writeIORegister(0x1000E000u, dctrl | (2u << 4) | (2u << 6));
+    }
     m.mem.writeIORegister(0x1000A030u, tadr);                // D2_TADR
     m.mem.writeIORegister(0x1000A020u, 0u);                  // D2_QWC
     m.mem.writeIORegister(0x1000A000u, 0x00000105u);         // D2_CHCR: DIR from memory, chain mode, STR
     m.mem.processPendingTransfers();
+    if (stall)
+    {
+        m.mem.writeIORegister(0x1000E060u, m.mem.readIORegister(0x1000E060u) + 0x1000u);
+        const uint32_t dctrl = m.mem.readIORegister(0x1000E000u);
+        m.mem.writeIORegister(0x1000E000u, dctrl & ~(3u << 6));
+        m.mem.processPendingTransfers();
+    }
 #else
 #error "PS2X_FUZZ_TARGET must be 1 (gif), 2 (vif0), 3 (vif1) or 4 (dma)"
 #endif

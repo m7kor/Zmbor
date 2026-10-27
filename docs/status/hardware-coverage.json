@@ -3,7 +3,7 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "4e2fd3df95726a0ba85c9f985ad1f5ac18055e77",
+  "unit_results_commit": "734c40cfe57417f2a2dc10c9130dc5ee15bcefc6",
   "unit_results_binary_sha256": "824d095f84a7086f270fe409a755060e733596b29851400eeb7cde82059b23ec"
  },
  "levels": [

@@ -3,7 +3,7 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `4e2fd3df9572`, binary sha256 `824d095f84a7086f`.
+Unit-test run: commit `734c40cfe574`, binary sha256 `824d095f84a7086f`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|

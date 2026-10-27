@@ -166,7 +166,8 @@ def coverage():
     contracts, problems = load_contracts(inv_ids)
     if problems:
         raise SystemExit("\n".join(problems))
-    hw = inv["measurements"]["hardware"]["tests"]
+    hw = dict(inv["measurements"]["hardware"]["tests"])
+    hw.update(inv["measurements"].get("iop_hardware", {}).get("tests", {}))  # IOP programs, a separate measurement
     run = json.loads(RESULTS.read_text(encoding="utf-8")) if RESULTS.exists() else {"results": {}}
     res = run["results"]
     comps = []

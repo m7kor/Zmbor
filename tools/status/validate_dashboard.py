@@ -59,7 +59,12 @@ def validate(inv, check_generated=True, check_measurements=True):
     problems = []
     ids = set()
     hw = inv.get("measurements", {}).get("hardware", {})
-    hw_tests = hw.get("tests", {})
+    # A component may cite EE programs and, once measured, IOP programs (measurements.iop_hardware).
+    iop_measurement = inv.get("measurements", {}).get("iop_hardware", {})
+    iop_tests = iop_measurement.get("tests", {})
+    iop_commit = iop_measurement.get("source", {}).get("evidence_commit")
+    hw_tests = dict(hw.get("tests", {}))
+    hw_tests.update(iop_tests)
     evidence_commit = inv.get("evidence_commit")
 
     def visit_group(g, section, path):
@@ -117,8 +122,13 @@ def validate(inv, check_generated=True, check_measurements=True):
         has_proof, has_tests = bool(leaf.get("proof")), bool(leaf["tests"])
         hardware_section = section == "hardware"
         verified = st in ("VERIFIED_COMPLETE", "VERIFIED_PARTIAL")
-        if verified and leaf["verified_at"] != evidence_commit:
-            problems.append(f"{where}: verified_at must be the evidence commit {evidence_commit}")
+        # The IOP programs were measured at their own commit: a component whose hardware evidence is only IOP
+        # programs is verified at that commit, every other one at the inventory's evidence commit.
+        expected_commit = evidence_commit
+        if leaf["hw"] and all(t in iop_tests for t in leaf["hw"]):
+            expected_commit = iop_commit
+        if verified and leaf["verified_at"] != expected_commit:
+            problems.append(f"{where}: verified_at must be the evidence commit {expected_commit}")
         if not verified and leaf["verified_at"] is not None:
             problems.append(f"{where}: verified_at must be null for {st}")
         if "isa" in leaf:
@@ -183,6 +193,15 @@ def validate(inv, check_generated=True, check_measurements=True):
         dash = json.loads(dash_path.read_text(encoding="utf-8"))
         if gen.measure_hw(dash) != hw:
             problems.append("hardware measurements differ from docs/hwtest/dashboard.json")
+        iop = inv["measurements"].get("iop_hardware")
+        if iop:
+            if not iop["source"].get("evidence_commit"):
+                problems.append("measurements.iop_hardware.source.evidence_commit is not set")
+            iop_path = ROOT / iop["source"]["path"]
+            if not iop_path.exists() or gen.sha256(iop_path) != iop["source"]["sha256"]:
+                problems.append(f"{iop['source']['path']} changed since it was measured: run generate_dashboard.py measure and review")
+            elif gen.measure_hw(json.loads(iop_path.read_text(encoding="utf-8"))) != {k: v for k, v in iop.items() if k != "source"}:
+                problems.append("IOP hardware measurements differ from " + iop["source"]["path"])
         isa_now = gen.decoded_isa()
         classes = inv["measurements"]["isa_coverage"]["classes"]
         if set(classes) != set(isa_now):
@@ -239,6 +258,7 @@ def selftest(inv):
     case("missing category", lambda d: d["sections"][0]["children"].pop())
     case("hle marked complete", lambda d: first_leaf(d, lambda l: l.get("implementation") == "hle").update(status="VERIFIED_COMPLETE", missing="", blocker=""))
     case("tampered measurement", lambda d: d["measurements"]["hardware"].update(lines_match=d["measurements"]["hardware"]["lines"]))
+    case("tampered IOP measurement", lambda d: d["measurements"]["iop_hardware"].update(programs_pass=d["measurements"]["iop_hardware"]["programs"]))
     case("invalid percentage", lambda d: d["measurements"]["isa_coverage"]["classes"]["mmi"].update(numerator=999))
     case("complete without enumerated scope", lambda d: first_leaf(d, lambda l: l["id"] == "vif.stcycl").update(status="VERIFIED_COMPLETE", missing="", blocker=""))
     case("missing with hardware evidence", lambda d: first_leaf(d, lambda l: l["status"] == "MISSING")["hw"].append("cpu_ee_alu"))

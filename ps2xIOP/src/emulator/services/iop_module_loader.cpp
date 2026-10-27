@@ -211,11 +211,14 @@ namespace ps2x::iop::detail
 
                     const uint32_t type = relocationInfo & 0xFFu;
                     const uint32_t symbolIndex = relocationInfo >> 8u;
+                    // An IOP relocatable module (type 0xFF80) is linked at image base 0: every relocated field already
+                    // holds its link-time image address, and loading adds the load base only. The symbol a relocation
+                    // names (ps2sdk IRXs keep .symtab and use section symbols) is not added again: its value is already
+                    // part of the field (cpu/iop ps2autotests IRXs: LO16 of .rodata+0x48 holds 0x208, not 0x48).
                     uint32_t symbolValue = isIopRelocatable ? loadBase : 0u;
-                    if (symbolIndex < symbols.size())
+                    if (!isIopRelocatable && symbolIndex < symbols.size())
                     {
                         const Elf32Sym &symbol = symbols[symbolIndex];
-                        if (!isIopRelocatable || symbolIndex != 0u)
                         {
                             symbolValue = symbol.value;
                             if (symbol.shndx != 0u)

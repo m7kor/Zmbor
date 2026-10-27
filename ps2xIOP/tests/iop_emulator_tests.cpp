@@ -260,7 +260,9 @@ namespace
                     importTable, sizeof(importTable));
     }
 
-    void writeRelocatableRpcServerIrx(TestHost &host, uint32_t address)
+    // withSymbols: relocations name a .text section symbol whose value (0x20) is not zero, as in ps2sdk-built IRXs;
+    // the fields already hold their image addresses, so the loader must add only the load base.
+    void writeRelocatableRpcServerIrx(TestHost &host, uint32_t address, bool withSymbols = false)
     {
         constexpr uint32_t codeOffset = 0x100u;
         constexpr uint32_t entryAddress = 0x20u;
@@ -271,6 +273,7 @@ namespace
         constexpr uint32_t iopModFileOffset = 0xE0u;
         constexpr uint32_t relocationFileOffset = 0x200u;
         constexpr uint32_t sectionTableOffset = 0x240u;
+        constexpr uint32_t symbolTableOffset = 0x300u;
         constexpr uint32_t rpcSid = 0xA11CE001u;
 
         ElfHeader header{};
@@ -291,7 +294,7 @@ namespace
         header.phentsize = sizeof(ProgramHeader);
         header.phnum = 2u;
         header.shentsize = sizeof(SectionHeader);
-        header.shnum = 3u;
+        header.shnum = withSymbols ? 4u : 3u;
 
         const uint32_t code[] = {
             0x27BDFFE0u, // addiu sp, sp, -0x20
@@ -366,11 +369,13 @@ namespace
         relocations.info = 1u; // target .text
         relocations.alignment = 4u;
         relocations.entrySize = sizeof(Relocation);
+        relocations.link = withSymbols ? 3u : 0u;
+        const uint32_t symbol = withSymbols ? (1u << 8u) : 0u; // .text section symbol
 
         const Relocation relocationData[] = {
-            {entryAddress + 5u * sizeof(uint32_t), 5u},  // symbol 0, R_MIPS_HI16
-            {entryAddress + 6u * sizeof(uint32_t), 6u},  // symbol 0, R_MIPS_LO16
-            {entryAddress + 11u * sizeof(uint32_t), 4u}, // symbol 0, R_MIPS_26
+            {entryAddress + 5u * sizeof(uint32_t), symbol | 5u},  // R_MIPS_HI16
+            {entryAddress + 6u * sizeof(uint32_t), symbol | 6u},  // R_MIPS_LO16
+            {entryAddress + 11u * sizeof(uint32_t), symbol | 4u}, // R_MIPS_26
         };
 
         std::fill(host.guest.begin() + address, host.guest.end(), 0u);
@@ -392,6 +397,20 @@ namespace
                     &text, sizeof(text));
         std::memcpy(host.guest.data() + address + sectionTableOffset + 2u * sizeof(SectionHeader),
                     &relocations, sizeof(relocations));
+        if (withSymbols)
+        {
+            // Elf32_Sym {name, value, size, info, other, shndx}: null symbol, then STT_SECTION for .text (index 1).
+            const uint32_t symbols[8] = {0u, 0u, 0u, 0u, 0u, entryAddress, 0u, 0x00010003u};
+            std::memcpy(host.guest.data() + address + symbolTableOffset, symbols, sizeof(symbols));
+            SectionHeader symtab{};
+            symtab.type = 2u; // SHT_SYMTAB
+            symtab.offset = symbolTableOffset;
+            symtab.size = sizeof(symbols);
+            symtab.alignment = 4u;
+            symtab.entrySize = 16u;
+            std::memcpy(host.guest.data() + address + sectionTableOffset + 3u * sizeof(SectionHeader),
+                        &symtab, sizeof(symtab));
+        }
     }
 
     void writeExportProviderIrx(TestHost &host, uint32_t address)
@@ -977,6 +996,22 @@ int main()
                 sizeof(relocatedGpData));
     if (!expect(relocatedGpData == 0x47505250u,
                 "Physical RPC callback did not inherit the registering module's GP")) return 1;
+
+    // The same module with a symbol table: relocations name the .text section symbol (value 0x20). Adding that
+    // value again would send the import call and the handler address 0x20 bytes off (cpu/iop ps2autotests IRXs).
+    iop.reset();
+    writeRelocatableRpcServerIrx(host, 0x100u, true);
+    const ModuleLoadResult symbolRpcModule = iop.loadModuleBuffer(0x100u);
+    if (!expect(symbolRpcModule.handled && symbolRpcModule.startResult == 0,
+                "Relocatable IRX with section-symbol relocations did not start")) return 1;
+    if (!expect(iop.canBindRpc(relocatableRpcSid),
+                "R_MIPS_26 against a section symbol did not reach the import stub")) return 1;
+    std::memset(host.guest.data() + relocatableRequest.receive.address, 0, sizeof(uint32_t));
+    const RpcResult symbolRpcResult = iop.handleRpc(relocatableRequest);
+    uint32_t symbolGpData = 0u;
+    std::memcpy(&symbolGpData, host.guest.data() + relocatableRequest.receive.address, sizeof(symbolGpData));
+    if (!expect(symbolRpcResult.handled && symbolGpData == 0x47505250u,
+                "R_MIPS_HI16/LO16 against a section symbol did not reach the RPC handler")) return 1;
 
     iop.reset();
     writeExportProviderIrx(host, 0x100u);

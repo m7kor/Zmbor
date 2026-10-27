@@ -3756,7 +3756,8 @@
          "tests": [
           "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_STAT toggles masks and clears channel status on write-one",
           "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set",
-          "ps2xTest/src/ps2_memory_tests.cpp::D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set"
+          "ps2xTest/src/ps2_memory_tests.cpp::D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM"
          ],
          "hw": [
           "dma_dmac_tagintr",
@@ -3790,15 +3791,24 @@
         {
          "id": "dma.stall",
          "name": "Stall control (STS/STD, D_STADR)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Stall control",
-         "implemented": "",
-         "missing": "Not implemented",
-         "src": [],
-         "tests": [],
+         "implemented": "fromSPR (STS=2) leaves its MADR in D_STADR after normal or interleave transfers; the VIF1 (STD=1) or GIF (STD=2) drain waits before a REFS tag or a normal-mode transfer that would read past D_STADR, stays active (STR, no CIS), raises SIS once per stall and resumes when D_STADR or D_CTRL changes",
+         "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources, the SIF1 drain and fromSPR destination-chain CNTS are not modelled",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a GIF REFS drain waits with SIS until fromSPR (STS) moves D_STADR past its data",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control applies only to the STD drain's REFS tags, up to and including D_STADR",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: changing D_CTRL.STD releases a waiting drain"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",
+         "target": "8",
          "verified_at": null
         },
         {

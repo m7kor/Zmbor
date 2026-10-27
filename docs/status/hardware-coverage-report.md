@@ -10,12 +10,12 @@ Unit-test run: commit `734c40cfe574`, binary sha256 `824d095f84a7086f`.
 | A | 41 | 41 | 31 | 31 | 31 | 2 | 25 | 0 |
 | B | 21 | 21 | 19 | 19 | 19 | 2 | 9 | 0 |
 | C | 27 | 27 | 24 | 22 | 22 | 0 | 4 | 0 |
-| D | 24 | 24 | 19 | 19 | 19 | 0 | 10 | 0 |
+| D | 24 | 24 | 20 | 19 | 18 | 0 | 10 | 0 |
 | E | 13 | 13 | 11 | 11 | 11 | 0 | 5 | 0 |
 | F | 17 | 17 | 13 | 7 | 7 | 0 | 4 | 0 |
 | G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **126** | **118** | **118** | **4** | **59** | **0** |
+| **all** | **174** | **174** | **127** | **118** | **117** | **4** | **59** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -122,9 +122,9 @@ Unit-test run: commit `734c40cfe574`, binary sha256 `824d095f84a7086f`.
 | `dma.chain` | `VERIFIED_PARTIAL` | 2 / 2 / 2 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.callret` | `IMPLEMENTED_UNVERIFIED` | 3 / 3 / 3 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.interleave` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 1 / 1 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `dma.irq` | `VERIFIED_PARTIAL` | 3 / 3 / 3 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
+| `dma.irq` | `VERIFIED_PARTIAL` | 3 / 3 / 4 | 2 / 2 | contract_specified, test_exists, test_executed, hardware_verified |
 | `dma.ctrl` | `VERIFIED_PARTIAL` | 2 / 2 / 2 | 1 / 1 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `dma.stall` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
+| `dma.stall` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 5 | 0 / 0 | contract_specified, test_exists |
 | `dma.mfifo` | `IMPLEMENTED_UNVERIFIED` | 4 / 4 / 4 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.timing` | `HLE_OR_STUB` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `mem.rdram` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |

@@ -18,9 +18,9 @@
  "components_total": 174,
  "totals": {
   "contract_specified": 174,
-  "test_exists": 126,
+  "test_exists": 127,
   "test_executed": 118,
-  "test_passed": 118,
+  "test_passed": 117,
   "vectors_passed": 4,
   "hardware_verified": 59,
   "timing_verified": 0
@@ -59,9 +59,9 @@
   "D": {
    "components": 24,
    "contract_specified": 24,
-   "test_exists": 19,
+   "test_exists": 20,
    "test_executed": 19,
-   "test_passed": 19,
+   "test_passed": 18,
    "vectors_passed": 0,
    "hardware_verified": 10,
    "timing_verified": 0
@@ -3429,7 +3429,7 @@
     "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
-    "test_passed": true,
+    "test_passed": false,
     "vectors_passed": false,
     "hardware_verified": true,
     "timing_verified": false
@@ -3439,7 +3439,7 @@
     "dma.ctrl"
    ],
    "named_tests": {
-    "cited": 3,
+    "cited": 4,
     "executed": 3,
     "passed": 3
    },
@@ -3482,13 +3482,13 @@
    "id": "dma.stall",
    "name": "Stall control (STS/STD, D_STADR)",
    "category": "D",
-   "status": "MISSING",
-   "missing": "Not implemented",
-   "blocker": "",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources, the SIF1 drain and fromSPR destination-chain CNTS are not modelled",
+   "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",
+   "target": "8",
    "levels": {
     "contract_specified": true,
-    "test_exists": false,
+    "test_exists": true,
     "test_executed": false,
     "test_passed": false,
     "vectors_passed": false,
@@ -3508,7 +3508,7 @@
     "dma.ctrl"
    ],
    "named_tests": {
-    "cited": 0,
+    "cited": 5,
     "executed": 0,
     "passed": 0
    },

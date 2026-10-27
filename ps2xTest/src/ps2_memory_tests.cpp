@@ -2651,10 +2651,15 @@ void register_ps2_memory_tests()
             rig.mem.writeIORegister(kVif1 + 0x20u, 0u);
             rig.mem.writeIORegister(kVif1 + 0x00u, 0x105u);
             t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain stays active while the ring is empty");
-            // END qwc 1 carrying MARK 0x1234 and three NOPs.
-            const uint64_t markAndNop = 0x07001234ull;
-            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, markAndNop, 0ull});
-            t.Equals(rig.mem.vif1_regs.mark, 0x1234u, "the drained MARK reaches VIF1");
+            // CNT qwc 1 carrying MARK 0x1111 and three NOPs: drained, then the drain waits for its next tag.
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x07001111ull, 0ull});
+            t.Equals(rig.mem.vif1_regs.mark, 0x1111u, "the first drained MARK reaches VIF1");
+            t.IsTrue((rig.dstat() & (1u << 1)) == 0u, "no CIS1 while the drain waits for its next tag");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain is still active");
+            // END qwc 1 carrying MARK 0x1234.
+            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, 0x07001234ull, 0ull});
+            t.Equals(rig.mem.vif1_regs.mark, 0x1234u, "the second drained MARK reaches VIF1");
+            t.IsTrue((rig.dstat() & (1u << 1)) != 0u, "END raises CIS1");
             t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) == 0u, "END completes the VIF1 channel");
         });
 

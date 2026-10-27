@@ -3219,17 +3219,18 @@
         },
         {
          "id": "gs.alpha",
-         "name": "Alpha blending (ALPHA, PABE, FBA)",
+         "name": "Alpha blending and COLCLAMP (ALPHA, PABE, FBA, COLCLAMP)",
          "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Alpha blending",
-         "implemented": "",
+         "implemented": "Blend equation on signed values; COLCLAMP saturates (1) or wraps to 8 bits (0)",
          "missing": "",
          "src": [
           "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_gs_tests.cpp::PABE bypasses alpha blend for low-alpha source pixels",
-          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor"
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour"
          ],
          "hw": [],
          "blocker": "",
@@ -3295,17 +3296,20 @@
         {
          "id": "gs.dither",
          "name": "Dithering (DTHE, DIMX)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Dithering",
-         "implemented": "Registers are latched",
-         "missing": "The rasteriser does not apply the dither matrix",
+         "implemented": "DIMX[y&3][x&3] (3-bit two's complement) added to RGB after blending and before COLCLAMP, for 16-bit frame buffers (PCSX2 model)",
+         "missing": "No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1)",
          "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
           "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+         "target": "8",
          "verified_at": null
         },
         {

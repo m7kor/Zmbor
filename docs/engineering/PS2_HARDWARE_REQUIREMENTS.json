@@ -1,0 +1,59 @@
+{
+ "schema": 1,
+ "description": "Verification contracts per PS2 hardware/runtime component (ids from docs/status/components.json). Hand-written; a contract states what correct means for the component, independently of how it is implemented. Fields with no known answer say 'unknown'. Checked by tools/hwcoverage/hwcoverage.py; coverage of contracts is reported as the contract_specified level.",
+ "contracts": {
+  "gs.dither": {
+   "block": "GS pixel pipeline, post-blend colour stage",
+   "registers": {
+    "DIMX (0x44)": "16 elements DMyx, 3 bits each at bit 4*(4*y+x), bit 4*(4*y+x)+3 unused; signed range -4..3",
+    "DTHE (0x45)": "bit 0 enables dithering",
+    "COLCLAMP (0x46)": "applied after dithering (see gs.alpha)"
+   },
+   "functional_requirements": [
+    "With DTHE=1, DMyx for (x mod 4, y mod 4) of the written pixel is added to R, G and B; alpha is unchanged",
+    "The addition happens after alpha blending and before COLCLAMP",
+    "Dithering affects frame buffers stored in a 16-bit format (PSMCT16/PSMCT16S) when the 8-bit result is reduced to 5 bits"
+   ],
+   "reset_state": "DIMX and DTHE zero after GS reset (PCSX2 GSDrawingEnvironment::Reset); hardware value unknown",
+   "read_write_semantics": "write-only GS general registers via GIF A+D or PACKED; not readable by the EE",
+   "error_behavior": "none defined",
+   "interrupts": "none",
+   "dma": "none (values arrive in GIF packets)",
+   "timing": "no timing obligation beyond pixel order",
+   "dependencies": ["gs.alpha", "gs.genregs", "gs.swizzle"],
+   "acceptance": [
+    "Unit test: every matrix position, sign handling (-4 vs -1), 4-pixel repetition, order relative to COLCLAMP, no effect with DTHE=0",
+    "Hardware: GS frame captures of a dither probe (flat colour quads in PSMCT16 and PSMCT32 over a known DIMX) match bit for bit"
+   ],
+   "references": ["PCSX2 f0523f8: GSRegs.h GIFRegDIMX, GSState.h ExpandDIMX, GSDrawScanline.cpp WriteFrame", "DobieStation gsthread.cpp (dither_mtx)"],
+   "known_divergences": "PCSX2 and DobieStation disagree on the element encoding and on whether 32-bit buffers are dithered (decision D-GS-1); unresolved without hardware"
+  },
+  "gs.alpha": {
+   "block": "GS pixel pipeline, alpha blending and colour clamp",
+   "registers": {
+    "ALPHA_1/2 (0x42/0x43)": "A, B, C, D selectors and FIX: Cv = ((A - B) * C >> 7) + D",
+    "PABE (0x49)": "bypass blending for source alpha with MSB clear",
+    "FBA_1/2 (0x4A/0x4B)": "force alpha MSB on write",
+    "COLCLAMP (0x46)": "bit 0: 1 saturates to 0..255, 0 keeps the low 8 bits"
+   },
+   "functional_requirements": [
+    "Blend on signed intermediate values without clamping",
+    "COLCLAMP selects saturation or wrap after blending and dithering",
+    "PABE and FBA as specified per register"
+   ],
+   "reset_state": "COLCLAMP zero after GS reset (PCSX2); the SDK environment sets it to 1",
+   "read_write_semantics": "write-only GS general registers",
+   "error_behavior": "none defined",
+   "interrupts": "none",
+   "dma": "none",
+   "timing": "none beyond pixel order",
+   "dependencies": ["gs.genregs", "gs.tests"],
+   "acceptance": [
+    "Unit tests: saturation and wrap in both directions, PABE, FBA",
+    "Hardware: GS frame captures of blend probes"
+   ],
+   "references": ["PCSX2 f0523f8 GSDrawScanline.cpp WriteFrame", "DobieStation gsthread.cpp"],
+   "known_divergences": "none between the two references for COLCLAMP"
+  }
+ }
+}

@@ -89,9 +89,9 @@ No overall completeness percentage is shown: the requirements of most components
 
 | section | components | `VERIFIED_COMPLETE` | `VERIFIED_PARTIAL` | `IMPLEMENTED_UNVERIFIED` | `HLE_OR_STUB` | `MISSING` | `NOT_APPLICABLE` | `UNKNOWN` |
 |---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 174 | 18 | 47 | 57 | 23 | 25 | 3 | 1 |
+| PS2 Hardware & Runtime | 174 | 18 | 47 | 58 | 23 | 24 | 3 | 1 |
 | Recompiler, Tools & Compatibility | 53 | 4 | 29 | 11 | 0 | 1 | 0 | 8 |
-| **all** | **227** | **22** | **76** | **68** | **23** | **26** | **3** | **9** |
+| **all** | **227** | **22** | **76** | **69** | **23** | **25** | **3** | **9** |
 
 ## PS2 Hardware & Runtime
 
@@ -189,11 +189,11 @@ Only GS SIGNAL/LABEL behaviour has hardware results (ps2autotests gs/*). Everyth
 | `gs.prims` | Points, lines, triangles, strips, fans, sprites | `IMPLEMENTED_UNVERIFIED` |  | — | 3 test ref(s) |  |
 | `gs.tex` | Texture sampling, STQ/UV, CLAMP, TEX1 filtering | `IMPLEMENTED_UNVERIFIED` |  | Mipmapping (LOD, MIPTBP) has no test | 3 test ref(s) |  |
 | `gs.clut` | CLUT (CSM1/CSM2, CSA, TEXCLUT, TEXA) | `IMPLEMENTED_UNVERIFIED` |  | — | 2 test ref(s) |  |
-| `gs.alpha` | Alpha blending (ALPHA, PABE, FBA) | `IMPLEMENTED_UNVERIFIED` |  | — | 2 test ref(s) |  |
+| `gs.alpha` | Alpha blending and COLCLAMP (ALPHA, PABE, FBA, COLCLAMP) | `IMPLEMENTED_UNVERIFIED` | Blend equation on signed values; COLCLAMP saturates (1) or wraps to 8 bits (0) | — | 3 test ref(s) |  |
 | `gs.tests` | Alpha, destination-alpha and depth tests | `IMPLEMENTED_UNVERIFIED` | ATST/AFAIL, DATE/DATM, ZTST, ZMSK (the GS has no stencil buffer) | — | 3 test ref(s) |  |
 | `gs.fog` | Fog (FOG, FOGCOL) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `gs.mask` | Scissor, FBMSK, XYOFFSET | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
-| `gs.dither` | Dithering (DTHE, DIMX) | `MISSING` | Registers are latched | The rasteriser does not apply the dither matrix | — | unscheduled |
+| `gs.dither` | Dithering (DTHE, DIMX) | `IMPLEMENTED_UNVERIFIED` | DIMX[y&3][x&3] (3-bit two's complement) added to RGB after blending and before COLCLAMP, for 16-bit frame buffers (PCSX2 model) | No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1); **blocker:** GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md) | 1 test ref(s) | 8 |
 | `gs.aa` | Antialiasing (AA1) | `MISSING` |  | Not implemented | — | unscheduled |
 | `gs.cpu` | CPU rasteriser backend (reference path) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `gs.cache` | Texture and CLUT page caches | `IMPLEMENTED_UNVERIFIED` |  | — | 2 test ref(s) |  |
@@ -473,11 +473,11 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `gs.prims` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS triangle fan subpixel quad fills rows without interior holes`<br>`ps2xTest/src/ps2_gs_tests.cpp::XYZ3 culls a triangle strip primitive without desynchronizing the vertex queue`<br>`ps2xTest/e2e/e2e_programs.py` |
 | `gs.tex` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS STQ triangle interpolation divides homogeneous coordinates after DDA`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS TEX1 linear filter blends T4 STQ triangle samples`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS CLAMP modes transform texture coordinates before sampling` |
 | `gs.clut` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS T8 CSM1 applies CSA and masks CSA bit 4 for CT32 CLUTs`<br>`ps2xTest/gs_cache/gs_clut_cache_tests.cpp` |
-| `gs.alpha` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::PABE bypasses alpha blend for low-alpha source pixels`<br>`ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor` |
+| `gs.alpha` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::PABE bypasses alpha blend for low-alpha source pixels`<br>`ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour` |
 | `gs.tests` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS alpha-test AFAIL independently masks framebuffer and depth`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS DATE and DATM inspect the framebuffer-format alpha bit`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS ZMSK suppresses depth without suppressing framebuffer writes` |
 | `gs.fog` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS fog blends the shaded color toward FOGCOL before framebuffer blending` |
 | `gs.mask` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS sprite draw applies XYOFFSET and fully-outside scissor should not render` |
-| `gs.dither` | `ps2xRuntime/src/lib/gs/gs_frontend.cpp` | — |
+| `gs.dither` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp`<br>`ps2xRuntime/src/lib/gs/gs_frontend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only` |
 | `gs.aa` | — | — |
 | `gs.cpu` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp`<br>`ps2xRuntime/include/runtime/gs/gs_backend.h` | `ps2xTest/src/ps2_gs_tests.cpp::GS backend replacement preserves canonical local memory` |
 | `gs.cache` | `ps2xRuntime/include/runtime/gs/gs_texture_page_cache.h` | `ps2xTest/gs_cache/gs_texture_cache_tests.cpp`<br>`ps2xTest/gs_cache/gs_clut_cache_tests.cpp` |

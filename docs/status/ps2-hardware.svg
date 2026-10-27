@@ -8,11 +8,11 @@
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
 <text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 47</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 57</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 58</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
 <text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 23</text>
 <rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 25</text>
+<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 24</text>
 <rect x="676.0600000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
 <text x="693.0600000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
 <rect x="796.72" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
@@ -692,11 +692,12 @@ status: IMPLEMENTED_UNVERIFIED</title>
 <text x="688.3" y="623.8" fill="#f0f6fc" font-size="9">CSA, TEXCLUT, TEXA)</text>
 <text x="796.9" y="638.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
-<g><title>gs.alpha — Alpha blending (ALPHA, PABE, FBA)
-status: IMPLEMENTED_UNVERIFIED</title>
+<g><title>gs.alpha — Alpha blending and COLCLAMP (ALPHA, PABE, FBA, COLCLAMP)
+status: IMPLEMENTED_UNVERIFIED
+implemented: Blend equation on signed values; COLCLAMP saturates (1) or wraps to 8 bits (0)</title>
 <rect x="447.3" y="644.9" width="131.3" height="38.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
 <text x="451.3" y="659.9" fill="#f0f6fc" font-size="11">Alpha blending</text>
-<text x="451.3" y="672.9" fill="#f0f6fc" font-size="11">(ALPHA, PABE, FBA)</text>
+<text x="574.6" y="679" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>gs.tests — Alpha, destination-alpha and depth tests
 status: IMPLEMENTED_UNVERIFIED
@@ -719,13 +720,14 @@ status: IMPLEMENTED_UNVERIFIED</title>
 <text x="685.7" y="687" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>gs.dither — Dithering (DTHE, DIMX)
-status: MISSING
-implemented: Registers are latched
-missing: The rasteriser does not apply the dither matrix</title>
-<rect x="691.7" y="644.9" width="109.1" height="46.1" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="695.7" y="659.9" fill="#ffffff" font-size="11">Dithering (DTHE,</text>
-<text x="695.7" y="672.9" fill="#ffffff" font-size="11">DIMX)</text>
-<text x="796.9" y="687" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: DIMX[y&amp;3][x&amp;3] (3-bit two's complement) added to RGB after blending and before COLCLAMP, for 16-bit frame buffers (PCSX2 model)
+missing: No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1)
+blocker: GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md)</title>
+<rect x="691.7" y="644.9" width="109.1" height="46.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="695.7" y="659.9" fill="#f0f6fc" font-size="11">Dithering (DTHE,</text>
+<text x="695.7" y="672.9" fill="#f0f6fc" font-size="11">DIMX)</text>
+<text x="796.9" y="687" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>gs.aa — Antialiasing (AA1)
 status: MISSING

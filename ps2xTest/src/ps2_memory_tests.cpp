@@ -3332,6 +3332,19 @@ void register_ps2_memory_tests()
                      "alternate: F[1][0] = 300 (weight 24) varies along y");
         });
 
+        tc.Run("IPU BDEC saturates coefficients to 12 bits and clamps intra samples to 0-255", [](TestCase &t)
+        {
+            // Escape level -2000 (12-bit 1000 0011 0000) at F[0][1], QSC 31: (2 * -2000 * 16 * 62) / 32 saturates to
+            // -2048; f(y, x) = 128 - 362 cos((2x + 1) pi / 16).
+            BdecRun run;
+            runBdec(run, 0u, kBdecIntra | (31u << 16), "100 000001 000000 100000110000 10  100 10  100 10  100 10  00 10  00 10",
+                    flatMatrix(16));
+            t.Equals(static_cast<int>(run.raw[0]), 0, "x = 0: -227 clamps to 0");
+            t.Equals(static_cast<int>(run.raw[3]), 57, "x = 3: 128 - 70.6 with the saturated coefficient");
+            t.Equals(static_cast<int>(run.raw[4]), 199, "x = 4: the negative level gives a rising row");
+            t.Equals(static_cast<int>(run.raw[7]), 255, "x = 7: 483 saturates to 255");
+        });
+
         tc.Run("IPU BDEC non-intra: coded_block_pattern, the first-coefficient '1s' code and unclamped samples", [](TestCase &t)
         {
             // CBP '1010' = 32 (Y0 only); '1s' = run 0 level +-1; non-intra matrix 16, QSC 2: F = (+-3 * 16 * 4) / 32.

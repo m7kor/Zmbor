@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "038536f",
+    "commit": "d15ce5a",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
-    "ps2x_tests": "570/570",
+    "ps2x_tests": "572/572",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate6.manifest.json (local)",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate7.manifest.json (local)",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -149,14 +149,33 @@
       ],
       "mutants": "IPU 6/6 killed (I5 survived first, test added in 8585b80)",
       "gate": "038536f: 53/55, 8202/8250, 0 regressions; unit 570/570, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 7,
+      "commits": [
+        "0828791",
+        "390f9fa",
+        "67b7810",
+        "d15ce5a"
+      ],
+      "components": {
+        "dma.c3": "MISSING -> IMPLEMENTED_UNVERIFIED (fromIPU)",
+        "ipu.dma": "MISSING -> IMPLEMENTED_UNVERIFIED (both FIFOs and channels, normal mode)"
+      },
+      "notes": [
+        "IPU CSC with integer BT.601 (decision D-IPU-1), dither, TH0/TH1 alpha; 8-qword output FIFO refilled as it drains",
+        "ipu.cmd stays MISSING: IDEC/BDEC/VDEC/PACK"
+      ],
+      "mutants": "CSC 6/6 killed (C2, C5 survived first, test added in 390f9fa)",
+      "gate": "d15ce5a: 53/55, 8202/8250, 0 regressions; unit 572/572, ctest 54/54, e2e 4/4, IOP 4/4"
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
     "VERIFIED_PARTIAL": 52,
-    "IMPLEMENTED_UNVERIFIED": 59,
+    "IMPLEMENTED_UNVERIFIED": 61,
     "HLE_OR_STUB": 20,
-    "MISSING": 21,
+    "MISSING": 19,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
   },
@@ -179,7 +198,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "IPU output side: output FIFO data path and fromIPU (channel 3), then CSC (YCbCr->RGB) and PACK, then the decoders (VDEC/BDEC/IDEC with MPEG-2 VLC tables and IDCT); then GS (gs.aa) and SPU2",
+  "next_action": "IPU PACK (RGB32 -> RGB16 / 4-bit indexed with VQ CLUT), then VDEC/BDEC/IDEC (MPEG-2 VLC tables, dequantisation, IDCT); then GS gs.aa and SPU2",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

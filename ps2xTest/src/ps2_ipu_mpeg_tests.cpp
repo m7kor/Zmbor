@@ -634,10 +634,12 @@ void register_ps2_ipu_mpeg_tests()
             t.IsTrue(adjacent.ipu.dcPredictor(0) == 131 && skipped.ipu.dcPredictor(0) == 128,
                      "increment 2 resets the DC predictors; increment 1 keeps them");
 
-            Driver stuffed = runIdecBits(endSlice(flat + " 00000001111 00000001111 1 " + flat), 0u);
-            t.IsTrue(!stuffed.error() && stuffed.out == two.out, "macroblock_stuffing is skipped");
-            Driver escaped = runIdecBits(endSlice(flat + " 00000001000 1 " + flat), 0u);
-            t.IsTrue(!escaped.error() && escaped.ipu.idecMacroblocks() == 2u, "macroblock_escape adds 33 to the next increment");
+            Driver stuffed = runIdecBits(endSlice(brightY0 + " 00000001111 00000001111 1 " + flat), 0u);
+            t.IsTrue(!stuffed.error() && stuffed.out == adjacent.out && stuffed.ipu.dcPredictor(0) == 131,
+                     "macroblock_stuffing is skipped: the increment stays 1 and the predictors are kept");
+            Driver escaped = runIdecBits(endSlice(brightY0 + " 00000001000 1 " + flat), 0u);
+            t.IsTrue(!escaped.error() && escaped.ipu.idecMacroblocks() == 2u && escaped.ipu.dcPredictor(0) == 128,
+                     "macroblock_escape adds 33: increment 34 resets the predictors");
             Driver escapeAtEnd = runIdecBits(endSlice(flat + " 00000001000"), 0u);
             t.IsTrue(escapeAtEnd.error() && !escapeAtEnd.ipu.busy() && escapeAtEnd.ipu.idecMacroblocks() == 1u,
                      "an escape without an increment is an error");

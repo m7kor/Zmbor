@@ -10,11 +10,11 @@ committed.
   `ec4a32d`. Push with the explicit URL `https://github.com/m7kor/Zmbor.git` (`origin` in the worktrees is upstream).
 - One PR only. No merge, no force-push, no history rewrite.
 
-## Verified baseline (batch 10 gate, `2dd2583`, clean tree)
+## Verified baseline (batch 11 gate, `0765383`, clean tree)
 
 ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 crashes, timeouts or regressions;
-`ps2x_tests` 596/596 (also 596/596 under ASan, 0 reports); ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs
-(separate measurement): 23/23 exact, 1306/1306 lines. Hardware inventory (174): 18 / 52 / 62 / 20 / 18 / 3 / 1.
+`ps2x_tests` 598/598 (batch 10: 596/596 under ASan, 0 reports); ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs
+(separate measurement): 23/23 exact, 1306/1306 lines. Hardware inventory (174): 18 / 52 / 63 / 20 / 17 / 3 / 1.
 
 ## Batches
 
@@ -22,6 +22,7 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 |---|---|---|---|
 | 1 | `5fab12b`..`0e47a2b` | `gs.dither`, `dma.mfifo`: MISSING → IMPLEMENTED_UNVERIFIED | 4/4 GS and 8/8 DMA mutants killed; 30,977 ASan fuzz runs |
 | 2 | `78b17e6`..`c64f357` | `dma.stall`: MISSING → IMPLEMENTED_UNVERIFIED | 5 unit tests, 10/10 mutants killed, 26,801 ASan fuzz runs; contracts for all 174 components with a checked dependency DAG |
+| 11 | `0765383`..`0e345dc` | `gs.aa` MISSING → IMPLEMENTED_UNVERIFIED | GS PRIM.AA1 for lines and triangles (D-GS-1); 11/11 mutants |
 | 10 | `a915237`..`d82a40a` | `ipu.cmd` MISSING → IMPLEMENTED_UNVERIFIED | IPU BDEC (D-IPU-3) and IDEC (D-IPU-4); bit-exact on 6 ffmpeg MPEG-1/2 fixtures; pause/resume, truncation, RST, 576 corrupted slices; 30/30 non-equivalent mutants; semantics ledger `PS2_IPU_SEMANTICS.md` |
 | 9 | `b2f7ce1`..`6f93475` | none (`ipu.cmd` stays MISSING) | IPU VDEC (MPEG-2 VLC tables); 4/4 mutants |
 | 8 | `ff3a138`..`af37990` | none (`ipu.cmd` stays MISSING) | IPU PACK (D-IPU-2); 3/3 mutants |
@@ -57,7 +58,7 @@ probes.
 
 ## Next action
 
-GS AA1 (`gs.aa`): edge coverage for lines and triangles as the blend alpha, with a decision record (PCSX2 is the only
-reference that models it, and its bounds are partly heuristic). Then SPU2 in dependency order: register model and
-sound RAM (`spu.cores`, `spu.ram`), voices, ADSR, pitch, mixer, reverb, interrupts. SIF0 stays an open architectural
-task.
+SPU2 in dependency order: a register model for both cores and the 2 MB sound RAM (`spu.cores`, `spu.ram`), with
+16-bit register access, the TSA data port, IRQA and the IOP DMA channels 4 and 7. Then voices, ADSR, pitch, mixer,
+reverb and interrupts. No ps2autotests program exercises the SPU2, so it can reach IMPLEMENTED_UNVERIFIED at most.
+SIF0 stays an open architectural task.

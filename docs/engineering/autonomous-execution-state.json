@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "2dd2583",
+    "commit": "0765383",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
-    "ps2x_tests": "596/596 (ASan 596/596, 0 reports)",
+    "ps2x_tests": "598/598",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate10.manifest.json",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate11.manifest.json",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -220,14 +220,30 @@
       ],
       "mutants": "BDEC 15/15, IDEC 15/15 non-equivalent (I15 equivalent: redundant code removed)",
       "gate": "2dd2583: 53/55, 8202/8250, 0 regressions; unit 596/596 (ASan 596/596), ctest 54/54, e2e 4/4, IOP 4/4; IOP corpus 23/23"
+    },
+    {
+      "id": 11,
+      "commits": [
+        "0765383",
+        "4aeb111",
+        "0e345dc"
+      ],
+      "components": {
+        "gs.aa": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "GS PRIM.AA1 lines and triangles, decision D-GS-1"
+      ],
+      "mutants": "AA1 11/11 killed",
+      "gate": "0765383: 53/55, 8202/8250, 0 regressions; unit 598/598, ctest 54/54, e2e 4/4, IOP 4/4"
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
     "VERIFIED_PARTIAL": 52,
-    "IMPLEMENTED_UNVERIFIED": 62,
+    "IMPLEMENTED_UNVERIFIED": 63,
     "HLE_OR_STUB": 20,
-    "MISSING": 18,
+    "MISSING": 17,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
   },
@@ -250,7 +266,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "GS AA1 (gs.aa) with a decision record; then SPU2 in dependency order: spu.cores/spu.ram, voices, ADSR, pitch, mixer, reverb, interrupts; SIF0 stays open",
+  "next_action": "SPU2: spu.cores + spu.ram register model (both cores, 16-bit access, TSA data port, IRQA, IOP DMA 4/7); then voices, ADSR, pitch, mixer, reverb, interrupts; SIF0 stays open",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

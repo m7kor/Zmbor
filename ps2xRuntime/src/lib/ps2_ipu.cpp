@@ -9,6 +9,7 @@ namespace
     constexpr uint32_t kSetiq = 5u;
     constexpr uint32_t kSetvq = 6u;
     constexpr uint32_t kCsc = 7u;
+    constexpr uint32_t kPack = 8u;
     // Integer BT.601 conversion (1/64 units), rounded by a final shift with +1 (PCSX2 yuv2rgb_reference, D-IPU-1).
     constexpr int32_t kYBias = 16;
     constexpr int32_t kYCoeff = 0x95;
@@ -167,25 +168,82 @@ void PS2Ipu::convertMacroblock()
         }
     }
     else
+        emitRgb16(rgb32.data(), dither);
+    refillOutput();
+}
+
+// RGB32 -> RGB16 (5:5:5, top bits, optional 4x4 dither; bit 15 for alpha 0x40), shared by CSC and PACK.
+std::array<uint16_t, 256> PS2Ipu::toRgb16(const uint8_t *rgb32, bool dither)
+{
+    std::array<uint16_t, 256> out{};
+    for (uint32_t pixel = 0; pixel < 256u; ++pixel)
     {
-        for (uint32_t q = 0; q < 32u; ++q)
+        const uint32_t y = pixel / 16u, x = pixel % 16u;
+        const int d = dither ? kDither[y & 3u][x & 3u] : 0;
+        const uint8_t *p = &rgb32[pixel * 4u];
+        const uint32_t r = static_cast<uint32_t>(clampByte(p[0] + d)) >> 3;
+        const uint32_t g = static_cast<uint32_t>(clampByte(p[1] + d)) >> 3;
+        const uint32_t b = static_cast<uint32_t>(clampByte(p[2] + d)) >> 3;
+        out[pixel] = static_cast<uint16_t>(r | (g << 5) | (b << 10) | ((p[3] == 0x40u ? 1u : 0u) << 15));
+    }
+    return out;
+}
+
+void PS2Ipu::emitRgb16(const uint8_t *rgb32, bool dither)
+{
+    const std::array<uint16_t, 256> rgb = toRgb16(rgb32, dither);
+    for (uint32_t q = 0; q < 32u; ++q)
+    {
+        Qword qword{};
+        for (uint32_t i = 0; i < 8u; ++i)
         {
-            Qword qword{};
-            for (uint32_t i = 0; i < 8u; ++i)
-            {
-                const uint32_t pixel = q * 8u + i;
-                const uint32_t y = pixel / 16u, x = pixel % 16u;
-                const int d = dither ? kDither[y & 3u][x & 3u] : 0;
-                const uint8_t *p = &rgb32[pixel * 4u];
-                const uint32_t r = static_cast<uint32_t>(clampByte(p[0] + d)) >> 3;
-                const uint32_t g = static_cast<uint32_t>(clampByte(p[1] + d)) >> 3;
-                const uint32_t b = static_cast<uint32_t>(clampByte(p[2] + d)) >> 3;
-                const uint16_t value = static_cast<uint16_t>(r | (g << 5) | (b << 10) | ((p[3] == 0x40u ? 1u : 0u) << 15));
-                qword[i * 2u] = static_cast<uint8_t>(value);
-                qword[i * 2u + 1u] = static_cast<uint8_t>(value >> 8);
-            }
-            m_outputPending.push_back(qword);
+            qword[i * 2u] = static_cast<uint8_t>(rgb[q * 8u + i]);
+            qword[i * 2u + 1u] = static_cast<uint8_t>(rgb[q * 8u + i] >> 8);
         }
+        m_outputPending.push_back(qword);
+    }
+}
+
+// PACK: an RGB32 macroblock (1024 bytes) to RGB16, or (OFM = 0) to 4-bit indices of the nearest VQ CLUT entry by
+// squared 5:5:5 distance, first minimum wins, two pixels per byte with the even pixel in the low nibble (decision
+// D-IPU-2, DobieStation process_PACK; single source).
+void PS2Ipu::packMacroblock()
+{
+    const bool rgb16 = (m_option & (1u << 27)) != 0u;
+    const bool dither = (m_option & (1u << 26)) != 0u;
+    if (rgb16)
+    {
+        emitRgb16(m_rgbBlock.data(), dither);
+        refillOutput();
+        return;
+    }
+    const std::array<uint16_t, 256> rgb = toRgb16(m_rgbBlock.data(), dither);
+    const auto nearest = [&](uint16_t color)
+    {
+        const int r = color & 0x1F, g = (color >> 5) & 0x1F, b = (color >> 10) & 0x1F;
+        uint8_t best = 0u;
+        int bestDistance = 1 << 30;
+        for (uint8_t i = 0; i < 16u; ++i)
+        {
+            const int dr = r - (m_vqClut[i] & 0x1F), dg = g - ((m_vqClut[i] >> 5) & 0x1F), db = b - ((m_vqClut[i] >> 10) & 0x1F);
+            const int distance = dr * dr + dg * dg + db * db;
+            if (distance < bestDistance)
+            {
+                best = i;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    };
+    for (uint32_t q = 0; q < 8u; ++q)
+    {
+        Qword qword{};
+        for (uint32_t i = 0; i < 16u; ++i)
+        {
+            const uint32_t pixel = q * 32u + i * 2u;
+            qword[i] = static_cast<uint8_t>(nearest(rgb[pixel]) | (nearest(rgb[pixel + 1u]) << 4));
+        }
+        m_outputPending.push_back(qword);
     }
     refillOutput();
 }
@@ -224,6 +282,7 @@ bool PS2Ipu::writeCommand(uint32_t value)
         m_remaining = 32u;
         break;
     case kCsc: // option bits 0-10 macroblock count, bit 26 dither (RGB16), bit 27 RGB16
+    case kPack:
         m_macroblocksLeft = m_option & 0x7FFu;
         m_macroblockBytes = 0u;
         break;
@@ -313,6 +372,28 @@ void PS2Ipu::run()
                 m_macroblock[m_macroblockBytes++] = static_cast<uint8_t>(byte);
             }
             convertMacroblock();
+            m_macroblockBytes = 0u;
+            --m_macroblocksLeft;
+        }
+    case kPack:
+        for (;;)
+        {
+            if (!m_outputPending.empty())
+                return;
+            if (m_macroblocksLeft == 0u)
+            {
+                finish();
+                return;
+            }
+            while (m_macroblockBytes < m_rgbBlock.size())
+            {
+                uint32_t byte = 0u;
+                if (!peekBits(8u, byte))
+                    return;
+                (void)advanceBits(8u);
+                m_rgbBlock[m_macroblockBytes++] = static_cast<uint8_t>(byte);
+            }
+            packMacroblock();
             m_macroblockBytes = 0u;
             --m_macroblocksLeft;
         }

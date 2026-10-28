@@ -12,8 +12,8 @@
 // The input FIFO holds 8 qwords fed by toIPU (DMA channel 4) or the IPU_in_FIFO window; the bitstream is the bytes in
 // memory order, each read MSB first (MPEG bit order).
 //
-// Implemented commands: BCLR (0), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), SETTH (9). IDEC (1), BDEC (2), VDEC (3)
-// and PACK (8) are not implemented: such a command is reported through unimplementedCommand() and completes without
+// Implemented commands: BCLR (0), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), PACK (8), SETTH (9). IDEC (1), BDEC (2)
+// and VDEC (3) are not implemented: such a command is reported through unimplementedCommand() and completes without
 // output, so a caller can see that no decoding happened.
 //
 // CSC converts YCbCr 4:2:0 macroblocks (Y 16x16, then Cb 8x8, Cr 8x8: 384 bytes) to RGB32 (64 qwords) or RGB16
@@ -71,7 +71,11 @@ private:
     bool advanceBits(uint32_t count);
     void finish();
     void convertMacroblock();
+    void packMacroblock();
+    void emitRgb16(const uint8_t *rgb32, bool dither);
+    [[nodiscard]] static std::array<uint16_t, 256> toRgb16(const uint8_t *rgb32, bool dither);
     void refillOutput();
+    std::array<uint8_t, 1024> m_rgbBlock{};
 
     std::deque<Qword> m_outputPending; // converted data not yet in the 8-qword output FIFO
     std::array<uint8_t, 384> m_macroblock{};

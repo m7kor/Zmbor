@@ -3086,6 +3086,61 @@ void register_ps2_memory_tests()
             t.Equals(p15, 0x800500CFu, "pixel x = 15 uses chroma column 7: R (9 + 404 + 1) >> 1 = 207, G clamps to 0, B 5");
         });
 
+        tc.Run("IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)", [](TestCase &t)
+        {
+            for (const bool indexed : {false, true})
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                uint8_t *rdram = mem.getRDRAM();
+                constexpr uint32_t kIn = 0x00480000u, kOut = 0x00490000u;
+                for (uint32_t pixel = 0; pixel < 256u; ++pixel)
+                {
+                    const bool even = (pixel & 1u) == 0u;
+                    const uint8_t rgba[4] = {static_cast<uint8_t>(even ? 255 : 0), static_cast<uint8_t>(even ? 25 : 0),
+                                             static_cast<uint8_t>(even ? 128 : 0), static_cast<uint8_t>(even ? 0x80 : 0x40)};
+                    std::memcpy(rdram + kIn + pixel * 4u, rgba, 4u);
+                }
+                if (indexed)
+                {
+                    // VQ CLUT: entry 3 = 0x407F (31, 3, 16); entries 0 and 9 black (tie: 0 must win); others mid-grey.
+                    uint16_t clut[16];
+                    for (uint16_t &c : clut)
+                        c = static_cast<uint16_t>(16u | (16u << 5) | (16u << 10));
+                    clut[0] = 0u;
+                    clut[9] = 0u;
+                    clut[3] = 0x407Fu;
+                    mem.writeIORegister(0x10002000u, 6u << 28); // SETVQ
+                    mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(&clut[0])));
+                    mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(&clut[8])));
+                    t.IsTrue(!mem.ipu().busy() && mem.ipu().vqClut(3) == 0x407Fu, "SETVQ loads 16 little-endian halfwords");
+                }
+                const uint32_t outQwords = indexed ? 8u : 32u;
+                mem.writeIORegister(0x10002000u, (8u << 28) | (indexed ? 0u : (1u << 27)) | 1u); // PACK, 1 macroblock
+                mem.writeIORegister(0x1000B010u, kOut);
+                mem.writeIORegister(0x1000B020u, outQwords);
+                mem.writeIORegister(0x1000B000u, 0x100u);
+                mem.writeIORegister(0x1000B410u, kIn);
+                mem.writeIORegister(0x1000B420u, 64u);
+                mem.writeIORegister(0x1000B400u, 0x101u);
+                if (indexed)
+                {
+                    t.Equals(rdram[kOut], static_cast<uint8_t>(0x03u), "even pixel -> index 3 (low nibble), black odd pixel -> index 0 (first of the tie)");
+                    t.Equals(rdram[kOut + 127u], static_cast<uint8_t>(0x03u), "the last byte packs the last two pixels the same way");
+                }
+                else
+                {
+                    uint16_t first = 0u, second = 0u;
+                    std::memcpy(&first, rdram + kOut, 2u);
+                    std::memcpy(&second, rdram + kOut + 2u, 2u);
+                    t.Equals(first, static_cast<uint16_t>(0x407Fu), "RGB16 of (255, 25, 128, 0x80)");
+                    t.Equals(second, static_cast<uint16_t>(0x8000u), "black with alpha 0x40 sets bit 15");
+                }
+                t.IsTrue(!mem.ipu().busy() && (mem.readIORegister(0x1000E010u) & (1u << 3)) != 0u, "PACK completes and fromIPU raises CIS3");
+                t.Equals(mem.ipu().unimplementedCommand(), -1, "PACK is executed, not reported as unimplemented");
+            }
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

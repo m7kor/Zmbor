@@ -83,3 +83,13 @@ one stay unverified until the stated measurement exists.
   The value read from an empty IPU_out_FIFO (zero here) is unknown.
 - **Settles it:** an IPU probe converting known macroblocks (grey ramp, saturated chroma, values around TH0/TH1)
   and reading the RGB32/RGB16 output back.
+
+## D-IPU-2 — IPU PACK to 4-bit indices
+
+- **Chosen:** each pixel is reduced to RGB 5:5:5 (with the optional dither) and replaced by the index of the VQ CLUT
+  entry with the smallest squared distance; on a tie the lower index wins. Two pixels per byte, the even pixel in the
+  low nibble.
+- **For:** DobieStation (`ee/ipu/ipu.cpp` process_PACK) models PACK this way.
+- **Against:** a single reference. PCSX2's indexed PACK was not compared, and the distance metric and tie rule are
+  not documented anywhere available here.
+- **Settles it:** an IPU probe packing a macroblock against a CLUT with equidistant entries.

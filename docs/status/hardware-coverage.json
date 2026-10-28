@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "3f30488c80c9cfdd4053274d2c861c6b174f2546",
-  "unit_results_binary_sha256": "e4519b0d9c605211d84f4c0b5f0f5fbf42e5862426238f32792f08eb2fd6d4dc"
+  "unit_results_commit": "960e6de982bfe52c9168539c62c876394cea1890",
+  "unit_results_binary_sha256": "51e3802055cc8322f700ec98e0590e08c9642d7a09d1d645d37f13cdc7f3b789"
  },
  "levels": [
   "contract_specified",
@@ -4102,9 +4102,9 @@
     "dma.c4"
    ],
    "named_tests": {
-    "cited": 3,
-    "executed": 3,
-    "passed": 3
+    "cited": 5,
+    "executed": 5,
+    "passed": 5
    },
    "hardware_programs": {
     "cited": 0,
@@ -4119,10 +4119,10 @@
    "id": "ipu.cmd",
    "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
    "category": "E",
-   "status": "MISSING",
-   "missing": "The block decoders IDEC and BDEC (DC/AC coefficient tables, dequantisation, IDCT) are not implemented (they complete without output and are reported as unimplemented)",
-   "blocker": "",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks the IPU; the PS2-specific behaviour in docs/engineering/PS2_IPU_SEMANTICS.md (B1-B11: timing, IPU_CMD after decoding, IDCT rounding, error recovery) is unknown",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
    "levels": {
     "contract_specified": true,
     "test_exists": true,
@@ -4136,9 +4136,9 @@
     "ipu.dma"
    ],
    "named_tests": {
-    "cited": 6,
-    "executed": 6,
-    "passed": 6
+    "cited": 26,
+    "executed": 26,
+    "passed": 26
    },
    "hardware_programs": {
     "cited": 0,

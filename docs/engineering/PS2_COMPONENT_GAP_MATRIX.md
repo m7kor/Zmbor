@@ -133,7 +133,7 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 | `vif.mscal` MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA | `IMPLEMENTED_UNVERIFIED` | — | — | — | `vu.sched` | contract_specified, test_exists, test_executed, test_passed |
 | `vif.direct` DIRECT/DIRECTHL to PATH2 | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.dma` IPU0/IPU1 FIFOs and DMA | `IMPLEMENTED_UNVERIFIED` | Chain modes of channels 3/4; no hardware program; transfer timing | IPU probe on a physical PS2 | 8 | `dma.c3`, `dma.c4` | contract_specified, test_exists, test_executed, test_passed |
-| `ipu.cmd` IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `MISSING` | The block decoders IDEC and BDEC (DC/AC coefficient tables, dequantisation, IDCT) are not implemented (they complete without output and are reported as unimplemented) | — | unscheduled | `ipu.dma` | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.cmd` IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `IMPLEMENTED_UNVERIFIED` | No hardware program checks the IPU; the PS2-specific behaviour in docs/engineering/PS2_IPU_SEMANTICS.md (B1-B11: timing, IPU_CMD after decoding, IDCT rounding, error recovery) is unknown | IPU probe on a physical PS2 | 8 | `ipu.dma` | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.mpeg` MPEG playback (libmpeg HLE) | `HLE_OR_STUB` | — | — | — | `ipu.cmd` | contract_specified, test_exists, test_executed, test_passed |
 
 ## F

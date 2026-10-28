@@ -80,7 +80,7 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 | `gs.fog` Fog (FOG, FOGCOL) | `IMPLEMENTED_UNVERIFIED` | — | — | — | `gs.prims` | contract_specified, test_exists, test_executed, test_passed |
 | `gs.mask` Scissor, FBMSK, XYOFFSET | `IMPLEMENTED_UNVERIFIED` | — | — | — | `gs.prims` | contract_specified, test_exists, test_executed, test_passed |
 | `gs.dither` Dithering (DTHE, DIMX) | `IMPLEMENTED_UNVERIFIED` | No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1) | GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md) | 8 | `gs.alpha`, `gs.genregs`, `gs.swizzle` | contract_specified, test_exists, test_executed, test_passed |
-| `gs.aa` Antialiasing (AA1) | `MISSING` | Not implemented | — | unscheduled | `gs.alpha` | contract_specified |
+| `gs.aa` Antialiasing (AA1) | `IMPLEMENTED_UNVERIFIED` | No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently) | GS probe drawing AA1 lines and triangles on a physical PS2 | 8 | `gs.alpha` | contract_specified, test_exists, test_executed, test_passed |
 | `gs.cpu` CPU rasteriser backend (reference path) | `IMPLEMENTED_UNVERIFIED` | — | — | — | `gs.prims` | contract_specified, test_exists, test_executed, test_passed |
 | `gs.cache` Texture and CLUT page caches | `IMPLEMENTED_UNVERIFIED` | — | — | — | `gs.tex` | contract_specified, test_exists |
 | `gs.fb` Framebuffers, PMODE circuit merge | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |

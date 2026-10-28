@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "960e6de982bfe52c9168539c62c876394cea1890",
-  "unit_results_binary_sha256": "51e3802055cc8322f700ec98e0590e08c9642d7a09d1d645d37f13cdc7f3b789"
+  "unit_results_commit": "4aeb1110265797c53cfb82f3f31bf89391afbdc6",
+  "unit_results_binary_sha256": "290ddf8a303d38c010d65306b16f27d74b25ca86ac884b72216498b637ba879f"
  },
  "levels": [
   "contract_specified",
@@ -18,9 +18,9 @@
  "components_total": 174,
  "totals": {
   "contract_specified": 174,
-  "test_exists": 132,
-  "test_executed": 123,
-  "test_passed": 123,
+  "test_exists": 133,
+  "test_executed": 124,
+  "test_passed": 124,
   "vectors_passed": 4,
   "hardware_verified": 64,
   "timing_verified": 0
@@ -49,9 +49,9 @@
   "C": {
    "components": 27,
    "contract_specified": 27,
-   "test_exists": 24,
-   "test_executed": 22,
-   "test_passed": 22,
+   "test_exists": 25,
+   "test_executed": 23,
+   "test_passed": 23,
    "vectors_passed": 0,
    "hardware_verified": 4,
    "timing_verified": 0
@@ -2718,15 +2718,15 @@
    "id": "gs.aa",
    "name": "Antialiasing (AA1)",
    "category": "C",
-   "status": "MISSING",
-   "missing": "Not implemented",
-   "blocker": "",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently)",
+   "blocker": "GS probe drawing AA1 lines and triangles on a physical PS2",
+   "target": "8",
    "levels": {
     "contract_specified": true,
-    "test_exists": false,
-    "test_executed": false,
-    "test_passed": false,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -2735,9 +2735,9 @@
     "gs.alpha"
    ],
    "named_tests": {
-    "cited": 0,
-    "executed": 0,
-    "passed": 0
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
    },
    "hardware_programs": {
     "cited": 0,

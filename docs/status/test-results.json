@@ -1,12 +1,12 @@
 {
- "commit": "960e6de982bfe52c9168539c62c876394cea1890",
+ "commit": "4aeb1110265797c53cfb82f3f31bf89391afbdc6",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "51e3802055cc8322f700ec98e0590e08c9642d7a09d1d645d37f13cdc7f3b789",
+ "binary_sha256": "290ddf8a303d38c010d65306b16f27d74b25ca86ac884b72216498b637ba879f",
  "exit_code": 0,
  "totals": {
-  "PASS": 596,
+  "PASS": 598,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -115,6 +115,8 @@
   "GIF arbiter prioritizes PATH1 then PATH2 then PATH3": "PASS",
   "GIF load-image packet uses native upload fast path": "PASS",
   "GIF_STAT exposes synchronously drained DMA occupancy for one EE quantum": "PASS",
+  "GS AA1 line: two edge pixels per column weighted by distance, blended through ALPHA, no Z write": "PASS",
+  "GS AA1 triangle: interior pixels at alpha 0x80, the uncovered-centre fringe at its exact coverage": "PASS",
   "GS CLAMP modes transform texture coordinates before sampling": "PASS",
   "GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour": "PASS",
   "GS CSR/IMR support coherent 64-bit and 32-bit access": "PASS",

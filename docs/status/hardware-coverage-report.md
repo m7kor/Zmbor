@@ -3,19 +3,19 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `960e6de982bf`, binary sha256 `51e3802055cc8322`.
+Unit-test run: commit `4aeb11102657`, binary sha256 `290ddf8a303d38c0`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|
 | A | 41 | 41 | 31 | 31 | 31 | 2 | 25 | 0 |
 | B | 21 | 21 | 19 | 19 | 19 | 2 | 9 | 0 |
-| C | 27 | 27 | 24 | 22 | 22 | 0 | 4 | 0 |
+| C | 27 | 27 | 25 | 23 | 23 | 0 | 4 | 0 |
 | D | 24 | 24 | 22 | 22 | 22 | 0 | 10 | 0 |
 | E | 13 | 13 | 13 | 13 | 13 | 0 | 5 | 0 |
 | F | 17 | 17 | 14 | 7 | 7 | 0 | 9 | 0 |
 | G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **132** | **123** | **123** | **4** | **64** | **0** |
+| **all** | **174** | **174** | **133** | **124** | **124** | **4** | **64** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -100,7 +100,7 @@ Unit-test run: commit `960e6de982bf`, binary sha256 `51e3802055cc8322`.
 | `gs.fog` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `gs.mask` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `gs.dither` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
-| `gs.aa` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
+| `gs.aa` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `gs.cpu` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `gs.cache` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
 | `gs.fb` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |

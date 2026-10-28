@@ -1,12 +1,12 @@
 {
- "commit": "539db0128df56be9237252568664670a1a403403",
+ "commit": "3f30488c80c9cfdd4053274d2c861c6b174f2546",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "a0a8ba98e51213bdb2f98d7390176c35aaca1cd48c2e61a5d04224fd682e68d4",
+ "binary_sha256": "e4519b0d9c605211d84f4c0b5f0f5fbf42e5862426238f32792f08eb2fd6d4dc",
  "exit_code": 0,
  "totals": {
-  "PASS": 573,
+  "PASS": 574,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -161,6 +161,7 @@
   "IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP": "PASS",
   "IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)": "PASS",
   "IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4": "PASS",
+  "IPU VDEC decodes address increment, macroblock type, motion code and dmvector symbols": "PASS",
   "IPU init executes its guest helper as a scheduler invocation": "PASS",
   "IPU init skips missing optional helper instead of dispatching the default trap": "PASS",
   "IPU toIPU stays active while the input FIFO is full and completes when a command frees it": "PASS",

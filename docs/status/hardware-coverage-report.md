@@ -3,7 +3,7 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `539db0128df5`, binary sha256 `a0a8ba98e51213bd`.
+Unit-test run: commit `3f30488c80c9`, binary sha256 `e4519b0d9c605211`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|
@@ -143,7 +143,7 @@ Unit-test run: commit `539db0128df5`, binary sha256 `a0a8ba98e51213bd`.
 | `vif.mscal` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `vif.direct` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.dma` | `IMPLEMENTED_UNVERIFIED` | 3 / 3 / 3 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
-| `ipu.cmd` | `MISSING` | 5 / 5 / 5 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.cmd` | `MISSING` | 6 / 6 / 6 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.mpeg` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `iop.cpu` | `VERIFIED_PARTIAL` | 0 / 0 / 0 | 7 / 7 | contract_specified, test_exists, hardware_verified |
 | `iop.mem` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |

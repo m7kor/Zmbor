@@ -1280,7 +1280,7 @@
     "Unit: each command against independently computed outputs",
     "Hardware: IPU probe running each command on fixed bitstreams"
    ],
-   "known_divergences": "BCLR/VDEC/FDEC/SETIQ/SETVQ/SETTH/CSC/PACK implemented (CSC D-IPU-1, PACK D-IPU-2); IDEC/BDEC not implemented"
+   "known_divergences": "All commands implemented (CSC D-IPU-1, PACK D-IPU-2, BDEC D-IPU-3, IDEC D-IPU-4); departures from ISO MPEG semantics and unknown PS2 behaviour in PS2_IPU_SEMANTICS.md"
   },
   "ipu.mpeg": {
    "reset_state": "IPU_CTRL.RST clears the FIFOs and state",

@@ -2938,8 +2938,8 @@ void register_ps2_memory_tests()
             const std::vector<uint8_t> stream(48u, 0u);
             const auto packets = PS2Memory::splitSif1Stream(stream);
             t.Equals(packets.size(), static_cast<size_t>(3u), "zero-length packets without an end flag continue");
-            std::vector<uint8_t> masked(32u, 0u);
-            masked[4] = 0x07u; // 7 words: the IOP channel takes 4 (count & 0xFFFFC)
+            std::vector<uint8_t> masked(64u, 0u); // room for 7 words, so an unmasked count would take 28 bytes
+            masked[4] = 0x07u;                     // 7 words: the IOP channel takes 4 (count & 0xFFFFC)
             const auto one = PS2Memory::splitSif1Stream(masked);
             t.IsTrue(!one.empty() && one[0].data.size() == 16u, "the word count is masked to whole qwords");
         });

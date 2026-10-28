@@ -15,16 +15,16 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "7181e0f",
+    "commit": "e2be153",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
     "ps2x_tests": "563/563",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate3.manifest.json (local)",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate4.manifest.json (local)",
     "gate_note": "clean tree",
-    "iop_programs": "8/23 exact, 1168/1306 lines (separate measurement)"
+    "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
   "batches": [
     {
@@ -85,13 +85,40 @@
       ],
       "evidence": "ps2autotests IOP programs 0/23 -> 8/23 exact; cpu/iop 7/7",
       "gate": "7181e0f: 53/55, 8202/8250, 0 regressions; unit 563/563, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 4,
+      "commits": [
+        "3696d34",
+        "c3e9553",
+        "1b55608",
+        "7929cbc",
+        "e2be153"
+      ],
+      "components": {
+        "iop.kernel": "HLE_OR_STUB -> VERIFIED_PARTIAL (12 kernel/iop programs)",
+        "iop.intr": "HLE_OR_STUB -> VERIFIED_PARTIAL (2 interrupt programs)"
+      },
+      "fixes": [
+        "module start runs in a priority-8 kernel thread with preemption",
+        "typed waits, KE_* codes, message boxes, variable pools",
+        "VBLANK raised on the guest clock",
+        "intrman registration codes, strtok/strtok_r",
+        "import stub retires a pending load"
+      ],
+      "mutants": "IOP kernel 15/15 killed (K13 survived first, test added in 1b55608)",
+      "evidence": "ps2autotests IOP programs 8/23 -> 23/23",
+      "gate": "e2be153: 53/55, 8202/8250, 0 regressions; unit 563/563, ctest 54/54, e2e 4/4, IOP 4/4",
+      "limitations": [
+        "cpu/iop/lsudelay does not return after -- TEST END (jal printf with lw ra in its delay slot); comparable output matches; post-END hardware behaviour unknown"
+      ]
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
-    "VERIFIED_PARTIAL": 48,
+    "VERIFIED_PARTIAL": 50,
     "IMPLEMENTED_UNVERIFIED": 59,
-    "HLE_OR_STUB": 23,
+    "HLE_OR_STUB": 21,
     "MISSING": 22,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
@@ -105,7 +132,6 @@
     "vu_lower_efu 182/223 (EATAN/ESIN/EEXP last bits)"
   ],
   "pending_owner_decisions": [
-    "3 NOT_APPLICABLE scope proposals in components.json",
     "merge of PR #7"
   ],
   "reproduce": {
@@ -116,5 +142,9 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "kernel/iop programs (15 mismatching: event flags, message boxes, threads, vpool, strtok) against the HLE IOP kernel in ps2xIOP/src/emulator/core/iop_kernel.cpp: diff each program, fix root causes, then decide whether iop.kernel can cite them; afterwards SIF0/SIF1 channel models (unblocks dma.c5/c6 and stall sources/drain)"
+  "next_action": "SIF1/SIF0 DMAC channel models: EE channel 6 source chain feeding IOP-tagged packets into IOP memory through the same SIF transfer notifications as sceSifSetDma, with stall control STD=3; then EE channel 5 with IOP channel 9; then IPU, GS, SPU2 in dependency order",
+  "owner_decisions": {
+    "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
+    "merge": "not authorised"
+  }
 }

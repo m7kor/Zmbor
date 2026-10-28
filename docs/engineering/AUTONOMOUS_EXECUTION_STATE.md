@@ -10,11 +10,11 @@ committed.
   `ec4a32d`. Push with the explicit URL `https://github.com/m7kor/Zmbor.git` (`origin` in the worktrees is upstream).
 - One PR only. No merge, no force-push, no history rewrite.
 
-## Verified baseline (batch 3 gate, `7181e0f`, clean tree)
+## Verified baseline (batch 4 gate, `e2be153`, clean tree)
 
 ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 crashes, timeouts or regressions;
-`ps2x_tests` 563/563; ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs (separate measurement): 8/23 exact,
-1168/1306 lines. Hardware inventory (174): 18 / 48 / 59 / 23 / 22 / 3 / 1.
+`ps2x_tests` 563/563; ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs (separate measurement): 23/23 exact,
+1306/1306 lines. Hardware inventory (174): 18 / 50 / 59 / 21 / 22 / 3 / 1.
 
 ## Batches
 
@@ -22,6 +22,7 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 |---|---|---|---|
 | 1 | `5fab12b`..`0e47a2b` | `gs.dither`, `dma.mfifo`: MISSING → IMPLEMENTED_UNVERIFIED | 4/4 GS and 8/8 DMA mutants killed; 30,977 ASan fuzz runs |
 | 2 | `78b17e6`..`c64f357` | `dma.stall`: MISSING → IMPLEMENTED_UNVERIFIED | 5 unit tests, 10/10 mutants killed, 26,801 ASan fuzz runs; contracts for all 174 components with a checked dependency DAG |
+| 4 | `3696d34`..`e2be153` | `iop.kernel`, `iop.intr`: HLE_OR_STUB → VERIFIED_PARTIAL | IOP kernel model (start thread, preemption, typed waits, message boxes, variable pools), VBLANK, intrman, strtok; 15/15 kernel mutants; IOP programs 8/23 → 23/23 |
 | 3 | `2318aad`..`7181e0f` | `iop.cpu`: IMPLEMENTED_UNVERIFIED → VERIFIED_PARTIAL | IRX relocation, IOP printf and JALR fixes, each with a test that fails without it; IOP programs 0/23 → 8/23 (cpu/iop 7/7) |
 
 ## Blockers
@@ -39,11 +40,14 @@ probes.
 
 ## Owner decisions pending
 
-- Three NOT_APPLICABLE scope proposals in `docs/status/components.json`.
 - Merging PR #7.
+
+## Owner decisions recorded
+
+- `per.bios`, `per.ps1`, `per.dvdv` stay NOT_APPLICABLE for the native recompilation/runtime scope (2026-10-28).
 
 ## Next action
 
-The 15 mismatching `kernel/iop` programs (event flags, message boxes, threads, vpool, strtok) against the HLE IOP
-kernel (`ps2xIOP/src/emulator/core/iop_kernel.cpp`): diff each, fix root causes, then decide what `iop.kernel` can
-cite. After that, SIF0/SIF1 channel models (unblock `dma.c5`/`dma.c6` and the remaining stall-control channels).
+SIF1/SIF0 DMAC channel models: EE channel 6 source chain delivering IOP-tagged packets into IOP memory through the
+same SIF transfer notifications as `sceSifSetDma`, with stall control (STD=3); then EE channel 5 with IOP channel 9;
+then IPU, GS and SPU2 in dependency order. `cpu/iop/lsudelay` still loops after its END marker (see batch 4).

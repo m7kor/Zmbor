@@ -3004,6 +3004,11 @@ void register_ps2_memory_tests()
             t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u, "CIS4 once all data is in");
             mem.writeIORegister(0x10002010u, 1u << 30); // CTRL.RST
             t.Equals(mem.readIORegister(0x10002010u) & 0xFFu, 0u, "RST empties the FIFOs");
+            mem.writeIORegister(0x10002000u, 5u << 28);                   // SETIQ: busy until 64 bytes arrive
+            mem.writeIORegister(0x10002000u, (9u << 28) | 0x00050003u);  // SETTH while busy
+            t.IsTrue(mem.ipu().threshold0() == 0u && mem.ipu().threshold1() == 0u && mem.ipu().busy(),
+                     "a command written while the IPU is busy is ignored");
+            mem.writeIORegister(0x10002010u, 1u << 30);
             mem.writeIORegister(0x10002000u, (1u << 28)); // IDEC: not implemented
             t.Equals(mem.ipu().unimplementedCommand(), 1, "an unimplemented command is reported, not decoded");
         });

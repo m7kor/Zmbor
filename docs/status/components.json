@@ -1277,13 +1277,13 @@
   "iop_hardware": {
    "source": {
     "path": "docs/hwtest/iop-dashboard.json",
-    "sha256": "c9f886faec5d20acea2b3918bd6813f85f9b2983c6955354abd1c98a6eae6cd1",
-    "evidence_commit": "00e1498",
-    "description": "the 23 ps2autotests IOP programs (.irx, real-PS2 .expected) run on ps2xIOP by tools/hwtest/iop_hwtest.py at 00e1498 (IRX relocation 2318aad, printf formatting 878f01a, JALR 00e1498)"
+    "sha256": "5fbea66ec92eaa8ebf52dd201036bd19e0e6da9ea587f3b2db2c23810ad86b44",
+    "evidence_commit": "1b55608",
+    "description": "the 23 ps2autotests IOP programs (.irx, real-PS2 .expected) run on ps2xIOP by tools/hwtest/iop_hwtest.py at 1b55608 (IRX relocation 2318aad, printf 878f01a, JALR 00e1498, IOP kernel c3e9553, intrman/sysclib 3696d34)"
    },
-   "programs_pass": 8,
+   "programs_pass": 23,
    "programs": 23,
-   "lines_match": 1168,
+   "lines_match": 1306,
    "lines": 1306,
    "crash": 0,
    "timeout": 0,
@@ -1295,9 +1295,9 @@
      "lines": 981
     },
     "kernel/iop": {
-     "programs_pass": 1,
+     "programs_pass": 16,
      "programs": 16,
-     "lines_match": 187,
+     "lines_match": 325,
      "lines": 325
     }
    },
@@ -1338,23 +1338,23 @@
      "lines": 202
     },
     "kernel_iop_eventflag_delete": {
-     "status": "MISMATCH",
-     "lines_match": 8,
+     "status": "PASS",
+     "lines_match": 11,
      "lines": 11
     },
     "kernel_iop_eventflag_poll": {
-     "status": "MISMATCH",
-     "lines_match": 11,
+     "status": "PASS",
+     "lines_match": 18,
      "lines": 18
     },
     "kernel_iop_interrupt_register": {
-     "status": "MISMATCH",
-     "lines_match": 11,
+     "status": "PASS",
+     "lines_match": 15,
      "lines": 15
     },
     "kernel_iop_interrupt_release": {
-     "status": "MISMATCH",
-     "lines_match": 6,
+     "status": "PASS",
+     "lines_match": 9,
      "lines": 9
     },
     "kernel_iop_libc_sprintf": {
@@ -1363,58 +1363,58 @@
      "lines": 19
     },
     "kernel_iop_libc_strtok": {
-     "status": "MISMATCH",
-     "lines_match": 5,
+     "status": "PASS",
+     "lines_match": 10,
      "lines": 10
     },
     "kernel_iop_messagebox_poll": {
-     "status": "MISMATCH",
-     "lines_match": 4,
+     "status": "PASS",
+     "lines_match": 9,
      "lines": 9
     },
     "kernel_iop_messagebox_receive": {
-     "status": "MISMATCH",
-     "lines_match": 5,
+     "status": "PASS",
+     "lines_match": 10,
      "lines": 10
     },
     "kernel_iop_messagebox_send": {
-     "status": "MISMATCH",
-     "lines_match": 8,
+     "status": "PASS",
+     "lines_match": 14,
      "lines": 14
     },
     "kernel_iop_thread_cancelwakeup": {
-     "status": "MISMATCH",
-     "lines_match": 8,
+     "status": "PASS",
+     "lines_match": 11,
      "lines": 11
     },
     "kernel_iop_thread_create": {
-     "status": "MISMATCH",
-     "lines_match": 14,
+     "status": "PASS",
+     "lines_match": 26,
      "lines": 26
     },
     "kernel_iop_thread_delete": {
-     "status": "MISMATCH",
-     "lines_match": 7,
+     "status": "PASS",
+     "lines_match": 15,
      "lines": 15
     },
     "kernel_iop_thread_releasewait": {
-     "status": "MISMATCH",
-     "lines_match": 13,
+     "status": "PASS",
+     "lines_match": 23,
      "lines": 23
     },
     "kernel_iop_thread_stat": {
-     "status": "MISMATCH",
-     "lines_match": 6,
+     "status": "PASS",
+     "lines_match": 17,
      "lines": 17
     },
     "kernel_iop_vpool_create": {
-     "status": "MISMATCH",
-     "lines_match": 8,
+     "status": "PASS",
+     "lines_match": 14,
      "lines": 14
     },
     "kernel_iop_vpool_pallocate": {
-     "status": "MISMATCH",
-     "lines_match": 54,
+     "status": "PASS",
+     "lines_match": 104,
      "lines": 104
     }
    }
@@ -4397,7 +4397,7 @@
          ],
          "blocker": "",
          "target": "8",
-         "verified_at": "00e1498"
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.mem",
@@ -4420,36 +4420,55 @@
         {
          "id": "iop.intr",
          "name": "Interrupts (intrman)",
-         "status": "HLE_OR_STUB",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP interrupts",
-         "implemented": "",
-         "missing": "",
+         "implemented": "HLE intrman: handler registration codes and line validation as on a real PS2, NULL handlers, VBLANK (line 0) raised at every field of guest time; the ps2autotests kernel/iop/interrupt register and release programs match their real-PS2 output exactly",
+         "missing": "HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled",
          "src": [
           "ps2xIOP/src/emulator/imports/iop_intrman.cpp"
          ],
-         "tests": [],
-         "hw": [],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
+         "hw": [
+          "kernel_iop_interrupt_register",
+          "kernel_iop_interrupt_release"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.kernel",
          "name": "Threads, semaphores, events (thbase, ...)",
-         "status": "HLE_OR_STUB",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP kernel",
-         "implemented": "",
-         "missing": "",
+         "implemented": "HLE kernel at system-call level (thbase, thsemap, thevent, thmsgbx, thvpool): thread checks and states, priority ready queue with preemption, typed waits with FIFO/priority queues, message boxes, variable pools; module start runs in a priority-8 kernel thread; the 12 ps2autotests kernel/iop thread, event flag, message box and vpool programs match their real-PS2 output exactly",
+         "missing": "HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate",
          "src": [
           "ps2xIOP/src/emulator/core/iop_kernel.cpp"
          ],
          "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp",
           "ps2xIOP/tests/iop_emulator_tests.cpp"
          ],
-         "hw": [],
+         "hw": [
+          "kernel_iop_eventflag_delete",
+          "kernel_iop_eventflag_poll",
+          "kernel_iop_messagebox_poll",
+          "kernel_iop_messagebox_receive",
+          "kernel_iop_messagebox_send",
+          "kernel_iop_thread_cancelwakeup",
+          "kernel_iop_thread_create",
+          "kernel_iop_thread_delete",
+          "kernel_iop_thread_releasewait",
+          "kernel_iop_thread_stat",
+          "kernel_iop_vpool_create",
+          "kernel_iop_vpool_pallocate"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.timers",

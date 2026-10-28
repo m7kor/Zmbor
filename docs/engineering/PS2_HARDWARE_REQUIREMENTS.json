@@ -2344,8 +2344,9 @@
     "iop.cpu"
    ],
    "acceptance": [
-    "Unit: source/mask/order",
-    "Hardware: IOP interrupt order probe"
+    "Unit: iop_import_tests intrman registration codes",
+    "Hardware: ps2autotests kernel/iop/interrupt register and release, 2/2 exact on ps2xIOP",
+    "Hardware still needed: interrupt lines other than VBLANK; nesting and latency"
    ],
    "references": [
     "ps2tek: IOP",
@@ -2375,8 +2376,9 @@
     "iop.timers"
    ],
    "acceptance": [
-    "Unit: kernel call semantics",
-    "Hardware: IOP kernel probe IRX printing results"
+    "Unit: iop_import_tests kernel checks (thread states, preemption, event flags, message boxes, variable pools), 15/15 mutants killed",
+    "Hardware: ps2autotests kernel/iop thread (5), eventflag (2), messagebox (3), vpool (2) programs, 12/12 exact on ps2xIOP",
+    "Hardware still needed: semaphore, alarm, fixed-pool and suspend/resume programs; thread-switch timing"
    ],
    "references": [
     "ps2tek: IOP",
@@ -2384,7 +2386,7 @@
     "DobieStation 68dd073: iop/iop.cpp, iop_dma.cpp, iop_timers.cpp, iop_intc.cpp",
     "ps2sdk: iop/kernel (intrman, thbase, thsemap, thevent, timrman, loadcore, modload, sifman, sifcmd)"
    ],
-   "known_divergences": "HLE"
+   "known_divergences": "HLE kernel; check order and wait-queue details follow the ps2sdk threadman reimplementation where no real-PS2 program covers them"
   },
   "iop.timers": {
    "block": "IOP timers and timrman",

@@ -18,11 +18,11 @@
  "components_total": 174,
  "totals": {
   "contract_specified": 174,
-  "test_exists": 127,
+  "test_exists": 128,
   "test_executed": 119,
   "test_passed": 119,
   "vectors_passed": 4,
-  "hardware_verified": 60,
+  "hardware_verified": 62,
   "timing_verified": 0
  },
  "by_category": {
@@ -79,11 +79,11 @@
   "F": {
    "components": 17,
    "contract_specified": 17,
-   "test_exists": 13,
+   "test_exists": 14,
    "test_executed": 7,
    "test_passed": 7,
    "vectors_passed": 0,
-   "hardware_verified": 5,
+   "hardware_verified": 7,
    "timing_verified": 0
   },
   "G": {
@@ -4247,17 +4247,17 @@
    "id": "iop.intr",
    "name": "Interrupts (intrman)",
    "category": "F",
-   "status": "HLE_OR_STUB",
-   "missing": "",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled",
    "blocker": "",
    "target": "",
    "levels": {
     "contract_specified": true,
-    "test_exists": false,
+    "test_exists": true,
     "test_executed": false,
     "test_passed": false,
     "vectors_passed": false,
-    "hardware_verified": false,
+    "hardware_verified": true,
     "timing_verified": false
    },
    "dependencies": [
@@ -4269,8 +4269,8 @@
     "passed": 0
    },
    "hardware_programs": {
-    "cited": 0,
-    "matching": 0
+    "cited": 2,
+    "matching": 2
    },
    "unverified_dependencies": []
   },
@@ -4278,8 +4278,8 @@
    "id": "iop.kernel",
    "name": "Threads, semaphores, events (thbase, ...)",
    "category": "F",
-   "status": "HLE_OR_STUB",
-   "missing": "",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate",
    "blocker": "",
    "target": "",
    "levels": {
@@ -4288,7 +4288,7 @@
     "test_executed": false,
     "test_passed": false,
     "vectors_passed": false,
-    "hardware_verified": false,
+    "hardware_verified": true,
     "timing_verified": false
    },
    "dependencies": [
@@ -4301,11 +4301,10 @@
     "passed": 0
    },
    "hardware_programs": {
-    "cited": 0,
-    "matching": 0
+    "cited": 12,
+    "matching": 12
    },
    "unverified_dependencies": [
-    "iop.intr",
     "iop.timers"
    ]
   },
@@ -4338,9 +4337,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.intr"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "iop.irx",
@@ -4373,8 +4370,7 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "iop.mem",
-    "iop.kernel"
+    "iop.mem"
    ]
   },
   {
@@ -4538,9 +4534,7 @@
     "cited": 1,
     "matching": 1
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "svc.ioman",
@@ -4572,9 +4566,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "svc.cdvdman",
@@ -4606,9 +4598,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "svc.cdvdfsv",
@@ -4640,9 +4630,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "svc.rpcsrv",
@@ -4674,9 +4662,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "svc.modload",
@@ -4708,9 +4694,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "sys.boot",
@@ -4742,9 +4726,7 @@
     "cited": 1,
     "matching": 1
    },
-   "unverified_dependencies": [
-    "iop.kernel"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "spu.cores",
@@ -4777,8 +4759,7 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "iop.mem",
-    "iop.intr"
+    "iop.mem"
    ]
   },
   {
@@ -5020,8 +5001,7 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "spu.cores",
-    "iop.intr"
+    "spu.cores"
    ]
   },
   {
@@ -5055,8 +5035,7 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "spu.ram",
-    "iop.intr"
+    "spu.ram"
    ]
   },
   {
@@ -5226,7 +5205,6 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "iop.intr",
     "iop.mem"
    ]
   },
@@ -5393,7 +5371,6 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "iop.intr",
     "svc.cdvdman"
    ]
   },
@@ -5428,7 +5405,6 @@
     "matching": 0
    },
    "unverified_dependencies": [
-    "iop.intr",
     "iop.mem"
    ]
   },
@@ -5461,9 +5437,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.intr"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "per.hdd",

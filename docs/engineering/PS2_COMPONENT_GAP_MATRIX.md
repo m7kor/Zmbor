@@ -142,35 +142,35 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 |---|---|---|---|---|---|---|
 | `iop.cpu` R3000A instruction execution | `VERIFIED_PARTIAL` | Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program | — | 8 | `iop.mem` | contract_specified, test_exists, hardware_verified |
 | `iop.mem` IOP memory map (2 MB, hardware ranges) | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
-| `iop.intr` Interrupts (intrman) | `HLE_OR_STUB` | — | — | — | — | contract_specified |
-| `iop.kernel` Threads, semaphores, events (thbase, ...) | `HLE_OR_STUB` | — | — | — | `iop.intr`, `iop.timers` | contract_specified, test_exists |
-| `iop.timers` Timers (timrman) | `HLE_OR_STUB` | — | — | — | `iop.intr` | contract_specified, test_exists |
-| `iop.irx` IRX loading, relocation, versioned imports | `IMPLEMENTED_UNVERIFIED` | — | — | — | `iop.mem`, `iop.kernel` | contract_specified, test_exists |
+| `iop.intr` Interrupts (intrman) | `VERIFIED_PARTIAL` | HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled | — | — | — | contract_specified, test_exists, hardware_verified |
+| `iop.kernel` Threads, semaphores, events (thbase, ...) | `VERIFIED_PARTIAL` | HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate | — | — | `iop.timers` | contract_specified, test_exists, hardware_verified |
+| `iop.timers` Timers (timrman) | `HLE_OR_STUB` | — | — | — | — | contract_specified, test_exists |
+| `iop.irx` IRX loading, relocation, versioned imports | `IMPLEMENTED_UNVERIFIED` | — | — | — | `iop.mem` | contract_specified, test_exists |
 | `iop.sched` IOP scheduling against the EE | `IMPLEMENTED_UNVERIFIED` | No ordering tests between IOP and EE progress (roadmap item 4) | — | 8 | — | contract_specified |
 | `sif.cmd` SIFCMD | `VERIFIED_PARTIAL` | Hardware evidence is indirect: every program's printf travels this path | — | — | `sif.dma` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `sif.rpc` SIFRPC | `VERIFIED_PARTIAL` | Hardware evidence is indirect (tty output path) | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `sif.dma` SIF DMA (sceSifSetDma) | `HLE_OR_STUB` | — | — | — | `dma.c5`, `dma.c6` | contract_specified, test_exists, test_executed, test_passed |
-| `svc.fileio` FILEIO | `VERIFIED_PARTIAL` | Only the tty write path has hardware evidence | — | — | `iop.kernel` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `svc.ioman` IOMAN/IOMANX | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified |
-| `svc.cdvdman` CDVDMAN | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified, test_exists |
-| `svc.cdvdfsv` CDVDFSV | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified |
-| `svc.rpcsrv` RPC servers (MCSERV, DBCMAN, LIBSD routing) | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified, test_exists |
-| `svc.modload` Module loading (SifLoadModule, MODLOAD) | `HLE_OR_STUB` | — | — | — | `iop.kernel` | contract_specified, test_exists, test_executed, test_passed |
-| `sys.boot` System init and shutdown (no-BIOS boot, exit) | `VERIFIED_PARTIAL` | — | — | — | `iop.kernel` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
+| `svc.fileio` FILEIO | `VERIFIED_PARTIAL` | Only the tty write path has hardware evidence | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
+| `svc.ioman` IOMAN/IOMANX | `HLE_OR_STUB` | — | — | — | — | contract_specified |
+| `svc.cdvdman` CDVDMAN | `HLE_OR_STUB` | — | — | — | — | contract_specified, test_exists |
+| `svc.cdvdfsv` CDVDFSV | `HLE_OR_STUB` | — | — | — | — | contract_specified |
+| `svc.rpcsrv` RPC servers (MCSERV, DBCMAN, LIBSD routing) | `HLE_OR_STUB` | — | — | — | — | contract_specified, test_exists |
+| `svc.modload` Module loading (SifLoadModule, MODLOAD) | `HLE_OR_STUB` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
+| `sys.boot` System init and shutdown (no-BIOS boot, exit) | `VERIFIED_PARTIAL` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 
 ## G
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `spu.cores` SPU2 cores and registers | `MISSING` | Register range mapped on the IOP side, no register model | — | 8 | `iop.mem`, `iop.intr` | contract_specified |
+| `spu.cores` SPU2 cores and registers | `MISSING` | Register range mapped on the IOP side, no register model | — | 8 | `iop.mem` | contract_specified |
 | `spu.ram` Sound RAM (2 MB) | `MISSING` | No sound RAM model | — | 8 | `spu.cores` | contract_specified |
 | `spu.voices` Voice engine (48 voices) | `MISSING` | No voice engine; libsd calls play decoded clips | — | 8 | `spu.ram`, `spu.adpcm`, `spu.adsr`, `spu.pitch` | contract_specified |
 | `spu.adsr` ADSR envelopes | `MISSING` | No envelope generator | — | 8 | `spu.cores` | contract_specified |
 | `spu.pitch` Pitch and interpolation | `MISSING` | No pitch counter or interpolation | — | 8 | `spu.cores` | contract_specified |
 | `spu.mix` Core mixing, volumes | `MISSING` | No SPU2 mixer | — | 8 | `spu.voices`, `spu.reverb` | contract_specified |
 | `spu.reverb` Reverb | `MISSING` | No reverb | — | unscheduled | `spu.ram`, `spu.voices` | contract_specified |
-| `spu.irq` SPU2 IRQ (address match) | `MISSING` | No SPU2 interrupts | — | 8 | `spu.cores`, `iop.intr` | contract_specified |
-| `spu.dma` Sound DMA (IOP channels 4/7) | `HLE_OR_STUB` | — | — | — | `spu.ram`, `iop.intr` | contract_specified, test_exists, test_executed, test_passed |
+| `spu.irq` SPU2 IRQ (address match) | `MISSING` | No SPU2 interrupts | — | 8 | `spu.cores` | contract_specified |
+| `spu.dma` Sound DMA (IOP channels 4/7) | `HLE_OR_STUB` | — | — | — | `spu.ram` | contract_specified, test_exists, test_executed, test_passed |
 | `spu.libsd` libsd / sceSd* HLE | `HLE_OR_STUB` | Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders | — | — | `spu.cores`, `spu.dma` | contract_specified, test_exists, test_executed, test_passed |
 | `spu.adpcm` VAG/ADPCM decoding | `IMPLEMENTED_UNVERIFIED` | No test | — | — | `spu.ram` | contract_specified |
 | `spu.host` Host audio output | `IMPLEMENTED_UNVERIFIED` | No test; plays decoded clips through raylib | — | — | `spu.mix`, `spu.sync` | contract_specified |
@@ -180,14 +180,14 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `per.sio2` SIO2 controller hardware | `MISSING` | Pads and cards are served at library level | — | unscheduled | `iop.intr`, `iop.mem` | contract_specified |
+| `per.sio2` SIO2 controller hardware | `MISSING` | Pads and cards are served at library level | — | unscheduled | `iop.mem` | contract_specified |
 | `per.pad` Digital/analog pads (libpad HLE) | `HLE_OR_STUB` | — | — | — | `per.sio2` | contract_specified, test_exists, test_executed, test_passed |
 | `per.ds2` DualShock 2 pressure and actuators | `HLE_OR_STUB` | Actuator (vibration) output not tested | — | — | `per.pad` | contract_specified, test_exists, test_executed, test_passed |
 | `per.mc` Memory cards (libmc HLE on host files) | `HLE_OR_STUB` | — | — | — | `per.sio2` | contract_specified, test_exists, test_executed, test_passed |
 | `per.save` Save/load persistence across runs | `HLE_OR_STUB` | No restart-and-read-back test | — | — | `per.mc` | contract_specified, test_exists, test_executed, test_passed |
-| `per.cdvd` CD/DVD reads (host files, disc image) | `HLE_OR_STUB` | — | — | — | `iop.intr`, `svc.cdvdman` | contract_specified, test_exists, test_executed, test_passed |
-| `per.usb` USB (usbd) | `MISSING` | No USB device emulation | — | unscheduled | `iop.intr`, `iop.mem` | contract_specified |
-| `per.dev9` DEV9 expansion bay | `MISSING` | No DEV9 emulation | — | unscheduled | `iop.intr` | contract_specified |
+| `per.cdvd` CD/DVD reads (host files, disc image) | `HLE_OR_STUB` | — | — | — | `svc.cdvdman` | contract_specified, test_exists, test_executed, test_passed |
+| `per.usb` USB (usbd) | `MISSING` | No USB device emulation | — | unscheduled | `iop.mem` | contract_specified |
+| `per.dev9` DEV9 expansion bay | `MISSING` | No DEV9 emulation | — | unscheduled | — | contract_specified |
 | `per.hdd` HDD (ATA, APA/PFS) | `MISSING` | Not implemented | — | unscheduled | `per.dev9` | contract_specified |
 | `per.netif` Network (SMAP, ps2ip) | `MISSING` | No network adapter emulation | — | unscheduled | `per.dev9` | contract_specified |
 | `per.intc` Interrupt controller (INTC) | `VERIFIED_PARTIAL` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |

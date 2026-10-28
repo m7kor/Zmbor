@@ -11,10 +11,10 @@
     },
     "kernel/iop": {
       "CRASH": 0,
-      "MISMATCH": 15,
+      "MISMATCH": 0,
       "NOT_BUILT": 0,
       "NO_OUTPUT": 0,
-      "PASS": 1,
+      "PASS": 16,
       "RECOMPILE_FAIL": 0,
       "TIMEOUT": 0
     }
@@ -27,9 +27,9 @@
     "discovered": 23,
     "executed": 23,
     "expected_lines": 1306,
-    "matching": 8,
-    "matching_lines": 1168,
-    "mismatch": 15,
+    "matching": 23,
+    "matching_lines": 1306,
+    "mismatch": 0,
     "no_output": 0,
     "not_built": 0,
     "recompile_fail": 0,
@@ -44,7 +44,7 @@
       "id": "cpu_iop_alu",
       "matching_lines": 467,
       "regression": false,
-      "run_seconds": 0.013,
+      "run_seconds": 0.017,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -55,7 +55,7 @@
       "id": "cpu_iop_branch",
       "matching_lines": 170,
       "regression": false,
-      "run_seconds": 0.013,
+      "run_seconds": 0.012,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -99,7 +99,7 @@
       "id": "cpu_iop_lsudelay",
       "matching_lines": 11,
       "regression": false,
-      "run_seconds": 0.073,
+      "run_seconds": 0.011,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -110,7 +110,7 @@
       "id": "cpu_iop_muldiv",
       "matching_lines": 202,
       "regression": false,
-      "run_seconds": 0.013,
+      "run_seconds": 0.012,
       "status": "PASS",
       "subsystem": "cpu/iop"
     },
@@ -119,10 +119,10 @@
       "exit_code": 0,
       "expected_lines": 11,
       "id": "kernel_iop_eventflag_delete",
-      "matching_lines": 8,
+      "matching_lines": 11,
       "regression": false,
-      "run_seconds": 0.013,
-      "status": "MISMATCH",
+      "run_seconds": 0.011,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -130,10 +130,10 @@
       "exit_code": 0,
       "expected_lines": 18,
       "id": "kernel_iop_eventflag_poll",
-      "matching_lines": 11,
+      "matching_lines": 18,
       "regression": false,
-      "run_seconds": 0.013,
-      "status": "MISMATCH",
+      "run_seconds": 0.011,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -141,10 +141,10 @@
       "exit_code": 0,
       "expected_lines": 15,
       "id": "kernel_iop_interrupt_register",
-      "matching_lines": 11,
+      "matching_lines": 15,
       "regression": false,
-      "run_seconds": 0.012,
-      "status": "MISMATCH",
+      "run_seconds": 0.01,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -152,10 +152,10 @@
       "exit_code": 0,
       "expected_lines": 9,
       "id": "kernel_iop_interrupt_release",
-      "matching_lines": 6,
+      "matching_lines": 9,
       "regression": false,
-      "run_seconds": 0.012,
-      "status": "MISMATCH",
+      "run_seconds": 0.01,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -174,10 +174,10 @@
       "exit_code": 0,
       "expected_lines": 10,
       "id": "kernel_iop_libc_strtok",
-      "matching_lines": 5,
+      "matching_lines": 10,
       "regression": false,
-      "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "run_seconds": 0.01,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -185,10 +185,10 @@
       "exit_code": 0,
       "expected_lines": 9,
       "id": "kernel_iop_messagebox_poll",
-      "matching_lines": 4,
+      "matching_lines": 9,
       "regression": false,
-      "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "run_seconds": 0.01,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -196,10 +196,10 @@
       "exit_code": 0,
       "expected_lines": 10,
       "id": "kernel_iop_messagebox_receive",
-      "matching_lines": 5,
+      "matching_lines": 10,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -207,10 +207,10 @@
       "exit_code": 0,
       "expected_lines": 14,
       "id": "kernel_iop_messagebox_send",
-      "matching_lines": 8,
+      "matching_lines": 14,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -218,10 +218,10 @@
       "exit_code": 0,
       "expected_lines": 11,
       "id": "kernel_iop_thread_cancelwakeup",
-      "matching_lines": 8,
+      "matching_lines": 11,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -229,10 +229,10 @@
       "exit_code": 0,
       "expected_lines": 26,
       "id": "kernel_iop_thread_create",
-      "matching_lines": 14,
+      "matching_lines": 26,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -240,10 +240,10 @@
       "exit_code": 0,
       "expected_lines": 15,
       "id": "kernel_iop_thread_delete",
-      "matching_lines": 7,
+      "matching_lines": 15,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -251,10 +251,10 @@
       "exit_code": 0,
       "expected_lines": 23,
       "id": "kernel_iop_thread_releasewait",
-      "matching_lines": 13,
+      "matching_lines": 23,
       "regression": false,
       "run_seconds": 0.012,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -262,10 +262,10 @@
       "exit_code": 0,
       "expected_lines": 17,
       "id": "kernel_iop_thread_stat",
-      "matching_lines": 6,
+      "matching_lines": 17,
       "regression": false,
       "run_seconds": 0.012,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -273,10 +273,10 @@
       "exit_code": 0,
       "expected_lines": 14,
       "id": "kernel_iop_vpool_create",
-      "matching_lines": 8,
+      "matching_lines": 14,
       "regression": false,
       "run_seconds": 0.011,
-      "status": "MISMATCH",
+      "status": "PASS",
       "subsystem": "kernel/iop"
     },
     {
@@ -284,10 +284,10 @@
       "exit_code": 0,
       "expected_lines": 104,
       "id": "kernel_iop_vpool_pallocate",
-      "matching_lines": 54,
+      "matching_lines": 104,
       "regression": false,
-      "run_seconds": 0.013,
-      "status": "MISMATCH",
+      "run_seconds": 0.011,
+      "status": "PASS",
       "subsystem": "kernel/iop"
     }
   ]

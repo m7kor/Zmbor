@@ -58,9 +58,9 @@ flowchart LR
 | status | PS2 Hardware & Runtime | Recompiler, Tools & Compatibility |
 |---|---|---|
 | verified complete | 18 | 4 |
-| verified partial | 48 | 29 |
+| verified partial | 50 | 29 |
 | implemented, unverified | 59 | 11 |
-| HLE / stub | 23 | 0 |
+| HLE / stub | 21 | 0 |
 | missing | 22 | 1 |
 | not applicable | 3 | 0 |
 | unknown | 1 | 8 |

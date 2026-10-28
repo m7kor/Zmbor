@@ -12,10 +12,10 @@ Unit-test run: commit `c64f357fd441`, binary sha256 `82dd798b35314f8d`.
 | C | 27 | 27 | 24 | 22 | 22 | 0 | 4 | 0 |
 | D | 24 | 24 | 20 | 20 | 20 | 0 | 10 | 0 |
 | E | 13 | 13 | 11 | 11 | 11 | 0 | 5 | 0 |
-| F | 17 | 17 | 13 | 7 | 7 | 0 | 5 | 0 |
+| F | 17 | 17 | 14 | 7 | 7 | 0 | 7 | 0 |
 | G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **127** | **119** | **119** | **4** | **60** | **0** |
+| **all** | **174** | **174** | **128** | **119** | **119** | **4** | **62** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -147,8 +147,8 @@ Unit-test run: commit `c64f357fd441`, binary sha256 `82dd798b35314f8d`.
 | `ipu.mpeg` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `iop.cpu` | `VERIFIED_PARTIAL` | 0 / 0 / 0 | 7 / 7 | contract_specified, test_exists, hardware_verified |
 | `iop.mem` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
-| `iop.intr` | `HLE_OR_STUB` | 0 / 0 / 0 | 0 / 0 | contract_specified |
-| `iop.kernel` | `HLE_OR_STUB` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
+| `iop.intr` | `VERIFIED_PARTIAL` | 0 / 0 / 0 | 2 / 2 | contract_specified, test_exists, hardware_verified |
+| `iop.kernel` | `VERIFIED_PARTIAL` | 0 / 0 / 0 | 12 / 12 | contract_specified, test_exists, hardware_verified |
 | `iop.timers` | `HLE_OR_STUB` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
 | `iop.irx` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 1 | 0 / 0 | contract_specified, test_exists |
 | `iop.sched` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified |

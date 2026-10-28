@@ -6,17 +6,17 @@
 <rect x="16" y="64" width="12" height="12" rx="2" fill="#2ea043" stroke="#30363d"/>
 <text x="33" y="74" fill="#e6edf3" font-size="11">verified complete 18</text>
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
-<text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 48</text>
+<text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 50</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
 <text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 59</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
-<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 23</text>
-<rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 22</text>
-<rect x="676.0600000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
-<text x="693.0600000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
-<rect x="796.72" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
-<text x="813.72" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
+<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 21</text>
+<rect x="578.0600000000001" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
+<text x="595.0600000000001" y="74" fill="#e6edf3" font-size="11">missing 22</text>
+<rect x="672.5400000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
+<text x="689.5400000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
+<rect x="793.2" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
+<text x="810.2" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
 <rect x="16" y="88" width="104.2" height="18" fill="#30363d"/>
 <text x="22" y="101" fill="#e6edf3" font-size="10">ps2autotests lines</text>
 <rect x="120.2" y="88" width="116.2" height="18" fill="#1f6feb"/>
@@ -1094,9 +1094,9 @@ implemented: sceMpeg* replaced; optional FFmpeg decode (PS2X_ENABLE_FFMPEG)</tit
 <text x="870.7" y="1015.2" fill="#ffffff" font-size="11">(libmpeg HLE)</text>
 </g>
 <rect x="17" y="1034.7" width="604.5" height="196.7" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-<text x="22" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">F · IOP AND SYSTEM SERVICES  (17 · 0 ok · 5 part)</text>
+<text x="22" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">F · IOP AND SYSTEM SERVICES  (17 · 0 ok · 7 part)</text>
 <rect x="20" y="1055.7" width="240.1" height="172.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
-<text x="25" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">IOP core  (7 · 0 ok · 1 part)</text>
+<text x="25" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">IOP core  (7 · 0 ok · 3 part)</text>
 <g><title>iop.cpu — R3000A instruction execution
 status: VERIFIED_PARTIAL
 implemented: R3000A interpreter with load and branch delay slots; the seven ps2autotests cpu/iop programs (ALU, branches, branch delay, HI/LO delay, loads/stores, load delay, mul/div) match their real-PS2 output exactly
@@ -1114,17 +1114,23 @@ status: IMPLEMENTED_UNVERIFIED</title>
 <text x="253.1" y="1110.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>iop.intr — Interrupts (intrman)
-status: HLE_OR_STUB</title>
-<rect x="23" y="1116.9" width="116" height="42.2" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
-<text x="27" y="1131.9" fill="#ffffff" font-size="11">Interrupts (intrman)</text>
-<text x="135" y="1155.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+status: VERIFIED_PARTIAL
+implemented: HLE intrman: handler registration codes and line validation as on a real PS2, NULL handlers, VBLANK (line 0) raised at every field of guest time; the ps2autotests kernel/iop/interrupt register and release programs match their real-PS2 output exactly
+missing: HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled
+hardware programs: kernel_iop_interrupt_register, kernel_iop_interrupt_release</title>
+<rect x="23" y="1116.9" width="116" height="42.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1131.9" fill="#0d1117" font-size="11">Interrupts (intrman)</text>
+<text x="135" y="1155.1" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
 </g>
 <g><title>iop.kernel — Threads, semaphores, events (thbase, ...)
-status: HLE_OR_STUB</title>
-<rect x="141" y="1116.9" width="116" height="42.2" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
-<text x="145" y="1129.9" fill="#ffffff" font-size="9">Threads, semaphores,</text>
-<text x="145" y="1140.9" fill="#ffffff" font-size="9">events (thbase, ...)</text>
-<text x="253.1" y="1155.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+status: VERIFIED_PARTIAL
+implemented: HLE kernel at system-call level (thbase, thsemap, thevent, thmsgbx, thvpool): thread checks and states, priority ready queue with preemption, typed waits with FIFO/priority queues, message boxes, variable pools; module start runs in a priority-8 kernel thread; the 12 ps2autotests kernel/iop thread, event flag, message box and vpool programs match their real-PS2 output exactly
+missing: HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate
+hardware programs: kernel_iop_eventflag_delete, kernel_iop_eventflag_poll, kernel_iop_messagebox_poll, kernel_iop_messagebox_receive, kernel_iop_messagebox_send, kernel_iop_thread_cancelwakeup, kernel_iop_thread_create, kernel_iop_thread_delete, kernel_iop_thread_releasewait, kernel_iop_thread_stat, kernel_iop_vpool_create, kernel_iop_vpool_pallocate</title>
+<rect x="141" y="1116.9" width="116" height="42.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="145" y="1129.9" fill="#0d1117" font-size="9">Threads, semaphores,</text>
+<text x="145" y="1140.9" fill="#0d1117" font-size="9">events (thbase, ...)</text>
+<text x="253.1" y="1155.1" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
 </g>
 <g><title>iop.timers — Timers (timrman)
 status: HLE_OR_STUB</title>

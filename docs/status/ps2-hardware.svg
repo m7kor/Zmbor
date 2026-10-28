@@ -1085,8 +1085,8 @@ blocker: IPU probe on a physical PS2</title>
 </g>
 <g><title>ipu.cmd — IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)
 status: MISSING
-implemented: IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1); sceIpu* HLE still returns without decoding
-missing: IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)</title>
+implemented: IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1) and PACK to RGB16 or 4-bit VQ indices (ff3a138, D-IPU-2); sceIpu* HLE still returns without decoding
+missing: The MPEG decoders IDEC, BDEC and VDEC are not implemented (they complete without output and are reported as unimplemented)</title>
 <rect x="754.4" y="987.2" width="110.3" height="39.5" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
 <text x="758.4" y="1002.2" fill="#ffffff" font-size="11">IPU commands</text>
 <text x="860.7" y="1022.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>

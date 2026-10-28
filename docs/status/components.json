@@ -4355,8 +4355,8 @@
          "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
          "status": "MISSING",
          "short": "IPU commands",
-         "implemented": "IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1); sceIpu* HLE still returns without decoding",
-         "missing": "IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)",
+         "implemented": "IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1) and PACK to RGB16 or 4-bit VQ indices (ff3a138, D-IPU-2); sceIpu* HLE still returns without decoding",
+         "missing": "The MPEG decoders IDEC, BDEC and VDEC are not implemented (they complete without output and are reported as unimplemented)",
          "src": [
           "ps2xRuntime/src/lib/ps2_ipu.cpp",
           "ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp"
@@ -4365,7 +4365,8 @@
           "ps2xTest/src/ps2_memory_tests.cpp::IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP",
           "ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4",
           "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
-          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample"
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)"
          ],
          "hw": [],
          "blocker": "",

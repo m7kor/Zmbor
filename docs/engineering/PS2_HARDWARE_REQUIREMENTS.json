@@ -1280,7 +1280,7 @@
     "Unit: each command against independently computed outputs",
     "Hardware: IPU probe running each command on fixed bitstreams"
    ],
-   "known_divergences": "BCLR/FDEC/SETIQ/SETVQ/SETTH/CSC implemented (CSC per D-IPU-1); IDEC/BDEC/VDEC/PACK not implemented"
+   "known_divergences": "BCLR/FDEC/SETIQ/SETVQ/SETTH/CSC/PACK implemented (CSC D-IPU-1, PACK D-IPU-2); IDEC/BDEC/VDEC not implemented"
   },
   "ipu.mpeg": {
    "reset_state": "IPU_CTRL.RST clears the FIFOs and state",

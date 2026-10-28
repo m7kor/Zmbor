@@ -677,6 +677,57 @@ void register_ps2_ipu_mpeg_tests()
                      "quantiser_scale_code carries to later macroblocks and replaces the option's QSC");
         });
 
+        tc.Run("IDEC holds the next macroblock while its output waits: input consumption stops until the guest drains", [](TestCase &t)
+        {
+            const Fixture &f = ipu_mpeg_fixtures::kFixtures[0];
+            const Slice &s = f.slices[0];
+            Driver whole;
+            (void)decodeSliceWithIdec(whole, f, s, 0u);
+
+            Driver d;
+            d.ipu.writeControl(f.control | (1u << 24));
+            d.loadMatrix(f.intraMatrix);
+            d.exec(kBclr);
+            d.feeder.load(s.data, s.size);
+            uint32_t increment = 0u;
+            t.IsTrue(readAddressIncrement(d, s.headerBits, increment) == Outcome::Done && increment == 1u, "first increment");
+            d.ipu.writeCommand(kIdec | (s.qsc << 16));
+            for (int i = 0; i < 64; ++i) // the guest feeds input but does not read the output
+            {
+                while (d.feeder.feed(d.ipu))
+                    d.ipu.run();
+                d.ipu.run();
+            }
+            const uint32_t bp = d.ipu.readBitPointer();
+            const size_t input = d.ipu.inputQwords();
+            t.IsTrue(d.ipu.busy() && d.ipu.idecMacroblocks() == 1u && d.ipu.outputQwords() == PS2Ipu::kFifoQwords,
+                     "one macroblock decoded; the output FIFO is full");
+            for (int i = 0; i < 16; ++i)
+                d.ipu.run();
+            t.IsTrue(d.ipu.readBitPointer() == bp && d.ipu.inputQwords() == input && d.ipu.idecMacroblocks() == 1u,
+                     "no input is consumed while the converted macroblock waits");
+            for (;;)
+            {
+                d.drain();
+                if (!d.ipu.busy())
+                    break;
+                if (!d.feeder.feed(d.ipu))
+                    d.ipu.run();
+            }
+            t.IsTrue(d.out == whole.out && !d.error(), "draining resumes the slice; the output matches an unthrottled decode");
+        });
+
+        tc.Run("CTRL.RST raises the IPU interrupt only when it interrupts a command", [](TestCase &t)
+        {
+            PS2Ipu ipu;
+            ipu.writeCommand(5u << 28); // SETIQ: waits for 64 bytes
+            t.IsTrue(ipu.busy() && !ipu.takeCompletion(), "SETIQ is executing");
+            ipu.writeControl(1u << 30);
+            t.IsTrue(!ipu.busy() && ipu.takeCompletion(), "the reset ends it with an interrupt");
+            ipu.writeControl(1u << 30);
+            t.IsTrue(!ipu.takeCompletion(), "a reset of an idle IPU raises none");
+        });
+
         tc.Run("IDEC through toIPU and fromIPU DMA writes the slice's RGB32 macroblocks to RAM and raises the IPU interrupt", [](TestCase &t)
         {
             const Fixture &f = ipu_mpeg_fixtures::kFixtures[3]; // field DCT

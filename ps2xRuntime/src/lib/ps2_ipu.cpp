@@ -844,6 +844,10 @@ void PS2Ipu::writeControl(uint32_t value)
     m_controlFields = value & kControlWritable;
     if ((value & kControlReset) != 0u)
     {
+        // ps2tek: a reset raises the IPU interrupt when a command is executing. A command's decoder state is set up
+        // again when the next command is written.
+        if (m_busy)
+            m_completed = true;
         m_input.clear();
         m_output.clear();
         m_outputPending.clear();
@@ -854,8 +858,6 @@ void PS2Ipu::writeControl(uint32_t value)
         m_busy = false;
         m_decoding = false;
         m_remaining = 0u;
-        m_bdec = BdecState{};
-        m_idec = IdecState{};
     }
 }
 

@@ -397,15 +397,16 @@
     "dma.chain"
    ],
    "acceptance": [
-    "Unit: SIF1 delivery of command packets to the IOP (today via sceSifSetDma HLE)",
-    "Hardware: ps2autotests kernel/sif programs"
+    "Unit: SIF1 normal and chain transfers, stall drain with STD=3, stream split, runtime integration into IOP memory; 5/5 mutants killed",
+    "Hardware: none yet",
+    "Hardware still needed: SIF1 probe programming channel 6 directly and reading the IOP buffer back (packet layout, end flags, CIS6 timing)"
    ],
    "references": [
     "ps2tek: EE DMAC (channel registers, D_CTRL, D_STAT, D_PCR, D_SQWC, D_ENABLER/W)",
     "PCSX2 f0523f8: Dmac.h (tDMA_CHCR, tDMAC_*), Dmac.cpp, HwRead.cpp/HwWrite.cpp",
     "DobieStation 68dd073: dmac.cpp (channel state machine, read32/write32)"
    ],
-   "known_divergences": "HLE: sceSifSetDma copies descriptors, no channel model"
+   "known_divergences": "register-level model plus the sceSifSetDma HLE path; FIFO depth, timing and the IOP channel 10 interrupt are not modelled"
   },
   "dma.c7": {
    "block": "EE DMAC channel 7 (SIF2)",

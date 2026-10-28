@@ -59,8 +59,8 @@ flowchart LR
 |---|---|---|
 | verified complete | 18 | 4 |
 | verified partial | 52 | 29 |
-| implemented, unverified | 57 | 11 |
-| HLE / stub | 21 | 0 |
+| implemented, unverified | 58 | 11 |
+| HLE / stub | 20 | 0 |
 | missing | 22 | 1 |
 | not applicable | 3 | 0 |
 | unknown | 1 | 8 |

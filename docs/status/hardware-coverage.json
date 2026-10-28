@@ -20,7 +20,7 @@
   "contract_specified": 174,
   "test_exists": 128,
   "test_executed": 119,
-  "test_passed": 119,
+  "test_passed": 117,
   "vectors_passed": 4,
   "hardware_verified": 64,
   "timing_verified": 0
@@ -61,7 +61,7 @@
    "contract_specified": 24,
    "test_exists": 20,
    "test_executed": 20,
-   "test_passed": 20,
+   "test_passed": 18,
    "vectors_passed": 0,
    "hardware_verified": 10,
    "timing_verified": 0
@@ -3168,15 +3168,15 @@
    "id": "dma.c6",
    "name": "Ch 6 SIF1 (EE to IOP)",
    "category": "D",
-   "status": "HLE_OR_STUB",
-   "missing": "No DMAC channel model",
-   "blocker": "",
-   "target": "",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised",
+   "blocker": "SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back)",
+   "target": "8",
    "levels": {
     "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
-    "test_passed": true,
+    "test_passed": false,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -3185,7 +3185,7 @@
     "dma.chain"
    ],
    "named_tests": {
-    "cited": 1,
+    "cited": 5,
     "executed": 1,
     "passed": 1
    },
@@ -3483,14 +3483,14 @@
    "name": "Stall control (STS/STD, D_STADR)",
    "category": "D",
    "status": "IMPLEMENTED_UNVERIFIED",
-   "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources, the SIF1 drain and fromSPR destination-chain CNTS are not modelled",
+   "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources and fromSPR destination-chain CNTS are not modelled (the SIF1 drain is, 0ad6e4b)",
    "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",
    "target": "8",
    "levels": {
     "contract_specified": true,
     "test_exists": true,
     "test_executed": true,
-    "test_passed": true,
+    "test_passed": false,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -3508,7 +3508,7 @@
     "dma.ctrl"
    ],
    "named_tests": {
-    "cited": 5,
+    "cited": 6,
     "executed": 5,
     "passed": 5
    },

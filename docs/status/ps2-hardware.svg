@@ -8,15 +8,15 @@
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
 <text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 52</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 57</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 58</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
-<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 21</text>
-<rect x="578.0600000000001" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="595.0600000000001" y="74" fill="#e6edf3" font-size="11">missing 22</text>
-<rect x="672.5400000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
-<text x="689.5400000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
-<rect x="793.2" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
-<text x="810.2" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
+<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 20</text>
+<rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
+<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 22</text>
+<rect x="676.0600000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
+<text x="693.0600000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
+<rect x="796.72" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
+<text x="813.72" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
 <rect x="16" y="88" width="104.2" height="18" fill="#30363d"/>
 <text x="22" y="101" fill="#e6edf3" font-size="10">ps2autotests lines</text>
 <rect x="120.2" y="88" width="116.2" height="18" fill="#1f6feb"/>
@@ -843,13 +843,14 @@ missing: No DMAC channel model</title>
 <text x="300.9" y="908.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
 </g>
 <g><title>dma.c6 — Ch 6 SIF1 (EE to IOP)
-status: HLE_OR_STUB
-implemented: sceSifSetDma HLE copies descriptors
-missing: No DMAC channel model</title>
-<rect x="306.9" y="809.2" width="92.6" height="50.8" fill="#8957e5" stroke="#0d1117" stroke-width="1"/>
-<text x="310.9" y="824.2" fill="#ffffff" font-size="11">Ch 6 SIF1 (EE</text>
-<text x="310.9" y="837.2" fill="#ffffff" font-size="11">to IOP)</text>
-<text x="395.6" y="856" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: Register-level channel 6: normal and source-chain mode with TTE, stall-control drain (STD=3), stream split into IOP packets (16-byte IOP tag, address bits 0-23, end bits 31/30, word count &amp; 0xFFFFC) written into IOP memory with a SIF transfer notification, CIS6; sceSifSetDma (HLE syscall) still copies descriptors directly
+missing: No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised
+blocker: SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back)</title>
+<rect x="306.9" y="809.2" width="92.6" height="50.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="310.9" y="824.2" fill="#f0f6fc" font-size="11">Ch 6 SIF1 (EE</text>
+<text x="310.9" y="837.2" fill="#f0f6fc" font-size="11">to IOP)</text>
+<text x="395.6" y="856" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>dma.c7 — Ch 7 SIF2
 status: MISSING
@@ -929,7 +930,7 @@ hardware programs: dma_dmac_cpcond</title>
 <g><title>dma.stall — Stall control (STS/STD, D_STADR)
 status: IMPLEMENTED_UNVERIFIED
 implemented: fromSPR (STS=2) leaves its MADR in D_STADR after normal or interleave transfers; the VIF1 (STD=1) or GIF (STD=2) drain waits before a REFS tag or a normal-mode transfer that would read past D_STADR, stays active (STR, no CIS), raises SIS once per stall and resumes when D_STADR or D_CTRL changes
-missing: No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources, the SIF1 drain and fromSPR destination-chain CNTS are not modelled
+missing: No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources and fromSPR destination-chain CNTS are not modelled (the SIF1 drain is, 0ad6e4b)
 blocker: Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models</title>
 <rect x="338.5" y="934.8" width="76.9" height="60.6" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
 <text x="342.5" y="949.8" fill="#f0f6fc" font-size="11">Stall control</text>

@@ -3726,19 +3726,25 @@
         {
          "id": "dma.c6",
          "name": "Ch 6 SIF1 (EE to IOP)",
-         "status": "HLE_OR_STUB",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "6 SIF1",
-         "implemented": "sceSifSetDma HLE copies descriptors",
-         "missing": "No DMAC channel model",
+         "implemented": "Register-level channel 6: normal and source-chain mode with TTE, stall-control drain (STD=3), stream split into IOP packets (16-byte IOP tag, address bits 0-23, end bits 31/30, word count & 0xFFFFC) written into IOP memory with a SIF transfer notification, CIS6; sceSifSetDma (HLE syscall) still copies descriptors directly",
+         "missing": "No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised",
          "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_runtime.cpp",
           "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
          ],
          "tests": [
-          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload"
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 without an IOP sink does not transfer or raise CIS6",
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::DMAC channel 6 (SIF1) programmed directly writes its IOP packet into IOP memory"
          ],
          "hw": [],
-         "blocker": "",
-         "target": "",
+         "blocker": "SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back)",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -3939,7 +3945,7 @@
          "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Stall control",
          "implemented": "fromSPR (STS=2) leaves its MADR in D_STADR after normal or interleave transfers; the VIF1 (STD=1) or GIF (STD=2) drain waits before a REFS tag or a normal-mode transfer that would read past D_STADR, stays active (STR, no CIS), raises SIS once per stall and resumes when D_STADR or D_CTRL changes",
-         "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources, the SIF1 drain and fromSPR destination-chain CNTS are not modelled",
+         "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources and fromSPR destination-chain CNTS are not modelled (the SIF1 drain is, 0ad6e4b)",
          "src": [
           "ps2xRuntime/src/lib/ps2_memory.cpp",
           "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
@@ -3949,7 +3955,8 @@
           "ps2xTest/src/ps2_memory_tests.cpp::stall control applies only to the STD drain's REFS tags, up to and including D_STADR",
           "ps2xTest/src/ps2_memory_tests.cpp::stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM",
           "ps2xTest/src/ps2_memory_tests.cpp::stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once",
-          "ps2xTest/src/ps2_memory_tests.cpp::stall control: changing D_CTRL.STD releases a waiting drain"
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: changing D_CTRL.STD releases a waiting drain",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)"
          ],
          "hw": [],
          "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",

@@ -103,8 +103,7 @@ namespace ps2x::iop::detail
         offset &= kRegisterBytes - 2u;
         if (offset >= kSharedBase)
         {
-            if (offset != kIrqInfo) // IRQINFO is status, cleared through ATTR
-                m_shared[(offset - kSharedBase) / 2u] = value;
+            m_shared[(offset - kSharedBase) / 2u] = value; // IRQINFO reads the interrupt status, not this value
             return;
         }
         const int c = offset >= kCoreStride ? 1 : 0;

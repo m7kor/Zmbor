@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "e2be153",
+    "commit": "46c4cf8",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
-    "ps2x_tests": "563/563",
+    "ps2x_tests": "567/567",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate4.manifest.json (local)",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate5.manifest.json (local)",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -112,20 +112,38 @@
       "limitations": [
         "cpu/iop/lsudelay does not return after -- TEST END (jal printf with lw ra in its delay slot); comparable output matches; post-END hardware behaviour unknown"
       ]
+    },
+    {
+      "id": 5,
+      "commits": [
+        "a1f2ddc",
+        "0ad6e4b",
+        "b9dc257",
+        "0254b68",
+        "46c4cf8"
+      ],
+      "components": {
+        "iop.irx": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (23 IOP programs)",
+        "iop.mem": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (lsu, lsudelay)",
+        "dma.c6": "HLE_OR_STUB -> IMPLEMENTED_UNVERIFIED (SIF1 channel model)"
+      },
+      "mutants": "SIF1 5/5 killed (F3 survived first, test strengthened in b9dc257)",
+      "sanitizers": "IOP suites and 16 kernel/iop programs under MSVC ASan: 0 reports",
+      "gate": "46c4cf8: 53/55, 8202/8250, 0 regressions; unit 567/567, ctest 54/54, e2e 4/4, IOP 4/4"
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
-    "VERIFIED_PARTIAL": 50,
-    "IMPLEMENTED_UNVERIFIED": 59,
-    "HLE_OR_STUB": 21,
+    "VERIFIED_PARTIAL": 52,
+    "IMPLEMENTED_UNVERIFIED": 58,
+    "HLE_OR_STUB": 20,
     "MISSING": 22,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
   },
   "hardware_blockers": [
     "no physical PS2, ps2link or ps2sdk toolchain in this environment: every hardware probe in PS2_HARDWARE_VERIFICATION.md is unrun",
-    "SIF0, SIF1 and fromIPU have no DMA channel model in PS2Memory (HLE only): stall-control sources/drain on them are blocked on those models"
+    "SIF0 (EE channel 5 / IOP channel 9) and fromIPU have no channel model; SIF1 is modelled at register level (0ad6e4b) but no hardware program drives it"
   ],
   "known_failures": [
     "cpu_ee_fpu_sqrt 59/66 (RSQRT.S)",
@@ -142,7 +160,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "SIF1/SIF0 DMAC channel models: EE channel 6 source chain feeding IOP-tagged packets into IOP memory through the same SIF transfer notifications as sceSifSetDma, with stall control STD=3; then EE channel 5 with IOP channel 9; then IPU, GS, SPU2 in dependency order",
+  "next_action": "SIF0: EE channel 5 destination chain fed by IOP channel 9 packets (IOP side in ps2xIOP sifman) with STS=1 stall source; then IPU (ipu.dma/ipu.cmd), GS (gs.aa), SPU2 (spu.*) in dependency order",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

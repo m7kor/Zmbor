@@ -8,15 +8,15 @@
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
 <text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 52</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 59</text>
-<rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
-<text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 20</text>
-<rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 21</text>
-<rect x="672.5400000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
-<text x="689.5400000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
-<rect x="793.2" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
-<text x="810.2" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 61</text>
+<rect x="469.71999999999997" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
+<text x="486.71999999999997" y="74" fill="#e6edf3" font-size="11">HLE / stub 20</text>
+<rect x="578.06" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
+<text x="595.06" y="74" fill="#e6edf3" font-size="11">missing 19</text>
+<rect x="669.02" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
+<text x="686.02" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
+<rect x="789.68" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
+<text x="806.68" y="74" fill="#e6edf3" font-size="11">unknown 1</text>
 <rect x="16" y="88" width="104.2" height="18" fill="#30363d"/>
 <text x="22" y="101" fill="#e6edf3" font-size="10">ps2autotests lines</text>
 <rect x="120.2" y="88" width="116.2" height="18" fill="#1f6feb"/>
@@ -818,12 +818,13 @@ missing: No hardware program checks GIF-channel DMA directly</title>
 <text x="206.3" y="856" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>dma.c3 — Ch 3 fromIPU
-status: MISSING
-missing: Channel not modelled (IPU is HLE)
-blocker: IPU hardware model (E)</title>
-<rect x="117.6" y="862" width="92.6" height="50.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="121.6" y="877" fill="#ffffff" font-size="11">Ch 3 fromIPU</text>
-<text x="206.3" y="908.8" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: fromIPU normal mode: IPU output FIFO qwords to MADR as they are produced, STR held while waiting, CIS3 at QWC = 0
+missing: Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source
+blocker: IPU probe on a physical PS2</title>
+<rect x="117.6" y="862" width="92.6" height="50.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="121.6" y="877" fill="#f0f6fc" font-size="11">Ch 3 fromIPU</text>
+<text x="206.3" y="908.8" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>dma.c4 — Ch 4 toIPU
 status: IMPLEMENTED_UNVERIFIED
@@ -1074,17 +1075,18 @@ status: IMPLEMENTED_UNVERIFIED</title>
 <rect x="639.2" y="970.2" width="340.8" height="59.5" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="644.2" y="980.2" fill="#8b949e" font-size="10" font-weight="500">IPU  (3 · 0 ok · 0 part)</text>
 <g><title>ipu.dma — IPU0/IPU1 FIFOs and DMA
-status: MISSING
-implemented: Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO (6ecc5f3)
-missing: Output FIFO data path and fromIPU (channel 3) are not modelled</title>
-<rect x="642.2" y="987.2" width="110.3" height="39.5" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="646.2" y="1002.2" fill="#ffffff" font-size="11">IPU0/IPU1 FIFOs</text>
-<text x="646.2" y="1015.2" fill="#ffffff" font-size="11">and DMA</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO; output FIFO (8 qwords) refilled from the converted macroblock, drained by fromIPU and IPU_out_FIFO; both channels in normal mode with flow control
+missing: Chain modes of channels 3/4; no hardware program; transfer timing
+blocker: IPU probe on a physical PS2</title>
+<rect x="642.2" y="987.2" width="110.3" height="39.5" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="646.2" y="1002.2" fill="#f0f6fc" font-size="11">IPU0/IPU1 FIFOs</text>
+<text x="646.2" y="1015.2" fill="#f0f6fc" font-size="11">and DMA</text>
 </g>
 <g><title>ipu.cmd — IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)
 status: MISSING
-implemented: IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3); sceIpu* HLE still returns without decoding
-missing: IDEC, BDEC, VDEC, CSC and PACK are not implemented (they complete without output and are reported as unimplemented)</title>
+implemented: IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1); sceIpu* HLE still returns without decoding
+missing: IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)</title>
 <rect x="754.4" y="987.2" width="110.3" height="39.5" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
 <text x="758.4" y="1002.2" fill="#ffffff" font-size="11">IPU commands</text>
 <text x="860.7" y="1022.7" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>

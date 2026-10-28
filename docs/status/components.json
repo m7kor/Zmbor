@@ -3680,15 +3680,21 @@
         {
          "id": "dma.c3",
          "name": "Ch 3 fromIPU",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "3 fromIPU",
-         "implemented": "",
-         "missing": "Channel not modelled (IPU is HLE)",
-         "src": [],
-         "tests": [],
+         "implemented": "fromIPU normal mode: IPU output FIFO qwords to MADR as they are produced, STR held while waiting, CIS3 at QWC = 0",
+         "missing": "Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_ipu.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample"
+         ],
          "hw": [],
-         "blocker": "IPU hardware model (E)",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -4326,15 +4332,22 @@
         {
          "id": "ipu.dma",
          "name": "IPU0/IPU1 FIFOs and DMA",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "IPU FIFOs/DMA",
-         "implemented": "Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO (6ecc5f3)",
-         "missing": "Output FIFO data path and fromIPU (channel 3) are not modelled",
-         "src": [],
-         "tests": [],
+         "implemented": "Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO; output FIFO (8 qwords) refilled from the converted macroblock, drained by fromIPU and IPU_out_FIFO; both channels in normal mode with flow control",
+         "missing": "Chain modes of channels 3/4; no hardware program; transfer timing",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_ipu.cpp",
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU toIPU stays active while the input FIFO is full and completes when a command frees it",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -4342,15 +4355,17 @@
          "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
          "status": "MISSING",
          "short": "IPU commands",
-         "implemented": "IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3); sceIpu* HLE still returns without decoding",
-         "missing": "IDEC, BDEC, VDEC, CSC and PACK are not implemented (they complete without output and are reported as unimplemented)",
+         "implemented": "IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3) and CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1); sceIpu* HLE still returns without decoding",
+         "missing": "IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)",
          "src": [
           "ps2xRuntime/src/lib/ps2_ipu.cpp",
           "ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_memory_tests.cpp::IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP",
-          "ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4"
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample"
          ],
          "hw": [],
          "blocker": "",

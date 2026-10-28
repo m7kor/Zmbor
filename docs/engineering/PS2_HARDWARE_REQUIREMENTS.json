@@ -289,15 +289,16 @@
     "dma.normal"
    ],
    "acceptance": [
-    "Unit: none (channel not modelled)",
-    "Hardware: IPU decode probe reading the output buffer and channel registers"
+    "Unit: fromIPU draining CSC output with flow control, CIS3; 6/6 CSC mutants killed",
+    "Hardware: none yet",
+    "Hardware still needed: IPU probe reading converted macroblocks through fromIPU"
    ],
    "references": [
     "ps2tek: EE DMAC (channel registers, D_CTRL, D_STAT, D_PCR, D_SQWC, D_ENABLER/W)",
     "PCSX2 f0523f8: Dmac.h (tDMA_CHCR, tDMAC_*), Dmac.cpp, HwRead.cpp/HwWrite.cpp",
     "DobieStation 68dd073: dmac.cpp (channel state machine, read32/write32)"
    ],
-   "known_divergences": "channel missing: IPU is HLE at library level"
+   "known_divergences": "normal mode only; synchronous; empty IPU_out_FIFO reads zero (unknown on hardware)"
   },
   "dma.c4": {
    "block": "EE DMAC channel 4 (toIPU)",
@@ -1233,10 +1234,11 @@
     "dma.c4"
    ],
    "acceptance": [
-    "Unit: FIFO levels, DMA in/out ordering",
-    "Hardware: IPU probe decoding a known stream through DMA"
+    "Unit: toIPU/fromIPU flow control on both 8-qword FIFOs; CSC through both channels",
+    "Hardware: none yet",
+    "Hardware still needed: IPU probe with DMA in both directions"
    ],
-   "known_divergences": "not modelled"
+   "known_divergences": "normal mode only; synchronous"
   },
   "ipu.cmd": {
    "reset_state": "IPU_CTRL.RST clears the FIFOs and state",
@@ -1278,7 +1280,7 @@
     "Unit: each command against independently computed outputs",
     "Hardware: IPU probe running each command on fixed bitstreams"
    ],
-   "known_divergences": "BCLR/FDEC/SETIQ/SETVQ/SETTH implemented; IDEC/BDEC/VDEC/CSC/PACK not implemented (reported, no output)"
+   "known_divergences": "BCLR/FDEC/SETIQ/SETVQ/SETTH/CSC implemented (CSC per D-IPU-1); IDEC/BDEC/VDEC/PACK not implemented"
   },
   "ipu.mpeg": {
    "reset_state": "IPU_CTRL.RST clears the FIFOs and state",

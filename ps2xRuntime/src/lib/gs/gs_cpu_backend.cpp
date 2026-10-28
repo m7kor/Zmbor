@@ -14,6 +14,8 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 using namespace GSInternal;
 
@@ -857,7 +859,8 @@ void GSCpuBackend::DrawPrimitive(const GSPrimitiveBatch &batch)
     }
 }
 
-void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t fog)
+void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t fog,
+                              int coverage, bool edge)
 {
     const auto &ctx = state.context;
     if (x < ctx.scissor.x0 || x > ctx.scissor.x1 || y < ctx.scissor.y0 || y > ctx.scissor.y1)
@@ -876,6 +879,12 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
         b = applyFog(b, state.fogB);
     }
 
+    // PRIM.AA1 (decision D-GS-1): the coverage replaces the source alpha (with ABE set, only an alpha of 0x80) ahead
+    // of the alpha test, and blending runs with the ALPHA register whether or not ABE is set.
+    const bool coverageAlpha = coverage >= 0;
+    if (coverageAlpha && (!state.prim.abe || a == 0x80u))
+        a = static_cast<uint8_t>(std::min(coverage, 0x80));
+
     const u32 fbp = GSInternal::framePageBaseToBlock(ctx.frame.fbp);
     const u32 fbw = std::max<u32>(ctx.frame.fbw, 1u);
     const u32 fpsm = ctx.frame.psm;
@@ -889,7 +898,7 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
     }
 
     const uint32_t ztestMethod = static_cast<uint32_t>((ctx.test >> 17) & 3u);
-    const bool alphaBlendEnabled = state.prim.abe;
+    const bool alphaBlendEnabled = state.prim.abe || coverageAlpha;
     const bool preserveDestinationAlpha = writeMask.writeRgb && !writeMask.writeAlpha && fpsm == GS_PSM_CT32;
     const bool destinationAlphaTestNeedsRead = ((ctx.test >> 14) & 0x1u) != 0u && (fpsm == GS_PSM_CT32 || fpsm == GS_PSM_CT16 || fpsm == GS_PSM_CT16S);
 
@@ -954,7 +963,7 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
         int cg = g;
         int cb = b;
 
-        if (state.prim.abe)
+        if (alphaBlendEnabled)
         {
             uint8_t dr = fbrgba & 0xFF;
             uint8_t dg = (fbrgba >> 8) & 0xFF;
@@ -1035,7 +1044,7 @@ void GSCpuBackend::WritePixel(const GSDrawState &state, int x, int y, int z, uin
         WriteVramUnlocked(fpsm, fbp, fbw, x, y, pixel);
     }
 
-    if (writeMask.writeDepth && !ctx.zbuf.zmask)
+    if (writeMask.writeDepth && !ctx.zbuf.zmask && !edge)
     {
         WriteVramUnlocked(zpsm, zbp, fbw, x, y, z);
     }
@@ -1340,84 +1349,214 @@ void GSCpuBackend::DrawTriangle(const GSPrimitiveBatch &batch)
     const float invAbsDenom = 1.0f / std::fabs(denom);
     constexpr float kEdgeEpsilon = 1.0e-4f;
 
-    for (int y = minY; y <= maxY; ++y)
+    const auto weights = [&](int x, int y, float &w0, float &w1, float &w2)
     {
-        float py = static_cast<float>(y) + 0.5f;
-        for (int x = minX; x <= maxX; ++x)
+        const float px = static_cast<float>(x) + 0.5f;
+        const float py = static_cast<float>(y) + 0.5f;
+        w0 = (((fy1 - fy2) * (px - fx2) + (fx2 - fx1) * (py - fy2)) * winding) * invAbsDenom;
+        w1 = (((fy2 - fy0) * (px - fx2) + (fx0 - fx2) * (py - fy2)) * winding) * invAbsDenom;
+        w2 = 1.0f - w0 - w1;
+        return !(w0 < -kEdgeEpsilon || w1 < -kEdgeEpsilon || w2 < -kEdgeEpsilon);
+    };
+    const bool antialias = state.prim.aa1;
+
+    const auto shade = [&](int x, int y, float w0, float w1, float w2, int coverage, bool edge)
+    {
+        double z = v0.z * w0 + v1.z * w1 + v2.z * w2;
+
+        uint8_t r, g, b, a;
+        if (state.prim.iip)
         {
-            float px = static_cast<float>(x) + 0.5f;
+            r = clampU8(static_cast<int>(v0.r * w0 + v1.r * w1 + v2.r * w2));
+            g = clampU8(static_cast<int>(v0.g * w0 + v1.g * w1 + v2.g * w2));
+            b = clampU8(static_cast<int>(v0.b * w0 + v1.b * w1 + v2.b * w2));
+            a = clampU8(static_cast<int>(v0.a * w0 + v1.a * w1 + v2.a * w2));
+        }
+        else
+        {
+            r = v2.r;
+            g = v2.g;
+            b = v2.b;
+            a = v2.a;
+        }
 
-            float w0 = (((fy1 - fy2) * (px - fx2) + (fx2 - fx1) * (py - fy2)) * winding) * invAbsDenom;
-            float w1 = (((fy2 - fy0) * (px - fx2) + (fx0 - fx2) * (py - fy2)) * winding) * invAbsDenom;
-            float w2 = 1.0f - w0 - w1;
-
-            if (w0 < -kEdgeEpsilon || w1 < -kEdgeEpsilon || w2 < -kEdgeEpsilon)
-                continue;
-
-            double z = v0.z * w0 + v1.z * w1 + v2.z * w2;
-
-            uint8_t r, g, b, a;
-            if (state.prim.iip)
+        if (state.prim.tme)
+        {
+            float is, it, iq;
+            uint16_t iu, iv;
+            if (state.prim.fst)
             {
-                r = clampU8(static_cast<int>(v0.r * w0 + v1.r * w1 + v2.r * w2));
-                g = clampU8(static_cast<int>(v0.g * w0 + v1.g * w1 + v2.g * w2));
-                b = clampU8(static_cast<int>(v0.b * w0 + v1.b * w1 + v2.b * w2));
-                a = clampU8(static_cast<int>(v0.a * w0 + v1.a * w1 + v2.a * w2));
+                iu = static_cast<uint16_t>(v0.u * w0 + v1.u * w1 + v2.u * w2);
+                iv = static_cast<uint16_t>(v0.v * w0 + v1.v * w1 + v2.v * w2);
+                is = 0.0f;
+                it = 0.0f;
+                iq = 1.0f;
             }
             else
             {
-                r = v2.r;
-                g = v2.g;
-                b = v2.b;
-                a = v2.a;
+                // The GS DDA interpolates the homogeneous S, T and Q
+                // values. Texel coordinates are calculated from S/Q and
+                // T/Q only after interpolation.
+                is = v0.s * w0 + v1.s * w1 + v2.s * w2;
+                it = v0.t * w0 + v1.t * w1 + v2.t * w2;
+                iq = v0.q * w0 + v1.q * w1 + v2.q * w2;
+                iu = 0;
+                iv = 0;
             }
 
-            if (state.prim.tme)
+            uint32_t texel = SampleTexture(state, is, it, iq, iu, iv);
+
+            uint8_t tr = static_cast<uint8_t>(texel & 0xFF);
+            uint8_t tg = static_cast<uint8_t>((texel >> 8) & 0xFF);
+            uint8_t tb = static_cast<uint8_t>((texel >> 16) & 0xFF);
+            uint8_t ta = static_cast<uint8_t>((texel >> 24) & 0xFF);
+
+            const auto &tex = ctx.tex0;
+            const uint8_t shadeR = r;
+            const uint8_t shadeG = g;
+            const uint8_t shadeB = b;
+            const uint8_t shadeA = a;
+            const TextureCombineResult color = combineTexture(tex, shadeR, shadeG, shadeB, shadeA, tr, tg, tb, ta);
+
+            r = color.r;
+            g = color.g;
+            b = color.b;
+            a = color.a;
+        }
+
+        const uint8_t fog = clampU8(static_cast<int>(v0.fog * w0 + v1.fog * w1 + v2.fog * w2));
+        WritePixel(state, x, y, static_cast<u32>(z + 0.5), r, g, b, a, fog, coverage, edge);
+    };
+
+    for (int y = minY; y <= maxY; ++y)
+    {
+        for (int x = minX; x <= maxX; ++x)
+        {
+            float w0, w1, w2;
+            if (weights(x, y, w0, w1, w2))
+                shade(x, y, w0, w1, w2, antialias ? 0x80 : -1, false);
+        }
+    }
+
+    if (!antialias)
+        return;
+
+    // AA1 fringe (decision D-GS-1): a pixel whose centre the triangle does not cover is drawn once more as an edge
+    // pixel when the triangle covers part of its square. The coverage is that area exactly (the pixel square clipped
+    // by the three edges) in 1/128 units, and the attributes are those of the nearest point of the triangle
+    // (barycentric weights clamped to the triangle and renormalised).
+    const float area2 = (fx1 - fx0) * (fy2 - fy0) - (fy1 - fy0) * (fx2 - fx0);
+    const float orient = area2 < 0.0f ? -1.0f : 1.0f;
+    const float ex[3] = {fx0, fx1, fx2};
+    const float ey[3] = {fy0, fy1, fy2};
+    const auto coveredArea = [&](int x, int y)
+    {
+        std::vector<std::pair<float, float>> poly = {{static_cast<float>(x), static_cast<float>(y)},
+                                                     {static_cast<float>(x + 1), static_cast<float>(y)},
+                                                     {static_cast<float>(x + 1), static_cast<float>(y + 1)},
+                                                     {static_cast<float>(x), static_cast<float>(y + 1)}};
+        for (int e = 0; e < 3 && !poly.empty(); ++e)
+        {
+            const float ax = ex[e], ay = ey[e], bx = ex[(e + 1) % 3], by = ey[(e + 1) % 3];
+            const auto side = [&](const std::pair<float, float> &q)
+            { return ((bx - ax) * (q.second - ay) - (by - ay) * (q.first - ax)) * orient; };
+            std::vector<std::pair<float, float>> clipped;
+            for (size_t i = 0; i < poly.size(); ++i)
             {
-                float is, it, iq;
-                uint16_t iu, iv;
-                if (state.prim.fst)
+                const auto &p0 = poly[i];
+                const auto &p1 = poly[(i + 1) % poly.size()];
+                const float s0 = side(p0), s1 = side(p1);
+                if (s0 >= 0.0f)
+                    clipped.push_back(p0);
+                if ((s0 >= 0.0f) != (s1 >= 0.0f))
                 {
-                    iu = static_cast<uint16_t>(v0.u * w0 + v1.u * w1 + v2.u * w2);
-                    iv = static_cast<uint16_t>(v0.v * w0 + v1.v * w1 + v2.v * w2);
-                    is = 0.0f;
-                    it = 0.0f;
-                    iq = 1.0f;
+                    const float t = s0 / (s0 - s1);
+                    clipped.push_back({p0.first + (p1.first - p0.first) * t, p0.second + (p1.second - p0.second) * t});
                 }
-                else
-                {
-                    // The GS DDA interpolates the homogeneous S, T and Q
-                    // values. Texel coordinates are calculated from S/Q and
-                    // T/Q only after interpolation.
-                    is = v0.s * w0 + v1.s * w1 + v2.s * w2;
-                    it = v0.t * w0 + v1.t * w1 + v2.t * w2;
-                    iq = v0.q * w0 + v1.q * w1 + v2.q * w2;
-                    iu = 0;
-                    iv = 0;
-                }
-
-                uint32_t texel = SampleTexture(state, is, it, iq, iu, iv);
-
-                uint8_t tr = static_cast<uint8_t>(texel & 0xFF);
-                uint8_t tg = static_cast<uint8_t>((texel >> 8) & 0xFF);
-                uint8_t tb = static_cast<uint8_t>((texel >> 16) & 0xFF);
-                uint8_t ta = static_cast<uint8_t>((texel >> 24) & 0xFF);
-
-                const auto &tex = ctx.tex0;
-                const uint8_t shadeR = r;
-                const uint8_t shadeG = g;
-                const uint8_t shadeB = b;
-                const uint8_t shadeA = a;
-                const TextureCombineResult color = combineTexture(tex, shadeR, shadeG, shadeB, shadeA, tr, tg, tb, ta);
-
-                r = color.r;
-                g = color.g;
-                b = color.b;
-                a = color.a;
             }
+            poly.swap(clipped);
+        }
+        float twice = 0.0f;
+        for (size_t i = 0; i < poly.size(); ++i)
+        {
+            const auto &p0 = poly[i];
+            const auto &p1 = poly[(i + 1) % poly.size()];
+            twice += p0.first * p1.second - p1.first * p0.second;
+        }
+        return std::fabs(twice) * 0.5f;
+    };
+    const int fringeX0 = clampInt(minX - 1, ctx.scissor.x0, ctx.scissor.x1);
+    const int fringeX1 = clampInt(maxX + 1, ctx.scissor.x0, ctx.scissor.x1);
+    const int fringeY0 = clampInt(minY - 1, ctx.scissor.y0, ctx.scissor.y1);
+    const int fringeY1 = clampInt(maxY + 1, ctx.scissor.y0, ctx.scissor.y1);
+    for (int y = fringeY0; y <= fringeY1; ++y)
+    {
+        for (int x = fringeX0; x <= fringeX1; ++x)
+        {
+            float w0, w1, w2;
+            if (weights(x, y, w0, w1, w2))
+                continue;
+            const int coverage = static_cast<int>(std::lround(coveredArea(x, y) * 128.0f));
+            if (coverage <= 0)
+                continue;
+            w0 = std::max(w0, 0.0f);
+            w1 = std::max(w1, 0.0f);
+            w2 = std::max(w2, 0.0f);
+            const float sum = w0 + w1 + w2;
+            shade(x, y, w0 / sum, w1 / sum, w2 / sum, coverage, true);
+        }
+    }
+}
 
-            const uint8_t fog = clampU8(static_cast<int>(v0.fog * w0 + v1.fog * w1 + v2.fog * w2));
-            WritePixel(state, x, y, static_cast<u32>(z + 0.5), r, g, b, a, fog);
+// PRIM.AA1 line (decision D-GS-1): along the major axis, each pixel column (or row) whose centre lies in
+// [start, end) is drawn as two edge pixels straddling the line, weighted by their distance from it
+// (1 - f and f, in 1/128 units).
+void GSCpuBackend::DrawAntialiasedLine(const GSPrimitiveBatch &batch)
+{
+    const GSDrawState &state = batch.state;
+    const auto &ctx = state.context;
+    const float ofx = static_cast<float>(ctx.xyoffset.ofx >> 4);
+    const float ofy = static_cast<float>(ctx.xyoffset.ofy >> 4);
+    const GSVertex *from = &batch.vertices[0];
+    const GSVertex *to = &batch.vertices[1];
+    const bool steep = std::fabs(to->y - from->y) > std::fabs(to->x - from->x);
+    const auto major = [&](const GSVertex *v) { return steep ? v->y - ofy : v->x - ofx; };
+    const auto minor = [&](const GSVertex *v) { return steep ? v->x - ofx : v->y - ofy; };
+    if (major(from) > major(to))
+        std::swap(from, to);
+    const float a0 = major(from), a1 = major(to);
+    const float b0 = minor(from), b1 = minor(to);
+    const float length = a1 - a0;
+    if (length <= 0.0f)
+        return;
+    const GSVertex &flat = batch.vertices[1];
+    for (int i = static_cast<int>(std::floor(a0)); static_cast<float>(i) + 0.5f < a1; ++i)
+    {
+        const float centre = static_cast<float>(i) + 0.5f;
+        if (centre < a0)
+            continue;
+        const float t = (centre - a0) / length;
+        const float m = b0 + (b1 - b0) * t - 0.5f;
+        const int base = static_cast<int>(std::floor(m));
+        const float f = m - static_cast<float>(base);
+        uint8_t r = flat.r, g = flat.g, b = flat.b, a = flat.a;
+        if (state.prim.iip)
+        {
+            r = clampU8(static_cast<int>(from->r + (to->r - from->r) * t));
+            g = clampU8(static_cast<int>(from->g + (to->g - from->g) * t));
+            b = clampU8(static_cast<int>(from->b + (to->b - from->b) * t));
+            a = clampU8(static_cast<int>(from->a + (to->a - from->a) * t));
+        }
+        const double z = from->z + (to->z - from->z) * t;
+        const uint8_t fog = clampU8(static_cast<int>(from->fog + (to->fog - from->fog) * t));
+        const int coverages[2] = {static_cast<int>(std::lround((1.0f - f) * 128.0f)), static_cast<int>(std::lround(f * 128.0f))};
+        for (int k = 0; k < 2; ++k)
+        {
+            if (coverages[k] <= 0)
+                continue;
+            const int px = steep ? base + k : i;
+            const int py = steep ? i : base + k;
+            WritePixel(state, px, py, static_cast<u32>(z), r, g, b, a, fog, coverages[k], true);
         }
     }
 }
@@ -1425,6 +1564,11 @@ void GSCpuBackend::DrawTriangle(const GSPrimitiveBatch &batch)
 void GSCpuBackend::DrawLine(const GSPrimitiveBatch &batch)
 {
     const GSDrawState &state = batch.state;
+    if (state.prim.aa1)
+    {
+        DrawAntialiasedLine(batch);
+        return;
+    }
     const GSVertex &v0 = batch.vertices[0];
     const GSVertex &v1 = batch.vertices[1];
     const auto &ctx = state.context;

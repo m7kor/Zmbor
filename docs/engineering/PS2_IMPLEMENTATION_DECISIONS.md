@@ -140,3 +140,26 @@ one stay unverified until the stated measurement exists.
   - The hardware's pacing between the macroblocks of one command is unknown.
 - **Settles it:** an IDEC probe on a physical PS2. Feed slices that end in garbage, in a start code at an odd bit
   position, and after macroblock_escape. Record CTRL.SCD/ECD, IPU_CMD, IPU_TOP and BP after each.
+
+## D-GS-1 — GS PRIM.AA1 antialiasing
+
+- **Chosen:** AA1 applies to lines and triangles.
+  - **Alpha:** the pixel's coverage, in 1/128 units, replaces the source alpha before the alpha test. With ABE set, it
+    replaces only a source alpha of 0x80.
+  - **Blending:** the ALPHA register formula is applied whether or not ABE is set.
+  - **Edge pixels** do not write Z.
+  - **Lines:** every line pixel is an edge pixel. Along the major axis, each column (or row) whose centre lies in
+    [start, end) is drawn as the two pixels that straddle the line, with weights 1 - f and f by distance.
+  - **Triangles:** interior pixels (centre covered) are drawn as before, at alpha 0x80. Each pixel whose centre is not
+    covered but whose square the triangle partly covers is drawn once as an edge pixel. Its coverage is that area,
+    computed exactly by clipping the square against the three edges. Its attributes are those of the nearest point of
+    the triangle.
+- **For:** PCSX2's software renderer is the only reference that models AA1, and it has the same alpha, blending and
+  Z-write rules, also for edge pixels only.
+- **Against:**
+  - The fringe pixels and their coverage values are this model's own definition. PCSX2 steps each edge, selects the
+    pixels with an edge-function walk, and says it picks its x bounds arbitrarily where hardware results are unclear.
+  - DobieStation and Play! ignore AA1.
+  - No GS manual text was available here.
+- **Settles it:** a GS probe that draws AA1 lines at known sub-pixel offsets and AA1 triangles with known edge slopes,
+  then reads the framebuffer and Z buffer back.

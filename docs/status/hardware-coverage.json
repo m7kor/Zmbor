@@ -22,7 +22,7 @@
   "test_executed": 119,
   "test_passed": 119,
   "vectors_passed": 4,
-  "hardware_verified": 62,
+  "hardware_verified": 64,
   "timing_verified": 0
  },
  "by_category": {
@@ -83,7 +83,7 @@
    "test_executed": 7,
    "test_passed": 7,
    "vectors_passed": 0,
-   "hardware_verified": 7,
+   "hardware_verified": 9,
    "timing_verified": 0
   },
   "G": {
@@ -4210,16 +4210,14 @@
     "cited": 7,
     "matching": 7
    },
-   "unverified_dependencies": [
-    "iop.mem"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "iop.mem",
    "name": "IOP memory map (2 MB, hardware ranges)",
    "category": "F",
-   "status": "IMPLEMENTED_UNVERIFIED",
-   "missing": "",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program",
    "blocker": "",
    "target": "",
    "levels": {
@@ -4228,7 +4226,7 @@
     "test_executed": true,
     "test_passed": true,
     "vectors_passed": false,
-    "hardware_verified": false,
+    "hardware_verified": true,
     "timing_verified": false
    },
    "dependencies": [],
@@ -4238,8 +4236,8 @@
     "passed": 1
    },
    "hardware_programs": {
-    "cited": 0,
-    "matching": 0
+    "cited": 2,
+    "matching": 2
    },
    "unverified_dependencies": []
   },
@@ -4343,8 +4341,8 @@
    "id": "iop.irx",
    "name": "IRX loading, relocation, versioned imports",
    "category": "F",
-   "status": "IMPLEMENTED_UNVERIFIED",
-   "missing": "",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program",
    "blocker": "",
    "target": "",
    "levels": {
@@ -4353,7 +4351,7 @@
     "test_executed": false,
     "test_passed": false,
     "vectors_passed": false,
-    "hardware_verified": false,
+    "hardware_verified": true,
     "timing_verified": false
    },
    "dependencies": [
@@ -4366,12 +4364,10 @@
     "passed": 0
    },
    "hardware_programs": {
-    "cited": 0,
-    "matching": 0
+    "cited": 23,
+    "matching": 23
    },
-   "unverified_dependencies": [
-    "iop.mem"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "iop.sched",
@@ -4758,9 +4754,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.mem"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "spu.ram",
@@ -5204,9 +5198,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.mem"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "per.pad",
@@ -5404,9 +5396,7 @@
     "cited": 0,
     "matching": 0
    },
-   "unverified_dependencies": [
-    "iop.mem"
-   ]
+   "unverified_dependencies": []
   },
   {
    "id": "per.dev9",

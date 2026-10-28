@@ -2314,8 +2314,9 @@
    "timing": "unknown",
    "dependencies": [],
    "acceptance": [
-    "Unit: map dispatch",
-    "Hardware: IOP memory probe"
+    "Unit: IOP heap DMA backing (ps2_sif_dma_tests)",
+    "Hardware: ps2autotests cpu/iop lsu and lsudelay (exact on ps2xIOP)",
+    "Hardware still needed: an IOP memory-map probe for hardware register ranges, mirrors and kseg aliases"
    ],
    "references": [
     "ps2tek: IOP",
@@ -2439,8 +2440,9 @@
     "iop.kernel"
    ],
    "acceptance": [
-    "Unit: relocation and imports",
-    "Hardware: load open-licensed IRX modules and run them"
+    "Unit: relocation of IRXs with and without section-symbol relocations (iop_emulator_tests); versioned imports (iop_import_version_tests)",
+    "Hardware: all 23 ps2autotests IOP programs load, link and match real-PS2 output (tools/hwtest/iop_hwtest.py)",
+    "Hardware still needed: Sony ROM modules and resident-library exports between real modules; module stop"
    ],
    "references": [
     "ps2tek: IOP",

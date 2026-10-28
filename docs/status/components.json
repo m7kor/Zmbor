@@ -4402,20 +4402,23 @@
         {
          "id": "iop.mem",
          "name": "IOP memory map (2 MB, hardware ranges)",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP memory",
-         "implemented": "",
-         "missing": "",
+         "implemented": "2 MB IOP RAM with byte/half/word loads and stores and load delays; the ps2autotests cpu/iop lsu and lsudelay programs match their real-PS2 output exactly",
+         "missing": "Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/core/iop_memory.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_sif_dma_tests.cpp::IOP heap DMA uses private backing instead of aliasing EE RDRAM"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.intr",
@@ -4491,10 +4494,10 @@
         {
          "id": "iop.irx",
          "name": "IRX loading, relocation, versioned imports",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "IRX loading",
-         "implemented": "",
-         "missing": "",
+         "implemented": "IRX (ELF type 0xFF80) loading, relocation by load base (HI16/LO16/26/32 against section symbols), import resolution by library and version; all 23 ps2autotests IOP programs load, link and match their real-PS2 output exactly",
+         "missing": "Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/services/iop_module_loader.cpp",
           "ps2xIOP/src/emulator/imports/iop_imports.cpp"
@@ -4502,10 +4505,34 @@
          "tests": [
           "ps2xIOP/tests/iop_import_version_tests.cpp::Physical IRX consumer links correct version end to end"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_alu",
+          "cpu_iop_branch",
+          "cpu_iop_branchdelay",
+          "cpu_iop_hilodelay",
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay",
+          "cpu_iop_muldiv",
+          "kernel_iop_eventflag_delete",
+          "kernel_iop_eventflag_poll",
+          "kernel_iop_interrupt_register",
+          "kernel_iop_interrupt_release",
+          "kernel_iop_libc_sprintf",
+          "kernel_iop_libc_strtok",
+          "kernel_iop_messagebox_poll",
+          "kernel_iop_messagebox_receive",
+          "kernel_iop_messagebox_send",
+          "kernel_iop_thread_cancelwakeup",
+          "kernel_iop_thread_create",
+          "kernel_iop_thread_delete",
+          "kernel_iop_thread_releasewait",
+          "kernel_iop_thread_stat",
+          "kernel_iop_vpool_create",
+          "kernel_iop_vpool_pallocate"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.sched",

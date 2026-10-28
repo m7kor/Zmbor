@@ -140,12 +140,12 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `iop.cpu` R3000A instruction execution | `VERIFIED_PARTIAL` | Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program | — | 8 | `iop.mem` | contract_specified, test_exists, hardware_verified |
-| `iop.mem` IOP memory map (2 MB, hardware ranges) | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
+| `iop.cpu` R3000A instruction execution | `VERIFIED_PARTIAL` | Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program | — | 8 | — | contract_specified, test_exists, hardware_verified |
+| `iop.mem` IOP memory map (2 MB, hardware ranges) | `VERIFIED_PARTIAL` | Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `iop.intr` Interrupts (intrman) | `VERIFIED_PARTIAL` | HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled | — | — | — | contract_specified, test_exists, hardware_verified |
 | `iop.kernel` Threads, semaphores, events (thbase, ...) | `VERIFIED_PARTIAL` | HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate | — | — | `iop.timers` | contract_specified, test_exists, hardware_verified |
 | `iop.timers` Timers (timrman) | `HLE_OR_STUB` | — | — | — | — | contract_specified, test_exists |
-| `iop.irx` IRX loading, relocation, versioned imports | `IMPLEMENTED_UNVERIFIED` | — | — | — | `iop.mem` | contract_specified, test_exists |
+| `iop.irx` IRX loading, relocation, versioned imports | `VERIFIED_PARTIAL` | Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program | — | — | — | contract_specified, test_exists, hardware_verified |
 | `iop.sched` IOP scheduling against the EE | `IMPLEMENTED_UNVERIFIED` | No ordering tests between IOP and EE progress (roadmap item 4) | — | 8 | — | contract_specified |
 | `sif.cmd` SIFCMD | `VERIFIED_PARTIAL` | Hardware evidence is indirect: every program's printf travels this path | — | — | `sif.dma` | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `sif.rpc` SIFRPC | `VERIFIED_PARTIAL` | Hardware evidence is indirect (tty output path) | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
@@ -162,7 +162,7 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `spu.cores` SPU2 cores and registers | `MISSING` | Register range mapped on the IOP side, no register model | — | 8 | `iop.mem` | contract_specified |
+| `spu.cores` SPU2 cores and registers | `MISSING` | Register range mapped on the IOP side, no register model | — | 8 | — | contract_specified |
 | `spu.ram` Sound RAM (2 MB) | `MISSING` | No sound RAM model | — | 8 | `spu.cores` | contract_specified |
 | `spu.voices` Voice engine (48 voices) | `MISSING` | No voice engine; libsd calls play decoded clips | — | 8 | `spu.ram`, `spu.adpcm`, `spu.adsr`, `spu.pitch` | contract_specified |
 | `spu.adsr` ADSR envelopes | `MISSING` | No envelope generator | — | 8 | `spu.cores` | contract_specified |
@@ -180,13 +180,13 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `per.sio2` SIO2 controller hardware | `MISSING` | Pads and cards are served at library level | — | unscheduled | `iop.mem` | contract_specified |
+| `per.sio2` SIO2 controller hardware | `MISSING` | Pads and cards are served at library level | — | unscheduled | — | contract_specified |
 | `per.pad` Digital/analog pads (libpad HLE) | `HLE_OR_STUB` | — | — | — | `per.sio2` | contract_specified, test_exists, test_executed, test_passed |
 | `per.ds2` DualShock 2 pressure and actuators | `HLE_OR_STUB` | Actuator (vibration) output not tested | — | — | `per.pad` | contract_specified, test_exists, test_executed, test_passed |
 | `per.mc` Memory cards (libmc HLE on host files) | `HLE_OR_STUB` | — | — | — | `per.sio2` | contract_specified, test_exists, test_executed, test_passed |
 | `per.save` Save/load persistence across runs | `HLE_OR_STUB` | No restart-and-read-back test | — | — | `per.mc` | contract_specified, test_exists, test_executed, test_passed |
 | `per.cdvd` CD/DVD reads (host files, disc image) | `HLE_OR_STUB` | — | — | — | `svc.cdvdman` | contract_specified, test_exists, test_executed, test_passed |
-| `per.usb` USB (usbd) | `MISSING` | No USB device emulation | — | unscheduled | `iop.mem` | contract_specified |
+| `per.usb` USB (usbd) | `MISSING` | No USB device emulation | — | unscheduled | — | contract_specified |
 | `per.dev9` DEV9 expansion bay | `MISSING` | No DEV9 emulation | — | unscheduled | — | contract_specified |
 | `per.hdd` HDD (ATA, APA/PFS) | `MISSING` | Not implemented | — | unscheduled | `per.dev9` | contract_specified |
 | `per.netif` Network (SMAP, ps2ip) | `MISSING` | No network adapter emulation | — | unscheduled | `per.dev9` | contract_specified |

@@ -6,9 +6,9 @@
 <rect x="16" y="64" width="12" height="12" rx="2" fill="#2ea043" stroke="#30363d"/>
 <text x="33" y="74" fill="#e6edf3" font-size="11">verified complete 18</text>
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
-<text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 50</text>
+<text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 52</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 59</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 57</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
 <text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 21</text>
 <rect x="578.0600000000001" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
@@ -1094,9 +1094,9 @@ implemented: sceMpeg* replaced; optional FFmpeg decode (PS2X_ENABLE_FFMPEG)</tit
 <text x="870.7" y="1015.2" fill="#ffffff" font-size="11">(libmpeg HLE)</text>
 </g>
 <rect x="17" y="1034.7" width="604.5" height="196.7" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-<text x="22" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">F · IOP AND SYSTEM SERVICES  (17 · 0 ok · 7 part)</text>
+<text x="22" y="1048.7" fill="#e6edf3" font-size="12" font-weight="600">F · IOP AND SYSTEM SERVICES  (17 · 0 ok · 9 part)</text>
 <rect x="20" y="1055.7" width="240.1" height="172.7" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
-<text x="25" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">IOP core  (7 · 0 ok · 3 part)</text>
+<text x="25" y="1065.7" fill="#8b949e" font-size="10" font-weight="500">IOP core  (7 · 0 ok · 5 part)</text>
 <g><title>iop.cpu — R3000A instruction execution
 status: VERIFIED_PARTIAL
 implemented: R3000A interpreter with load and branch delay slots; the seven ps2autotests cpu/iop programs (ALU, branches, branch delay, HI/LO delay, loads/stores, load delay, mul/div) match their real-PS2 output exactly
@@ -1107,11 +1107,14 @@ hardware programs: cpu_iop_alu, cpu_iop_branch, cpu_iop_branchdelay, cpu_iop_hil
 <text x="27" y="1100.7" fill="#0d1117" font-size="11">execution</text>
 </g>
 <g><title>iop.mem — IOP memory map (2 MB, hardware ranges)
-status: IMPLEMENTED_UNVERIFIED</title>
-<rect x="141" y="1072.7" width="116" height="42.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
-<text x="145" y="1085.7" fill="#f0f6fc" font-size="9">IOP memory map (2</text>
-<text x="145" y="1096.7" fill="#f0f6fc" font-size="9">MB, hardware ranges)</text>
-<text x="253.1" y="1110.9" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
+status: VERIFIED_PARTIAL
+implemented: 2 MB IOP RAM with byte/half/word loads and stores and load delays; the ps2autotests cpu/iop lsu and lsudelay programs match their real-PS2 output exactly
+missing: Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program
+hardware programs: cpu_iop_lsu, cpu_iop_lsudelay</title>
+<rect x="141" y="1072.7" width="116" height="42.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="145" y="1085.7" fill="#0d1117" font-size="9">IOP memory map (2</text>
+<text x="145" y="1096.7" fill="#0d1117" font-size="9">MB, hardware ranges)</text>
+<text x="253.1" y="1110.9" fill="#0d1117" font-size="8" text-anchor="end" opacity="0.8">PART</text>
 </g>
 <g><title>iop.intr — Interrupts (intrman)
 status: VERIFIED_PARTIAL
@@ -1139,10 +1142,13 @@ status: HLE_OR_STUB</title>
 <text x="174.4" y="1188.3" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">HLE</text>
 </g>
 <g><title>iop.irx — IRX loading, relocation, versioned imports
-status: IMPLEMENTED_UNVERIFIED</title>
-<rect x="23" y="1194.3" width="155.4" height="31.2" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
-<text x="27" y="1207.3" fill="#f0f6fc" font-size="9">IRX loading, relocation,</text>
-<text x="27" y="1218.3" fill="#f0f6fc" font-size="9">versioned imports</text>
+status: VERIFIED_PARTIAL
+implemented: IRX (ELF type 0xFF80) loading, relocation by load base (HI16/LO16/26/32 against section symbols), import resolution by library and version; all 23 ps2autotests IOP programs load, link and match their real-PS2 output exactly
+missing: Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program
+hardware programs: cpu_iop_alu, cpu_iop_branch, cpu_iop_branchdelay, cpu_iop_hilodelay, cpu_iop_lsu, cpu_iop_lsudelay, cpu_iop_muldiv, kernel_iop_eventflag_delete, kernel_iop_eventflag_poll, kernel_iop_interrupt_register, kernel_iop_interrupt_release, kernel_iop_libc_sprintf, kernel_iop_libc_strtok, kernel_iop_messagebox_poll, kernel_iop_messagebox_receive, kernel_iop_messagebox_send, kernel_iop_thread_cancelwakeup, kernel_iop_thread_create, kernel_iop_thread_delete, kernel_iop_thread_releasewait, kernel_iop_thread_stat, kernel_iop_vpool_create, kernel_iop_vpool_pallocate</title>
+<rect x="23" y="1194.3" width="155.4" height="31.2" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1207.3" fill="#0d1117" font-size="9">IRX loading, relocation,</text>
+<text x="27" y="1218.3" fill="#0d1117" font-size="9">versioned imports</text>
 </g>
 <g><title>iop.sched — IOP scheduling against the EE
 status: IMPLEMENTED_UNVERIFIED

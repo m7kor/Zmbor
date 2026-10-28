@@ -1514,12 +1514,18 @@ void register_ps2_runtime_expansion_tests()
             R5900Context ctx{};
             ctx.pc = 0x0010B470u;
 
+            // Leave the IPU busy with data in its FIFO, so only the init sequence's reset can make it idle again.
+            (void)runtime.memory().ipu().pushInput(PS2Ipu::Qword{});
+            runtime.memory().writeIORegister(0x10002000u, 5u << 28); // SETIQ waits for 64 bytes
             ps2_stubs::sceIpuInit(rdram.data(), &ctx, &runtime);
 
             t.IsFalse(runtime.isStopRequested(),
                       "sceIpuInit should tolerate the missing optional SetD4 helper");
-            t.Equals(runtime.memory().read32(0x10002010u), 0x40000000u,
-                     "sceIpuInit should still program IPU_CTRL");
+            // IPU_CTRL.RST is a write-only trigger: the init sequence's effect is an idle IPU with empty FIFOs.
+            t.Equals(runtime.memory().read32(0x10002010u) & 0x800000FFu, 0u,
+                     "sceIpuInit should still reset the IPU (idle, empty FIFOs)");
+            t.Equals(runtime.memory().ipu().threshold0(), static_cast<uint16_t>(0u),
+                     "commands written while SETIQ waits for data are ignored, as on the IPU");
             t.Equals(runtime.memory().read32(0x10002000u), 0u,
                      "sceIpuInit should leave IPU_CMD reset after initialization");
         });
@@ -1535,6 +1541,10 @@ void register_ps2_runtime_expansion_tests()
             gIpuSetD4Argument.store(0u, std::memory_order_release);
             gIpuInitResult.store(-999, std::memory_order_release);
 
+            // Leave the IPU busy with data in its FIFO, so only the init sequence's reset can make it idle again.
+            (void)runtime.memory().ipu().pushInput(PS2Ipu::Qword{});
+            runtime.memory().writeIORegister(0x10002000u, 5u << 28); // SETIQ waits for 64 bytes
+
             R5900Context context{};
             context.pc = kIpuInitMainPc;
             runtime.eeScheduler().reset(rdram.data(), context);
@@ -1546,7 +1556,8 @@ void register_ps2_runtime_expansion_tests()
                      "the invocation should receive the SetD4 enable argument");
             t.Equals(gIpuInitResult.load(std::memory_order_acquire), 0,
                      "the HLE completion should resume the preserved base context with success");
-            t.Equals(runtime.memory().read32(0x10002010u), 0x40000000u,
+            // IPU_CTRL.RST is a write-only trigger: the init sequence's effect is an idle IPU with empty FIFOs.
+            t.Equals(runtime.memory().read32(0x10002010u) & 0x800000FFu, 0u,
                      "IPU initialization should finish only after the guest invocation completes");
         });
 

@@ -512,6 +512,24 @@ PS2Runtime::PS2Runtime()
 
     m_eeScheduler = std::make_unique<EeScheduler>(*this);
 
+    // A guest that programs DMAC channel 6 (SIF1) directly: each IOP packet of the stream lands in IOP memory at its
+    // IOP tag's address, as IOP DMA channel 10 would write it. The data no longer has a single EE source address once
+    // it went through the chain, so the notification carries 0 there (the IOP services only act on the destination).
+    m_memory.setSif1Sink([this](const std::vector<PS2Memory::Sif1Packet> &packets)
+                         {
+                             for (const PS2Memory::Sif1Packet &packet : packets)
+                             {
+                                 if (packet.data.empty() ||
+                                     !writeIopMemory(packet.iopAddress, packet.data.data(), packet.data.size()))
+                                     continue;
+                                 notifyIopSifTransfer(m_memory.getRDRAM(),
+                                                      {ps2x::iop::SifTransferKind::SetDma,
+                                                       ps2x::iop::SifTransferPhase::AfterCopy,
+                                                       0u,
+                                                       packet.iopAddress,
+                                                       static_cast<uint32_t>(packet.data.size())});
+                             } });
+
     // Assign rather than memset: R5900Context's constructor zeroes itself and
     // then applies the COP0 reset values, which a memset here would discard.
     m_cpuContext = R5900Context{};

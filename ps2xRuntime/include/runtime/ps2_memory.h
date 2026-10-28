@@ -12,6 +12,8 @@
 #include <mutex>
 
 #include "gs/ps2_gif_arbiter.h"
+#include "runtime/ps2_ipu.h"
+#include <deque>
 #if defined(_MSC_VER)
 #include <intrin.h>
 #elif defined(USE_SSE2NEON)
@@ -494,6 +496,71 @@ public:
     bool tryProcessScratchpadDma(uint32_t channelBase, uint32_t chcr);
     void completeDmacChannel(uint32_t channelBase, uint32_t cause);
     void queueCompletedDmacCause(uint32_t cause);
+    // Starts a VIF0/VIF1/GIF transfer for a CHCR with STR set (normal or source-chain mode).
+    void startEeChannelTransfer(uint32_t channelBase, uint32_t chcr);
+
+    // MFIFO (D_CTRL.MFD = 2 VIF1, 3 GIF): fromSPR writes into the ring D_RBOR..D_RBOR+D_RBSR+16 and the drain
+    // channel's source chain reads its tags (and data that follows them) from that ring, stalling with D_STAT.MEIS
+    // when it reaches fromSPR's MADR. Decisions D-DMA-1/2 in docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md.
+    uint32_t mfifoDrainChannel() const;
+    bool mfifoRingContains(uint32_t address) const;
+    uint32_t mfifoWrap(uint32_t address) const;
+    uint32_t mfifoAvailableBytes(uint32_t readAddress) const;
+    void raiseMfifoEmpty();
+    void resumeMfifoDrain();
+    bool m_mfifoDrainStalled = false;
+    bool m_mfifoEmptyRaised = false;
+
+    // Stall control (D_CTRL.STS bits 4-5, 2 = fromSPR is the source; D_CTRL.STD bits 6-7, 1 = VIF1, 2 = GIF is the
+    // drain): the source copies its MADR into D_STADR after a normal or interleave transfer, and the drain, in normal
+    // mode or at a REFS tag, waits with D_STAT.SIS while its transfer would read past D_STADR. SIF0/fromIPU sources
+    // and the SIF1 drain have no channel model here. Decision D-DMA-4 in docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md.
+    uint32_t stallDrainChannel() const;
+    bool stallDrainBlocked(uint32_t madr, uint32_t qwc) const;
+    void raiseStallInterrupt();
+    void resumeStallDrain();
+    // A drain held by MFIFO or stall control is still running: STR stays set and no CIS is raised.
+    bool isDrainChannelHeld(uint32_t channelBase) const;
+    uint32_t m_stallHeldChannel = 0u;
+    bool m_stallSisRaised = false;
+
+public:
+    // IPU (registers 0x10002000-0x10002030, IPU_in_FIFO 0x10007010, toIPU = DMA channel 4).
+    PS2Ipu &ipu() noexcept { return m_ipu; }
+    bool takePendingIpuInterrupt() noexcept { return m_pendingIpuInterrupt.exchange(false, std::memory_order_acq_rel); }
+
+private:
+    // Feeds a held toIPU transfer into the input FIFO as space frees, runs the IPU, and completes the channel when its
+    // data is in; an IPU command that finishes raises INTC line 8.
+    void serviceIpu();
+    PS2Ipu m_ipu;
+    std::atomic<bool> m_pendingIpuInterrupt{false};
+    std::deque<PS2Ipu::Qword> m_toIpuPending; // qwords of a running toIPU transfer not yet in the FIFO
+    bool m_toIpuActive = false;
+    uint32_t m_toIpuEndMadr = 0u;
+    bool m_fromIpuActive = false; // fromIPU (channel 3) waiting for IPU output
+    uint32_t m_fromIpuMadr = 0u;
+    uint32_t m_fromIpuLeft = 0u;
+
+public:
+    // SIF1 (EE DMAC channel 6, EE -> IOP). The channel's data stream reaches IOP DMA channel 10, which reads a 16-byte
+    // IOP tag per packet (word 0: IOP address in bits 0-23, bit 31 IRQ / bit 30 end; word 1: word count; words 2-3
+    // unused) followed by that many words (PCSX2 Sif1.cpp, DobieStation iop_dma.cpp process_SIF1 agree).
+    struct Sif1Packet
+    {
+        uint32_t iopAddress = 0;
+        std::vector<uint8_t> data;
+        bool end = false;
+    };
+    using Sif1Sink = std::function<void(const std::vector<Sif1Packet> &)>;
+    // Without a sink (no IOP attached) channel 6 does not transfer.
+    void setSif1Sink(Sif1Sink sink) { m_sif1Sink = std::move(sink); }
+    [[nodiscard]] static std::vector<Sif1Packet> splitSif1Stream(const std::vector<uint8_t> &stream);
+
+private:
+    void startSif1Transfer(uint32_t chcr);
+    Sif1Sink m_sif1Sink;
+    std::vector<uint8_t> m_sif1Stream;
 };
 
 #endif // PS2_MEMORY_H

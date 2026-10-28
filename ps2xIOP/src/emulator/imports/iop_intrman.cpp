@@ -6,6 +6,19 @@
 
 namespace ps2x::iop::detail
 {
+    namespace
+    {
+        constexpr int32_t kIllegalIntrCode = -101;  // KE_ILLEGAL_INTRCODE
+        constexpr int32_t kFoundHandler = -104;     // KE_FOUND_HANDLER
+        constexpr int32_t kNotFoundHandler = -105;  // KE_NOTFOUND_HANDLER
+
+        // Interrupt lines with a handler slot: VBLANK (0) to DMA SIO2 out (0x2C), and the software lines 0x3E/0x3F.
+        bool validLine(int irq)
+        {
+            return (irq >= 0 && irq <= 0x2C) || irq == 0x3E || irq == 0x3F;
+        }
+    }
+
     IopIntrman::IopIntrman(IopMemory &memory) noexcept
         : m_memory(memory)
     {
@@ -33,14 +46,38 @@ namespace ps2x::iop::detail
         case 3:
             setV0(0u);
             return true;
-        case 4: // RegisterIntrHandler
-            m_handlers[static_cast<int>(a0)] = {a2, a3, cpu.gpr[28]};
-            setV0(0u);
+        case 4: // RegisterIntrHandler(irq, mode, handler, arg)
+        {
+            // Real PS2 (ps2autotests kernel/iop/interrupt/register): a second handler on a line is refused with
+            // KE_FOUND_HANDLER; a NULL handler leaves the line without one; any mode value is accepted.
+            const int irq = static_cast<int>(a0);
+            const auto existing = m_handlers.find(irq);
+            if (!validLine(irq))
+                setV0(static_cast<uint32_t>(kIllegalIntrCode));
+            else if (existing != m_handlers.end() && existing->second.function != 0u)
+                setV0(static_cast<uint32_t>(kFoundHandler));
+            else
+            {
+                m_handlers[irq] = {a2, a3, cpu.gpr[28]};
+                setV0(0u);
+            }
             return true;
-        case 5: // ReleaseIntrHandler
-            m_handlers.erase(static_cast<int>(a0));
-            setV0(0u);
+        }
+        case 5: // ReleaseIntrHandler(irq)
+        {
+            const int irq = static_cast<int>(a0);
+            const auto existing = m_handlers.find(irq);
+            if (!validLine(irq))
+                setV0(static_cast<uint32_t>(kIllegalIntrCode));
+            else if (existing == m_handlers.end() || existing->second.function == 0u)
+                setV0(static_cast<uint32_t>(kNotFoundHandler));
+            else
+            {
+                m_handlers.erase(existing);
+                setV0(0u);
+            }
             return true;
+        }
         case 6: // EnableIntr
             m_enabled[static_cast<int>(a0)] = true;
             if (a0 < 32u)

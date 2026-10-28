@@ -183,6 +183,25 @@ void register_ps2_sif_dma_tests()
             t.IsTrue(getRegS32(env.ctx, 2) < 0, "sceSifDmaStat should be negative when transfer is complete");
         });
 
+        tc.Run("DMAC channel 6 (SIF1) programmed directly writes its IOP packet into IOP memory", [](TestCase &t)
+        {
+            TestEnv env;
+            PS2Memory &mem = env.runtime.memory();
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            const uint32_t iopAddress = env.runtime.allocateIopMemory(0x100u, 16u);
+            t.IsTrue(iopAddress != 0u, "an IOP buffer is allocated");
+            constexpr uint32_t kSrc = 0x00410000u;
+            const uint32_t stream[8] = {0x80000000u | iopAddress, 4u, 0u, 0u, 0x11111111u, 0x22222222u, 0x33333333u, 0x44444444u};
+            std::memcpy(mem.getRDRAM() + kSrc, stream, sizeof(stream));
+            mem.writeIORegister(0x1000C410u, kSrc);
+            mem.writeIORegister(0x1000C420u, 2u);
+            mem.writeIORegister(0x1000C400u, 0x101u);
+            uint32_t words[4] = {};
+            t.IsTrue(env.runtime.readIopMemory(iopAddress, words, sizeof(words)), "the IOP buffer is readable");
+            t.IsTrue(words[0] == 0x11111111u && words[3] == 0x44444444u, "the packet data lands at the IOP tag's address");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) != 0u, "CIS6 is raised");
+        });
+
         tc.Run("IOP heap DMA uses private backing instead of aliasing EE RDRAM", [](TestCase &t)
         {
             TestEnv env;

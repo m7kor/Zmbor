@@ -1,5 +1,7 @@
 #pragma once
 
+#include "iop_spu2.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -68,6 +70,8 @@ namespace ps2x::iop::detail
         void setInterruptControl(uint32_t value) noexcept { m_interruptControl = value & 1u; }
 
         [[nodiscard]] std::optional<DmaStart> takeDmaStart() noexcept;
+        [[nodiscard]] Spu2 &spu2() noexcept { return m_spu2; }
+        [[nodiscard]] const Spu2 &spu2() const noexcept { return m_spu2; }
         [[nodiscard]] std::span<const uint8_t> ram() const noexcept { return m_ram; }
 
         [[nodiscard]] static uint32_t physicalAddress(uint32_t address) noexcept;
@@ -76,6 +80,13 @@ namespace ps2x::iop::detail
         [[nodiscard]] uint32_t readHardware32(uint32_t address) const;
         void writeHardware32(uint32_t address, uint32_t value);
         void markOwned(uint32_t address, size_t size);
+        [[nodiscard]] static bool isSpu2Register(uint32_t phys) noexcept
+        {
+            return phys >= Spu2Base && phys < Spu2Base + Spu2::kRegisterBytes;
+        }
+        // Latches an SPU2 IRQA hit into I_STAT (line 9).
+        void pollSpu2() const;
+        void transferSpu2Dma(bool secondCore, uint32_t chcr, uint32_t halfwords);
 
         std::vector<uint8_t> m_ram;
         std::vector<uint8_t> m_owned;
@@ -83,9 +94,10 @@ namespace ps2x::iop::detail
         std::unordered_map<uint32_t, uint32_t> m_hardware;
         std::vector<Allocation> m_allocations;
         uint32_t m_heapCursor = HeapBase;
-        uint32_t m_interruptStatus = 0;
+        mutable uint32_t m_interruptStatus = 0; // the SPU2 interrupt can latch during a register read
         uint32_t m_interruptMask = 0;
         uint32_t m_interruptControl = 1;
         std::optional<DmaStart> m_dmaStart;
+        mutable Spu2 m_spu2; // data-port reads advance the transfer address
     };
 }

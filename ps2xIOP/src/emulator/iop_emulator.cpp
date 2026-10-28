@@ -129,6 +129,7 @@ namespace ps2x::iop::detail
             nextModuleId = 1;
             moduleCursor = kModuleLoadBase;
             totalCycles = 0;
+            nextVblankCycle = kVblankPeriodCycles;
             totalInstructions = 0;
             eeCycleCarry = 0;
             activeCpu = nullptr;
@@ -284,6 +285,18 @@ namespace ps2x::iop::detail
                            ? ImportDisposition::Handled
                            : ImportDisposition::Missing;
             }
+            if (iequals(call.library, "thmsgbx"))
+            {
+                return kernel.dispatchMessageBoxImport(call.ordinal, cpu)
+                           ? ImportDisposition::Handled
+                           : ImportDisposition::Missing;
+            }
+            if (iequals(call.library, "thvpool"))
+            {
+                return kernel.dispatchVariablePoolImport(call.ordinal, cpu)
+                           ? ImportDisposition::Handled
+                           : ImportDisposition::Missing;
+            }
             if (iequals(call.library, "sifcmd"))
             {
                 return rpc.dispatchSifCmdImport(call.ordinal, cpu)
@@ -380,6 +393,15 @@ namespace ps2x::iop::detail
 
             if (const auto import = imports.decode(cpu.pc))
             {
+                // The import stub is an instruction of its own (a linked stub is `j target`), so a load issued in the
+                // calling jal's delay slot retires before the callee runs: `jal f; lw ra, 16(sp)` (gcc fills the
+                // delay slot this way, ps2autotests cpu/iop/lsudelay) leaves the loaded ra for f to return to.
+                if (cpu.pendingLoad)
+                {
+                    if (cpu.pendingLoadReg != 0u)
+                        cpu.gpr[cpu.pendingLoadReg] = cpu.pendingLoadValue;
+                    cpu.pendingLoad = false;
+                }
                 const ImportDisposition disposition = dispatchImport(*import, cpu);
                 ++totalInstructions;
                 ++totalCycles;
@@ -553,39 +575,84 @@ namespace ps2x::iop::detail
             servicingGuestCallbacks = false;
         }
 
+        // VBLANK start (IOP interrupt line 0) at every field boundary of guest time; the intrman handler runs when
+        // the line is enabled and interrupts are not suspended (ps2autotests kernel/iop/interrupt/register waits
+        // for its VBLANK handler).
+        void serviceVblank()
+        {
+            while (totalCycles >= nextVblankCycle)
+            {
+                nextVblankCycle += kVblankPeriodCycles;
+                if (memory.interruptControl() != 0u)
+                    (void)intrman.dispatchInterrupt(0, *this);
+            }
+        }
+
+        // One scheduling step at the current guest cycle: due interrupts and callbacks, then the highest-priority
+        // ready thread for at most one slice, or, with nothing ready, a jump to the next event before `target`.
+        void scheduleStep(uint64_t target)
+        {
+            servicePendingDmaInterrupts();
+            servicePendingGuestCallbacks();
+            serviceVblank();
+            timrman.serviceDue(totalCycles, *this);
+            IopThread *next = kernel.beginNextReady(totalCycles);
+            if (!next)
+            {
+                uint64_t nextWake = std::min(kernel.nextWakeCycle(target), nextVblankCycle);
+                for (const auto &[irq, completionCycle] : pendingDmaInterrupts)
+                    nextWake = std::min(nextWake, completionCycle);
+                if (!pendingGuestCallbacks.empty())
+                    nextWake = std::min(nextWake, pendingGuestCallbacks.begin()->first);
+                nextWake = timrman.nextEventCycle(nextWake);
+                totalCycles = std::max(totalCycles + 1u, std::min(target, nextWake));
+                return;
+            }
+            const uint64_t before = totalCycles;
+            runCpu(next->cpu, static_cast<uint32_t>(std::min<uint64_t>(kDefaultSlice, target - totalCycles)));
+            kernel.endTimeslice(*next, kThreadReturnSentinel);
+            if (totalCycles == before)
+                ++totalCycles;
+        }
+
         void runCycles(uint64_t cycles) noexcept
         {
             try
             {
                 const uint64_t target = totalCycles + cycles;
                 while (totalCycles < target)
-                {
-                    servicePendingDmaInterrupts();
-                    servicePendingGuestCallbacks();
-                    timrman.serviceDue(totalCycles, *this);
-                    IopThread *next = kernel.beginNextReady(totalCycles);
-                    if (!next)
-                    {
-                        uint64_t nextWake = kernel.nextWakeCycle(target);
-                        for (const auto &[irq, completionCycle] : pendingDmaInterrupts)
-                            nextWake = std::min(nextWake, completionCycle);
-                        if (!pendingGuestCallbacks.empty())
-                            nextWake = std::min(nextWake, pendingGuestCallbacks.begin()->first);
-                        nextWake = timrman.nextEventCycle(nextWake);
-                        totalCycles = std::max(totalCycles + 1u, std::min(target, nextWake));
-                        continue;
-                    }
-                    const uint64_t before = totalCycles;
-                    runCpu(next->cpu, static_cast<uint32_t>(std::min<uint64_t>(kDefaultSlice, target - totalCycles)));
-                    kernel.endTimeslice(*next, kThreadReturnSentinel);
-                    if (totalCycles == before)
-                        ++totalCycles;
-                }
+                    scheduleStep(target);
             }
             catch (...)
             {
                 // Runtime scheduling must never throw through EeScheduler::accountCycles().
             }
+        }
+
+        // A module's start entry runs in a kernel thread of priority 8 (what a real PS2 reports for the start code's
+        // own thread), scheduled with every other thread in guest time until it returns. If it is still blocked
+        // after kStartBudgetCycles of guest time the module is reported resident and the thread keeps running from
+        // runEeCycles. Called from a running IOP thread (no loader context to block), the entry is called directly.
+        uint32_t runModuleStart(uint32_t entry, uint32_t gp, uint32_t argc, uint32_t argv)
+        {
+            constexpr uint32_t kStartThreadPriority = 8u;
+            constexpr uint64_t kStartBudgetCycles = kIopClockHz * 10u;
+            if (kernel.hasCurrentThread())
+                return callFunction(entry, argc, argv, 0u, 0u, gp);
+            const int id = kernel.createStartThread(entry, gp, argc, argv, kStartThreadPriority);
+            if (id < 0)
+                return static_cast<uint32_t>(id);
+            const uint64_t limit = totalCycles + kStartBudgetCycles;
+            while (!kernel.isThreadDormant(id) && totalCycles < limit)
+                scheduleStep(limit);
+            if (!kernel.isThreadDormant(id))
+            {
+                log(LogLevel::Warning, "[IOP] module start thread still waiting after its start budget; module kept resident");
+                return 0u;
+            }
+            const uint32_t result = kernel.threadResult(id);
+            kernel.deleteThreadNow(id);
+            return result;
         }
 
         ModuleLoadResult loadImage(std::string path, std::span<const uint8_t> image, const void *arguments, uint32_t argumentSize)
@@ -624,7 +691,7 @@ namespace ps2x::iop::detail
                     write8(args + argumentSize, 0u);
                 }
             }
-            const uint32_t startResult = callFunction(module.entry, argumentSize, args, 0u, 0u, module.gp);
+            const uint32_t startResult = runModuleStart(module.entry, module.gp, argumentSize, args);
             if (args)
                 freeAllocation(args);
             module.resident = startResult == 0u || startResult == 2u;
@@ -700,6 +767,7 @@ namespace ps2x::iop::detail
         uint32_t nextModuleId = 1;
         uint32_t moduleCursor = kModuleLoadBase;
         uint64_t totalCycles = 0;
+        uint64_t nextVblankCycle = kVblankPeriodCycles;
         uint64_t totalInstructions = 0;
         uint64_t eeCycleCarry = 0;
         CpuState *activeCpu = nullptr;

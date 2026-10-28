@@ -44,7 +44,10 @@ private:
     void DrawSprite(const GSPrimitiveBatch &batch);
     void DrawTriangle(const GSPrimitiveBatch &batch);
     void DrawLine(const GSPrimitiveBatch &batch);
-    void WritePixel(const GSDrawState &state, int x, int y, int z, uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t fog);
+    // coverage >= 0: PRIM.AA1 coverage alpha (0-128) for a line or triangle pixel; edge pixels do not write Z.
+    void WritePixel(const GSDrawState &state, int x, int y, int z, uint8_t r, uint8_t g, uint8_t b, uint8_t a, uint8_t fog,
+                    int coverage = -1, bool edge = false);
+    void DrawAntialiasedLine(const GSPrimitiveBatch &batch);
     uint32_t SampleTexture(const GSDrawState &state, float s, float t, float q, uint16_t u, uint16_t v);
     uint32_t LookupCLUT(const GSDrawState &state, uint8_t index, uint8_t cpsm, uint8_t csm, uint8_t csa, uint8_t sourcePsm);
 

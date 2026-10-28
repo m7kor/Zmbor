@@ -1273,6 +1273,151 @@
      "denominator": 132
     }
    }
+  },
+  "iop_hardware": {
+   "source": {
+    "path": "docs/hwtest/iop-dashboard.json",
+    "sha256": "5fbea66ec92eaa8ebf52dd201036bd19e0e6da9ea587f3b2db2c23810ad86b44",
+    "evidence_commit": "1b55608",
+    "description": "the 23 ps2autotests IOP programs (.irx, real-PS2 .expected) run on ps2xIOP by tools/hwtest/iop_hwtest.py at 1b55608 (IRX relocation 2318aad, printf 878f01a, JALR 00e1498, IOP kernel c3e9553, intrman/sysclib 3696d34)"
+   },
+   "programs_pass": 23,
+   "programs": 23,
+   "lines_match": 1306,
+   "lines": 1306,
+   "crash": 0,
+   "timeout": 0,
+   "by_area": {
+    "cpu/iop": {
+     "programs_pass": 7,
+     "programs": 7,
+     "lines_match": 981,
+     "lines": 981
+    },
+    "kernel/iop": {
+     "programs_pass": 16,
+     "programs": 16,
+     "lines_match": 325,
+     "lines": 325
+    }
+   },
+   "tests": {
+    "cpu_iop_alu": {
+     "status": "PASS",
+     "lines_match": 467,
+     "lines": 467
+    },
+    "cpu_iop_branch": {
+     "status": "PASS",
+     "lines_match": 170,
+     "lines": 170
+    },
+    "cpu_iop_branchdelay": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "cpu_iop_hilodelay": {
+     "status": "PASS",
+     "lines_match": 6,
+     "lines": 6
+    },
+    "cpu_iop_lsu": {
+     "status": "PASS",
+     "lines_match": 114,
+     "lines": 114
+    },
+    "cpu_iop_lsudelay": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "cpu_iop_muldiv": {
+     "status": "PASS",
+     "lines_match": 202,
+     "lines": 202
+    },
+    "kernel_iop_eventflag_delete": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "kernel_iop_eventflag_poll": {
+     "status": "PASS",
+     "lines_match": 18,
+     "lines": 18
+    },
+    "kernel_iop_interrupt_register": {
+     "status": "PASS",
+     "lines_match": 15,
+     "lines": 15
+    },
+    "kernel_iop_interrupt_release": {
+     "status": "PASS",
+     "lines_match": 9,
+     "lines": 9
+    },
+    "kernel_iop_libc_sprintf": {
+     "status": "PASS",
+     "lines_match": 19,
+     "lines": 19
+    },
+    "kernel_iop_libc_strtok": {
+     "status": "PASS",
+     "lines_match": 10,
+     "lines": 10
+    },
+    "kernel_iop_messagebox_poll": {
+     "status": "PASS",
+     "lines_match": 9,
+     "lines": 9
+    },
+    "kernel_iop_messagebox_receive": {
+     "status": "PASS",
+     "lines_match": 10,
+     "lines": 10
+    },
+    "kernel_iop_messagebox_send": {
+     "status": "PASS",
+     "lines_match": 14,
+     "lines": 14
+    },
+    "kernel_iop_thread_cancelwakeup": {
+     "status": "PASS",
+     "lines_match": 11,
+     "lines": 11
+    },
+    "kernel_iop_thread_create": {
+     "status": "PASS",
+     "lines_match": 26,
+     "lines": 26
+    },
+    "kernel_iop_thread_delete": {
+     "status": "PASS",
+     "lines_match": 15,
+     "lines": 15
+    },
+    "kernel_iop_thread_releasewait": {
+     "status": "PASS",
+     "lines_match": 23,
+     "lines": 23
+    },
+    "kernel_iop_thread_stat": {
+     "status": "PASS",
+     "lines_match": 17,
+     "lines": 17
+    },
+    "kernel_iop_vpool_create": {
+     "status": "PASS",
+     "lines_match": 14,
+     "lines": 14
+    },
+    "kernel_iop_vpool_pallocate": {
+     "status": "PASS",
+     "lines_match": 104,
+     "lines": 104
+    }
+   }
   }
  },
  "sections": [
@@ -3219,17 +3364,18 @@
         },
         {
          "id": "gs.alpha",
-         "name": "Alpha blending (ALPHA, PABE, FBA)",
+         "name": "Alpha blending and COLCLAMP (ALPHA, PABE, FBA, COLCLAMP)",
          "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Alpha blending",
-         "implemented": "",
+         "implemented": "Blend equation on signed values; COLCLAMP saturates (1) or wraps to 8 bits (0)",
          "missing": "",
          "src": [
           "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_gs_tests.cpp::PABE bypasses alpha blend for low-alpha source pixels",
-          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor"
+          "ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS alpha blend uses ALPHA register FIX factor",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour"
          ],
          "hw": [],
          "blocker": "",
@@ -3295,31 +3441,39 @@
         {
          "id": "gs.dither",
          "name": "Dithering (DTHE, DIMX)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Dithering",
-         "implemented": "Registers are latched",
-         "missing": "The rasteriser does not apply the dither matrix",
+         "implemented": "DIMX[y&3][x&3] (3-bit two's complement) added to RGB after blending and before COLCLAMP, for 16-bit frame buffers (PCSX2 model)",
+         "missing": "No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1)",
          "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp",
           "ps2xRuntime/src/lib/gs/gs_frontend.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+         "target": "8",
          "verified_at": null
         },
         {
          "id": "gs.aa",
          "name": "Antialiasing (AA1)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "AA1",
-         "implemented": "",
-         "missing": "Not implemented",
-         "src": [],
-         "tests": [],
+         "implemented": "PRIM.AA1 for lines and triangles (0765383, D-GS-1): coverage replaces the source alpha (with ABE only an alpha of 0x80) and blends through ALPHA whether or not ABE is set; edge pixels do not write Z; lines as two distance-weighted pixels per column, triangles with an exact-area fringe; 11 of 11 mutants killed",
+         "missing": "No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently)",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS AA1 line: two edge pixels per column weighted by distance, blended through ALPHA, no Z write",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS AA1 triangle: interior pixels at alpha 0x80, the uncovered-centre fringe at its exact coverage"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "GS probe drawing AA1 lines and triangles on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -3531,29 +3685,41 @@
         {
          "id": "dma.c3",
          "name": "Ch 3 fromIPU",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "3 fromIPU",
-         "implemented": "",
-         "missing": "Channel not modelled (IPU is HLE)",
-         "src": [],
-         "tests": [],
+         "implemented": "fromIPU normal mode: IPU output FIFO qwords to MADR as they are produced, STR held while waiting, CIS3 at QWC = 0",
+         "missing": "Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_ipu.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample"
+         ],
          "hw": [],
-         "blocker": "IPU hardware model (E)",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
          "id": "dma.c4",
          "name": "Ch 4 toIPU",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "4 toIPU",
-         "implemented": "",
-         "missing": "Channel not modelled (IPU is HLE)",
-         "src": [],
-         "tests": [],
+         "implemented": "toIPU normal mode: MADR/QWC qwords into the 8-qword IPU input FIFO with flow control (STR held while the FIFO is full), CIS4 when all data is in",
+         "missing": "Source-chain mode; no hardware program; transfer timing",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_ipu.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU toIPU stays active while the input FIFO is full and completes when a command frees it"
+         ],
          "hw": [],
-         "blocker": "IPU hardware model (E)",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -3577,19 +3743,25 @@
         {
          "id": "dma.c6",
          "name": "Ch 6 SIF1 (EE to IOP)",
-         "status": "HLE_OR_STUB",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "6 SIF1",
-         "implemented": "sceSifSetDma HLE copies descriptors",
-         "missing": "No DMAC channel model",
+         "implemented": "Register-level channel 6: normal and source-chain mode with TTE, stall-control drain (STD=3), stream split into IOP packets (16-byte IOP tag, address bits 0-23, end bits 31/30, word count & 0xFFFFC) written into IOP memory with a SIF transfer notification, CIS6; sceSifSetDma (HLE syscall) still copies descriptors directly",
+         "missing": "No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised",
          "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_runtime.cpp",
           "ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp"
          ],
          "tests": [
-          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload"
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 without an IOP sink does not transfer or raise CIS6",
+          "ps2xTest/src/ps2_sif_dma_tests.cpp::DMAC channel 6 (SIF1) programmed directly writes its IOP packet into IOP memory"
          ],
          "hw": [],
-         "blocker": "",
-         "target": "",
+         "blocker": "SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back)",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -3744,14 +3916,16 @@
          "name": "DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE)",
          "status": "VERIFIED_PARTIAL",
          "short": "DMA interrupts",
-         "implemented": "",
+         "implemented": "CIS0-9, SIS, MEIS, BEIS clear on write-one; CIM, SIM, MEIM toggle; INT1 when a masked status bit is set; tag IRQ and TIE",
          "missing": "",
          "src": [
           "ps2xRuntime/src/lib/ps2_memory.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_memory_tests.cpp::DMAC D_STAT toggles masks and clears channel status on write-one",
-          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set"
+          "ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain IRQ stops only when TIE is set",
+          "ps2xTest/src/ps2_memory_tests.cpp::D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM"
          ],
          "hw": [
           "dma_dmac_tagintr",
@@ -3785,31 +3959,47 @@
         {
          "id": "dma.stall",
          "name": "Stall control (STS/STD, D_STADR)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Stall control",
-         "implemented": "",
-         "missing": "Not implemented",
-         "src": [],
-         "tests": [],
+         "implemented": "fromSPR (STS=2) leaves its MADR in D_STADR after normal or interleave transfers; the VIF1 (STD=1) or GIF (STD=2) drain waits before a REFS tag or a normal-mode transfer that would read past D_STADR, stays active (STR, no CIS), raises SIS once per stall and resumes when D_STADR or D_CTRL changes",
+         "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources and fromSPR destination-chain CNTS are not modelled (the SIF1 drain is, 0ad6e4b)",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a GIF REFS drain waits with SIS until fromSPR (STS) moves D_STADR past its data",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control applies only to the STD drain's REFS tags, up to and including D_STADR",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once",
+          "ps2xTest/src/ps2_memory_tests.cpp::stall control: changing D_CTRL.STD releases a waiting drain",
+          "ps2xTest/src/ps2_memory_tests.cpp::SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",
+         "target": "8",
          "verified_at": null
         },
         {
          "id": "dma.mfifo",
          "name": "MFIFO ring (D_RBOR/D_RBSR)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "MFIFO",
-         "implemented": "Ring registers can be written",
-         "missing": "No MFIFO transfer behaviour",
+         "implemented": "fromSPR writes into the D_RBOR/D_RBSR ring; the GIF (MFD=3) or VIF1 (MFD=2) source chain drains it with wrapping, stalls at the write position with D_STAT.MEIS and resumes when fromSPR adds data",
+         "missing": "No hardware program; stall granularity is one tag (the hardware can stop inside the data, D-DMA-2); fromSPR interleave and chain modes into the ring are not wrapped",
          "src": [
-          "ps2xRuntime/src/lib/Kernel/Stubs/DMA.cpp"
+          "ps2xRuntime/src/lib/ps2_memory.cpp",
+          "ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO GIF drain stalls on an empty ring with MEIS and resumes when fromSPR adds data",
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO VIF1 drain (MFD=2) waits for fromSPR and then executes the VIF codes it drains",
+          "ps2xTest/src/ps2_memory_tests.cpp::MFIFO tags and following data wrap at the ring end; REF data is read in place",
+          "ps2xTest/src/ps2_memory_tests.cpp::fromSPR writes linearly when MFD selects no drain or MADR is outside the ring"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "MFIFO probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -4147,31 +4337,68 @@
         {
          "id": "ipu.dma",
          "name": "IPU0/IPU1 FIFOs and DMA",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "IPU FIFOs/DMA",
-         "implemented": "",
-         "missing": "Not modelled",
-         "src": [],
-         "tests": [],
+         "implemented": "Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO; output FIFO (8 qwords) refilled from the converted macroblock, drained by fromIPU and IPU_out_FIFO; both channels in normal mode with flow control",
+         "missing": "Chain modes of channels 3/4; no hardware program; transfer timing",
+         "src": [
+          "ps2xRuntime/src/lib/ps2_ipu.cpp",
+          "ps2xRuntime/src/lib/ps2_memory.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU toIPU stays active while the input FIFO is full and completes when a command frees it",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC runs through toIPU and fromIPU DMA",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC through toIPU and fromIPU DMA writes the slice's RGB32 macroblocks to RAM and raises the IPU interrupt"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
          "id": "ipu.cmd",
          "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "IPU commands",
-         "implemented": "sceIpuInit/Stop/RestartDMA return without decoding",
-         "missing": "No command decoding",
+         "implemented": "IPU register file (CMD/CTRL/BP/TOP) and all ten commands: BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3); CSC with integer BT.601, dither and alpha thresholds (0828791, D-IPU-1); PACK to RGB16 or 4-bit VQ indices (ff3a138, D-IPU-2); VDEC with the MPEG-2 VLC tables B-1, B-2..B-4, B-10, B-11 (b2f7ce1); BDEC block decoding to RAW16 (a915237, D-IPU-3); IDEC slice decoding with CSC (71ca2cb, D-IPU-4). Bit-exact with ffmpeg on six MPEG-1/MPEG-2 intra fixtures; 30 of 30 non-equivalent BDEC/IDEC mutants killed. sceIpu* HLE still returns without decoding",
+         "missing": "No hardware program checks the IPU; the PS2-specific behaviour in docs/engineering/PS2_IPU_SEMANTICS.md (B1-B11: timing, IPU_CMD after decoding, IDCT rounding, error recovery) is unknown",
          "src": [
+          "ps2xRuntime/src/lib/ps2_ipu.cpp",
           "ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU VDEC decodes address increment, macroblock type, motion code and dmvector symbols",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC decodes an intra DC-only macroblock: DC differentials, predictors and the RAW16 layout",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC applies MPEG-2 mismatch control to the last coefficient (IDP 3 tie)",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC escape coefficients follow CTRL.AS scan, zigzag matrix order and the non-linear QSC",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC saturates coefficients to 12 bits and clamps intra samples to 0-255",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC non-intra: coded_block_pattern, the first-coefficient '1s' code and unclamped samples",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC MPEG-1 mode: 8/16-bit escape levels and oddification without mismatch control",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC intra with CTRL.IVF uses table B-15",
+          "ps2xTest/src/ps2_memory_tests.cpp::IPU BDEC flags bitstream errors with CTRL.ECD and outputs nothing",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::BDEC driven by VDEC/FDEC decodes ffmpeg-encoded MPEG-1/MPEG-2 intra pictures within IEEE 1180 bounds",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::BDEC decoding is repeatable and independent of how the input FIFO is filled",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::BDEC paused at every qword of a slice waits without error or partial output, then resumes exactly",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::BDEC on a truncated slice keeps waiting for data: no error, no partial macroblock",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::CTRL.RST in the middle of a slice leaves no state behind: the slice then decodes as from cold",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::BDEC on randomly corrupted slices ends with whole macroblocks, an error or a wait, deterministically",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC decodes every fixture slice to its start code; the output equals CSC of the BDEC macroblocks",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC paused at every qword resumes exactly; it is repeatable under lazy and full-FIFO feeding",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC on randomly corrupted slices ends deterministically with whole macroblocks or an error",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC slice syntax: address increments, stuffing, escape, skipped-macroblock DC reset, dct_type and quantiser_scale_code",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::IDEC holds the next macroblock while its output waits: input consumption stops until the guest drains",
+          "ps2xTest/src/ps2_ipu_mpeg_tests.cpp::CTRL.RST raises the IPU interrupt only when it interrupts a command"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "IPU probe on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {
@@ -4209,72 +4436,103 @@
         {
          "id": "iop.cpu",
          "name": "R3000A instruction execution",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "R3000A CPU",
-         "implemented": "",
-         "missing": "ps2autotests cpu/iop programs exist but are not run",
+         "implemented": "R3000A interpreter with load and branch delay slots; the seven ps2autotests cpu/iop programs (ALU, branches, branch delay, HI/LO delay, loads/stores, load delay, mul/div) match their real-PS2 output exactly",
+         "missing": "Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/core/iop_cpu.cpp"
          ],
          "tests": [
-          "ps2xIOP/tests/iop_emulator_tests.cpp"
+          "ps2xIOP/tests/iop_emulator_tests.cpp",
+          "ps2xIOP/tests/iop_import_tests.cpp"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_alu",
+          "cpu_iop_branch",
+          "cpu_iop_branchdelay",
+          "cpu_iop_hilodelay",
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay",
+          "cpu_iop_muldiv"
+         ],
          "blocker": "",
          "target": "8",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.mem",
          "name": "IOP memory map (2 MB, hardware ranges)",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP memory",
-         "implemented": "",
-         "missing": "",
+         "implemented": "2 MB IOP RAM with byte/half/word loads and stores and load delays; the ps2autotests cpu/iop lsu and lsudelay programs match their real-PS2 output exactly",
+         "missing": "Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/core/iop_memory.cpp"
          ],
          "tests": [
           "ps2xTest/src/ps2_sif_dma_tests.cpp::IOP heap DMA uses private backing instead of aliasing EE RDRAM"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.intr",
          "name": "Interrupts (intrman)",
-         "status": "HLE_OR_STUB",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP interrupts",
-         "implemented": "",
-         "missing": "",
+         "implemented": "HLE intrman: handler registration codes and line validation as on a real PS2, NULL handlers, VBLANK (line 0) raised at every field of guest time; the ps2autotests kernel/iop/interrupt register and release programs match their real-PS2 output exactly",
+         "missing": "HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled",
          "src": [
           "ps2xIOP/src/emulator/imports/iop_intrman.cpp"
          ],
-         "tests": [],
-         "hw": [],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
+         "hw": [
+          "kernel_iop_interrupt_register",
+          "kernel_iop_interrupt_release"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.kernel",
          "name": "Threads, semaphores, events (thbase, ...)",
-         "status": "HLE_OR_STUB",
+         "status": "VERIFIED_PARTIAL",
          "short": "IOP kernel",
-         "implemented": "",
-         "missing": "",
+         "implemented": "HLE kernel at system-call level (thbase, thsemap, thevent, thmsgbx, thvpool): thread checks and states, priority ready queue with preemption, typed waits with FIFO/priority queues, message boxes, variable pools; module start runs in a priority-8 kernel thread; the 12 ps2autotests kernel/iop thread, event flag, message box and vpool programs match their real-PS2 output exactly",
+         "missing": "HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate",
          "src": [
           "ps2xIOP/src/emulator/core/iop_kernel.cpp"
          ],
          "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp",
           "ps2xIOP/tests/iop_emulator_tests.cpp"
          ],
-         "hw": [],
+         "hw": [
+          "kernel_iop_eventflag_delete",
+          "kernel_iop_eventflag_poll",
+          "kernel_iop_messagebox_poll",
+          "kernel_iop_messagebox_receive",
+          "kernel_iop_messagebox_send",
+          "kernel_iop_thread_cancelwakeup",
+          "kernel_iop_thread_create",
+          "kernel_iop_thread_delete",
+          "kernel_iop_thread_releasewait",
+          "kernel_iop_thread_stat",
+          "kernel_iop_vpool_create",
+          "kernel_iop_vpool_pallocate"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.timers",
@@ -4297,10 +4555,10 @@
         {
          "id": "iop.irx",
          "name": "IRX loading, relocation, versioned imports",
-         "status": "IMPLEMENTED_UNVERIFIED",
+         "status": "VERIFIED_PARTIAL",
          "short": "IRX loading",
-         "implemented": "",
-         "missing": "",
+         "implemented": "IRX (ELF type 0xFF80) loading, relocation by load base (HI16/LO16/26/32 against section symbols), import resolution by library and version; all 23 ps2autotests IOP programs load, link and match their real-PS2 output exactly",
+         "missing": "Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program",
          "src": [
           "ps2xIOP/src/emulator/services/iop_module_loader.cpp",
           "ps2xIOP/src/emulator/imports/iop_imports.cpp"
@@ -4308,10 +4566,34 @@
          "tests": [
           "ps2xIOP/tests/iop_import_version_tests.cpp::Physical IRX consumer links correct version end to end"
          ],
-         "hw": [],
+         "hw": [
+          "cpu_iop_alu",
+          "cpu_iop_branch",
+          "cpu_iop_branchdelay",
+          "cpu_iop_hilodelay",
+          "cpu_iop_lsu",
+          "cpu_iop_lsudelay",
+          "cpu_iop_muldiv",
+          "kernel_iop_eventflag_delete",
+          "kernel_iop_eventflag_poll",
+          "kernel_iop_interrupt_register",
+          "kernel_iop_interrupt_release",
+          "kernel_iop_libc_sprintf",
+          "kernel_iop_libc_strtok",
+          "kernel_iop_messagebox_poll",
+          "kernel_iop_messagebox_receive",
+          "kernel_iop_messagebox_send",
+          "kernel_iop_thread_cancelwakeup",
+          "kernel_iop_thread_create",
+          "kernel_iop_thread_delete",
+          "kernel_iop_thread_releasewait",
+          "kernel_iop_thread_stat",
+          "kernel_iop_vpool_create",
+          "kernel_iop_vpool_pallocate"
+         ],
          "blocker": "",
          "target": "",
-         "verified_at": null
+         "verified_at": "1b55608"
         },
         {
          "id": "iop.sched",
@@ -4549,30 +4831,39 @@
         {
          "id": "spu.cores",
          "name": "SPU2 cores and registers",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Cores / registers",
-         "implemented": "",
-         "missing": "Register range mapped on the IOP side, no register model",
+         "implemented": "Both cores' register files at 0x1F900000/0x1F900400 plus the volume/SPDIF block, 16-bit access (32-bit split, low half first), read-back as written with 20-bit address halves; KON loads NAX from SSA and clears ENDX, KON/KOFF latch; ENDX write rule; STAT bit 7 / ATTR bit 15 (944a3e5, D-SPU-1); 14 of 14 non-equivalent mutants killed",
+         "missing": "No hardware program checks the SPU2; core 0 output routing into core 1 and every voice-engine effect (spu.voices, spu.adsr, spu.pitch, spu.mix, spu.reverb) are not modelled; power-on register state unknown",
          "src": [
-          "ps2xIOP/src/emulator/core/iop_memory.h"
+          "ps2xIOP/src/emulator/core/iop_memory.h",
+          "ps2xIOP/src/emulator/core/iop_spu2.cpp",
+          "ps2xIOP/src/emulator/core/iop_memory.cpp"
          ],
-         "tests": [],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
          "hw": [],
-         "blocker": "",
+         "blocker": "SPU2 register probe on a physical PS2",
          "target": "8",
          "verified_at": null
         },
         {
          "id": "spu.ram",
          "name": "Sound RAM (2 MB)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "Sound RAM",
-         "implemented": "",
-         "missing": "No sound RAM model",
-         "src": [],
-         "tests": [],
+         "implemented": "2 MB sound RAM; the TSA data port writes and reads at an advancing, wrapping transfer address; IOP DMA channels 4/7 move data between IOP RAM and sound RAM (944a3e5, D-SPU-1)",
+         "missing": "No hardware program checks the SPU2; the fixed core input/output areas are not used yet (no mixer or ADMA); the DMA completion delay is the existing estimate",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_spu2.cpp",
+          "ps2xIOP/src/emulator/core/iop_memory.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
          "hw": [],
-         "blocker": "",
+         "blocker": "SPU2 register probe on a physical PS2",
          "target": "8",
          "verified_at": null
         },
@@ -4649,14 +4940,19 @@
         {
          "id": "spu.irq",
          "name": "SPU2 IRQ (address match)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "SPU2 IRQ",
-         "implemented": "",
-         "missing": "No SPU2 interrupts",
-         "src": [],
-         "tests": [],
+         "implemented": "IRQA: any sound-RAM access by the data port or DMA is checked against both cores' IRQA; with ATTR bit 6 a hit sets IRQINFO bit 2 + core and raises IOP INTC 9; clearing ATTR bit 6 clears it (944a3e5, D-SPU-1)",
+         "missing": "No hardware program checks the SPU2; IRQA checks for voice fetches, reverb and ADMA accesses wait for those engines",
+         "src": [
+          "ps2xIOP/src/emulator/core/iop_spu2.cpp",
+          "ps2xIOP/src/emulator/core/iop_memory.cpp"
+         ],
+         "tests": [
+          "ps2xIOP/tests/iop_import_tests.cpp"
+         ],
          "hw": [],
-         "blocker": "",
+         "blocker": "SPU2 register probe on a physical PS2",
          "target": "8",
          "verified_at": null
         },

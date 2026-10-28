@@ -14,7 +14,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
+#include <initializer_list>
+#include <utility>
 #include <cstring>
 #include <thread>
 #include <vector>
@@ -412,6 +415,38 @@ namespace
             gs.ReadVram(GS_PSM_Z32, kDepthBlock, 1u, 0u, 0u),
         };
     }
+
+    // CT32 frame (black) and Z32 depth (0x11111111) for PRIM.AA1 draws: ZTE with ZTST ALWAYS, ALPHA = (Cs - Cd) * As
+    // + Cd, source red with a chosen alpha, vertex depth 0x22222222.
+    struct AaCanvas
+    {
+        std::vector<uint8_t> vram = std::vector<uint8_t>(PS2_GS_VRAM_SIZE, 0u);
+        GS gs;
+
+        AaCanvas()
+        {
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            for (uint32_t y = 0; y < 16u; ++y)
+                for (uint32_t x = 0; x < 16u; ++x)
+                    gs.WriteVram(GS_PSM_Z32, 32u, 1u, x, y, 0x11111111u);
+            gs.writeRegister(GS_REG_FRAME_1, 1ull << 16);
+            gs.writeRegister(GS_REG_ZBUF_1, 1ull);
+            gs.writeRegister(GS_REG_SCISSOR_1, (63ull << 16) | (63ull << 48));
+            gs.writeRegister(GS_REG_TEST_1, (1ull << 16) | (1ull << 17));
+            gs.writeRegister(GS_REG_ALPHA_1, 0x44ull); // A = Cs, B = Cd, C = As, D = Cd
+        }
+        void draw(uint64_t prim, uint8_t alpha, std::initializer_list<std::pair<float, float>> points)
+        {
+            gs.writeRegister(GS_REG_PRIM, prim);
+            gs.writeRegister(GS_REG_RGBAQ, 0xFFull | (static_cast<uint64_t>(alpha) << 24) | (0x3F800000ull << 32));
+            for (const auto &p : points)
+                gs.writeRegister(GS_REG_XYZ2, static_cast<uint64_t>(std::lround(p.first * 16.0f)) |
+                                                  (static_cast<uint64_t>(std::lround(p.second * 16.0f)) << 16) |
+                                                  (0x22222222ull << 32));
+        }
+        uint32_t frame(uint32_t x, uint32_t y) { return gs.ReadVram(GS_PSM_CT32, 0u, 1u, x, y); }
+        uint32_t depth(uint32_t x, uint32_t y) { return gs.ReadVram(GS_PSM_Z32, 32u, 1u, x, y); }
+    };
 }
 
 void register_ps2_gs_tests()
@@ -906,6 +941,90 @@ void register_ps2_gs_tests()
             std::memcpy(&highAlphaPixel, vram.data(), sizeof(highAlphaPixel));
             t.Equals(highAlphaPixel, 0x803F3F3Fu,
                      "with PABE enabled, high-alpha source pixels should still use the configured ALPHA blend");
+        });
+
+        // Post-blend colour stage. Expected values are computed by hand from the GS register definitions; the
+        // behaviour follows PCSX2 (GSDrawScanline WriteFrame) and DobieStation (gsthread), which agree on COLCLAMP.
+        // No hardware capture exists for these yet (docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md, D-GS-1/2).
+        tc.Run("GS COLCLAMP=1 saturates and COLCLAMP=0 keeps the low 8 bits of the blended colour", [](TestCase &t)
+        {
+            auto blendOnce = [](uint64_t alphaReg, uint32_t destination, uint8_t source, uint64_t colclamp) {
+                std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+                GS gs;
+                gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+                gs.writeRegister(GS_REG_FRAME_1, (1ull << 16));
+                gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+                gs.writeRegister(GS_REG_SCISSOR_1, 0ull);
+                gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                gs.writeRegister(GS_REG_ALPHA_1, alphaReg);
+                gs.writeRegister(GS_REG_COLCLAMP, colclamp);
+                std::memcpy(vram.data(), &destination, sizeof(destination));
+                gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_POINT) | (1ull << 6));
+                gs.writeRegister(GS_REG_RGBAQ, 0x80000000ull | source | (source << 8) | (static_cast<uint64_t>(source) << 16));
+                gs.writeRegister(GS_REG_XYZ2, 0ull);
+                uint32_t pixel = 0u;
+                std::memcpy(&pixel, vram.data(), sizeof(pixel));
+                return pixel;
+            };
+            // A=Cs, B=0, C=FIX(0x80), D=Cd: Cs + Cd = 0x80 + 0xC0 = 0x140.
+            const uint64_t add = (0x80ull << 32) | 0x68ull;
+            t.Equals(blendOnce(add, 0x00C0C0C0u, 0x80u, 1ull), 0x80FFFFFFu, "COLCLAMP=1 saturates 0x140 to 0xFF");
+            t.Equals(blendOnce(add, 0x00C0C0C0u, 0x80u, 0ull), 0x80404040u, "COLCLAMP=0 keeps the low 8 bits of 0x140");
+            // A=0, B=Cs, C=FIX(0x80), D=0: -Cs = -0x40.
+            const uint64_t negate = (0x80ull << 32) | 0xA2ull;
+            t.Equals(blendOnce(negate, 0u, 0x40u, 1ull), 0x80000000u, "COLCLAMP=1 saturates -0x40 to 0");
+            t.Equals(blendOnce(negate, 0u, 0x40u, 0ull), 0x80C0C0C0u, "COLCLAMP=0 keeps the low 8 bits of -0x40");
+        });
+
+        tc.Run("GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only", [](TestCase &t)
+        {
+            // DIMX: (0,0)=+3, (1,0)=-4, (2,0)=-1, (3,0)=+1, (0,1)=-2, everything else 0 (3-bit two's complement).
+            auto element = [](uint32_t x, uint32_t y, uint64_t v) { return (v & 0x7ull) << (4u * (4u * y + x)); };
+            const uint64_t dimx = element(0, 0, 3) | element(1, 0, 4) | element(2, 0, 7) | element(3, 0, 1) | element(0, 1, 6);
+
+            struct Run
+            {
+                uint32_t psm;
+                uint64_t dthe;
+                uint64_t colclamp;
+            };
+            // Returns the stored red value: 5 bits for CT16, 8 bits for CT32.
+            auto drawRed = [&](const Run &run, uint32_t x, uint32_t y, uint8_t c) {
+                std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+                GS gs;
+                gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+                gs.writeRegister(GS_REG_FRAME_1, (1ull << 16) | (static_cast<uint64_t>(run.psm) << 24));
+                gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+                gs.writeRegister(GS_REG_SCISSOR_1, (63ull << 16) | (63ull << 48));
+                gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                gs.writeRegister(GS_REG_DIMX, dimx);
+                gs.writeRegister(GS_REG_DTHE, run.dthe);
+                gs.writeRegister(GS_REG_COLCLAMP, run.colclamp);
+                gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_POINT));
+                gs.writeRegister(GS_REG_RGBAQ, 0x80000000ull | c | (c << 8) | (static_cast<uint64_t>(c) << 16));
+                gs.writeRegister(GS_REG_XYZ2, (static_cast<uint64_t>(x) << 4) | (static_cast<uint64_t>(y) << 20));
+                const uint32_t raw = gs.ReadVram(run.psm, 0u, 1u, x, y);
+                return run.psm == GS_PSM_CT32 ? (raw & 0xFFu) : (raw & 0x1Fu);
+            };
+            const Run ct16{GS_PSM_CT16, 1ull, 1ull};
+            // 0x7F = 127: +3 -> 130 (16), -4 -> 123 (15), -1 -> 126 (15), +1 -> 128 (16), -2 -> 125 (15), 0 -> 15.
+            t.Equals(drawRed(ct16, 0, 0, 0x7F), 16u, "(0,0) adds +3");
+            t.Equals(drawRed(ct16, 1, 0, 0x7F), 15u, "(1,0) adds -4");
+            t.Equals(drawRed(ct16, 3, 0, 0x7F), 16u, "(3,0) adds +1");
+            t.Equals(drawRed(ct16, 1, 1, 0x7F), 15u, "(1,1) adds 0");
+            // 0x81 = 129: -4 -> 125 (15), -1 -> 128 (16), -2 -> 127 (15), 0 -> 16.
+            t.Equals(drawRed(ct16, 1, 0, 0x81), 15u, "(1,0) adds -4, not -1");
+            t.Equals(drawRed(ct16, 2, 0, 0x81), 16u, "(2,0) adds -1, not -4");
+            t.Equals(drawRed(ct16, 0, 1, 0x81), 15u, "(0,1) adds -2");
+            // The matrix repeats every 4 pixels in both directions.
+            t.Equals(drawRed(ct16, 4, 4, 0x7F), 16u, "(4,4) uses (0,0) = +3");
+            t.Equals(drawRed(ct16, 5, 0, 0x81), 15u, "(5,0) uses (1,0) = -4");
+            // Dither is applied before COLCLAMP: 0xFE + 3 = 0x101.
+            t.Equals(drawRed(ct16, 0, 0, 0xFE), 31u, "COLCLAMP=1 saturates the dithered value");
+            t.Equals(drawRed(Run{GS_PSM_CT16, 1ull, 0ull}, 0, 0, 0xFE), 0u, "COLCLAMP=0 wraps the dithered value");
+            // No dithering when DTHE=0, and none for a 32-bit frame buffer.
+            t.Equals(drawRed(Run{GS_PSM_CT16, 0ull, 1ull}, 1, 0, 0x81), 16u, "DTHE=0 leaves 0x81 at 16");
+            t.Equals(drawRed(Run{GS_PSM_CT32, 1ull, 1ull}, 1, 0, 0x81), 0x81u, "CT32 frame buffers are not dithered");
         });
 
         tc.Run("FBA forces the framebuffer alpha high bit on CT32 writes", [](TestCase &t)
@@ -3752,6 +3871,63 @@ void register_ps2_gs_tests()
                      "AFAIL=RGB_ONLY should preserve destination alpha on CT32");
             t.Equals(rgbOnly.depth, kInitialDepth,
                      "AFAIL=RGB_ONLY should preserve depth");
+        });
+
+        // PRIM.AA1 (decision D-GS-1); expected values computed by hand from the coverage rules.
+        constexpr uint64_t kAa1 = 1ull << 7, kAbe = 1ull << 6;
+        tc.Run("GS AA1 line: two edge pixels per column weighted by distance, blended through ALPHA, no Z write", [](TestCase &t)
+        {
+            // y = 4.75: rows 4 and 5 straddle it at distances 0.25 and 0.75 -> coverage 96 and 32 (of 128).
+            AaCanvas plain;
+            plain.draw(GS_PRIM_LINE | kAa1, 0x80u, {{1.0f, 4.75f}, {5.0f, 4.75f}});
+            t.Equals(plain.frame(1, 4), 0x600000BFu, "row 4: (255 * 96) >> 7 = 191, alpha = coverage 96");
+            t.Equals(plain.frame(4, 5), 0x2000003Fu, "row 5: (255 * 32) >> 7 = 63, alpha = coverage 32");
+            t.IsTrue(plain.frame(0, 4) == 0u && plain.frame(5, 4) == 0u && plain.frame(2, 3) == 0u,
+                     "columns whose centre is outside [1, 5) and rows farther than one pixel stay untouched");
+            t.Equals(plain.depth(2, 4), 0x11111111u, "AA1 line pixels are edge pixels: no Z write");
+
+            AaCanvas translucent; // ABE with source alpha 0x40: the coverage replaces only an alpha of 0x80
+            translucent.draw(GS_PRIM_LINE | kAa1 | kAbe, 0x40u, {{1.0f, 4.75f}, {5.0f, 4.75f}});
+            t.IsTrue(translucent.frame(1, 4) == 0x4000007Fu && translucent.frame(1, 5) == 0x4000007Fu,
+                     "ABE keeps alpha 0x40 on both rows");
+            AaCanvas opaque;
+            opaque.draw(GS_PRIM_LINE | kAa1 | kAbe, 0x80u, {{1.0f, 4.75f}, {5.0f, 4.75f}});
+            t.Equals(opaque.frame(1, 4), 0x600000BFu, "ABE with alpha 0x80 takes the coverage");
+
+            AaCanvas late; // starts at x = 1.75: column 1's centre (1.5) lies before the start
+            late.draw(GS_PRIM_LINE | kAa1, 0x80u, {{1.75f, 4.75f}, {5.0f, 4.75f}});
+            t.IsTrue(late.frame(1, 4) == 0u && late.frame(2, 4) == 0x600000BFu, "only centres in [start, end) are drawn");
+
+            AaCanvas steep; // x = 2.25: columns 1 and 2 at distances 0.75 and 0.25
+            steep.draw(GS_PRIM_LINE | kAa1, 0x80u, {{2.25f, 1.0f}, {2.25f, 4.0f}});
+            t.IsTrue(steep.frame(1, 2) == 0x2000003Fu && steep.frame(2, 2) == 0x600000BFu && steep.frame(3, 2) == 0u,
+                     "a steep line weights the pixels of each row");
+        });
+
+        tc.Run("GS AA1 triangle: interior pixels at alpha 0x80, the uncovered-centre fringe at its exact coverage", [](TestCase &t)
+        {
+            // Hypotenuse x + y = 8.5: pixel (4,4) has its centre outside and 1/8 of its square inside -> coverage 16.
+            AaCanvas aa;
+            aa.draw(GS_PRIM_TRIANGLE | kAa1, 0x80u, {{0.0f, 0.0f}, {8.5f, 0.0f}, {0.0f, 8.5f}});
+            t.Equals(aa.frame(4, 3), 0x800000FFu, "interior pixel: alpha 0x80, (255 * 128) >> 7 = 255");
+            // (the triangle path interpolates Z with float weights, so a constant 0x22222222 can land a few units off)
+            t.IsTrue(aa.depth(4, 3) != 0x11111111u, "interior pixels write Z");
+            t.Equals(aa.frame(4, 4), 0x1000001Fu, "fringe pixel: coverage 16, (255 * 16) >> 7 = 31");
+            t.Equals(aa.depth(4, 4), 0x11111111u, "fringe pixels do not write Z");
+            t.Equals(aa.frame(5, 3), 0x1000001Fu, "the fringe follows the edge");
+            t.IsTrue(aa.frame(6, 6) == 0u && aa.frame(9, 0) == 0u, "pixels the triangle does not reach stay untouched");
+
+            AaCanvas reversed; // the same triangle wound the other way
+            reversed.draw(GS_PRIM_TRIANGLE | kAa1, 0x80u, {{0.0f, 0.0f}, {0.0f, 8.5f}, {8.5f, 0.0f}});
+            t.IsTrue(reversed.frame(4, 3) == 0x800000FFu && reversed.frame(4, 4) == 0x1000001Fu, "winding does not change the coverage");
+
+            AaCanvas faint; // ABE clear: AA1 sets the interior alpha to 0x80 whatever the source alpha
+            faint.draw(GS_PRIM_TRIANGLE | kAa1, 0x40u, {{0.0f, 0.0f}, {8.5f, 0.0f}, {0.0f, 8.5f}});
+            t.Equals(faint.frame(4, 3), 0x800000FFu, "interior alpha 0x80 replaces the source 0x40");
+
+            AaCanvas plain;
+            plain.draw(GS_PRIM_TRIANGLE, 0x80u, {{0.0f, 0.0f}, {8.5f, 0.0f}, {0.0f, 8.5f}});
+            t.IsTrue(plain.frame(4, 3) == 0x800000FFu && plain.frame(4, 4) == 0u, "without AA1 there is no fringe");
         });
 
         tc.Run("GS RGB_ONLY falls back to FB_ONLY outside CT32", [](TestCase &t)

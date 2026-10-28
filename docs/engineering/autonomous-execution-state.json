@@ -1,0 +1,294 @@
+{
+  "schema": 1,
+  "note": "Resumable state of the PS2 hardware engineering program. Verify against git before acting: the commit fields describe the branch when this file was last committed, not necessarily now.",
+  "repository": "https://github.com/m7kor/Zmbor",
+  "pull_request": "https://github.com/m7kor/Zmbor/pull/7",
+  "branch": "ultimate/ps2-hardware-system-engineering",
+  "base": {
+    "branch": "main",
+    "commit": "ec4a32de4d77b41990591d87a36f475e7725099b"
+  },
+  "push_remote": "https://github.com/m7kor/Zmbor.git (in the worktrees 'origin' is upstream ran-j/PS2Recomp: never push there)",
+  "rules": [
+    "one PR (#7); no merge, no force-push, no history rewrite",
+    "statuses change only in docs/status/components.json, with evidence; never shrink the 174/227 denominator",
+    "no .expected edits; no hardware results without a physical PS2 run"
+  ],
+  "baseline": {
+    "commit": "34d48e0",
+    "ps2autotests_programs": "53/55",
+    "ps2autotests_lines": "8202/8250",
+    "ps2x_tests": "598/598",
+    "ctest": "54/54",
+    "e2e": "4/4",
+    "iop": "4/4",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate12.manifest.json",
+    "gate_note": "clean tree",
+    "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
+  },
+  "batches": [
+    {
+      "id": 1,
+      "commits": [
+        "5fab12b",
+        "4b58414",
+        "77ea0dc",
+        "d292229",
+        "d92e313",
+        "df62323",
+        "4e2fd3d",
+        "02672be",
+        "734c40c",
+        "0e47a2b"
+      ],
+      "components": {
+        "gs.dither": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "dma.mfifo": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "mutants": "GS 4/4, DMA 8/8 killed",
+      "fuzz": "dma harness with MFIFO, 30,977 ASan executions, no finding"
+    },
+    {
+      "id": 2,
+      "commits": [
+        "78b17e6",
+        "d025f87",
+        "c545f1a",
+        "059629f",
+        "7274ffb",
+        "c64f357"
+      ],
+      "components": {
+        "dma.stall": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "mutants": "stall control 10/10 killed (S9 survived the first run; test added in d025f87)",
+      "fuzz": "dma harness with stall control, 26,801 ASan executions in 180 s, no finding",
+      "contracts": "174/174 hardware components; checker with schema, dependency and cycle rules, selftest 9/9"
+    },
+    {
+      "id": 3,
+      "commits": [
+        "2318aad",
+        "878f01a",
+        "b3d8537",
+        "00e1498",
+        "607428b",
+        "7181e0f"
+      ],
+      "components": {
+        "iop.cpu": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (7 real-PS2 cpu/iop programs, verified at 00e1498)"
+      },
+      "fixes": [
+        "IRX relocation added the symbol value on top of the load base",
+        "IOP printf/sprintf/vsprintf did not format arguments",
+        "JALR wrote the link before reading the target"
+      ],
+      "evidence": "ps2autotests IOP programs 0/23 -> 8/23 exact; cpu/iop 7/7",
+      "gate": "7181e0f: 53/55, 8202/8250, 0 regressions; unit 563/563, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 4,
+      "commits": [
+        "3696d34",
+        "c3e9553",
+        "1b55608",
+        "7929cbc",
+        "e2be153"
+      ],
+      "components": {
+        "iop.kernel": "HLE_OR_STUB -> VERIFIED_PARTIAL (12 kernel/iop programs)",
+        "iop.intr": "HLE_OR_STUB -> VERIFIED_PARTIAL (2 interrupt programs)"
+      },
+      "fixes": [
+        "module start runs in a priority-8 kernel thread with preemption",
+        "typed waits, KE_* codes, message boxes, variable pools",
+        "VBLANK raised on the guest clock",
+        "intrman registration codes, strtok/strtok_r",
+        "import stub retires a pending load"
+      ],
+      "mutants": "IOP kernel 15/15 killed (K13 survived first, test added in 1b55608)",
+      "evidence": "ps2autotests IOP programs 8/23 -> 23/23",
+      "gate": "e2be153: 53/55, 8202/8250, 0 regressions; unit 563/563, ctest 54/54, e2e 4/4, IOP 4/4",
+      "limitations": [
+        "cpu/iop/lsudelay does not return after -- TEST END (jal printf with lw ra in its delay slot); comparable output matches; post-END hardware behaviour unknown"
+      ]
+    },
+    {
+      "id": 5,
+      "commits": [
+        "a1f2ddc",
+        "0ad6e4b",
+        "b9dc257",
+        "0254b68",
+        "46c4cf8"
+      ],
+      "components": {
+        "iop.irx": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (23 IOP programs)",
+        "iop.mem": "IMPLEMENTED_UNVERIFIED -> VERIFIED_PARTIAL (lsu, lsudelay)",
+        "dma.c6": "HLE_OR_STUB -> IMPLEMENTED_UNVERIFIED (SIF1 channel model)"
+      },
+      "mutants": "SIF1 5/5 killed (F3 survived first, test strengthened in b9dc257)",
+      "sanitizers": "IOP suites and 16 kernel/iop programs under MSVC ASan: 0 reports",
+      "gate": "46c4cf8: 53/55, 8202/8250, 0 regressions; unit 567/567, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 6,
+      "commits": [
+        "6ecc5f3",
+        "8585b80",
+        "22f6830",
+        "038536f"
+      ],
+      "components": {
+        "dma.c4": "MISSING -> IMPLEMENTED_UNVERIFIED (toIPU normal mode)"
+      },
+      "notes": [
+        "IPU core: CMD/CTRL/BP/TOP, 8-qword input FIFO, BCLR/FDEC/SETIQ/SETVQ/SETTH, CTRL.RST, INTC 8",
+        "ipu.cmd and ipu.dma stay MISSING (decoders, output FIFO, fromIPU absent)",
+        "SIF0 deferred: IOP-side sifman and EE reception are HLE; a channel-5 model would bypass a working path with no program that drives it"
+      ],
+      "mutants": "IPU 6/6 killed (I5 survived first, test added in 8585b80)",
+      "gate": "038536f: 53/55, 8202/8250, 0 regressions; unit 570/570, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 7,
+      "commits": [
+        "0828791",
+        "390f9fa",
+        "67b7810",
+        "d15ce5a"
+      ],
+      "components": {
+        "dma.c3": "MISSING -> IMPLEMENTED_UNVERIFIED (fromIPU)",
+        "ipu.dma": "MISSING -> IMPLEMENTED_UNVERIFIED (both FIFOs and channels, normal mode)"
+      },
+      "notes": [
+        "IPU CSC with integer BT.601 (decision D-IPU-1), dither, TH0/TH1 alpha; 8-qword output FIFO refilled as it drains",
+        "ipu.cmd stays MISSING: IDEC/BDEC/VDEC/PACK"
+      ],
+      "mutants": "CSC 6/6 killed (C2, C5 survived first, test added in 390f9fa)",
+      "gate": "d15ce5a: 53/55, 8202/8250, 0 regressions; unit 572/572, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 8,
+      "commits": [
+        "ff3a138",
+        "539db01",
+        "af37990"
+      ],
+      "components": {},
+      "notes": [
+        "IPU PACK to RGB16 / 4-bit VQ indices (decision D-IPU-2); ipu.cmd stays MISSING until IDEC/BDEC/VDEC"
+      ],
+      "mutants": "PACK 3/3 killed",
+      "gate": "af37990: 53/55, 8202/8250, 0 regressions; unit 573/573, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 9,
+      "commits": [
+        "b2f7ce1",
+        "3f30488",
+        "6f93475"
+      ],
+      "components": {},
+      "notes": [
+        "IPU VDEC with MPEG-2 VLC tables B-1, B-2..B-4, B-10, B-11; ipu.cmd stays MISSING until IDEC/BDEC"
+      ],
+      "mutants": "VDEC 4/4 killed",
+      "gate": "6f93475: 53/55, 8202/8250, 0 regressions; unit 574/574, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 10,
+      "commits": [
+        "a915237",
+        "d0432bc",
+        "b916ea6",
+        "a8e4992",
+        "71ca2cb",
+        "c708b8d",
+        "2dd2583",
+        "960e6de",
+        "d82a40a"
+      ],
+      "components": {
+        "ipu.cmd": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "IPU BDEC (D-IPU-3) and IDEC (D-IPU-4); CTRL.RST raises the interrupt of a running command",
+        "ffmpeg 8.0.1 fixtures (tools/ipu/make_ipu_fixtures.py): 6 pictures bit-exact, field DCT and per-MB quantiser exercised",
+        "semantics ledger docs/engineering/PS2_IPU_SEMANTICS.md (A1-A12 departures, B1-B11 unknown PS2 behaviour)"
+      ],
+      "mutants": "BDEC 15/15, IDEC 15/15 non-equivalent (I15 equivalent: redundant code removed)",
+      "gate": "2dd2583: 53/55, 8202/8250, 0 regressions; unit 596/596 (ASan 596/596), ctest 54/54, e2e 4/4, IOP 4/4; IOP corpus 23/23"
+    },
+    {
+      "id": 11,
+      "commits": [
+        "0765383",
+        "4aeb111",
+        "0e345dc"
+      ],
+      "components": {
+        "gs.aa": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "GS PRIM.AA1 lines and triangles, decision D-GS-1"
+      ],
+      "mutants": "AA1 11/11 killed",
+      "gate": "0765383: 53/55, 8202/8250, 0 regressions; unit 598/598, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 12,
+      "commits": [
+        "944a3e5",
+        "fa440ad",
+        "34d48e0",
+        "713127b",
+        "adaecc7"
+      ],
+      "components": {
+        "spu.cores": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "spu.ram": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "spu.irq": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "SPU2 register file, 2 MB sound RAM, data port, IRQA, IOP DMA 4/7 (decision D-SPU-1); no voice engine"
+      ],
+      "mutants": "SPU2 14/14 non-equivalent (S12 equivalent: dead guard removed)",
+      "gate": "34d48e0: 53/55, 8202/8250, 0 regressions; unit 598/598, ctest 54/54, e2e 4/4, IOP 4/4; IOP corpus 23/23; IOP ASan clean"
+    }
+  ],
+  "hardware_inventory": {
+    "VERIFIED_COMPLETE": 18,
+    "VERIFIED_PARTIAL": 52,
+    "IMPLEMENTED_UNVERIFIED": 66,
+    "HLE_OR_STUB": 20,
+    "MISSING": 14,
+    "NOT_APPLICABLE": 3,
+    "UNKNOWN": 1
+  },
+  "hardware_blockers": [
+    "SIF0 (EE channel 5 / IOP channel 9) has no DMA channel model: open architectural task, HLE is not a permanent substitute",
+    "No physical PS2: IPU behaviour B1-B11 (PS2_IPU_SEMANTICS.md), timing and every probe in PS2_HARDWARE_VERIFICATION.md are unrun"
+  ],
+  "known_failures": [
+    "cpu_ee_fpu_sqrt 59/66 (RSQRT.S)",
+    "vu_lower_efu 182/223 (EATAN/ESIN/EEXP last bits)"
+  ],
+  "pending_owner_decisions": [
+    "merge of PR #7"
+  ],
+  "reproduce": {
+    "build": "MSVC 14.44 + Ninja, cmake -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=<Python310 with z3>, FETCHCONTENT_SOURCE_DIR_* from D:/Project/Zmbor/deps",
+    "unit": "build/ps2xTest/ps2x_tests (from the repo root; delete ps2_log.txt afterwards)",
+    "gate": "tools/acceptance/gate.ps1 (docs/architecture/acceptance-gate.md)",
+    "coverage": "python -I tools/hwcoverage/hwcoverage.py record --tests-exe build/ps2xTest/ps2x_tests.exe && python -I tools/hwcoverage/hwcoverage.py report",
+    "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
+    "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
+  },
+  "next_action": "SPU2 voice engine: spu.adpcm + spu.voices (KON/KOFF per 48 kHz tick, NAX/ENDX, IRQA on fetch), then spu.pitch, spu.adsr, spu.mix, spu.reverb, ADMA; SIF0 stays open",
+  "owner_decisions": {
+    "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
+    "merge": "not authorised"
+  }
+}

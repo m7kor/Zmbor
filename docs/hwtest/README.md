@@ -31,3 +31,21 @@ run fails in a later one.
 
 Fixed in Phase 4 (see `CHANGELOG.md`): branch in a delay slot, heap ownership (memory/ee/default), COP0 performance
 counters, MUL.S truncation and non-commutativity, VU0 vi24.
+
+## IOP programs (separate measurement)
+
+ps2autotests also ships 23 prebuilt IOP modules (`tests/cpu/iop`, `tests/kernel/iop`, `.irx`) with real-PS2 `.expected`
+output. They run on the ps2xIOP emulator through `tools/hwtest/iop_hwtest.py` (runner `ps2_iop_autotest_runner`, same
+BEGIN/END extraction and comparison as the EE programs) and are reported in `iop-dashboard.json` / `IOP_DASHBOARD.md`.
+They are not added to the 55 EE programs above.
+
+| run | exact programs | matching lines |
+|---|---|---|
+| first run (printf formatting in place, before the IRX relocation fix) | 0 / 23 (no output) | 0 / 1306 |
+| after the IRX relocation fix (`2318aad`) and printf formatting (`878f01a`) | 7 / 23 | 1167 / 1306 |
+| JALR fix (`00e1498`) | 8 / 23 | 1168 / 1306 |
+| current (IOP kernel `c3e9553`, intrman/sysclib `3696d34`; recorded at `1b55608`) | 23 / 23 | 1306 / 1306 |
+
+Exact: all 23 programs (`cpu/iop` 7, `kernel/iop` 16). `cpu/iop/lsudelay` does not return from its start code after
+`-- TEST END` (`jal printf` with `lw ra` in the delay slot unwinds the wrong frame); everything up to the marker
+matches, and what a real PS2 does after it is not in the `.expected` file.

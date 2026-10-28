@@ -1,0 +1,192 @@
+# PS2 implementation decisions
+
+Each record states the behaviour chosen where references disagree or where hardware behaviour is unknown, the
+evidence for and against, and what would settle it. A decision is not hardware evidence; components that rest on
+one stay unverified until the stated measurement exists.
+
+## D-GS-1 — DIMX element encoding and which frame buffers are dithered
+
+- **Chosen:** each DMyx is a 3-bit two's complement value (-4..3) added to R, G and B; dithering applies only to
+  16-bit frame buffers (PSMCT16/PSMCT16S). `gs_cpu_backend.cpp` `ditherMatrixValue`, `WritePixel`.
+- **For:** PCSX2 (f0523f8) `GSRegs.h` declares `s32 DMyx : 3`; `GSDrawScanline.cpp` WriteFrame adds the matrix only
+  when `fpsm == 2` (16-bit formats). PCSX2 is the most widely tested implementation.
+- **Against:** DobieStation (68dd073) `gsthread.cpp` reads bit 2 as "subtract (low two bits + 1)", so `100` is -1 and
+  `111` is -4 (the reverse order for negative values), and dithers every frame-buffer format. Play! has no dithering.
+- **Settles it:** GS output captured on a PS2 for a dither probe: flat-colour quads over a DIMX with distinct negative
+  entries, in PSMCT16 and PSMCT32, read back through local-to-host transfers.
+- **Status impact:** `gs.dither` is `IMPLEMENTED_UNVERIFIED`.
+
+## D-GS-2 — COLCLAMP and the order blend → dither → clamp
+
+- **Chosen:** blending and dithering produce signed values wider than 8 bits; COLCLAMP=1 saturates to 0..255,
+  COLCLAMP=0 keeps the low 8 bits. COLCLAMP's reset value is 0; the SDK environment (`Support.h`) sets 1.
+- **For:** PCSX2 WriteFrame (`colclamp == 0` masks with 0xFF, otherwise packs with saturation) and DobieStation
+  (`COLCLAMP` clamps, otherwise `&= 0xFF`) agree, both after dithering.
+- **Against:** none found.
+- **Settles it:** GS output for blend probes that overflow and underflow with both COLCLAMP values.
+- **Status impact:** `gs.alpha` stays `IMPLEMENTED_UNVERIFIED` (no GS hardware program covers blending).
+
+## D-DMA-1 — When fromSPR writes into the MFIFO ring
+
+- **Chosen:** fromSPR wraps into the ring only when D_CTRL.MFD selects a drain **and** its MADR lies inside
+  [RBOR, RBOR + RBSR + 16).
+- **For:** DobieStation wraps whenever MFD is set; PCSX2 `_SPR0chain` wraps whenever MADR is inside the ring, without
+  looking at MFD. Requiring both never writes outside the ring when either reference would not.
+- **Against:** a program that writes fromSPR into the ring with MFD=0 and expects wrapping (PCSX2 behaviour) would
+  write linearly here.
+- **Settles it:** an MFIFO probe on hardware writing into the ring with MFD=0 and with MADR outside the ring.
+
+## D-DMA-2 — MFIFO stall granularity
+
+- **Chosen:** the drain consumes a tag only when the tag and the data that follows it are in the ring; otherwise it
+  stops before the tag.
+- **For:** the runtime's DMA model transfers whole tags synchronously (`dma.timing` is HLE); the data a program sees
+  after the drain resumes is the same.
+- **Against:** the hardware (DobieStation `mfifo_handler`, per qword) can stop inside a tag's data, so MADR/QWC
+  observed while stalled can differ.
+- **Settles it:** an MFIFO probe that reads drain MADR/QWC while stalled; then a per-qword drain if they differ.
+
+## D-DMA-3 — D_STAT bit 31
+
+- **Kept:** bit 31 of D_STAT is this runtime's INT1 line (some masked status bit is set). The hardware register has no
+  defined bit 31 (PCSX2 `Dmac.h` DMACh_STAT); a guest read sees it. Unchanged from earlier phases; noted so that it is
+  not mistaken for hardware behaviour.
+
+## D-DMA-4 — Stall control (D_CTRL.STS/STD, D_STADR)
+
+- **Chosen:** with STS = fromSPR, a fromSPR normal or interleave transfer leaves its final MADR in D_STADR. The STD
+  drain (VIF1 or GIF) checks `MADR + QWC * 16 > D_STADR` before each REFS tag and before a normal-mode transfer; if
+  so it stops before the data, stays active (STR set, no CIS) and raises D_STAT.SIS once per stall. A write to D_STADR
+  or D_CTRL, or a fromSPR transfer that moves D_STADR, makes it check again from where it stopped.
+- **For:** PCSX2 (`Gif.cpp`, `Vif1_Dma.cpp`: REFS check, `tadr -= 16`; `SPR.cpp`: STADR = MADR in normal and
+  interleave mode) and DobieStation (`dmac.cpp`: `can_stall_drain` for non-chain modes and REFS, `update_stadr`
+  re-activates the stalled drain, `has_dma_stalled` raises SIS once) agree on the comparison, the source update and
+  the REFS rule.
+- **Against:** the references differ on granularity: PCSX2 stalls a whole tag, DobieStation per block of up to 8
+  qwords, so MADR observed during a stall can differ from hardware (same limitation as D-DMA-2). Normal-mode drain
+  stall follows DobieStation only (PCSX2 logs it as unimplemented). D_STADR updates during a fromSPR transfer are not
+  visible because the transfer is synchronous. SIF0 and fromIPU as sources, SIF1 as drain and the fromSPR
+  destination-chain CNTS tag are not modelled (those channels have no DMA model in `PS2Memory`).
+- **Settles it:** a stall-control probe on hardware reading drain MADR/QWC, D_STADR and SIS while a fromSPR source and
+  a GIF/VIF1 drain overlap, in normal mode and with REFS tags.
+
+## D-IPU-1 — IPU colour-space conversion (CSC)
+
+- **Chosen:** the integer BT.601 method with Y bias 16 and coefficients 0x95 (Y), 0xCC (R from Cr), -0x68 (G from Cr),
+  -0x32 (G from Cb), 0x102 (B from Cb) in 1/64 units, each term shifted right by 6, summed, plus 1, shifted right by 1,
+  clamped to 0-255. Alpha is 0 below TH0 in all channels, 0x40 below TH1, else 0x80. RGB16 takes the top 5 bits,
+  optionally after a 4x4 dither, with bit 15 set for alpha 0x40.
+- **For:** PCSX2 (`IPU/yuv2rgb.cpp` yuv2rgb_reference) describes this as the precise documented integer method used by
+  the hardware. Its dither matrix and RGB16 packing (`IPU/IPUdither.cpp`) agree with DobieStation's.
+- **Against:** DobieStation (`ee/ipu/ipu.cpp` process_CSC) uses full-range float coefficients (1.402, 0.34414,
+  0.71414, 1.772) without the Y bias; the two give different colours. The alpha threshold rule is DobieStation's.
+  The value read from an empty IPU_out_FIFO (zero here) is unknown.
+- **Settles it:** an IPU probe converting known macroblocks (grey ramp, saturated chroma, values around TH0/TH1)
+  and reading the RGB32/RGB16 output back.
+
+## D-IPU-2 — IPU PACK to 4-bit indices
+
+- **Chosen:** each pixel is reduced to RGB 5:5:5 (with the optional dither) and replaced by the index of the VQ CLUT
+  entry with the smallest squared distance; on a tie the lower index wins. Two pixels per byte, the even pixel in the
+  low nibble.
+- **For:** DobieStation (`ee/ipu/ipu.cpp` process_PACK) models PACK this way.
+- **Against:** a single reference. PCSX2's indexed PACK was not compared, and the distance metric and tie rule are
+  not documented anywhere available here.
+- **Settles it:** an IPU probe packing a macroblock against a CLUT with equidistant entries.
+
+## D-IPU-3 — IPU BDEC reconstruction
+
+- **Chosen:** ISO/IEC 13818-2 as written (ISO/IEC 11172-2 with CTRL.MP1):
+  - the SETIQ matrices are taken in zigzag order whatever CTRL.AS, as the standard transmits them;
+  - inverse quantisation divides with truncation toward zero, then saturates to [-2048, 2047];
+  - MPEG-2 applies mismatch control to F[7][7]; MPEG-1 makes each non-zero AC value odd instead;
+  - the inverse DCT is the exact separable cosine transform of Annex A in double precision, rounded to nearest, then
+    saturated to [-256, 255];
+  - intra samples are clamped to 0-255; non-intra samples stay signed;
+  - DC predictors are reset only by the DCR option.
+- **For:** the standard is the only complete specification available. PCSX2 (libmpeg2-derived) also clamps intra
+  output and resets the predictors only on DCR.
+- **Against:** the IPU's own IDCT is integer hardware, and any IEEE 1180 implementation may differ from this reference
+  by 1 in some samples. The references also disagree:
+  - PCSX2 weights a coefficient by its scan position (equal to this choice for zigzag, different for alternate scan)
+    and shifts escape levels arithmetically;
+  - DobieStation odd-ifies every format, with no mismatch control.
+- **Settles it:** an IPU probe decoding blocks with alternate scan, escape levels of both signs and a DC that rounds
+  at .5, compared with RAW16 output from a physical PS2.
+
+## D-IPU-4 — IPU IDEC slice decoding
+
+- **Chosen:** IDEC starts at the slice's first macroblock_type, after software has read the slice header and the
+  first macroblock_address_increment.
+  - **Per macroblock:**
+    - macroblock_type from B-2 (intra only);
+    - dct_type when option DTD is set;
+    - a 5-bit quantiser_scale_code when the type has macroblock_quant. It holds for the following macroblocks;
+      before the first one, the option's QSC applies.
+  - **Blocks:** six intra blocks as BDEC decodes them, then CSC (OFM, DTE, and SGN after the alpha thresholds).
+  - **DC predictors:** reset to 128 << IDP at the command start and after an address increment above 1.
+  - **Pacing:** the next macroblock is decoded only after the converted one has entered the output FIFO.
+  - **End of slice:** where an increment is due but none is coded, next_start_code must follow (zero bits to the byte
+    boundary, zero bytes, then 0x000001). The start code is left in the FIFO and CTRL.SCD is set. Anything else sets
+    CTRL.ECD, and so does an escape with no increment after it.
+- **For:** this is ISO/IEC 13818-2 6.2.4-6.2.5 and 7.2.1. PCSX2's IDEC follows the same order: modes, quantiser,
+  blocks, CSC, output, then the address increment. It resets the predictors the same way and leaves the start code
+  for software. DobieStation reads dct_type before the quantiser too.
+- **Against:**
+  - PCSX2 ends the slice without a flag when the bits after a macroblock are neither an increment nor zero, where
+    this model sets ECD.
+  - DobieStation reads dct_type and then ignores it.
+  - Neither reference documents IPU_CMD's value after IDEC; this model leaves it unchanged.
+  - The hardware's pacing between the macroblocks of one command is unknown.
+- **Settles it:** an IDEC probe on a physical PS2. Feed slices that end in garbage, in a start code at an odd bit
+  position, and after macroblock_escape. Record CTRL.SCD/ECD, IPU_CMD, IPU_TOP and BP after each.
+
+## D-GS-1 — GS PRIM.AA1 antialiasing
+
+- **Chosen:** AA1 applies to lines and triangles.
+  - **Alpha:** the pixel's coverage, in 1/128 units, replaces the source alpha before the alpha test. With ABE set, it
+    replaces only a source alpha of 0x80.
+  - **Blending:** the ALPHA register formula is applied whether or not ABE is set.
+  - **Edge pixels** do not write Z.
+  - **Lines:** every line pixel is an edge pixel. Along the major axis, each column (or row) whose centre lies in
+    [start, end) is drawn as the two pixels that straddle the line, with weights 1 - f and f by distance.
+  - **Triangles:** interior pixels (centre covered) are drawn as before, at alpha 0x80. Each pixel whose centre is not
+    covered but whose square the triangle partly covers is drawn once as an edge pixel. Its coverage is that area,
+    computed exactly by clipping the square against the three edges. Its attributes are those of the nearest point of
+    the triangle.
+- **For:** PCSX2's software renderer is the only reference that models AA1, and it has the same alpha, blending and
+  Z-write rules, also for edge pixels only.
+- **Against:**
+  - The fringe pixels and their coverage values are this model's own definition. PCSX2 steps each edge, selects the
+    pixels with an edge-function walk, and says it picks its x bounds arbitrarily where hardware results are unclear.
+  - DobieStation and Play! ignore AA1.
+  - No GS manual text was available here.
+- **Settles it:** a GS probe that draws AA1 lines at known sub-pixel offsets and AA1 triangles with known edge slopes,
+  then reads the framebuffer and Z buffer back.
+
+## D-SPU-1 — SPU2 register file and sound RAM
+
+- **Chosen:**
+  - **Layout:** two cores at IOP 0x1F900000 and 0x1F900400, plus the volume/SPDIF block at 0x1F900760. Registers
+    are 16 bits wide, and a 32-bit access is two 16-bit accesses, low half first.
+  - **Read-back:** every register reads back as written. Address high halves keep 4 bits (20-bit halfword
+    addresses), and ATTR bit 15 does not read back.
+  - **Data port and DMA:** both move sound RAM at the core's transfer address. Writing TSA sets that address; data
+    moves advance it and wrap in the 2 MB RAM. IOP DMA channels 4 and 7 move their data when the channel starts, and
+    STAT bit 7 is set at the end. ATTR bit 15 clears STAT bit 7.
+  - **IRQA:** every sound-RAM access is checked against both cores' IRQA. A hit on a core with ATTR bit 6 sets
+    IRQINFO bit 2 + core and raises IOP INTC line 9. Clearing ATTR bit 6 clears that bit; writes to IRQINFO are
+    ignored.
+  - **KON:** loads NAX from SSA and clears the voice's ENDX bit. KON/KOFF latch until a voice engine consumes them.
+  - **ENDX writes:** a write to 0x340 clears bits 0-15, and a write to 0x342 clears bits 16-23.
+- **For:** PCSX2 (spu2sys.cpp) and DobieStation (iop/spu/spu.cpp) agree on the layout, the 20-bit addresses, the
+  data port, the IRQA check and IRQINFO bits, KON's NAX/ENDX effects and the ENDX write rule.
+- **Against:**
+  - The ENDX write rule looks inconsistent: each half's write clears the other half. Both references have it this
+    way.
+  - The power-on register state, IRQINFO's write behaviour and STAT's other bits are unknown.
+  - The IOP DMA completion delay is the existing estimate (two cycles per word, at least 64). It is not a measured
+    figure.
+  - No ps2autotests program exercises the SPU2.
+- **Settles it:** an SPU2 register probe on a physical PS2. Read back every register after reset and after writes,
+  move data through the data port and DMA with IRQA set, and read ENDX after writes to each half.

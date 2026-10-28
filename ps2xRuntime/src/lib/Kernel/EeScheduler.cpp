@@ -1887,6 +1887,10 @@ void EeScheduler::processPendingEvents()
             dispatchIrq(false, 4u + vif); // INTC_VIF0 = 4, INTC_VIF1 = 5
         }
     }
+    if (m_runtime.memory().takePendingIpuInterrupt())
+    {
+        dispatchIrq(false, 8u); // INTC_IPU: an IPU command completed
+    }
     std::deque<EeEvent> pending;
     {
         std::lock_guard lock(m_eventMutex);

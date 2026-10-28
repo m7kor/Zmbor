@@ -1,0 +1,5750 @@
+{
+ "source": {
+  "inventory": "docs/status/components.json",
+  "hardware_results": "docs/hwtest/dashboard.json",
+  "unit_results": "docs/status/test-results.json",
+  "unit_results_commit": "713127b3119e86397c95264ce61d72f4ab2b1ef0",
+  "unit_results_binary_sha256": "79ab742270f12612e09d6c9196c6ceea7efd220bf83a36a6a4a0d4ad822a03a7"
+ },
+ "levels": [
+  "contract_specified",
+  "test_exists",
+  "test_executed",
+  "test_passed",
+  "vectors_passed",
+  "hardware_verified",
+  "timing_verified"
+ ],
+ "components_total": 174,
+ "totals": {
+  "contract_specified": 174,
+  "test_exists": 136,
+  "test_executed": 124,
+  "test_passed": 124,
+  "vectors_passed": 4,
+  "hardware_verified": 64,
+  "timing_verified": 0
+ },
+ "by_category": {
+  "A": {
+   "components": 41,
+   "contract_specified": 41,
+   "test_exists": 31,
+   "test_executed": 31,
+   "test_passed": 31,
+   "vectors_passed": 2,
+   "hardware_verified": 25,
+   "timing_verified": 0
+  },
+  "B": {
+   "components": 21,
+   "contract_specified": 21,
+   "test_exists": 19,
+   "test_executed": 19,
+   "test_passed": 19,
+   "vectors_passed": 2,
+   "hardware_verified": 9,
+   "timing_verified": 0
+  },
+  "C": {
+   "components": 27,
+   "contract_specified": 27,
+   "test_exists": 25,
+   "test_executed": 23,
+   "test_passed": 23,
+   "vectors_passed": 0,
+   "hardware_verified": 4,
+   "timing_verified": 0
+  },
+  "D": {
+   "components": 24,
+   "contract_specified": 24,
+   "test_exists": 22,
+   "test_executed": 22,
+   "test_passed": 22,
+   "vectors_passed": 0,
+   "hardware_verified": 10,
+   "timing_verified": 0
+  },
+  "E": {
+   "components": 13,
+   "contract_specified": 13,
+   "test_exists": 13,
+   "test_executed": 13,
+   "test_passed": 13,
+   "vectors_passed": 0,
+   "hardware_verified": 5,
+   "timing_verified": 0
+  },
+  "F": {
+   "components": 17,
+   "contract_specified": 17,
+   "test_exists": 14,
+   "test_executed": 7,
+   "test_passed": 7,
+   "vectors_passed": 0,
+   "hardware_verified": 9,
+   "timing_verified": 0
+  },
+  "G": {
+   "components": 13,
+   "contract_specified": 13,
+   "test_exists": 5,
+   "test_executed": 2,
+   "test_passed": 2,
+   "vectors_passed": 0,
+   "hardware_verified": 0,
+   "timing_verified": 0
+  },
+  "H": {
+   "components": 18,
+   "contract_specified": 18,
+   "test_exists": 7,
+   "test_executed": 7,
+   "test_passed": 7,
+   "vectors_passed": 0,
+   "hardware_verified": 2,
+   "timing_verified": 0
+  }
+ },
+ "components": [
+  {
+   "id": "ee.alu",
+   "name": "Integer ALU, shifts, moves (35 ops)",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.trap_arith",
+   "name": "Overflow-trapping ADD/ADDI/SUB/DADD/DADDI/DSUB",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "No hardware program names these; exception delivery on overflow only unit-tested",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "ee.branch",
+   "name": "Branches, branch-likely, J/JAL/JR/JALR",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.branchdelay",
+   "name": "Branch and jump in a delay slot",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Architecturally undefined; only the measured combinations are known",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.branch"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.lsu",
+   "name": "Loads and stores, 8 to 128 bit, unaligned forms",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "mem.rdram"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
+  },
+  {
+   "id": "ee.muldiv",
+   "name": "MULT/DIV, MADD, HI/LO and pipeline 1",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.sa",
+   "name": "SA register and QFSRV funnel shift",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.traps",
+   "name": "Conditional traps (TEQ, TGE, TLTI, ...)",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No test and no hardware program",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "ee.llsc",
+   "name": "LL/SC, SYNC, BREAK, CACHE",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program names them",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.cache",
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.cache",
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "ee.decode",
+   "name": "R5900 decode tables",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Most decoded mnemonics outside MMI are not named by a hardware program (see Measurements)",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 5,
+    "matching": 5
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.arith",
+   "name": "Parallel add, subtract, saturate, abs, min/max",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.compare",
+   "name": "Parallel compare",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.logic",
+   "name": "Parallel logic, shifts, PLZCW",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.muldiv",
+   "name": "Parallel multiply/divide, 128-bit HI/LO",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": true,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.shuffle",
+   "name": "Pack, extend, interleave, shuffle",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mmi.unexercised",
+   "name": "MMI MSUB/MSUBU",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Not named by any hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.alu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "cop0.regs",
+   "name": "COP0 registers (MFC0/MTC0)",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program for the register file",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "cop0.perf",
+   "name": "Performance counters (PCCR, PCR0/1)",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Event counts are derived from the runtime's cycle model, not measured hardware timing",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.regs"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": [
+    "cop0.regs"
+   ]
+  },
+  {
+   "id": "cop0.count",
+   "name": "Count/Compare timer interrupt",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No test of the Compare interrupt",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.intr"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "cop0.exc",
+   "name": "Exception entry, EPC/BD, BEV vectors",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program for exception entry",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.regs"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.regs"
+   ]
+  },
+  {
+   "id": "cop0.adderr",
+   "name": "Address-error exceptions",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Fast-path memory helpers do not check alignment; no hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "cop0.intr",
+   "name": "Interrupt enable, ERET, INTC dispatch order",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "cop0.bc0",
+   "name": "BC0F/BC0T (DMAC CPCOND)",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "COP0 instructions are not in the automated measurement; branch-likely forms not shown to be exercised",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.ctrl",
+    "dma.irq"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "cop0.tlb",
+   "name": "TLB (48 entries)",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No TLB-mapped address translation or refill/invalid exceptions; no test",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "cop0.cache",
+   "name": "Instruction/data cache model",
+   "category": "A",
+   "status": "MISSING",
+   "missing": "CACHE ops are translated without a cache model; coherency effects are not emulated",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.regs",
+    "mem.rdram"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.regs",
+    "mem.rdram"
+   ]
+  },
+  {
+   "id": "fpu.arith",
+   "name": "ADD/SUB/ABS/NEG/MOV/MAX/MIN, ADDA/SUBA",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": true,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.muldiv",
+   "name": "MUL/DIV, MADD/MSUB, MULA/MADDA/MSUBA",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.sqrt",
+   "name": "SQRT.S",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Its program also contains the RSQRT.S rows that mismatch",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.rsqrt",
+   "name": "RSQRT.S rounding",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "7 of 66 program lines differ by 1 ulp; no pre-registered datapath model fits",
+   "blocker": "Needs new hardware rows: probe P3 run on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.compare",
+   "name": "C.F/C.EQ/C.LT/C.LE",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.branch",
+   "name": "BC1F/BC1T/BC1FL/BC1TL",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.convert",
+   "name": "CVT.S.W / CVT.W.S",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.transfer",
+   "name": "MFC1/MTC1/CFC1/CTC1/LWC1/SWC1",
+   "category": "A",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "fpu.flags",
+   "name": "FCR31 flags and non-IEEE rounding",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "RSQRT.S rounding unknown (fpu.rsqrt)",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ee.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ee.timer03",
+   "name": "EE timers T0-T3 (COUNT/MODE/COMP/HOLD)",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program; host-time driven",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "k.threads",
+   "name": "Threads: create, start, sleep, suspend, terminate",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Preemption timing is not cycle-exact",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 8,
+    "matching": 8
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "k.sync",
+   "name": "Semaphores and event flags",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program for semaphores or event flags",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "k.irqh",
+   "name": "Interrupt handler syscalls (AddIntcHandler, ...)",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "k.heap",
+   "name": "Heap: SetupHeap, EndOfHeap",
+   "category": "A",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "k.syscalltab",
+   "name": "Syscall dispatch and SetSyscall overrides",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "k.alarm",
+   "name": "Alarms, DelayThread, VSync waits",
+   "category": "A",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.exc",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "cop0.exc"
+   ]
+  },
+  {
+   "id": "vu0.fmac",
+   "name": "Macro FMAC arithmetic (VADD, VMUL, VMADD, ...)",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Most macro FMAC mnemonics are not named by a hardware program (9 of 128 confirmed)",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": true,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.upper"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu0.int",
+   "name": "Macro integer ops (VIADD, VIAND, ...)",
+   "category": "B",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.lowerint"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu0.xfer",
+   "name": "QMFC2/QMTC2/CFC2/CTC2/LQC2/SQC2",
+   "category": "B",
+   "status": "VERIFIED_COMPLETE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu0.micro"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": [
+    "vu0.micro"
+   ]
+  },
+  {
+   "id": "vu0.mem",
+   "name": "Macro VU memory ops (VLQI, VSQD, VILWR, ...)",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.mem"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.mem"
+   ]
+  },
+  {
+   "id": "vu0.flags",
+   "name": "Macro MAC/STATUS/CLIP flags",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Probe P5 prepared, never run on hardware",
+   "blocker": "Physical PS2 + ps2sdk to run probe P5",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.flags"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu0.fdiv",
+   "name": "Macro VDIV/VSQRT/VRSQRT",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program in macro mode",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.fdiv"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.upper",
+   "name": "Upper (FMAC) instructions",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.flags"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.lowerint",
+   "name": "Lower integer ALU (IADD ... ISUBIU)",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "The program names all seven ops (checked by hand); VU micro instructions are not in the automated measurement",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.branch",
+   "name": "Branches, JR/JALR",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Hardware program covers JALR only",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.fdiv",
+   "name": "FDIV (DIV/SQRT/RSQRT) and Q pipeline",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.hazards"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.efu",
+   "name": "EFU (EATAN, ESIN, EEXP, ...) and P pipeline",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "41 of 223 program lines differ in the last bit",
+   "blocker": "Exact term rounding unknown; needs an EFU probe run on hardware",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": true,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.hazards"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.flags",
+   "name": "MAC/STATUS/CLIP flag pipeline",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.hazards"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.hazards",
+   "name": "Data hazards, stalls, cycle counts",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Only the random program checks cycle-level results on hardware",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.decode"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.rng",
+   "name": "Random unit (RINIT/RGET/RNEXT/RXOR)",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.decode"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.decode",
+   "name": "VU instruction decode, reserved opcodes",
+   "category": "B",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.ebit",
+   "name": "E/D/T bit stops, FBRST",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.sched"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
+  },
+  {
+   "id": "vu.mem",
+   "name": "VU0/VU1 micro and data memory, EE mapping",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "mem.io"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "mem.io"
+   ]
+  },
+  {
+   "id": "vu.load",
+   "name": "Microprogram loading and decode cache",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.mpg"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vif.mpg"
+   ]
+  },
+  {
+   "id": "vu0.micro",
+   "name": "VU0 micro mode (VCALLMS/VCALLMSR)",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program runs VU0 micro code",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.sched"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
+  },
+  {
+   "id": "vu.sched",
+   "name": "VU execution relative to the EE",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Concurrency timing against the EE is not measured",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.hazards"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vu.xgkick",
+   "name": "XGKICK (PATH1)",
+   "category": "B",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.mem",
+    "vu.sched"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.mem",
+    "vu.sched"
+   ]
+  },
+  {
+   "id": "gif.tags",
+   "name": "GIFtag formats (PACKED, REGLIST, IMAGE)",
+   "category": "C",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "gif.path1",
+   "name": "PATH1 (VU1 XGKICK)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vu.xgkick",
+    "gif.tags"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.xgkick"
+   ]
+  },
+  {
+   "id": "gif.path2",
+   "name": "PATH2 (VIF1 DIRECT/DIRECTHL)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.direct"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vif.direct"
+   ]
+  },
+  {
+   "id": "gif.path3",
+   "name": "PATH3 (GIF DMA) and MSKPATH3",
+   "category": "C",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c2",
+    "gif.tags"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": [
+    "dma.c2"
+   ]
+  },
+  {
+   "id": "gif.arb",
+   "name": "Path arbitration and GIF_STAT",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Priority and IMAGE-packet interleaving not measured on hardware",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gif.path1",
+    "gif.path2",
+    "gif.path3"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gif.path1",
+    "gif.path2"
+   ]
+  },
+  {
+   "id": "gs.priv",
+   "name": "Privileged registers (CSR, IMR, SMODE, DISPFB, ...)",
+   "category": "C",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "gs.events",
+   "name": "SIGNAL, FINISH, LABEL",
+   "category": "C",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "FINISH has no hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.priv",
+    "gs.genregs"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "gs.genregs"
+   ]
+  },
+  {
+   "id": "gs.genregs",
+   "name": "General registers (PRIM, TEX0/1/2, ALPHA, TEST, ...)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gif.tags"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "gs.vram",
+   "name": "4 MB local memory, pages and blocks",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "gs.swizzle",
+   "name": "Swizzling (PSMCT32/24/16/16S, PSMT8/4/8H/4HL/4HH, PSMZ)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.vram"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.vram"
+   ]
+  },
+  {
+   "id": "gs.xfer",
+   "name": "Image transfers (host-local, local-host, local-local)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.swizzle"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.swizzle"
+   ]
+  },
+  {
+   "id": "gs.prims",
+   "name": "Points, lines, triangles, strips, fans, sprites",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.genregs"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.genregs"
+   ]
+  },
+  {
+   "id": "gs.tex",
+   "name": "Texture sampling, STQ/UV, CLAMP, TEX1 filtering",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Mipmapping (LOD, MIPTBP) has no test",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.vram",
+    "gs.swizzle",
+    "gs.clut"
+   ],
+   "named_tests": {
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.vram",
+    "gs.swizzle",
+    "gs.clut"
+   ]
+  },
+  {
+   "id": "gs.clut",
+   "name": "CLUT (CSM1/CSM2, CSA, TEXCLUT, TEXA)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.vram",
+    "gs.swizzle"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.vram",
+    "gs.swizzle"
+   ]
+  },
+  {
+   "id": "gs.alpha",
+   "name": "Alpha blending and COLCLAMP (ALPHA, PABE, FBA, COLCLAMP)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.genregs",
+    "gs.tests"
+   ],
+   "named_tests": {
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.genregs",
+    "gs.tests"
+   ]
+  },
+  {
+   "id": "gs.tests",
+   "name": "Alpha, destination-alpha and depth tests",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.prims"
+   ],
+   "named_tests": {
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
+  },
+  {
+   "id": "gs.fog",
+   "name": "Fog (FOG, FOGCOL)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.prims"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
+  },
+  {
+   "id": "gs.mask",
+   "name": "Scissor, FBMSK, XYOFFSET",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.prims"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
+  },
+  {
+   "id": "gs.dither",
+   "name": "Dithering (DTHE, DIMX)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1)",
+   "blocker": "GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.alpha",
+    "gs.genregs",
+    "gs.swizzle"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.alpha",
+    "gs.genregs",
+    "gs.swizzle"
+   ]
+  },
+  {
+   "id": "gs.aa",
+   "name": "Antialiasing (AA1)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently)",
+   "blocker": "GS probe drawing AA1 lines and triangles on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.alpha"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.alpha"
+   ]
+  },
+  {
+   "id": "gs.cpu",
+   "name": "CPU rasteriser backend (reference path)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.prims"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.prims"
+   ]
+  },
+  {
+   "id": "gs.cache",
+   "name": "Texture and CLUT page caches",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.tex"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.tex"
+   ]
+  },
+  {
+   "id": "gs.fb",
+   "name": "Framebuffers, PMODE circuit merge",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.priv"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "gs.interlace",
+   "name": "Interlace and field mode (SMODE2, FIELD)",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.fb"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.fb"
+   ]
+  },
+  {
+   "id": "gs.present",
+   "name": "Frame presentation and VSync",
+   "category": "C",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.fb"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.fb"
+   ]
+  },
+  {
+   "id": "gs.vulkan",
+   "name": "Vulkan backend",
+   "category": "C",
+   "status": "MISSING",
+   "missing": "No GPU backend exists",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.cpu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.cpu"
+   ]
+  },
+  {
+   "id": "gs.pgs",
+   "name": "parallel-gs integration",
+   "category": "C",
+   "status": "MISSING",
+   "missing": "Spike planned (docs/architecture/phase8-roadmap.md, item 2)",
+   "blocker": "Vulkan-capable test host and GS trace capture",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "gs.cpu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "gs.cpu"
+   ]
+  },
+  {
+   "id": "dma.c0",
+   "name": "Ch 0 VIF0",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain",
+    "vif.stall"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c1",
+   "name": "Ch 1 VIF1",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain",
+    "vif.stall"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 5,
+    "matching": 5
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c2",
+   "name": "Ch 2 GIF",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks GIF-channel DMA directly",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c3",
+   "name": "Ch 3 fromIPU",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c4",
+   "name": "Ch 4 toIPU",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Source-chain mode; no hardware program; transfer timing",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c5",
+   "name": "Ch 5 SIF0 (IOP to EE)",
+   "category": "D",
+   "status": "HLE_OR_STUB",
+   "missing": "No DMAC channel model",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c6",
+   "name": "Ch 6 SIF1 (EE to IOP)",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised",
+   "blocker": "SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back)",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain"
+   ],
+   "named_tests": {
+    "cited": 5,
+    "executed": 5,
+    "passed": 5
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c7",
+   "name": "Ch 7 SIF2",
+   "category": "D",
+   "status": "MISSING",
+   "missing": "Not modelled",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c8",
+   "name": "Ch 8 fromSPR",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal",
+    "dma.interleave",
+    "mem.spr"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 3,
+    "matching": 3
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.c9",
+   "name": "Ch 9 toSPR",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain",
+    "dma.interleave",
+    "mem.spr"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 4,
+    "matching": 4
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.normal",
+   "name": "Normal (burst) mode, MADR/QWC write-back",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.ctrl",
+    "dma.irq"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.chain",
+   "name": "Source chain tags (REFE, CNT, NEXT, REF, REFS, END)",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.callret",
+   "name": "CALL/RET and ASR0/ASR1",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program uses CALL/RET",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.chain"
+   ],
+   "named_tests": {
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.interleave",
+   "name": "Interleave mode (SQWC/TQWC)",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.irq",
+   "name": "DMA interrupts (D_STAT CIS/SIS, tag IRQ, TIE)",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.intr",
+    "dma.ctrl"
+   ],
+   "named_tests": {
+    "cited": 4,
+    "executed": 4,
+    "passed": 4
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.ctrl",
+   "name": "D_CTRL, D_PCR, D_ENABLER/W",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "dma.stall",
+   "name": "Stall control (STS/STD, D_STADR)",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program; whole-tag/whole-transfer granularity (the references differ, D-DMA-4); SIF0 and fromIPU sources and fromSPR destination-chain CNTS are not modelled (the SIF1 drain is, 0ad6e4b)",
+   "blocker": "Stall-control probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md); SIF0/SIF1/fromIPU channel models",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c8",
+    "dma.c1",
+    "dma.c2",
+    "dma.c5",
+    "dma.c6",
+    "dma.c3",
+    "dma.chain",
+    "dma.normal",
+    "dma.irq",
+    "dma.ctrl"
+   ],
+   "named_tests": {
+    "cited": 6,
+    "executed": 6,
+    "passed": 6
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "dma.c2",
+    "dma.c5",
+    "dma.c6",
+    "dma.c3"
+   ]
+  },
+  {
+   "id": "dma.mfifo",
+   "name": "MFIFO ring (D_RBOR/D_RBSR)",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program; stall granularity is one tag (the hardware can stop inside the data, D-DMA-2); fromSPR interleave and chain modes into the ring are not wrapped",
+   "blocker": "MFIFO probe on a physical PS2 (docs/engineering/PS2_HARDWARE_VERIFICATION.md)",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c8",
+    "dma.c1",
+    "dma.c2",
+    "dma.chain",
+    "dma.irq",
+    "mem.spr"
+   ],
+   "named_tests": {
+    "cited": 4,
+    "executed": 4,
+    "passed": 4
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "dma.c2"
+   ]
+  },
+  {
+   "id": "dma.timing",
+   "name": "Bus arbitration, priority, timing",
+   "category": "D",
+   "status": "HLE_OR_STUB",
+   "missing": "No bus arbitration or transfer timing",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.normal",
+    "dma.chain"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mem.rdram",
+   "name": "32 MB RDRAM, kseg aliases, uncached mirrors",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mem.spr",
+   "name": "Scratchpad RAM (16 KB)",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.tlb"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "cop0.tlb"
+   ]
+  },
+  {
+   "id": "mem.fast",
+   "name": "Recompiled fast-path memory access",
+   "category": "D",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "mem.rdram"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
+  },
+  {
+   "id": "mem.io",
+   "name": "I/O register map",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.ctrl",
+    "per.intc",
+    "gs.priv"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "mem.reserved",
+   "name": "Runtime-reserved kernel area and arena",
+   "category": "D",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "mem.rdram",
+    "k.heap"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "mem.rdram"
+   ]
+  },
+  {
+   "id": "vif.unpack",
+   "name": "UNPACK formats (S, V2, V3, V4, V4-5)",
+   "category": "E",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.stcycl",
+    "vif.stmod",
+    "vif.mask",
+    "vu.mem"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": [
+    "vif.mask",
+    "vu.mem"
+   ]
+  },
+  {
+   "id": "vif.stcycl",
+   "name": "STCYCL skip and fill (CL/WL)",
+   "category": "E",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vif.stmod",
+   "name": "STMOD offset/difference/row modes",
+   "category": "E",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Scope not enumerated by the automated measurement; one matching program, coverage of every case not checked",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vif.mask",
+   "name": "Masking (STMASK, ROW, COL)",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs",
+    "vif.stcycl"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vif.stall",
+   "name": "I-bit stalls and VIF interrupts",
+   "category": "E",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs",
+    "per.intc"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vif.regs",
+   "name": "VIF registers, FBRST, STAT",
+   "category": "E",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "vif.mpg",
+   "name": "MPG microprogram upload",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs",
+    "vu.mem"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.mem"
+   ]
+  },
+  {
+   "id": "vif.dbf",
+   "name": "Double buffering (BASE, OFFSET, TOPS, ITOPS)",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.mscal"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vif.mscal"
+   ]
+  },
+  {
+   "id": "vif.mscal",
+   "name": "MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs",
+    "vu.sched"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "vu.sched"
+   ]
+  },
+  {
+   "id": "vif.direct",
+   "name": "DIRECT/DIRECTHL to PATH2",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "vif.regs",
+    "gif.tags"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "ipu.dma",
+   "name": "IPU0/IPU1 FIFOs and DMA",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Chain modes of channels 3/4; no hardware program; transfer timing",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c3",
+    "dma.c4"
+   ],
+   "named_tests": {
+    "cited": 5,
+    "executed": 5,
+    "passed": 5
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "dma.c3",
+    "dma.c4"
+   ]
+  },
+  {
+   "id": "ipu.cmd",
+   "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
+   "category": "E",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks the IPU; the PS2-specific behaviour in docs/engineering/PS2_IPU_SEMANTICS.md (B1-B11: timing, IPU_CMD after decoding, IDCT rounding, error recovery) is unknown",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ipu.dma"
+   ],
+   "named_tests": {
+    "cited": 26,
+    "executed": 26,
+    "passed": 26
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "ipu.dma"
+   ]
+  },
+  {
+   "id": "ipu.mpeg",
+   "name": "MPEG playback (libmpeg HLE)",
+   "category": "E",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "ipu.cmd"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "ipu.cmd"
+   ]
+  },
+  {
+   "id": "iop.cpu",
+   "name": "R3000A instruction execution",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Instruction scope not enumerated; exceptions, interrupts and COP0 are not exercised by a hardware program",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.mem"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 7,
+    "matching": 7
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "iop.mem",
+   "name": "IOP memory map (2 MB, hardware ranges)",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Hardware register ranges (0x1F801000.., SPU2, CDVD) and mirrors/aliases are not exercised by a hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "iop.intr",
+   "name": "Interrupts (intrman)",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "HLE; interrupt lines other than VBLANK and DMA completion are not raised; nesting and exception-level timing are not modelled",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.cpu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "iop.kernel",
+   "name": "Threads, semaphores, events (thbase, ...)",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "HLE (not the Sony IOP kernel binary); semaphores, alarms, fixed pools and suspend/resume are not exercised by a hardware program; thread switch timing is not cycle-accurate",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr",
+    "iop.timers"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 12,
+    "matching": 12
+   },
+   "unverified_dependencies": [
+    "iop.timers"
+   ]
+  },
+  {
+   "id": "iop.timers",
+   "name": "Timers (timrman)",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "iop.irx",
+   "name": "IRX loading, relocation, versioned imports",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Only ps2sdk-built test modules are exercised (no Sony ROM modules or resident-library exports between real modules); module stop/unload is not exercised by a hardware program",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.mem",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 23,
+    "matching": 23
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "iop.sched",
+   "name": "IOP scheduling against the EE",
+   "category": "F",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No ordering tests between IOP and EE progress (roadmap item 4)",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.cpu"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "sif.cmd",
+   "name": "SIFCMD",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Hardware evidence is indirect: every program's printf travels this path",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.dma"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "sif.dma"
+   ]
+  },
+  {
+   "id": "sif.rpc",
+   "name": "SIFRPC",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Hardware evidence is indirect (tty output path)",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.cmd"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "sif.dma",
+   "name": "SIF DMA (sceSifSetDma)",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c5",
+    "dma.c6",
+    "iop.cpu"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "dma.c5",
+    "dma.c6"
+   ]
+  },
+  {
+   "id": "svc.fileio",
+   "name": "FILEIO",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "Only the tty write path has hardware evidence",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "svc.ioman",
+   "name": "IOMAN/IOMANX",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "svc.cdvdman",
+   "name": "CDVDMAN",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "svc.cdvdfsv",
+   "name": "CDVDFSV",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "svc.rpcsrv",
+   "name": "RPC servers (MCSERV, DBCMAN, LIBSD routing)",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "svc.modload",
+   "name": "Module loading (SifLoadModule, MODLOAD)",
+   "category": "F",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "sys.boot",
+   "name": "System init and shutdown (no-BIOS boot, exit)",
+   "category": "F",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "sif.rpc",
+    "iop.kernel"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "spu.cores",
+   "name": "SPU2 cores and registers",
+   "category": "G",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks the SPU2; core 0 output routing into core 1 and every voice-engine effect (spu.voices, spu.adsr, spu.pitch, spu.mix, spu.reverb) are not modelled; power-on register state unknown",
+   "blocker": "SPU2 register probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.mem",
+    "iop.intr"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "spu.ram",
+   "name": "Sound RAM (2 MB)",
+   "category": "G",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks the SPU2; the fixed core input/output areas are not used yet (no mixer or ADMA); the DMA completion delay is the existing estimate",
+   "blocker": "SPU2 register probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.cores"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
+  },
+  {
+   "id": "spu.voices",
+   "name": "Voice engine (48 voices)",
+   "category": "G",
+   "status": "MISSING",
+   "missing": "No voice engine; libsd calls play decoded clips",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.ram",
+    "spu.adpcm",
+    "spu.adsr",
+    "spu.pitch"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.ram",
+    "spu.adpcm",
+    "spu.adsr",
+    "spu.pitch"
+   ]
+  },
+  {
+   "id": "spu.adsr",
+   "name": "ADSR envelopes",
+   "category": "G",
+   "status": "MISSING",
+   "missing": "No envelope generator",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.cores"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
+  },
+  {
+   "id": "spu.pitch",
+   "name": "Pitch and interpolation",
+   "category": "G",
+   "status": "MISSING",
+   "missing": "No pitch counter or interpolation",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.cores"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
+  },
+  {
+   "id": "spu.mix",
+   "name": "Core mixing, volumes",
+   "category": "G",
+   "status": "MISSING",
+   "missing": "No SPU2 mixer",
+   "blocker": "",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.voices",
+    "spu.reverb"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.voices",
+    "spu.reverb"
+   ]
+  },
+  {
+   "id": "spu.reverb",
+   "name": "Reverb",
+   "category": "G",
+   "status": "MISSING",
+   "missing": "No reverb",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.ram",
+    "spu.voices"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.ram",
+    "spu.voices"
+   ]
+  },
+  {
+   "id": "spu.irq",
+   "name": "SPU2 IRQ (address match)",
+   "category": "G",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No hardware program checks the SPU2; IRQA checks for voice fetches, reverb and ADMA accesses wait for those engines",
+   "blocker": "SPU2 register probe on a physical PS2",
+   "target": "8",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.cores",
+    "iop.intr"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.cores"
+   ]
+  },
+  {
+   "id": "spu.dma",
+   "name": "Sound DMA (IOP channels 4/7)",
+   "category": "G",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.ram",
+    "iop.intr"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.ram"
+   ]
+  },
+  {
+   "id": "spu.libsd",
+   "name": "libsd / sceSd* HLE",
+   "category": "G",
+   "status": "HLE_OR_STUB",
+   "missing": "Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.cores",
+    "spu.dma"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.cores",
+    "spu.dma"
+   ]
+  },
+  {
+   "id": "spu.adpcm",
+   "name": "VAG/ADPCM decoding",
+   "category": "G",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No test",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.ram"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.ram"
+   ]
+  },
+  {
+   "id": "spu.host",
+   "name": "Host audio output",
+   "category": "G",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "No test; plays decoded clips through raylib",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.mix",
+    "spu.sync"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.mix",
+    "spu.sync"
+   ]
+  },
+  {
+   "id": "spu.sync",
+   "name": "Audio synchronisation with emulated time",
+   "category": "G",
+   "status": "UNKNOWN",
+   "missing": "Not characterised",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "spu.mix"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "spu.mix"
+   ]
+  },
+  {
+   "id": "per.sio2",
+   "name": "SIO2 controller hardware",
+   "category": "H",
+   "status": "MISSING",
+   "missing": "Pads and cards are served at library level",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.pad",
+   "name": "Digital/analog pads (libpad HLE)",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.sio2"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.sio2"
+   ]
+  },
+  {
+   "id": "per.ds2",
+   "name": "DualShock 2 pressure and actuators",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "Actuator (vibration) output not tested",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.pad"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.pad"
+   ]
+  },
+  {
+   "id": "per.mc",
+   "name": "Memory cards (libmc HLE on host files)",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.sio2"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.sio2"
+   ]
+  },
+  {
+   "id": "per.save",
+   "name": "Save/load persistence across runs",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "No restart-and-read-back test",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.mc"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.mc"
+   ]
+  },
+  {
+   "id": "per.cdvd",
+   "name": "CD/DVD reads (host files, disc image)",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr",
+    "svc.cdvdman"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "svc.cdvdman"
+   ]
+  },
+  {
+   "id": "per.usb",
+   "name": "USB (usbd)",
+   "category": "H",
+   "status": "MISSING",
+   "missing": "No USB device emulation",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr",
+    "iop.mem"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.dev9",
+   "name": "DEV9 expansion bay",
+   "category": "H",
+   "status": "MISSING",
+   "missing": "No DEV9 emulation",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "iop.intr"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.hdd",
+   "name": "HDD (ATA, APA/PFS)",
+   "category": "H",
+   "status": "MISSING",
+   "missing": "Not implemented",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.dev9"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.dev9"
+   ]
+  },
+  {
+   "id": "per.netif",
+   "name": "Network (SMAP, ps2ip)",
+   "category": "H",
+   "status": "MISSING",
+   "missing": "No network adapter emulation",
+   "blocker": "",
+   "target": "unscheduled",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.dev9"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.dev9"
+   ]
+  },
+  {
+   "id": "per.intc",
+   "name": "Interrupt controller (INTC)",
+   "category": "H",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "cop0.intr"
+   ],
+   "named_tests": {
+    "cited": 1,
+    "executed": 1,
+    "passed": 1
+   },
+   "hardware_programs": {
+    "cited": 1,
+    "matching": 1
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.rtc",
+   "name": "RTC (sceCdReadClock)",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.cdvd"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.cdvd"
+   ]
+  },
+  {
+   "id": "per.biossvc",
+   "name": "BIOS-dependent services (ROMVER, OSD config)",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "per.rtc"
+   ],
+   "named_tests": {
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "per.rtc"
+   ]
+  },
+  {
+   "id": "per.boot",
+   "name": "ELF boot without a BIOS",
+   "category": "H",
+   "status": "VERIFIED_PARTIAL",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": true,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "mem.reserved",
+    "sys.boot"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 2,
+    "matching": 2
+   },
+   "unverified_dependencies": [
+    "mem.reserved"
+   ]
+  },
+  {
+   "id": "per.deci2",
+   "name": "DECI2 debug channel",
+   "category": "H",
+   "status": "HLE_OR_STUB",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [
+    "dma.c7"
+   ],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": [
+    "dma.c7"
+   ]
+  },
+  {
+   "id": "per.bios",
+   "name": "BIOS ROM execution",
+   "category": "H",
+   "status": "NOT_APPLICABLE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.ps1",
+   "name": "PS1 compatibility mode",
+   "category": "H",
+   "status": "NOT_APPLICABLE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  },
+  {
+   "id": "per.dvdv",
+   "name": "DVD-Video playback",
+   "category": "H",
+   "status": "NOT_APPLICABLE",
+   "missing": "",
+   "blocker": "",
+   "target": "",
+   "levels": {
+    "contract_specified": true,
+    "test_exists": false,
+    "test_executed": false,
+    "test_passed": false,
+    "vectors_passed": false,
+    "hardware_verified": false,
+    "timing_verified": false
+   },
+   "dependencies": [],
+   "named_tests": {
+    "cited": 0,
+    "executed": 0,
+    "passed": 0
+   },
+   "hardware_programs": {
+    "cited": 0,
+    "matching": 0
+   },
+   "unverified_dependencies": []
+  }
+ ]
+}

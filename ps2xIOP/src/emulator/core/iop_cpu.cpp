@@ -142,9 +142,12 @@ namespace ps2x::iop::detail
                 newBranchTarget = cpu.gpr[rs];
                 break;
             case 0x09:
-                write(rd ? rd : 31u, pc + 8u);
+                // The target is read before the link is written: with rs == rd the jump goes to the old rs value
+                // (ps2autotests cpu/iop/branchdelay "jalr: rs/rd match" on a real PS2). The link goes to rd as
+                // encoded (`jalr rs` encodes rd = 31; rd = 0 discards it).
                 newBranch = true;
                 newBranchTarget = cpu.gpr[rs];
+                write(rd, pc + 8u);
                 break;
             case 0x0C:
                 raiseException(cpu, 8u, pc, wasDelaySlot);

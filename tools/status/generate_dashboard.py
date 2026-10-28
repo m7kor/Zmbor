@@ -27,6 +27,8 @@ from xml.sax.saxutils import escape
 ROOT = Path(__file__).resolve().parents[2]
 INVENTORY = ROOT / "docs/status/components.json"
 HW_DASHBOARD = ROOT / "docs/hwtest/dashboard.json"
+# ps2autotests IOP programs (.irx) run on ps2xIOP: a separate measurement, never added to the EE program counts.
+IOP_HW_DASHBOARD = ROOT / "docs/hwtest/iop-dashboard.json"
 INSTRUCTIONS_H = ROOT / "ps2xRecomp/include/ps2recomp/instructions.h"
 STATUS_README = ROOT / "docs/status/README.md"
 TOP_README = ROOT / "README.md"
@@ -183,6 +185,14 @@ def measure_hw(hw_dashboard):
             "by_area": {k: by_area[k] for k in sorted(by_area)},
             "tests": {t["id"]: {"status": t["status"], "lines_match": t["matching_lines"], "lines": t["expected_lines"]}
                       for t in sorted(tests, key=lambda x: x["id"])}}
+
+
+def hw_tests_of(inv):
+    """Every hardware program a component may cite: the EE programs and, when measured, the IOP programs."""
+    m = inv["measurements"]
+    tests = dict(m["hardware"]["tests"])
+    tests.update(m.get("iop_hardware", {}).get("tests", {}))
+    return tests
 
 
 def sha256(path):
@@ -540,6 +550,18 @@ def render_status_readme(inv):
     for area, v in hw["by_area"].items():
         a(f"| `{area}` lines | {v['lines_match']} / {v['lines']} ({v['programs_pass']}/{v['programs']} programs) | {pct(v['lines_match'], v['lines'])} |")
     a("")
+    iop = inv["measurements"].get("iop_hardware")
+    if iop:
+        a(f"IOP programs (a separate measurement, not part of the counts above): `{iop['source']['path']}` (sha256 "
+          f"`{iop['source']['sha256'][:16]}…`), {iop['source']['description']}")
+        a("")
+        a("| measurement | numerator / denominator | value |")
+        a("|---|---|---|")
+        a(f"| IOP output lines matching real-PS2 `.expected` | {iop['lines_match']} / {iop['lines']} | {pct(iop['lines_match'], iop['lines'])} |")
+        a(f"| IOP programs matching exactly | {iop['programs_pass']} / {iop['programs']} | {pct(iop['programs_pass'], iop['programs'])} |")
+        for area, v in iop["by_area"].items():
+            a(f"| `{area}` lines | {v['lines_match']} / {v['lines']} ({v['programs_pass']}/{v['programs']} programs) | {pct(v['lines_match'], v['lines'])} |")
+        a("")
     a(isa["method"])
     a("")
     a("| instruction class | hardware-confirmed / decoded | value | exercised only by a mismatching program | not exercised by any program |")
@@ -583,7 +605,8 @@ def render_status_readme(inv):
                 for leaf in sg["children"]:
                     ev = []
                     if leaf.get("hw"):
-                        ev.append("hw: " + ", ".join(f"`{t}` {hw['tests'][t]['lines_match']}/{hw['tests'][t]['lines']}" for t in leaf["hw"]))
+                        cited = hw_tests_of(inv)
+                        ev.append("hw: " + ", ".join(f"`{t}` {cited[t]['lines_match']}/{cited[t]['lines']}" for t in leaf["hw"]))
                     if leaf.get("hwvec"):
                         ev.append(f"{len(leaf['hwvec'])} real-PS2 vector test(s)")
                     if leaf.get("isa"):
@@ -705,6 +728,15 @@ def cmd_measure(autotests):
     inv["measurements"]["hardware_source"]["sha256"] = sha256(HW_DASHBOARD)
     inv["measurements"]["hardware"] = measure_hw(dash)
     inv["measurements"]["isa_coverage"]["classes"] = measure_isa(autotests, dash, decoded_isa())
+    if IOP_HW_DASHBOARD.exists():
+        prev = inv["measurements"].get("iop_hardware", {}).get("source", {})
+        inv["measurements"]["iop_hardware"] = {
+            # evidence_commit: the commit whose code produced the dashboard; written by hand when the run is recorded.
+            "source": {"path": "docs/hwtest/iop-dashboard.json", "sha256": sha256(IOP_HW_DASHBOARD),
+                       "evidence_commit": prev.get("evidence_commit"),
+                       "description": prev.get("description", "the ps2autotests IOP programs (.irx) run on ps2xIOP by "
+                                                              "tools/hwtest/iop_hwtest.py")},
+            **measure_hw(json.loads(IOP_HW_DASHBOARD.read_text(encoding="utf-8")))}
     INVENTORY.write_text(json.dumps(inv, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print("measurements updated in docs/status/components.json; review and commit the diff")
     return 0

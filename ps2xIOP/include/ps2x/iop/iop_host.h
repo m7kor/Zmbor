@@ -131,5 +131,12 @@ namespace ps2x::iop
         }
 
         virtual void log(LogLevel level, std::string_view message) = 0;
+
+        // Text an IOP module writes to its console (stdio printf/puts/putchar, already formatted). The default keeps
+        // the earlier behaviour of logging each write; a host that needs the exact byte stream overrides it.
+        virtual void consoleWrite(std::string_view text)
+        {
+            log(LogLevel::Info, std::string("[IOP tty] ") + std::string(text));
+        }
     };
 }

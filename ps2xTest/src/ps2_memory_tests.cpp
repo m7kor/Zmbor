@@ -9,6 +9,7 @@
 #include "Stubs/GS.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -54,6 +55,50 @@ namespace
         std::memset(rdram + tagAddr, 0, 16);
         std::memcpy(rdram + tagAddr, &tagLo, sizeof(tagLo));
     }
+
+    struct MfifoRig
+    {
+        static constexpr uint32_t kRing = 0x00100000u;
+        static constexpr uint32_t kGif = 0x1000A000u;
+        static constexpr uint32_t kSprFrom = 0x1000D000u;
+        static constexpr uint32_t kDStat = 0x1000E010u;
+        // received outlives mem: the GIF callback writes into it.
+        std::vector<uint8_t> received;
+        PS2Memory mem;
+        bool ok = false;
+
+        MfifoRig(uint32_t ringMask, uint32_t mfd = 3u)
+        {
+            ok = mem.initialize();
+            mem.setGifPacketCallback([this](const uint8_t *data, uint32_t size) { received.insert(received.end(), data, data + size); });
+            mem.writeIORegister(0x1000E050u, kRing);    // D_RBOR
+            mem.writeIORegister(0x1000E040u, ringMask); // D_RBSR
+            mem.writeIORegister(0x1000E000u, 1u | (mfd << 2u));
+            mem.writeIORegister(kSprFrom + 0x10u, kRing); // fromSPR MADR: the write position starts at the base
+        }
+        // Copies qwords to the scratchpad at offset 0 and runs fromSPR (normal mode) from there.
+        void fromSpr(const std::vector<uint64_t> &qwordHalves)
+        {
+            std::memcpy(mem.getScratchpad(), qwordHalves.data(), qwordHalves.size() * 8u);
+            mem.writeIORegister(kSprFrom + 0x80u, 0u);
+            mem.writeIORegister(kSprFrom + 0x20u, static_cast<uint32_t>(qwordHalves.size() / 2u));
+            mem.writeIORegister(kSprFrom + 0x00u, 0x100u);
+        }
+        void startGifChain(uint32_t tadr)
+        {
+            mem.writeIORegister(kGif + 0x30u, tadr);
+            mem.writeIORegister(kGif + 0x20u, 0u);
+            mem.writeIORegister(kGif + 0x00u, 0x105u);
+        }
+        bool gifActive() { return (mem.readIORegister(kGif) & 0x100u) != 0u; }
+        uint32_t dstat() { return mem.readIORegister(kDStat); }
+    };
+
+    // Stall-control tests: D_STADR, the drain's data and its chain.
+    constexpr uint32_t kDStadr = 0x1000E060u;
+    constexpr uint32_t kStallData = 0x00300000u;
+    constexpr uint32_t kStallChain = 0x00200000u;
+    constexpr uint32_t kSis = 1u << 13;
 
     void writeU64(uint8_t *rdram, uint32_t addr, uint64_t value)
     {
@@ -152,6 +197,86 @@ namespace
     {
         appendU64(packet, static_cast<uint64_t>(u & 0x3FFFu) | (static_cast<uint64_t>(v & 0x3FFFu) << 32u));
         appendU64(packet, 0u);
+    }
+
+    // MSB-first bitstream from '0'/'1' characters (spaces ignored), zero-padded to whole qwords.
+    std::vector<PS2Ipu::Qword> ipuBits(const char *bits)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t count = 0u;
+        for (const char *c = bits; *c != '\0'; ++c)
+        {
+            if (*c != '0' && *c != '1')
+                continue;
+            if (count % 8u == 0u)
+                bytes.push_back(0u);
+            if (*c == '1')
+                bytes.back() |= static_cast<uint8_t>(0x80u >> (count % 8u));
+            ++count;
+        }
+        std::vector<PS2Ipu::Qword> qwords((bytes.size() + 15u) / 16u);
+        for (size_t i = 0; i < bytes.size(); ++i)
+            qwords[i / 16u][i % 16u] = bytes[i];
+        return qwords;
+    }
+
+    struct BdecRun
+    {
+        bool busyBeforeData = false;
+        bool busyAfter = true;
+        uint32_t control = 0u;
+        size_t qwords = 0u;
+        std::array<int16_t, 384> raw{};
+        PS2Ipu ipu;
+    };
+
+    // Loads `matrix` with SETIQ (intra, or non-intra), then runs one BDEC on `bits` through the FIFOs.
+    void runBdec(BdecRun &run, uint32_t control, uint32_t option, const char *bits,
+                 const std::array<uint8_t, 64> &matrix, bool nonIntraMatrix = false)
+    {
+        PS2Ipu &ipu = run.ipu;
+        ipu.writeControl(control);
+        ipu.writeCommand((5u << 28) | (nonIntraMatrix ? (1u << 27) : 0u));
+        for (uint32_t q = 0; q < 4u; ++q)
+        {
+            PS2Ipu::Qword qword{};
+            std::copy_n(matrix.begin() + q * 16u, 16u, qword.begin());
+            ipu.pushInput(qword);
+            ipu.run();
+        }
+        ipu.writeCommand((2u << 28) | option);
+        run.busyBeforeData = ipu.busy();
+        std::vector<uint8_t> out;
+        const auto drain = [&]
+        {
+            PS2Ipu::Qword qword{};
+            while (ipu.popOutput(qword))
+            {
+                out.insert(out.end(), qword.begin(), qword.end());
+                ipu.run();
+            }
+        };
+        for (const PS2Ipu::Qword &qword : ipuBits(bits))
+        {
+            while (!ipu.canAcceptInput())
+                drain();
+            ipu.pushInput(qword);
+            ipu.run();
+            drain();
+        }
+        drain();
+        run.busyAfter = ipu.busy();
+        run.control = ipu.readControl();
+        run.qwords = out.size() / 16u;
+        for (size_t i = 0; i < run.raw.size() && i * 2u + 1u < out.size(); ++i)
+            run.raw[i] = static_cast<int16_t>(out[i * 2u] | (out[i * 2u + 1u] << 8));
+    }
+
+    std::array<uint8_t, 64> flatMatrix(uint8_t value)
+    {
+        std::array<uint8_t, 64> m{};
+        m.fill(value);
+        return m;
     }
 
 }
@@ -2572,6 +2697,738 @@ void register_ps2_memory_tests()
             t.Equals(causes.size(), static_cast<size_t>(1u), "SPR_TO should queue one DMAC completion");
             if (!causes.empty())
                 t.Equals(causes[0], 9u, "SPR_TO completion should use DMAC cause 9");
+        });
+
+        // MFIFO: fromSPR fills the ring D_RBOR/D_RBSR, the GIF (MFD=3) or VIF1 (MFD=2) source chain drains it.
+        // Expected behaviour from PCSX2 (SPR.cpp, Hw.cpp hwMFIFOWrite/Resume) and DobieStation (dmac.cpp
+        // mfifo_handler); no hardware program covers MFIFO (docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md D-DMA-1/2).
+
+        tc.Run("MFIFO GIF drain stalls on an empty ring with MEIS and resumes when fromSPR adds data", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u); // 4 KB ring
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.startGifChain(MfifoRig::kRing);
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "nothing is transferred from an empty ring");
+            t.IsTrue(rig.gifActive(), "the drain stays active (STR) while the ring is empty");
+            t.IsTrue((rig.dstat() & (1u << 14)) != 0u, "D_STAT.MEIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 while the drain waits");
+
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x1111111111111111ull, 0x2222222222222222ull}); // CNT qwc 1 + data
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the CNT data is transferred once it is in the ring");
+            t.IsTrue(rig.gifActive(), "the drain waits again for its next tag");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), MfifoRig::kRing + 0x20u, "TADR points at the next tag");
+
+            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, 0x3333333333333333ull, 0x4444444444444444ull}); // END qwc 1 + data
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the END data is transferred");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+            t.IsTrue((rig.dstat() & (1u << 2)) != 0u, "CIS2 is raised at completion");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x1111111111111111ull && words[1] == 0x2222222222222222ull &&
+                         words[2] == 0x3333333333333333ull && words[3] == 0x4444444444444444ull,
+                     "the payload arrives unchanged and in order");
+        });
+
+        tc.Run("MFIFO VIF1 drain (MFD=2) waits for fromSPR and then executes the VIF codes it drains", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u, 2u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kVif1 = 0x10009000u;
+            rig.mem.writeIORegister(kVif1 + 0x30u, MfifoRig::kRing);
+            rig.mem.writeIORegister(kVif1 + 0x20u, 0u);
+            rig.mem.writeIORegister(kVif1 + 0x00u, 0x105u);
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain stays active while the ring is empty");
+            // CNT qwc 1 carrying MARK 0x1111 and three NOPs: drained, then the drain waits for its next tag.
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x07001111ull, 0ull});
+            t.Equals(rig.mem.vif1_regs.mark, 0x1111u, "the first drained MARK reaches VIF1");
+            t.IsTrue((rig.dstat() & (1u << 1)) == 0u, "no CIS1 while the drain waits for its next tag");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain is still active");
+            // END qwc 1 carrying MARK 0x1234.
+            rig.fromSpr({makeDmaTag(1u, 7u, 0u), 0ull, 0x07001234ull, 0ull});
+            t.Equals(rig.mem.vif1_regs.mark, 0x1234u, "the second drained MARK reaches VIF1");
+            t.IsTrue((rig.dstat() & (1u << 1)) != 0u, "END raises CIS1");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) == 0u, "END completes the VIF1 channel");
+        });
+
+        tc.Run("MFIFO tags and following data wrap at the ring end; REF data is read in place", [](TestCase &t)
+        {
+            MfifoRig rig(0x70u); // 8-qword ring (a completely full ring reads as empty, as on both references)
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kOutside = 0x00200000u;
+            const uint64_t refData[2] = {0x5555555555555555ull, 0x6666666666666666ull};
+            std::memcpy(rig.mem.getRDRAM() + kOutside, refData, sizeof(refData));
+            // Move the write position to the last ring slot, then write CNT(1) at +0x70 whose data wraps to +0x00,
+            // REF(1) at +0x10 pointing outside the ring, and END(0) at +0x20.
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, MfifoRig::kRing + 0x70u);
+            rig.fromSpr({makeDmaTag(1u, 1u, 0u), 0ull, 0x7777777777777777ull, 0x8888888888888888ull,
+                         makeDmaTag(1u, 3u, kOutside), 0ull, makeDmaTag(0u, 7u, 0u), 0ull});
+            t.Equals(rig.mem.readIORegister(MfifoRig::kSprFrom + 0x10u), MfifoRig::kRing + 0x30u,
+                     "fromSPR MADR wraps around the ring (0x70 + 4 qwords)");
+            rig.startGifChain(MfifoRig::kRing + 0x70u);
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "CNT data and REF data are transferred");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x7777777777777777ull && words[1] == 0x8888888888888888ull,
+                     "the CNT data is read from the wrapped position +0x00");
+            t.IsTrue(words[2] == 0x5555555555555555ull && words[3] == 0x6666666666666666ull,
+                     "the REF data is read from its own address, outside the ring");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+        });
+
+        tc.Run("fromSPR writes linearly when MFD selects no drain or MADR is outside the ring", [](TestCase &t)
+        {
+            for (const bool mfdOff : {true, false})
+            {
+                MfifoRig rig(0x30u, mfdOff ? 0u : 3u);
+                t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+                const uint32_t start = mfdOff ? MfifoRig::kRing + 0x30u : 0x00300000u;
+                rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, start);
+                rig.fromSpr({1ull, 2ull, 3ull, 4ull, 5ull, 6ull});
+                t.Equals(rig.mem.readIORegister(MfifoRig::kSprFrom + 0x10u), start + 0x30u, "MADR advances without wrapping");
+                uint64_t last = 0u;
+                std::memcpy(&last, rig.mem.getRDRAM() + start + 0x20u, sizeof(last));
+                t.Equals(last, 5ull, "the third qword lands at MADR + 0x20");
+            }
+        });
+
+        tc.Run("D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set", [](TestCase &t)
+        {
+            MfifoRig rig(0xFF0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.startGifChain(MfifoRig::kRing);
+            t.IsTrue((rig.dstat() & (1u << 14)) != 0u, "MEIS is raised by the empty ring");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "no INT1 while MEIM is clear");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 30); // toggle MEIM on
+            t.IsTrue((rig.dstat() & (1u << 30)) != 0u, "MEIM toggles on");
+            t.IsTrue((rig.dstat() & (1u << 31)) != 0u, "MEIS with MEIM raises INT1");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 14); // clear MEIS
+            t.IsTrue((rig.dstat() & (1u << 14)) == 0u, "MEIS clears on write-one");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with MEIS cleared");
+            t.IsTrue((rig.dstat() & (1u << 30)) != 0u, "MEIM stays set");
+        });
+
+        // Stall control: D_CTRL.STS (bits 4-5) names the source whose MADR is copied into D_STADR, D_CTRL.STD
+        // (bits 6-7) the drain that may not read past D_STADR. Expected behaviour where PCSX2 (Gif.cpp, Vif1_Dma.cpp,
+        // SPR.cpp) and DobieStation (dmac.cpp) agree; no hardware program covers it (D-DMA-4).
+
+        tc.Run("stall control: a GIF REFS drain waits with SIS until fromSPR (STS) moves D_STADR past its data", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 4) | (2u << 6)); // STS = fromSPR, STD = GIF
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, kStallData);
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(2u, 4u, kStallData));      // REFS qwc 2
+            writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));      // END
+            rig.startGifChain(kStallChain);
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "nothing below D_STADR yet: no REFS data is read");
+            t.IsTrue(rig.gifActive(), "the drain stays active (STR) at the stall address");
+            t.IsTrue((rig.dstat() & kSis) != 0u, "D_STAT.SIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 while the drain waits");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), kStallChain, "TADR still points at the REFS tag");
+
+            rig.mem.writeIORegister(MfifoRig::kDStat, kSis); // clear SIS: the same stall must not raise it again
+            rig.fromSpr({0x1111111111111111ull, 0x2222222222222222ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), kStallData + 0x10u, "fromSPR (STS) leaves its MADR in D_STADR");
+            t.Equals(rig.received.size(), static_cast<size_t>(0u), "one qword below D_STADR is not enough for REFS qwc 2");
+            t.IsTrue(rig.gifActive(), "the drain still waits");
+            t.IsTrue((rig.dstat() & kSis) == 0u, "SIS is raised once per stall, not again on each check");
+
+            rig.fromSpr({0x3333333333333333ull, 0x4444444444444444ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), kStallData + 0x20u, "D_STADR follows fromSPR's MADR");
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the REFS data is read once it lies below D_STADR");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+            t.IsTrue((rig.dstat() & (1u << 2)) != 0u, "CIS2 is raised at completion");
+            uint64_t words[4] = {};
+            std::memcpy(words, rig.received.data(), std::min<size_t>(rig.received.size(), sizeof(words)));
+            t.IsTrue(words[0] == 0x1111111111111111ull && words[1] == 0x2222222222222222ull &&
+                         words[2] == 0x3333333333333333ull && words[3] == 0x4444444444444444ull,
+                     "the drain reads what fromSPR wrote, in order");
+        });
+
+        tc.Run("stall control applies only to the STD drain's REFS tags, up to and including D_STADR", [](TestCase &t)
+        {
+            struct Case
+            {
+                const char *name;
+                uint32_t dctrl;
+                uint8_t tagId;
+                uint32_t stadr;
+            };
+            const Case cases[] = {
+                {"REFS ending exactly at D_STADR proceeds", 1u | (2u << 6), 4u, kStallData + 0x20u},
+                {"REF ignores D_STADR", 1u | (2u << 6), 3u, 0u},
+                {"STD = 0 disables stall control", 1u, 4u, 0u},
+                {"STD = VIF1 does not stall the GIF", 1u | (1u << 6), 4u, 0u},
+            };
+            for (const Case &c : cases)
+            {
+                MfifoRig rig(0x30u, 0u);
+                t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+                rig.mem.writeIORegister(0x1000E000u, c.dctrl);
+                rig.mem.writeIORegister(kDStadr, c.stadr);
+                uint8_t *rdram = rig.mem.getRDRAM();
+                writeDmaTag(rdram, kStallChain, makeDmaTag(2u, c.tagId, kStallData));
+                writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));
+                rig.startGifChain(kStallChain);
+                t.Equals(rig.received.size(), static_cast<size_t>(32u), c.name);
+                t.IsTrue(!rig.gifActive(), c.name);
+                t.IsTrue((rig.dstat() & kSis) == 0u, c.name);
+            }
+
+            // Without STS = fromSPR, a fromSPR transfer leaves D_STADR alone.
+            MfifoRig rig(0x30u, 0u);
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));
+            rig.mem.writeIORegister(kDStadr, 0x1230u);
+            rig.mem.writeIORegister(MfifoRig::kSprFrom + 0x10u, kStallData);
+            rig.fromSpr({1ull, 2ull});
+            t.Equals(rig.mem.readIORegister(kDStadr), 0x1230u, "STS = 0: D_STADR is not updated by fromSPR");
+        });
+
+        tc.Run("stall control: a VIF1 normal-mode drain resumes on an EE write to D_STADR; SIS reaches INT1 only with SIM", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            constexpr uint32_t kVif1 = 0x10009000u;
+            rig.mem.writeIORegister(0x1000E000u, 1u | (1u << 6)); // STD = VIF1
+            rig.mem.writeIORegister(kDStadr, kStallData);
+            writeU64(rig.mem.getRDRAM(), kStallData, 0x07004321ull); // MARK 0x4321, NOP
+            writeU64(rig.mem.getRDRAM(), kStallData + 8u, 0ull);
+            rig.mem.writeIORegister(kVif1 + 0x10u, kStallData);
+            rig.mem.writeIORegister(kVif1 + 0x20u, 1u);
+            rig.mem.writeIORegister(kVif1 + 0x00u, 0x101u); // normal mode, from memory, STR
+            t.Equals(rig.mem.vif1_regs.mark, 0u, "the blocked transfer delivers nothing");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) != 0u, "the VIF1 drain stays active");
+            t.Equals(rig.mem.readIORegister(kVif1 + 0x10u), kStallData, "MADR is untouched while the drain waits");
+            t.IsTrue((rig.dstat() & kSis) != 0u, "SIS is raised");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "no INT1 while SIM is clear");
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 29); // toggle SIM on
+            t.IsTrue((rig.dstat() & (1u << 31)) != 0u, "SIS with SIM raises INT1");
+
+            rig.mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(rig.mem.vif1_regs.mark, 0x4321u, "the drain transfers once D_STADR covers its qword");
+            t.IsTrue((rig.mem.readIORegister(kVif1) & 0x100u) == 0u, "the transfer completes");
+            t.IsTrue((rig.dstat() & (1u << 1)) != 0u, "CIS1 is raised");
+            t.Equals(rig.mem.readIORegister(kVif1 + 0x10u), kStallData + 0x10u, "MADR ends past the data");
+            rig.mem.writeIORegister(MfifoRig::kDStat, kSis);
+            t.IsTrue((rig.dstat() & kSis) == 0u, "SIS clears on write-one");
+            t.IsTrue((rig.dstat() & (1u << 31)) == 0u, "INT1 drops with SIS cleared");
+        });
+
+        tc.Run("stall control: a GIF drain held after delivering earlier tags stays active; SIS with SIM queues cause 13 once", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));   // STD = GIF
+            rig.mem.writeIORegister(MfifoRig::kDStat, 1u << 29);    // SIM on before the stall
+            (void)rig.mem.consumeCompletedDmacCauses();
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 1u, 0u));                   // CNT qwc 1
+            writeU64(rdram, kStallChain + 0x10u, 0x5151515151515151ull);
+            writeU64(rdram, kStallChain + 0x18u, 0x5252525252525252ull);
+            writeDmaTag(rdram, kStallChain + 0x20u, makeDmaTag(1u, 4u, kStallData));   // REFS qwc 1 (blocked)
+            writeDmaTag(rdram, kStallChain + 0x30u, makeDmaTag(0u, 7u, 0u));           // END
+            rig.startGifChain(kStallChain);
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the CNT data before the REFS tag is delivered");
+            t.IsTrue(rig.gifActive(), "the drain is still active at the REFS tag");
+            t.IsTrue((rig.dstat() & (1u << 2)) == 0u, "no CIS2 for the delivered part");
+            t.Equals(rig.mem.readIORegister(MfifoRig::kGif + 0x30u), kStallChain + 0x20u, "TADR points at the REFS tag");
+            const std::vector<uint32_t> causes = rig.mem.consumeCompletedDmacCauses();
+            t.Equals(static_cast<size_t>(std::count(causes.begin(), causes.end(), 13u)), static_cast<size_t>(1u),
+                     "SIS with SIM queues the DMAC handler for cause 13 once");
+            t.Equals(static_cast<size_t>(std::count(causes.begin(), causes.end(), 2u)), static_cast<size_t>(0u),
+                     "no cause 2 while the GIF drain is held");
+            rig.mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(rig.received.size(), static_cast<size_t>(32u), "the REFS data follows once D_STADR covers it");
+            t.IsTrue(!rig.gifActive(), "END completes the channel");
+        });
+
+        // SIF1 (channel 6): IOP packets = 16-byte IOP tag (address bits 0-23, bit 31/30 end, word count) + data
+        // (PCSX2 Sif1.cpp and DobieStation iop_dma.cpp agree). No hardware program drives channel 6 directly.
+        tc.Run("SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<PS2Memory::Sif1Packet> got;
+            mem.setSif1Sink([&](const std::vector<PS2Memory::Sif1Packet> &p) { got.insert(got.end(), p.begin(), p.end()); });
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kSrc = 0x00400000u;
+            const uint32_t stream[] = {0x00012340u, 4u, 0u, 0u, 0xA1u, 0xA2u, 0xA3u, 0xA4u,           // packet 1: 4 words
+                                       0x80056780u, 8u, 0u, 0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u}; // packet 2, IRQ: end
+            std::memcpy(rdram + kSrc, stream, sizeof(stream));
+            mem.writeIORegister(0x1000C410u, kSrc);
+            mem.writeIORegister(0x1000C420u, sizeof(stream) / 16u);
+            mem.writeIORegister(0x1000C400u, 0x101u); // from memory, normal, STR
+            t.Equals(got.size(), static_cast<size_t>(2u), "two IOP packets");
+            if (got.size() == 2u)
+            {
+                t.Equals(got[0].iopAddress, 0x00012340u, "packet 1 IOP address");
+                t.Equals(got[0].data.size(), static_cast<size_t>(16u), "packet 1 carries 4 words");
+                t.IsTrue(!got[0].end && got[1].end, "bit 31 of the IOP tag ends the transfer");
+                t.Equals(got[1].iopAddress, 0x00056780u, "packet 2 IOP address (flags masked)");
+                uint32_t last = 0u;
+                std::memcpy(&last, got[1].data.data() + 28u, 4u);
+                t.Equals(last, 8u, "packet 2 data arrives in order");
+            }
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) != 0u, "CIS6 is raised");
+            t.IsTrue((mem.readIORegister(0x1000C400u) & 0x100u) == 0u, "the channel completes");
+            t.Equals(mem.readIORegister(0x1000C410u), kSrc + static_cast<uint32_t>(sizeof(stream)), "MADR ends past the data");
+        });
+
+        tc.Run("SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<PS2Memory::Sif1Packet> got;
+            mem.setSif1Sink([&](const std::vector<PS2Memory::Sif1Packet> &p) { got.insert(got.end(), p.begin(), p.end()); });
+            uint8_t *rdram = mem.getRDRAM();
+            mem.writeIORegister(0x1000E000u, 1u | (3u << 6)); // STD = SIF1
+            // CNT carries the IOP tag (packet of 4 words, end), REFS carries its data from kStallData.
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 1u, 0u));
+            const uint32_t header[4] = {0x40002000u, 4u, 0u, 0u};
+            std::memcpy(rdram + kStallChain + 16u, header, sizeof(header));
+            writeDmaTag(rdram, kStallChain + 32u, makeDmaTag(1u, 4u, kStallData));
+            writeDmaTag(rdram, kStallChain + 48u, makeDmaTag(0u, 7u, 0u));
+            const uint32_t data[4] = {0xD0u, 0xD1u, 0xD2u, 0xD3u};
+            std::memcpy(rdram + kStallData, data, sizeof(data));
+            mem.writeIORegister(0x1000C430u, kStallChain);
+            mem.writeIORegister(0x1000C420u, 0u);
+            mem.writeIORegister(0x1000C400u, 0x105u); // chain, STR
+            t.Equals(got.size(), static_cast<size_t>(0u), "nothing reaches the IOP while the packet's data is behind D_STADR");
+            t.IsTrue((mem.readIORegister(0x1000C400u) & 0x100u) != 0u, "SIF1 stays active");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & kSis) != 0u, "SIS is raised");
+            mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(got.size(), static_cast<size_t>(1u), "the packet is delivered once");
+            if (!got.empty())
+            {
+                t.Equals(got[0].iopAddress, 0x00002000u, "IOP address");
+                t.Equals(got[0].data.size(), static_cast<size_t>(16u), "the whole packet, header and REFS data together");
+                t.IsTrue(got[0].end, "bit 30 ends the transfer");
+            }
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) != 0u, "CIS6 after the chain's END");
+        });
+
+        tc.Run("SIF1 without an IOP sink does not transfer or raise CIS6", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            mem.writeIORegister(0x1000C410u, 0x00400000u);
+            mem.writeIORegister(0x1000C420u, 1u);
+            mem.writeIORegister(0x1000C400u, 0x101u);
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) == 0u, "no CIS6 without a receiver");
+            const std::vector<uint8_t> stream(48u, 0u);
+            const auto packets = PS2Memory::splitSif1Stream(stream);
+            t.Equals(packets.size(), static_cast<size_t>(3u), "zero-length packets without an end flag continue");
+            std::vector<uint8_t> masked(64u, 0u); // room for 7 words, so an unmasked count would take 28 bytes
+            masked[4] = 0x07u;                     // 7 words: the IOP channel takes 4 (count & 0xFFFFC)
+            const auto one = PS2Memory::splitSif1Stream(masked);
+            t.IsTrue(!one.empty() && one[0].data.size() == 16u, "the word count is masked to whole qwords");
+        });
+
+        // IPU: register file, input FIFO and the non-decoding commands. Expected values from the register layout
+        // (ps2tek) and the MPEG bit order (bytes in memory order, MSB first); no hardware program checks the IPU.
+        tc.Run("IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            const uint8_t bytes[16] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0, 0, 0, 0, 0, 0, 0, 0};
+            mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(bytes)));
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 1u, "CTRL.IFC counts the input qword");
+            mem.writeIORegister(0x10002000u, (4u << 28) | 4u); // FDEC, skip 4 bits
+            t.Equals(mem.readIORegister(0x10002000u), 0x23456789u, "FDEC result: 32 bits after the first 4, MSB first");
+            t.IsTrue((mem.readIORegister(0x10002004u) & 0x80000000u) == 0u && (mem.readIORegister(0x10002010u) & 0x80000000u) == 0u,
+                     "FDEC completes (CMD bit 63 and CTRL.BUSY clear)");
+            t.Equals(mem.readIORegister(0x10002020u) & 0x7Fu, 4u, "FDEC consumed only its skip (BP = 4)");
+            t.Equals(mem.readIORegister(0x10002030u), 0x23456789u, "TOP shows the same 32 bits");
+            t.IsTrue(mem.takePendingIpuInterrupt(), "a completed command raises the IPU interrupt");
+
+            mem.writeIORegister(0x10002000u, (0u << 28) | 112u); // BCLR, BP = 112
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 0u, "BCLR empties the input FIFO");
+            mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(bytes)));
+            t.Equals(mem.readIORegister(0x10002020u), 112u | (1u << 16), "BP 112 in a partly consumed qword: FP = 1, IFC = 0");
+            // 16 bits left (bytes 14-15 = 0): TOP left-aligns them and sets bit 63 for "fewer than 32 bits".
+            t.IsTrue((mem.readIORegister(0x10002034u) & 0x80000000u) != 0u, "TOP bit 63 flags fewer than 32 bits");
+        });
+
+        tc.Run("IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kSrc = 0x00420000u;
+            uint8_t *rdram = mem.getRDRAM();
+            for (uint32_t i = 0; i < 64u; ++i)
+                rdram[kSrc + i] = static_cast<uint8_t>(i + 1u);
+            mem.writeIORegister(0x10002000u, (5u << 28) | (1u << 27)); // SETIQ, non-intra, no skip
+            t.IsTrue((mem.readIORegister(0x10002010u) & 0x80000000u) != 0u, "SETIQ waits for data (BUSY)");
+            mem.writeIORegister(0x1000B410u, kSrc);
+            mem.writeIORegister(0x1000B420u, 4u);
+            mem.writeIORegister(0x1000B400u, 0x101u); // toIPU, normal, STR
+            t.IsTrue((mem.readIORegister(0x10002010u) & 0x80000000u) == 0u, "SETIQ completes once 64 bytes arrived");
+            t.IsTrue(mem.ipu().nonIntraQuantizer(0) == 1u && mem.ipu().nonIntraQuantizer(63) == 64u && mem.ipu().intraQuantizer(0) == 0u,
+                     "bit 27 selects the non-intra matrix, filled in stream order");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u, "CIS4 is raised");
+            t.Equals(mem.readIORegister(0x1000B410u), kSrc + 64u, "toIPU MADR ends past the data");
+        });
+
+        tc.Run("IPU toIPU stays active while the input FIFO is full and completes when a command frees it", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            mem.writeIORegister(0x1000B410u, 0x00430000u);
+            mem.writeIORegister(0x1000B420u, 10u);
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 8u, "the FIFO holds 8 qwords");
+            t.IsTrue((mem.readIORegister(0x1000B400u) & 0x100u) != 0u, "toIPU waits for FIFO space (STR set)");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) == 0u, "no CIS4 yet");
+            mem.writeIORegister(0x10002000u, 0u); // BCLR frees the FIFO
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 2u, "the last 2 qwords enter");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u, "CIS4 once all data is in");
+            mem.writeIORegister(0x10002010u, 1u << 30); // CTRL.RST
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFFu, 0u, "RST empties the FIFOs");
+            mem.writeIORegister(0x10002000u, 5u << 28);                   // SETIQ: busy until 64 bytes arrive
+            mem.writeIORegister(0x10002000u, (9u << 28) | 0x00050003u);  // SETTH while busy
+            t.IsTrue(mem.ipu().threshold0() == 0u && mem.ipu().threshold1() == 0u && mem.ipu().busy(),
+                     "a command written while the IPU is busy is ignored");
+            mem.writeIORegister(0x10002010u, 1u << 30);
+            mem.writeIORegister(0x10002000u, (0xAu << 28)); // command 10: not an IPU command
+            t.Equals(mem.ipu().unimplementedCommand(), 10, "an undefined command is reported, not executed");
+        });
+
+        // CSC: integer BT.601 (D-IPU-1); expected values computed by hand from the formula.
+        tc.Run("IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)", [](TestCase &t)
+        {
+            struct Case
+            {
+                uint32_t option;   // CSC option bits (RGB16 bit 27, dither bit 26)
+                uint32_t setth;    // SETTH option
+                uint32_t qwc;      // output qwords
+                uint32_t firstWord; // first 32 bits of the output
+            };
+            const Case cases[] = {
+                {0u, 0u, 64u, 0x80801980u | 0xFFu},                        // RGBA (255, 25, 128, 0x80)
+                {1u << 27, 0u, 32u, 0x407Fu | (0x407Fu << 16)},            // RGB16 31 | 3 << 5 | 16 << 10
+                {(1u << 27) | (1u << 26), 0u, 32u, 0x3C5Fu},               // dithered pixel (0,0), d = -4
+                {1u << 27, 256u << 16, 32u, 0xC07Fu | (0xC07Fu << 16)},    // TH1 = 256: alpha 0x40 sets bit 15
+            };
+            for (const Case &c : cases)
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                uint8_t *rdram = mem.getRDRAM();
+                constexpr uint32_t kIn = 0x00440000u, kOut = 0x00450000u;
+                std::memset(rdram + kIn, 126, 256);       // Y
+                std::memset(rdram + kIn + 256, 128, 64);  // Cb
+                std::memset(rdram + kIn + 320, 255, 64);  // Cr
+                std::memset(rdram + kOut, 0xEE, 1024);
+                mem.writeIORegister(0x10002000u, (9u << 28) | c.setth);
+                mem.writeIORegister(0x10002000u, (7u << 28) | c.option | 1u); // CSC, one macroblock
+                mem.writeIORegister(0x1000B010u, kOut);
+                mem.writeIORegister(0x1000B020u, c.qwc);
+                mem.writeIORegister(0x1000B000u, 0x100u); // fromIPU, normal, STR
+                mem.writeIORegister(0x1000B410u, kIn);
+                mem.writeIORegister(0x1000B420u, 24u);
+                mem.writeIORegister(0x1000B400u, 0x101u); // toIPU, normal, STR
+                uint32_t first = 0u;
+                std::memcpy(&first, rdram + kOut, 4u);
+                const uint32_t mask = (c.option & (1u << 26)) != 0u ? 0xFFFFu : 0xFFFFFFFFu;
+                t.Equals(first & mask, c.firstWord & mask, "first output word matches the integer BT.601 result");
+                uint32_t last = 0u;
+                std::memcpy(&last, rdram + kOut + c.qwc * 16u - 4u, 4u);
+                t.IsTrue(last != 0xEEEEEEEEu, "the whole macroblock reached memory");
+                t.IsTrue((mem.readIORegister(0x1000E010u) & ((1u << 3) | (1u << 4))) == ((1u << 3) | (1u << 4)), "CIS3 and CIS4 are raised");
+                t.IsTrue(!mem.ipu().busy(), "CSC completes once its output has drained");
+            }
+        });
+
+        tc.Run("IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kIn = 0x00460000u, kOut = 0x00470000u;
+            std::memset(rdram + kIn, 20, 256);        // Y = 20: lum = (0x95 * 4) >> 6 = 9 (odd)
+            std::memset(rdram + kIn + 256, 128, 64);  // Cb neutral
+            std::memset(rdram + kIn + 320, 128, 64);  // Cr neutral ...
+            for (uint32_t row = 0; row < 8u; ++row)
+                rdram[kIn + 320 + row * 8 + 7] = 255; // ... except chroma column 7 (pixels x = 14, 15)
+            mem.writeIORegister(0x10002000u, (7u << 28) | 1u);
+            mem.writeIORegister(0x1000B010u, kOut);
+            mem.writeIORegister(0x1000B020u, 64u);
+            mem.writeIORegister(0x1000B000u, 0x100u);
+            mem.writeIORegister(0x1000B410u, kIn);
+            mem.writeIORegister(0x1000B420u, 24u);
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            uint32_t p0 = 0u, p13 = 0u, p15 = 0u;
+            std::memcpy(&p0, rdram + kOut, 4u);
+            std::memcpy(&p13, rdram + kOut + 13u * 4u, 4u);
+            std::memcpy(&p15, rdram + kOut + 15u * 4u, 4u);
+            t.Equals(p0, 0x80050505u, "(9 + 1) >> 1 = 5 in every channel: the +1 rounds the half-scale sum");
+            t.Equals(p13, 0x80050505u, "pixel x = 13 uses chroma column 6");
+            t.Equals(p15, 0x800500CFu, "pixel x = 15 uses chroma column 7: R (9 + 404 + 1) >> 1 = 207, G clamps to 0, B 5");
+        });
+
+        tc.Run("IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)", [](TestCase &t)
+        {
+            for (const bool indexed : {false, true})
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                uint8_t *rdram = mem.getRDRAM();
+                constexpr uint32_t kIn = 0x00480000u, kOut = 0x00490000u;
+                for (uint32_t pixel = 0; pixel < 256u; ++pixel)
+                {
+                    const bool even = (pixel & 1u) == 0u;
+                    const uint8_t rgba[4] = {static_cast<uint8_t>(even ? 255 : 0), static_cast<uint8_t>(even ? 25 : 0),
+                                             static_cast<uint8_t>(even ? 128 : 0), static_cast<uint8_t>(even ? 0x80 : 0x40)};
+                    std::memcpy(rdram + kIn + pixel * 4u, rgba, 4u);
+                }
+                if (indexed)
+                {
+                    // VQ CLUT: entry 3 = 0x407F (31, 3, 16); entries 0 and 9 black (tie: 0 must win); others mid-grey.
+                    uint16_t clut[16];
+                    for (uint16_t &c : clut)
+                        c = static_cast<uint16_t>(16u | (16u << 5) | (16u << 10));
+                    clut[0] = 0u;
+                    clut[9] = 0u;
+                    clut[3] = 0x407Fu;
+                    mem.writeIORegister(0x10002000u, 6u << 28); // SETVQ
+                    mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(&clut[0])));
+                    mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(&clut[8])));
+                    t.IsTrue(!mem.ipu().busy() && mem.ipu().vqClut(3) == 0x407Fu, "SETVQ loads 16 little-endian halfwords");
+                }
+                const uint32_t outQwords = indexed ? 8u : 32u;
+                mem.writeIORegister(0x10002000u, (8u << 28) | (indexed ? 0u : (1u << 27)) | 1u); // PACK, 1 macroblock
+                mem.writeIORegister(0x1000B010u, kOut);
+                mem.writeIORegister(0x1000B020u, outQwords);
+                mem.writeIORegister(0x1000B000u, 0x100u);
+                mem.writeIORegister(0x1000B410u, kIn);
+                mem.writeIORegister(0x1000B420u, 64u);
+                mem.writeIORegister(0x1000B400u, 0x101u);
+                if (indexed)
+                {
+                    t.Equals(rdram[kOut], static_cast<uint8_t>(0x03u), "even pixel -> index 3 (low nibble), black odd pixel -> index 0 (first of the tie)");
+                    t.Equals(rdram[kOut + 127u], static_cast<uint8_t>(0x03u), "the last byte packs the last two pixels the same way");
+                }
+                else
+                {
+                    uint16_t first = 0u, second = 0u;
+                    std::memcpy(&first, rdram + kOut, 2u);
+                    std::memcpy(&second, rdram + kOut + 2u, 2u);
+                    t.Equals(first, static_cast<uint16_t>(0x407Fu), "RGB16 of (255, 25, 128, 0x80)");
+                    t.Equals(second, static_cast<uint16_t>(0x8000u), "black with alpha 0x40 sets bit 15");
+                }
+                t.IsTrue(!mem.ipu().busy() && (mem.readIORegister(0x1000E010u) & (1u << 3)) != 0u, "PACK completes and fromIPU raises CIS3");
+                t.Equals(mem.ipu().unimplementedCommand(), -1, "PACK is executed, not reported as unimplemented");
+            }
+        });
+
+        // VDEC: MPEG-2 VLC tables (ISO/IEC 13818-2 Annex B); result = (code length << 16) | value.
+        tc.Run("IPU VDEC decodes address increment, macroblock type, motion code and dmvector symbols", [](TestCase &t)
+        {
+            struct Case
+            {
+                uint8_t byte0, byte1;
+                uint32_t table;       // TBL, option bits 26-27
+                uint32_t picture;     // CTRL.PCT
+                uint32_t result;      // expected IPU_CMD result
+                uint32_t bitPointer;  // expected BP after the symbol
+                bool error;
+            };
+            const Case cases[] = {
+                {0b00000101, 0b11000000, 0u, 0u, (10u << 16) | 16u, 10u, false},   // B-1: 0000 0101 11 -> 16
+                {0b00000001, 0b00000000, 0u, 0u, (11u << 16) | 35u, 11u, false},   // B-1: escape 0000 0001 000 -> 35
+                {0b00010000, 0b00000000, 1u, 2u, (5u << 16) | 0x1Au, 5u, false},   // B-3 (P): 0001 0 -> quant+fwd+pattern
+                {0b01000000, 0b00000000, 1u, 1u, (2u << 16) | 0x11u, 2u, false},   // B-2 (I): 01 -> quant+intra
+                {0b00001011, 0b00000000, 2u, 0u, (8u << 16) | 0xFFFBu, 8u, false}, // B-10: 0000 1011 -> -5
+                {0b11000000, 0b00000000, 3u, 0u, (2u << 16) | 0xFFFFu, 2u, false}, // B-11: 11 -> -1
+                {0b00000000, 0b00000000, 0u, 0u, 0u, 0u, true},                    // no B-1 code is all zeros
+                {0b10000000, 0b00000000, 1u, 0u, 0u, 0u, true},                    // TBL 1 needs PCT 1-3
+            };
+            for (const Case &c : cases)
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                mem.writeIORegister(0x10002010u, c.picture << 24);
+                mem.writeIORegister(0x10002000u, (3u << 28) | (c.table << 26)); // VDEC, no skip
+                // Without a valid picture type there is no macroblock-type table: the error needs no data.
+                const bool noTable = c.table == 1u && (c.picture < 1u || c.picture > 3u);
+                t.IsTrue(mem.ipu().busy() != noTable, "VDEC waits for data (or fails at once without a table)");
+                uint8_t q[16] = {c.byte0, c.byte1};
+                mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(q)));
+                t.IsTrue(!mem.ipu().busy(), "VDEC completes once the symbol is in the FIFO");
+                const bool ecd = (mem.readIORegister(0x10002010u) & (1u << 14)) != 0u;
+                t.Equals(ecd, c.error, "CTRL.ECD flags an invalid symbol");
+                if (!c.error)
+                {
+                    t.Equals(mem.readIORegister(0x10002000u), c.result, "VDEC result = length << 16 | value");
+                    t.Equals(mem.readIORegister(0x10002020u) & 0x7Fu, c.bitPointer, "the symbol's bits are consumed");
+                }
+            }
+        });
+
+        // BDEC: ISO/IEC 13818-2 7.2-7.6 (D-IPU-3). Expected samples are computed with an independent double-precision
+        // model of the standard's formulas; options: MBI bit 27, DCR 26, DT 25, QSC 16-20.
+        constexpr uint32_t kBdecIntra = (1u << 27) | (1u << 26);
+        tc.Run("IPU BDEC decodes an intra DC-only macroblock: DC differentials, predictors and the RAW16 layout", [](TestCase &t)
+        {
+            // Y0 size 0; Y1 size 2 '11' (+3); Y2 size 1 '0' (-1); Y3 size 0; Cb size 0; Cr size 3 '000' (-7); EOB '10'.
+            const char *bits = "100 10  01 11 10  00 0 10  100 10  00 10  110 000 10";
+            for (const bool field : {false, true})
+            {
+                BdecRun run;
+                runBdec(run, 0u, kBdecIntra | (1u << 16) | (field ? (1u << 25) : 0u), bits, flatMatrix(16));
+                t.IsTrue(run.busyBeforeData && !run.busyAfter, "BDEC waits for data, then completes once its output drained");
+                t.Equals(run.qwords, static_cast<size_t>(48u), "RAW16 macroblock: 384 halfwords");
+                t.Equals((run.control >> 8) & 0x3Fu, 0x3Fu, "an intra macroblock codes all six blocks (CTRL.CBP)");
+                t.Equals((run.control >> 14) & 1u, 0u, "no error");
+                t.Equals(static_cast<int>(run.raw[0]), 128, "Y0: predictor reset to 128, F = 8 * 128, f = 128");
+                t.Equals(static_cast<int>(run.raw[15]), 131, "Y1 (top right): 128 + 3");
+                t.Equals(static_cast<int>(run.raw[255]), 130, "Y3 (bottom right) keeps Y2's predictor 131 - 1");
+                t.Equals(static_cast<int>(run.raw[field ? 16 : 128]), 130, field ? "field DCT: line 1 belongs to Y2" : "frame DCT: line 8 belongs to Y2");
+                t.Equals(static_cast<int>(run.raw[field ? 128 : 16]), 128, field ? "field DCT: line 8 is Y0's row 4" : "frame DCT: line 1 is Y0's row 1");
+                t.Equals(static_cast<int>(run.raw[256]), 128, "Cb: its own predictor");
+                t.Equals(static_cast<int>(run.raw[383]), 121, "Cr: 128 - 7");
+                t.IsTrue(run.ipu.dcPredictor(0) == 130 && run.ipu.dcPredictor(1) == 128 && run.ipu.dcPredictor(2) == 121,
+                         "the predictors carry to the next macroblock");
+                t.Equals(run.ipu.unimplementedCommand(), -1, "BDEC is executed, not reported as unimplemented");
+            }
+            BdecRun kept; // DCR clear: the predictors are not reset
+            runBdec(kept, 0u, kBdecIntra, bits, flatMatrix(16));
+            kept.ipu.writeCommand(0u); // BCLR: drop the first stream's padding
+            kept.ipu.writeCommand((2u << 28) | (1u << 27));
+            for (const PS2Ipu::Qword &q : ipuBits(bits))
+                kept.ipu.pushInput(q);
+            kept.ipu.run();
+            PS2Ipu::Qword first{};
+            t.IsTrue(kept.ipu.popOutput(first), "the second macroblock is decoded");
+            t.Equals(static_cast<int>(static_cast<int16_t>(first[0] | (first[1] << 8))), 130, "without DCR Y0 continues from 130");
+        });
+
+        tc.Run("IPU BDEC applies MPEG-2 mismatch control to the last coefficient (IDP 3 tie)", [](TestCase &t)
+        {
+            // IDP 3: predictor 1024, size 3 '100' (+4) -> F = 1028, f = 128.5; the sum is even, so F[63] becomes 1 and
+            // its basis tips each sample to 128 or 129.
+            BdecRun run;
+            runBdec(run, 3u << 16, kBdecIntra | (1u << 16), "101 100 10  100 10  100 10  100 10  00 10  00 10", flatMatrix(16));
+            t.Equals(run.ipu.dcPredictor(0), 1028, "IDP 3 resets the predictor to 1024");
+            t.Equals(static_cast<int>(run.raw[0]), 129, "(0,0): 128.5 + F[63]'s positive basis");
+            t.Equals(static_cast<int>(run.raw[1]), 128, "(0,1): 128.5 + a negative basis value");
+            t.Equals(static_cast<int>(run.raw[7 * 16 + 7]), 129, "(7,7)");
+        });
+
+        tc.Run("IPU BDEC escape coefficients follow CTRL.AS scan, zigzag matrix order and the non-linear QSC", [](TestCase &t)
+        {
+            // Escape '000001', run 0, level 100 at scan position 1 (zigzag: raster 1; alternate: raster 8, weight
+            // matrix[2] = 24). QST 1, QSC 2 -> quantiser_scale 2 (linear would be 4).
+            std::array<uint8_t, 64> matrix = flatMatrix(16);
+            matrix[2] = 24;
+            const char *bits = "100 000001 000000 000001100100 10  100 10  100 10  100 10  00 10  00 10";
+            BdecRun zigzag, alternate;
+            runBdec(zigzag, 1u << 22, kBdecIntra | (2u << 16), bits, matrix);
+            runBdec(alternate, (1u << 22) | (1u << 20), kBdecIntra | (2u << 16), bits, matrix);
+            t.IsTrue(zigzag.raw[0] == 163 && zigzag.raw[7] == 93 && zigzag.raw[7 * 16] == 163,
+                     "zigzag: F[0][1] = 200 varies along x");
+            t.IsTrue(alternate.raw[0] == 180 && alternate.raw[7] == 180 && alternate.raw[7 * 16] == 76,
+                     "alternate: F[1][0] = 300 (weight 24) varies along y");
+        });
+
+        tc.Run("IPU BDEC saturates coefficients to 12 bits and clamps intra samples to 0-255", [](TestCase &t)
+        {
+            // Escape level -2000 (12-bit 1000 0011 0000) at F[0][1], QSC 31: (2 * -2000 * 16 * 62) / 32 saturates to
+            // -2048; f(y, x) = 128 - 362 cos((2x + 1) pi / 16).
+            BdecRun run;
+            runBdec(run, 0u, kBdecIntra | (31u << 16), "100 000001 000000 100000110000 10  100 10  100 10  100 10  00 10  00 10",
+                    flatMatrix(16));
+            t.Equals(static_cast<int>(run.raw[0]), 0, "x = 0: -227 clamps to 0");
+            t.Equals(static_cast<int>(run.raw[3]), 57, "x = 3: 128 - 70.6 with the saturated coefficient");
+            t.Equals(static_cast<int>(run.raw[4]), 199, "x = 4: the negative level gives a rising row");
+            t.Equals(static_cast<int>(run.raw[7]), 255, "x = 7: 483 saturates to 255");
+        });
+
+        tc.Run("IPU BDEC non-intra: coded_block_pattern, the first-coefficient '1s' code and unclamped samples", [](TestCase &t)
+        {
+            // CBP '1010' = 32 (Y0 only); '1s' = run 0 level +-1; non-intra matrix 16, QSC 2: F = (+-3 * 16 * 4) / 32.
+            for (const bool negative : {false, true})
+            {
+                BdecRun run;
+                runBdec(run, 0u, 2u << 16, negative ? "1010 11 10" : "1010 10 10", flatMatrix(16), true);
+                const int expected = negative ? -1 : 1;
+                t.IsTrue(!run.busyAfter && run.qwords == 48u, "the macroblock is output");
+                t.Equals((run.control >> 8) & 0x3Fu, 32u, "CTRL.CBP = 32");
+                t.IsTrue(run.raw[0] == expected && run.raw[7 * 16 + 7] == expected, "Y0 = round(F / 8) everywhere");
+                t.IsTrue(run.raw[8] == 0 && run.raw[128] == 0 && run.raw[256] == 0 && run.raw[383] == 0, "uncoded blocks are 0");
+            }
+        });
+
+        tc.Run("IPU BDEC MPEG-1 mode: 8/16-bit escape levels and oddification without mismatch control", [](TestCase &t)
+        {
+            // Y0: escape level 100 -> F = 200, odd-ified to 199. Y1: escape 0x00 then 200 -> F = 399.
+            BdecRun run;
+            runBdec(run, 1u << 23, kBdecIntra | (1u << 16),
+                    "100 000001 000000 01100100 10  100 000001 000000 00000000 11001000 10  100 110 110 110 10  100 10  00 10  00 10",
+                    flatMatrix(16));
+            t.Equals(static_cast<int>(run.raw[3 * 16 + 1]), 157, "Y0 (3,1) with F = 199 (MPEG-2 rules give 158)");
+            t.Equals(static_cast<int>(run.raw[8]), 197, "Y1 (0,0) with the two-byte level 200");
+            // Y2: three level-1 coefficients, F = 2 each, odd-ified to 1 (without oddification (8,1) would be 129).
+            t.IsTrue(run.raw[128] == 129 && run.raw[129] == 128, "Y2: oddification alone decides the rounding");
+            t.Equals((run.control >> 14) & 1u, 0u, "no error");
+        });
+
+        tc.Run("IPU BDEC intra with CTRL.IVF uses table B-15", [](TestCase &t)
+        {
+            // B-15: '10s' = run 0 level 1, EOB '0110' (in B-14 '10' would be EOB). QSC 16: F = 32.
+            BdecRun run;
+            runBdec(run, 1u << 21, kBdecIntra | (16u << 16),
+                    "100 100 0110  100 0110  100 0110  100 0110  00 0110  00 0110", flatMatrix(16));
+            t.IsTrue(run.raw[0] == 134 && run.raw[7] == 122, "F[0][1] = 32 from the B-15 code");
+            t.Equals((run.control >> 14) & 1u, 0u, "no error");
+        });
+
+        tc.Run("IPU BDEC flags bitstream errors with CTRL.ECD and outputs nothing", [](TestCase &t)
+        {
+            BdecRun overrun; // escape run 63 after the DC: past coefficient 63
+            runBdec(overrun, 0u, kBdecIntra, "100 000001 111111 000000000001 10", flatMatrix(16));
+            t.IsTrue(!overrun.busyAfter && ((overrun.control >> 14) & 1u) == 1u && overrun.qwords == 0u, "run past the block");
+            BdecRun cbp; // nine zeros: not a B-9 code
+            runBdec(cbp, 0u, 0u, "000000000 1", flatMatrix(16), true);
+            t.IsTrue(!cbp.busyAfter && ((cbp.control >> 14) & 1u) == 1u && cbp.qwords == 0u, "invalid coded_block_pattern");
+        });
+
+        tc.Run("IPU BDEC runs through toIPU and fromIPU DMA", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kIn = 0x004A0000u, kOut = 0x004B0000u;
+            const std::vector<PS2Ipu::Qword> stream = ipuBits("100 10  01 11 10  00 0 10  100 10  00 10  110 000 10");
+            std::memcpy(rdram + kIn, stream.data(), stream.size() * 16u);
+            mem.writeIORegister(0x10002000u, (2u << 28) | kBdecIntra);
+            mem.writeIORegister(0x1000B010u, kOut);
+            mem.writeIORegister(0x1000B020u, 48u);
+            mem.writeIORegister(0x1000B000u, 0x100u);
+            mem.writeIORegister(0x1000B410u, kIn);
+            mem.writeIORegister(0x1000B420u, static_cast<uint32_t>(stream.size()));
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            int16_t y0 = 0, cr = 0;
+            std::memcpy(&y0, rdram + kOut, 2u);
+            std::memcpy(&cr, rdram + kOut + 766u, 2u);
+            t.IsTrue(y0 == 128 && cr == 121, "the RAW16 macroblock reaches memory");
+            t.IsTrue(!mem.ipu().busy() && (mem.readIORegister(0x1000E010u) & (1u << 3)) != 0u, "BDEC completes and fromIPU raises CIS3");
+        });
+
+        tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
+        {
+            MfifoRig rig(0x30u, 0u);
+            t.IsTrue(rig.ok, "PS2Memory initialize should succeed");
+            rig.mem.writeIORegister(0x1000E000u, 1u | (2u << 6));
+            uint8_t *rdram = rig.mem.getRDRAM();
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 4u, kStallData));
+            writeDmaTag(rdram, kStallChain + 0x10u, makeDmaTag(0u, 7u, 0u));
+            rig.startGifChain(kStallChain);
+            t.IsTrue(rig.gifActive(), "the drain waits at D_STADR = 0");
+            rig.mem.writeIORegister(0x1000E000u, 1u); // STD = 0
+            t.Equals(rig.received.size(), static_cast<size_t>(16u), "the REFS data is read once stall control is off");
+            t.IsTrue(!rig.gifActive(), "the chain completes");
         });
 
         tc.Run("sceDmaReset re-enables DMAC DMAE", [](TestCase &t)

@@ -10,10 +10,10 @@ committed.
   `ec4a32d`. Push with the explicit URL `https://github.com/m7kor/Zmbor.git` (`origin` in the worktrees is upstream).
 - One PR only. No merge, no force-push, no history rewrite.
 
-## Verified baseline (batch 7 gate, `d15ce5a`, clean tree)
+## Verified baseline (batch 8 gate, `af37990`, clean tree)
 
 ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 crashes, timeouts or regressions;
-`ps2x_tests` 572/572; ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs (separate measurement): 23/23 exact,
+`ps2x_tests` 573/573; ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs (separate measurement): 23/23 exact,
 1306/1306 lines. Hardware inventory (174): 18 / 52 / 61 / 20 / 19 / 3 / 1.
 
 ## Batches
@@ -22,6 +22,7 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 |---|---|---|---|
 | 1 | `5fab12b`..`0e47a2b` | `gs.dither`, `dma.mfifo`: MISSING → IMPLEMENTED_UNVERIFIED | 4/4 GS and 8/8 DMA mutants killed; 30,977 ASan fuzz runs |
 | 2 | `78b17e6`..`c64f357` | `dma.stall`: MISSING → IMPLEMENTED_UNVERIFIED | 5 unit tests, 10/10 mutants killed, 26,801 ASan fuzz runs; contracts for all 174 components with a checked dependency DAG |
+| 8 | `ff3a138`..`af37990` | none (`ipu.cmd` stays MISSING) | IPU PACK (D-IPU-2); 3/3 mutants |
 | 7 | `0828791`..`d15ce5a` | `dma.c3`, `ipu.dma` MISSING → IMPLEMENTED_UNVERIFIED | IPU CSC (D-IPU-1), output FIFO, fromIPU; 6/6 CSC mutants |
 | 6 | `6ecc5f3`..`038536f` | `dma.c4` MISSING → IMPLEMENTED_UNVERIFIED | IPU core (registers, input FIFO, BCLR/FDEC/SETIQ/SETVQ/SETTH, RST, INTC 8) and toIPU; 6/6 mutants; `ipu.cmd`/`ipu.dma` stay MISSING |
 | 5 | `a1f2ddc`..`46c4cf8` | `iop.irx`, `iop.mem` → VERIFIED_PARTIAL; `dma.c6` HLE_OR_STUB → IMPLEMENTED_UNVERIFIED | IOP evidence cited; SIF1 channel-6 model with stall drain, 5/5 mutants; IOP kernel clean under ASan |
@@ -51,5 +52,5 @@ probes.
 
 ## Next action
 
-IPU PACK, then VDEC/BDEC/IDEC (MPEG-2 VLC tables, dequantisation, IDCT); then GS (`gs.aa`) and SPU2. SIF0 stays
-deferred (see batch 6).
+IPU decoders VDEC, BDEC and IDEC: the MPEG-2 VLC tables, dequantisation with the SETIQ matrices, IDCT, and IDEC colour
+conversion. Then GS (`gs.aa`) and SPU2. SIF0 stays deferred (see batch 6).

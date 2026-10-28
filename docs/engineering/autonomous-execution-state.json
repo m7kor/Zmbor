@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "d15ce5a",
+    "commit": "af37990",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
-    "ps2x_tests": "572/572",
+    "ps2x_tests": "573/573",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate7.manifest.json (local)",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate8.manifest.json (local)",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -168,6 +168,20 @@
       ],
       "mutants": "CSC 6/6 killed (C2, C5 survived first, test added in 390f9fa)",
       "gate": "d15ce5a: 53/55, 8202/8250, 0 regressions; unit 572/572, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 8,
+      "commits": [
+        "ff3a138",
+        "539db01",
+        "af37990"
+      ],
+      "components": {},
+      "notes": [
+        "IPU PACK to RGB16 / 4-bit VQ indices (decision D-IPU-2); ipu.cmd stays MISSING until IDEC/BDEC/VDEC"
+      ],
+      "mutants": "PACK 3/3 killed",
+      "gate": "af37990: 53/55, 8202/8250, 0 regressions; unit 573/573, ctest 54/54, e2e 4/4, IOP 4/4"
     }
   ],
   "hardware_inventory": {
@@ -198,7 +212,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "IPU PACK (RGB32 -> RGB16 / 4-bit indexed with VQ CLUT), then VDEC/BDEC/IDEC (MPEG-2 VLC tables, dequantisation, IDCT); then GS gs.aa and SPU2",
+  "next_action": "IPU VDEC/BDEC/IDEC: MPEG-2 VLC tables (macroblock address increment, macroblock type, coded block pattern, motion code, DC size, DCT coefficient tables 0/1), dequantisation with SETIQ matrices, IDCT, IDEC colour conversion; then GS gs.aa and SPU2",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

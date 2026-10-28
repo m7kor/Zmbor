@@ -294,9 +294,16 @@ namespace ps2x::iop::detail
                       : a0 + static_cast<uint32_t>(position));
             return true;
         }
-        case 35: // strtok state is intentionally not shared across modules yet.
-            setV0(0);
+        case 35: // strtok(s, delim): one position for the whole sysclib, as the single sysclib module keeps it
+            setV0(tokenize(a0, a1, m_strtokNext));
             return true;
+        case 43: // strtok_r(s, delim, lasts)
+        {
+            uint32_t next = m_memory.read32(a2);
+            setV0(tokenize(a0, a1, next));
+            m_memory.write32(a2, next);
+            return true;
+        }
         case 36:
         case 38: // strtol / strtoul
         {
@@ -326,11 +333,40 @@ namespace ps2x::iop::detail
                 m_memory.write32(a0 + i * 4u, a1);
             setV0(a0);
             return true;
-        case 43:
-            setV0(0);
-            return true;
         default:
             return false;
         }
+    }
+
+    // strtok semantics: skip leading delimiters, cut the token at the next delimiter (written as NUL) and remember
+    // the position after it; s == 0 continues from that position. A NULL delimiter set is empty, so the whole rest is
+    // one token (real PS2: strtok("val1,val2,val3,val4", NULL) returns the whole string).
+    uint32_t IopSysclib::tokenize(uint32_t s, uint32_t delimiters, uint32_t &next)
+    {
+        uint32_t p = s != 0u ? s : next;
+        if (p == 0u)
+            return 0u;
+        const std::string delim = delimiters != 0u ? m_memory.readString(delimiters, 256u) : std::string();
+        const auto isDelimiter = [&](uint8_t c) { return c != 0u && delim.find(static_cast<char>(c)) != std::string::npos; };
+        constexpr uint32_t kLimit = 1u << 20;
+        uint32_t guard = 0u;
+        while (isDelimiter(m_memory.read8(p)) && guard++ < kLimit)
+            ++p;
+        if (m_memory.read8(p) == 0u)
+        {
+            next = 0u;
+            return 0u;
+        }
+        const uint32_t token = p;
+        while (m_memory.read8(p) != 0u && !isDelimiter(m_memory.read8(p)) && guard++ < kLimit)
+            ++p;
+        if (m_memory.read8(p) == 0u)
+            next = 0u;
+        else
+        {
+            m_memory.write8(p, 0u);
+            next = p + 1u;
+        }
+        return token;
     }
 }

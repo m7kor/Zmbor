@@ -98,9 +98,9 @@ No overall completeness percentage is shown: the requirements of most components
 
 | section | components | `VERIFIED_COMPLETE` | `VERIFIED_PARTIAL` | `IMPLEMENTED_UNVERIFIED` | `HLE_OR_STUB` | `MISSING` | `NOT_APPLICABLE` | `UNKNOWN` |
 |---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 174 | 18 | 52 | 63 | 20 | 17 | 3 | 1 |
+| PS2 Hardware & Runtime | 174 | 18 | 52 | 66 | 20 | 14 | 3 | 1 |
 | Recompiler, Tools & Compatibility | 53 | 4 | 29 | 11 | 0 | 1 | 0 | 8 |
-| **all** | **227** | **22** | **81** | **74** | **20** | **18** | **3** | **9** |
+| **all** | **227** | **22** | **81** | **77** | **20** | **15** | **3** | **9** |
 
 ## PS2 Hardware & Runtime
 
@@ -289,14 +289,14 @@ There is no SPU2 hardware model. Audio libraries (libsd, audsrv) are replaced at
 
 | id | component | status | implemented | missing / blocker | evidence | target |
 |---|---|---|---|---|---|---|
-| `spu.cores` | SPU2 cores and registers | `MISSING` |  | Register range mapped on the IOP side, no register model | — | 8 |
-| `spu.ram` | Sound RAM (2 MB) | `MISSING` |  | No sound RAM model | — | 8 |
+| `spu.cores` | SPU2 cores and registers | `IMPLEMENTED_UNVERIFIED` | Both cores' register files at 0x1F900000/0x1F900400 plus the volume/SPDIF block, 16-bit access (32-bit split, low half first), read-back as written with 20-bit address halves; KON loads NAX from SSA and clears ENDX, KON/KOFF latch; ENDX write rule; STAT bit 7 / ATTR bit 15 (944a3e5, D-SPU-1); 14 of 14 non-equivalent mutants killed | No hardware program checks the SPU2; core 0 output routing into core 1 and every voice-engine effect (spu.voices, spu.adsr, spu.pitch, spu.mix, spu.reverb) are not modelled; power-on register state unknown; **blocker:** SPU2 register probe on a physical PS2 | 1 test ref(s) | 8 |
+| `spu.ram` | Sound RAM (2 MB) | `IMPLEMENTED_UNVERIFIED` | 2 MB sound RAM; the TSA data port writes and reads at an advancing, wrapping transfer address; IOP DMA channels 4/7 move data between IOP RAM and sound RAM (944a3e5, D-SPU-1) | No hardware program checks the SPU2; the fixed core input/output areas are not used yet (no mixer or ADMA); the DMA completion delay is the existing estimate; **blocker:** SPU2 register probe on a physical PS2 | 1 test ref(s) | 8 |
 | `spu.voices` | Voice engine (48 voices) | `MISSING` |  | No voice engine; libsd calls play decoded clips | — | 8 |
 | `spu.adsr` | ADSR envelopes | `MISSING` |  | No envelope generator | — | 8 |
 | `spu.pitch` | Pitch and interpolation | `MISSING` |  | No pitch counter or interpolation | — | 8 |
 | `spu.mix` | Core mixing, volumes | `MISSING` |  | No SPU2 mixer | — | 8 |
 | `spu.reverb` | Reverb | `MISSING` |  | No reverb | — | unscheduled |
-| `spu.irq` | SPU2 IRQ (address match) | `MISSING` |  | No SPU2 interrupts | — | 8 |
+| `spu.irq` | SPU2 IRQ (address match) | `IMPLEMENTED_UNVERIFIED` | IRQA: any sound-RAM access by the data port or DMA is checked against both cores' IRQA; with ATTR bit 6 a hit sets IRQINFO bit 2 + core and raises IOP INTC 9; clearing ATTR bit 6 clears it (944a3e5, D-SPU-1) | No hardware program checks the SPU2; IRQA checks for voice fetches, reverb and ADMA accesses wait for those engines; **blocker:** SPU2 register probe on a physical PS2 | 1 test ref(s) | 8 |
 | `spu.dma` | Sound DMA (IOP channels 4/7) | `HLE_OR_STUB` | sceSdVoiceTrans/BlockTrans return byte counts | — | 1 test ref(s) |  |
 | `spu.libsd` | libsd / sceSd* HLE | `HLE_OR_STUB` |  | Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders | 1 test ref(s) |  |
 | `spu.adpcm` | VAG/ADPCM decoding | `IMPLEMENTED_UNVERIFIED` |  | No test | — |  |
@@ -549,14 +549,14 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `svc.rpcsrv` | `ps2xIOP/src/modules/mcserv.cpp`<br>`ps2xIOP/src/modules/dbcman.cpp` | `ps2xIOP/tests/iop_compatibility_tests.cpp::MCSERV response bounds for both dialects` |
 | `svc.modload` | `ps2xIOP/src/iop_module_manager.cpp` | `ps2xTest/src/ps2_sif_rpc_tests.cpp::SifLoadModule validates ROM modules and activates their HLE service` |
 | `sys.boot` | `ps2xRuntime/src/lib/ps2_runtime.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::EE scheduler ends the run once every thread is dormant` |
-| `spu.cores` | `ps2xIOP/src/emulator/core/iop_memory.h` | — |
-| `spu.ram` | — | — |
+| `spu.cores` | `ps2xIOP/src/emulator/core/iop_memory.h`<br>`ps2xIOP/src/emulator/core/iop_spu2.cpp`<br>`ps2xIOP/src/emulator/core/iop_memory.cpp` | `ps2xIOP/tests/iop_import_tests.cpp` |
+| `spu.ram` | `ps2xIOP/src/emulator/core/iop_spu2.cpp`<br>`ps2xIOP/src/emulator/core/iop_memory.cpp` | `ps2xIOP/tests/iop_import_tests.cpp` |
 | `spu.voices` | — | — |
 | `spu.adsr` | — | — |
 | `spu.pitch` | — | — |
 | `spu.mix` | — | — |
 | `spu.reverb` | — | — |
-| `spu.irq` | — | — |
+| `spu.irq` | `ps2xIOP/src/emulator/core/iop_spu2.cpp`<br>`ps2xIOP/src/emulator/core/iop_memory.cpp` | `ps2xIOP/tests/iop_import_tests.cpp` |
 | `spu.dma` | `ps2xRuntime/src/lib/Kernel/Stubs/Audio.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::sceSdRemote isolates voice transfers from block streaming state` |
 | `spu.libsd` | `ps2xRuntime/src/lib/Kernel/Stubs/Audio.cpp`<br>`ps2xIOP/src/modules/libsd.cpp` | `ps2xTest/src/ps2_sif_rpc_tests.cpp::LIBSD RPC routes through the IOP audio service` |
 | `spu.adpcm` | `ps2xRuntime/src/lib/ps2_audio_vag.cpp` | — |

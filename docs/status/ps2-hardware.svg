@@ -8,11 +8,11 @@
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
 <text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 52</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 63</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 66</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
 <text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 20</text>
 <rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 17</text>
+<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 14</text>
 <rect x="672.5400000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
 <text x="689.5400000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
 <rect x="793.2" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
@@ -1246,20 +1246,24 @@ hardware programs: kernel_ee_thread_exit</title>
 <rect x="20" y="1254.4" width="402.5" height="125.6" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="25" y="1264.4" fill="#8b949e" font-size="10" font-weight="500">SPU2 hardware  (9 · 0 ok · 0 part)</text>
 <g><title>spu.cores — SPU2 cores and registers
-status: MISSING
-missing: Register range mapped on the IOP side, no register model</title>
-<rect x="23" y="1271.4" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="27" y="1286.4" fill="#ffffff" font-size="11">SPU2 cores</text>
-<text x="27" y="1299.4" fill="#ffffff" font-size="11">and registers</text>
-<text x="105.6" y="1319.2" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: Both cores' register files at 0x1F900000/0x1F900400 plus the volume/SPDIF block, 16-bit access (32-bit split, low half first), read-back as written with 20-bit address halves; KON loads NAX from SSA and clears ENDX, KON/KOFF latch; ENDX write rule; STAT bit 7 / ATTR bit 15 (944a3e5, D-SPU-1); 14 of 14 non-equivalent mutants killed
+missing: No hardware program checks the SPU2; core 0 output routing into core 1 and every voice-engine effect (spu.voices, spu.adsr, spu.pitch, spu.mix, spu.reverb) are not modelled; power-on register state unknown
+blocker: SPU2 register probe on a physical PS2</title>
+<rect x="23" y="1271.4" width="86.6" height="51.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1286.4" fill="#f0f6fc" font-size="11">SPU2 cores</text>
+<text x="27" y="1299.4" fill="#f0f6fc" font-size="11">and registers</text>
+<text x="105.6" y="1319.2" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>spu.ram — Sound RAM (2 MB)
-status: MISSING
-missing: No sound RAM model</title>
-<rect x="23" y="1325.2" width="86.6" height="51.8" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="27" y="1340.2" fill="#ffffff" font-size="11">Sound RAM (2</text>
-<text x="27" y="1353.2" fill="#ffffff" font-size="11">MB)</text>
-<text x="105.6" y="1373" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: 2 MB sound RAM; the TSA data port writes and reads at an advancing, wrapping transfer address; IOP DMA channels 4/7 move data between IOP RAM and sound RAM (944a3e5, D-SPU-1)
+missing: No hardware program checks the SPU2; the fixed core input/output areas are not used yet (no mixer or ADMA); the DMA completion delay is the existing estimate
+blocker: SPU2 register probe on a physical PS2</title>
+<rect x="23" y="1325.2" width="86.6" height="51.8" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="27" y="1340.2" fill="#f0f6fc" font-size="11">Sound RAM (2</text>
+<text x="27" y="1353.2" fill="#f0f6fc" font-size="11">MB)</text>
+<text x="105.6" y="1373" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>spu.voices — Voice engine (48 voices)
 status: MISSING
@@ -1298,11 +1302,13 @@ missing: No reverb</title>
 <text x="204.1" y="1329.5" fill="#ffffff" font-size="11">Reverb</text>
 </g>
 <g><title>spu.irq — SPU2 IRQ (address match)
-status: MISSING
-missing: No SPU2 interrupts</title>
-<rect x="200.1" y="1346.7" width="145.6" height="30.3" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="204.1" y="1360.7" fill="#ffffff" font-size="10">SPU2 IRQ (address match)</text>
-<text x="341.7" y="1373" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: IRQA: any sound-RAM access by the data port or DMA is checked against both cores' IRQA; with ATTR bit 6 a hit sets IRQINFO bit 2 + core and raises IOP INTC 9; clearing ATTR bit 6 clears it (944a3e5, D-SPU-1)
+missing: No hardware program checks the SPU2; IRQA checks for voice fetches, reverb and ADMA accesses wait for those engines
+blocker: SPU2 register probe on a physical PS2</title>
+<rect x="200.1" y="1346.7" width="145.6" height="30.3" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="204.1" y="1360.7" fill="#f0f6fc" font-size="10">SPU2 IRQ (address match)</text>
+<text x="341.7" y="1373" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>spu.dma — Sound DMA (IOP channels 4/7)
 status: HLE_OR_STUB

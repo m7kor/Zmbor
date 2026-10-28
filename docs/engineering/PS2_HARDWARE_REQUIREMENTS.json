@@ -1344,7 +1344,7 @@
     "DobieStation 68dd073: iop/spu/ (spu.cpp, spu_adpcm.cpp, spu_envelope.cpp)",
     "ps2sdk: iop/sound/libsd"
    ],
-   "known_divergences": "no register model"
+   "known_divergences": "register file per decision D-SPU-1; no voice engine, no core 0 -> core 1 routing"
   },
   "spu.ram": {
    "block": "SPU2 sound RAM (2 MB)",
@@ -1376,7 +1376,7 @@
     "DobieStation 68dd073: iop/spu/ (spu.cpp, spu_adpcm.cpp, spu_envelope.cpp)",
     "ps2sdk: iop/sound/libsd"
    ],
-   "known_divergences": "no RAM model"
+   "known_divergences": "RAM, data port and IOP DMA 4/7 per decision D-SPU-1; fixed areas unused (no mixer/ADMA)"
   },
   "spu.voices": {
    "block": "SPU2 voice engine (48 voices)",

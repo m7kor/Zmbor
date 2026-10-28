@@ -3,19 +3,19 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `22f683047083`, binary sha256 `c9b9e0d51c558f0d`.
+Unit-test run: commit `67b7810b7b5a`, binary sha256 `60e2708b3889407d`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|
 | A | 41 | 41 | 31 | 31 | 31 | 2 | 25 | 0 |
 | B | 21 | 21 | 19 | 19 | 19 | 2 | 9 | 0 |
 | C | 27 | 27 | 24 | 22 | 22 | 0 | 4 | 0 |
-| D | 24 | 24 | 21 | 21 | 21 | 0 | 10 | 0 |
-| E | 13 | 13 | 12 | 12 | 12 | 0 | 5 | 0 |
+| D | 24 | 24 | 22 | 22 | 22 | 0 | 10 | 0 |
+| E | 13 | 13 | 13 | 13 | 13 | 0 | 5 | 0 |
 | F | 17 | 17 | 14 | 7 | 7 | 0 | 9 | 0 |
 | G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **130** | **121** | **121** | **4** | **64** | **0** |
+| **all** | **174** | **174** | **132** | **123** | **123** | **4** | **64** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -111,7 +111,7 @@ Unit-test run: commit `22f683047083`, binary sha256 `c9b9e0d51c558f0d`.
 | `dma.c0` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.c1` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 5 / 5 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.c2` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
-| `dma.c3` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
+| `dma.c3` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c4` | `IMPLEMENTED_UNVERIFIED` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c5` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c6` | `IMPLEMENTED_UNVERIFIED` | 5 / 5 / 5 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
@@ -142,8 +142,8 @@ Unit-test run: commit `22f683047083`, binary sha256 `c9b9e0d51c558f0d`.
 | `vif.dbf` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `vif.mscal` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `vif.direct` | `IMPLEMENTED_UNVERIFIED` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
-| `ipu.dma` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
-| `ipu.cmd` | `MISSING` | 2 / 2 / 2 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.dma` | `IMPLEMENTED_UNVERIFIED` | 3 / 3 / 3 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.cmd` | `MISSING` | 4 / 4 / 4 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.mpeg` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `iop.cpu` | `VERIFIED_PARTIAL` | 0 / 0 / 0 | 7 / 7 | contract_specified, test_exists, hardware_verified |
 | `iop.mem` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 2 / 2 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |

@@ -96,7 +96,7 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 | `dma.c0` Ch 0 VIF0 | `VERIFIED_PARTIAL` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.c1` Ch 1 VIF1 | `VERIFIED_PARTIAL` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
 | `dma.c2` Ch 2 GIF | `IMPLEMENTED_UNVERIFIED` | No hardware program checks GIF-channel DMA directly | — | — | — | contract_specified, test_exists, test_executed, test_passed |
-| `dma.c3` Ch 3 fromIPU | `MISSING` | Channel not modelled (IPU is HLE) | IPU hardware model (E) | unscheduled | — | contract_specified |
+| `dma.c3` Ch 3 fromIPU | `IMPLEMENTED_UNVERIFIED` | Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source | IPU probe on a physical PS2 | 8 | — | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c4` Ch 4 toIPU | `IMPLEMENTED_UNVERIFIED` | Source-chain mode; no hardware program; transfer timing | IPU probe on a physical PS2 | 8 | — | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c5` Ch 5 SIF0 (IOP to EE) | `HLE_OR_STUB` | No DMAC channel model | — | — | — | contract_specified, test_exists, test_executed, test_passed |
 | `dma.c6` Ch 6 SIF1 (EE to IOP) | `IMPLEMENTED_UNVERIFIED` | No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised | SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back) | 8 | — | contract_specified, test_exists, test_executed, test_passed |
@@ -132,8 +132,8 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 | `vif.dbf` Double buffering (BASE, OFFSET, TOPS, ITOPS) | `IMPLEMENTED_UNVERIFIED` | — | — | — | `vif.mscal` | contract_specified, test_exists, test_executed, test_passed |
 | `vif.mscal` MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA | `IMPLEMENTED_UNVERIFIED` | — | — | — | `vu.sched` | contract_specified, test_exists, test_executed, test_passed |
 | `vif.direct` DIRECT/DIRECTHL to PATH2 | `IMPLEMENTED_UNVERIFIED` | — | — | — | — | contract_specified, test_exists, test_executed, test_passed |
-| `ipu.dma` IPU0/IPU1 FIFOs and DMA | `MISSING` | Output FIFO data path and fromIPU (channel 3) are not modelled | — | unscheduled | `dma.c3`, `dma.c4` | contract_specified |
-| `ipu.cmd` IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `MISSING` | IDEC, BDEC, VDEC, CSC and PACK are not implemented (they complete without output and are reported as unimplemented) | — | unscheduled | `ipu.dma` | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.dma` IPU0/IPU1 FIFOs and DMA | `IMPLEMENTED_UNVERIFIED` | Chain modes of channels 3/4; no hardware program; transfer timing | IPU probe on a physical PS2 | 8 | `dma.c3`, `dma.c4` | contract_specified, test_exists, test_executed, test_passed |
+| `ipu.cmd` IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `MISSING` | IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented) | — | unscheduled | `ipu.dma` | contract_specified, test_exists, test_executed, test_passed |
 | `ipu.mpeg` MPEG playback (libmpeg HLE) | `HLE_OR_STUB` | — | — | — | `ipu.cmd` | contract_specified, test_exists, test_executed, test_passed |
 
 ## F

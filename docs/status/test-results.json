@@ -1,12 +1,12 @@
 {
- "commit": "22f683047083b23dbf6f93b706c1030a70ea515a",
+ "commit": "67b7810b7b5a477b7453ef9b5022f881ad21d1a4",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "c9b9e0d51c558f0dbd340a2b12cff3e3d7aef7f52210b5fbc367cf98015acd84",
+ "binary_sha256": "60e2708b3889407dd382406b525a120a7fd232d9e017402772a98949f84baae1",
  "exit_code": 0,
  "totals": {
-  "PASS": 570,
+  "PASS": 572,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -156,6 +156,8 @@
   "IOP SIFCMD publishes a command buffer and answers INIT_CMD with SET_SREG(RPCINIT, 1)": "PASS",
   "IOP SIFRPC binds the ROM FILEIO server and answers a tty write call": "PASS",
   "IOP heap DMA uses private backing instead of aliasing EE RDRAM": "PASS",
+  "IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)": "PASS",
+  "IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample": "PASS",
   "IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP": "PASS",
   "IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4": "PASS",
   "IPU init executes its guest helper as a scheduler invocation": "PASS",

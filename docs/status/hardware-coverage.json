@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "22f683047083b23dbf6f93b706c1030a70ea515a",
-  "unit_results_binary_sha256": "c9b9e0d51c558f0dbd340a2b12cff3e3d7aef7f52210b5fbc367cf98015acd84"
+  "unit_results_commit": "67b7810b7b5a477b7453ef9b5022f881ad21d1a4",
+  "unit_results_binary_sha256": "60e2708b3889407dd382406b525a120a7fd232d9e017402772a98949f84baae1"
  },
  "levels": [
   "contract_specified",
@@ -18,9 +18,9 @@
  "components_total": 174,
  "totals": {
   "contract_specified": 174,
-  "test_exists": 130,
-  "test_executed": 121,
-  "test_passed": 121,
+  "test_exists": 132,
+  "test_executed": 123,
+  "test_passed": 123,
   "vectors_passed": 4,
   "hardware_verified": 64,
   "timing_verified": 0
@@ -59,9 +59,9 @@
   "D": {
    "components": 24,
    "contract_specified": 24,
-   "test_exists": 21,
-   "test_executed": 21,
-   "test_passed": 21,
+   "test_exists": 22,
+   "test_executed": 22,
+   "test_passed": 22,
    "vectors_passed": 0,
    "hardware_verified": 10,
    "timing_verified": 0
@@ -69,9 +69,9 @@
   "E": {
    "components": 13,
    "contract_specified": 13,
-   "test_exists": 12,
-   "test_executed": 12,
-   "test_passed": 12,
+   "test_exists": 13,
+   "test_executed": 13,
+   "test_passed": 13,
    "vectors_passed": 0,
    "hardware_verified": 5,
    "timing_verified": 0
@@ -3075,15 +3075,15 @@
    "id": "dma.c3",
    "name": "Ch 3 fromIPU",
    "category": "D",
-   "status": "MISSING",
-   "missing": "Channel not modelled (IPU is HLE)",
-   "blocker": "IPU hardware model (E)",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Destination-chain mode; no hardware program; transfer timing; STS = fromIPU stall source",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
    "levels": {
     "contract_specified": true,
-    "test_exists": false,
-    "test_executed": false,
-    "test_passed": false,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -3092,9 +3092,9 @@
     "dma.normal"
    ],
    "named_tests": {
-    "cited": 0,
-    "executed": 0,
-    "passed": 0
+    "cited": 2,
+    "executed": 2,
+    "passed": 2
    },
    "hardware_programs": {
     "cited": 0,
@@ -4084,15 +4084,15 @@
    "id": "ipu.dma",
    "name": "IPU0/IPU1 FIFOs and DMA",
    "category": "E",
-   "status": "MISSING",
-   "missing": "Output FIFO data path and fromIPU (channel 3) are not modelled",
-   "blocker": "",
-   "target": "unscheduled",
+   "status": "IMPLEMENTED_UNVERIFIED",
+   "missing": "Chain modes of channels 3/4; no hardware program; transfer timing",
+   "blocker": "IPU probe on a physical PS2",
+   "target": "8",
    "levels": {
     "contract_specified": true,
-    "test_exists": false,
-    "test_executed": false,
-    "test_passed": false,
+    "test_exists": true,
+    "test_executed": true,
+    "test_passed": true,
     "vectors_passed": false,
     "hardware_verified": false,
     "timing_verified": false
@@ -4102,9 +4102,9 @@
     "dma.c4"
    ],
    "named_tests": {
-    "cited": 0,
-    "executed": 0,
-    "passed": 0
+    "cited": 3,
+    "executed": 3,
+    "passed": 3
    },
    "hardware_programs": {
     "cited": 0,
@@ -4120,7 +4120,7 @@
    "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
    "category": "E",
    "status": "MISSING",
-   "missing": "IDEC, BDEC, VDEC, CSC and PACK are not implemented (they complete without output and are reported as unimplemented)",
+   "missing": "IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)",
    "blocker": "",
    "target": "unscheduled",
    "levels": {
@@ -4136,9 +4136,9 @@
     "ipu.dma"
    ],
    "named_tests": {
-    "cited": 2,
-    "executed": 2,
-    "passed": 2
+    "cited": 4,
+    "executed": 4,
+    "passed": 4
    },
    "hardware_programs": {
     "cited": 0,

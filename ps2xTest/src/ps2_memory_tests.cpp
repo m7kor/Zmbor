@@ -9,6 +9,7 @@
 #include "Stubs/GS.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -196,6 +197,86 @@ namespace
     {
         appendU64(packet, static_cast<uint64_t>(u & 0x3FFFu) | (static_cast<uint64_t>(v & 0x3FFFu) << 32u));
         appendU64(packet, 0u);
+    }
+
+    // MSB-first bitstream from '0'/'1' characters (spaces ignored), zero-padded to whole qwords.
+    std::vector<PS2Ipu::Qword> ipuBits(const char *bits)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t count = 0u;
+        for (const char *c = bits; *c != '\0'; ++c)
+        {
+            if (*c != '0' && *c != '1')
+                continue;
+            if (count % 8u == 0u)
+                bytes.push_back(0u);
+            if (*c == '1')
+                bytes.back() |= static_cast<uint8_t>(0x80u >> (count % 8u));
+            ++count;
+        }
+        std::vector<PS2Ipu::Qword> qwords((bytes.size() + 15u) / 16u);
+        for (size_t i = 0; i < bytes.size(); ++i)
+            qwords[i / 16u][i % 16u] = bytes[i];
+        return qwords;
+    }
+
+    struct BdecRun
+    {
+        bool busyBeforeData = false;
+        bool busyAfter = true;
+        uint32_t control = 0u;
+        size_t qwords = 0u;
+        std::array<int16_t, 384> raw{};
+        PS2Ipu ipu;
+    };
+
+    // Loads `matrix` with SETIQ (intra, or non-intra), then runs one BDEC on `bits` through the FIFOs.
+    void runBdec(BdecRun &run, uint32_t control, uint32_t option, const char *bits,
+                 const std::array<uint8_t, 64> &matrix, bool nonIntraMatrix = false)
+    {
+        PS2Ipu &ipu = run.ipu;
+        ipu.writeControl(control);
+        ipu.writeCommand((5u << 28) | (nonIntraMatrix ? (1u << 27) : 0u));
+        for (uint32_t q = 0; q < 4u; ++q)
+        {
+            PS2Ipu::Qword qword{};
+            std::copy_n(matrix.begin() + q * 16u, 16u, qword.begin());
+            ipu.pushInput(qword);
+            ipu.run();
+        }
+        ipu.writeCommand((2u << 28) | option);
+        run.busyBeforeData = ipu.busy();
+        std::vector<uint8_t> out;
+        const auto drain = [&]
+        {
+            PS2Ipu::Qword qword{};
+            while (ipu.popOutput(qword))
+            {
+                out.insert(out.end(), qword.begin(), qword.end());
+                ipu.run();
+            }
+        };
+        for (const PS2Ipu::Qword &qword : ipuBits(bits))
+        {
+            while (!ipu.canAcceptInput())
+                drain();
+            ipu.pushInput(qword);
+            ipu.run();
+            drain();
+        }
+        drain();
+        run.busyAfter = ipu.busy();
+        run.control = ipu.readControl();
+        run.qwords = out.size() / 16u;
+        for (size_t i = 0; i < run.raw.size() && i * 2u + 1u < out.size(); ++i)
+            run.raw[i] = static_cast<int16_t>(out[i * 2u] | (out[i * 2u + 1u] << 8));
+    }
+
+    std::array<uint8_t, 64> flatMatrix(uint8_t value)
+    {
+        std::array<uint8_t, 64> m{};
+        m.fill(value);
+        return m;
     }
 
 }
@@ -3183,6 +3264,141 @@ void register_ps2_memory_tests()
                     t.Equals(mem.readIORegister(0x10002020u) & 0x7Fu, c.bitPointer, "the symbol's bits are consumed");
                 }
             }
+        });
+
+        // BDEC: ISO/IEC 13818-2 7.2-7.6 (D-IPU-3). Expected samples are computed with an independent double-precision
+        // model of the standard's formulas; options: MBI bit 27, DCR 26, DT 25, QSC 16-20.
+        constexpr uint32_t kBdecIntra = (1u << 27) | (1u << 26);
+        tc.Run("IPU BDEC decodes an intra DC-only macroblock: DC differentials, predictors and the RAW16 layout", [](TestCase &t)
+        {
+            // Y0 size 0; Y1 size 2 '11' (+3); Y2 size 1 '0' (-1); Y3 size 0; Cb size 0; Cr size 3 '000' (-7); EOB '10'.
+            const char *bits = "100 10  01 11 10  00 0 10  100 10  00 10  110 000 10";
+            for (const bool field : {false, true})
+            {
+                BdecRun run;
+                runBdec(run, 0u, kBdecIntra | (1u << 16) | (field ? (1u << 25) : 0u), bits, flatMatrix(16));
+                t.IsTrue(run.busyBeforeData && !run.busyAfter, "BDEC waits for data, then completes once its output drained");
+                t.Equals(run.qwords, static_cast<size_t>(48u), "RAW16 macroblock: 384 halfwords");
+                t.Equals((run.control >> 8) & 0x3Fu, 0x3Fu, "an intra macroblock codes all six blocks (CTRL.CBP)");
+                t.Equals((run.control >> 14) & 1u, 0u, "no error");
+                t.Equals(static_cast<int>(run.raw[0]), 128, "Y0: predictor reset to 128, F = 8 * 128, f = 128");
+                t.Equals(static_cast<int>(run.raw[15]), 131, "Y1 (top right): 128 + 3");
+                t.Equals(static_cast<int>(run.raw[255]), 130, "Y3 (bottom right) keeps Y2's predictor 131 - 1");
+                t.Equals(static_cast<int>(run.raw[field ? 16 : 128]), 130, field ? "field DCT: line 1 belongs to Y2" : "frame DCT: line 8 belongs to Y2");
+                t.Equals(static_cast<int>(run.raw[field ? 128 : 16]), 128, field ? "field DCT: line 8 is Y0's row 4" : "frame DCT: line 1 is Y0's row 1");
+                t.Equals(static_cast<int>(run.raw[256]), 128, "Cb: its own predictor");
+                t.Equals(static_cast<int>(run.raw[383]), 121, "Cr: 128 - 7");
+                t.IsTrue(run.ipu.dcPredictor(0) == 130 && run.ipu.dcPredictor(1) == 128 && run.ipu.dcPredictor(2) == 121,
+                         "the predictors carry to the next macroblock");
+                t.Equals(run.ipu.unimplementedCommand(), -1, "BDEC is executed, not reported as unimplemented");
+            }
+            BdecRun kept; // DCR clear: the predictors are not reset
+            runBdec(kept, 0u, kBdecIntra, bits, flatMatrix(16));
+            kept.ipu.writeCommand(0u); // BCLR: drop the first stream's padding
+            kept.ipu.writeCommand((2u << 28) | (1u << 27));
+            for (const PS2Ipu::Qword &q : ipuBits(bits))
+                kept.ipu.pushInput(q);
+            kept.ipu.run();
+            PS2Ipu::Qword first{};
+            t.IsTrue(kept.ipu.popOutput(first), "the second macroblock is decoded");
+            t.Equals(static_cast<int>(static_cast<int16_t>(first[0] | (first[1] << 8))), 130, "without DCR Y0 continues from 130");
+        });
+
+        tc.Run("IPU BDEC applies MPEG-2 mismatch control to the last coefficient (IDP 3 tie)", [](TestCase &t)
+        {
+            // IDP 3: predictor 1024, size 3 '100' (+4) -> F = 1028, f = 128.5; the sum is even, so F[63] becomes 1 and
+            // its basis tips each sample to 128 or 129.
+            BdecRun run;
+            runBdec(run, 3u << 16, kBdecIntra | (1u << 16), "101 100 10  100 10  100 10  100 10  00 10  00 10", flatMatrix(16));
+            t.Equals(run.ipu.dcPredictor(0), 1028, "IDP 3 resets the predictor to 1024");
+            t.Equals(static_cast<int>(run.raw[0]), 129, "(0,0): 128.5 + F[63]'s positive basis");
+            t.Equals(static_cast<int>(run.raw[1]), 128, "(0,1): 128.5 + a negative basis value");
+            t.Equals(static_cast<int>(run.raw[7 * 16 + 7]), 129, "(7,7)");
+        });
+
+        tc.Run("IPU BDEC escape coefficients follow CTRL.AS scan, zigzag matrix order and the non-linear QSC", [](TestCase &t)
+        {
+            // Escape '000001', run 0, level 100 at scan position 1 (zigzag: raster 1; alternate: raster 8, weight
+            // matrix[2] = 24). QST 1, QSC 2 -> quantiser_scale 2 (linear would be 4).
+            std::array<uint8_t, 64> matrix = flatMatrix(16);
+            matrix[2] = 24;
+            const char *bits = "100 000001 000000 000001100100 10  100 10  100 10  100 10  00 10  00 10";
+            BdecRun zigzag, alternate;
+            runBdec(zigzag, 1u << 22, kBdecIntra | (2u << 16), bits, matrix);
+            runBdec(alternate, (1u << 22) | (1u << 20), kBdecIntra | (2u << 16), bits, matrix);
+            t.IsTrue(zigzag.raw[0] == 163 && zigzag.raw[7] == 93 && zigzag.raw[7 * 16] == 163,
+                     "zigzag: F[0][1] = 200 varies along x");
+            t.IsTrue(alternate.raw[0] == 180 && alternate.raw[7] == 180 && alternate.raw[7 * 16] == 76,
+                     "alternate: F[1][0] = 300 (weight 24) varies along y");
+        });
+
+        tc.Run("IPU BDEC non-intra: coded_block_pattern, the first-coefficient '1s' code and unclamped samples", [](TestCase &t)
+        {
+            // CBP '1010' = 32 (Y0 only); '1s' = run 0 level +-1; non-intra matrix 16, QSC 2: F = (+-3 * 16 * 4) / 32.
+            for (const bool negative : {false, true})
+            {
+                BdecRun run;
+                runBdec(run, 0u, 2u << 16, negative ? "1010 11 10" : "1010 10 10", flatMatrix(16), true);
+                const int expected = negative ? -1 : 1;
+                t.IsTrue(!run.busyAfter && run.qwords == 48u, "the macroblock is output");
+                t.Equals((run.control >> 8) & 0x3Fu, 32u, "CTRL.CBP = 32");
+                t.IsTrue(run.raw[0] == expected && run.raw[7 * 16 + 7] == expected, "Y0 = round(F / 8) everywhere");
+                t.IsTrue(run.raw[8] == 0 && run.raw[128] == 0 && run.raw[256] == 0 && run.raw[383] == 0, "uncoded blocks are 0");
+            }
+        });
+
+        tc.Run("IPU BDEC MPEG-1 mode: 8/16-bit escape levels and oddification without mismatch control", [](TestCase &t)
+        {
+            // Y0: escape level 100 -> F = 200, odd-ified to 199. Y1: escape 0x00 then 200 -> F = 399.
+            BdecRun run;
+            runBdec(run, 1u << 23, kBdecIntra | (1u << 16),
+                    "100 000001 000000 01100100 10  100 000001 000000 00000000 11001000 10  100 10  100 10  00 10  00 10",
+                    flatMatrix(16));
+            t.Equals(static_cast<int>(run.raw[3 * 16 + 1]), 157, "Y0 (3,1) with F = 199 (MPEG-2 rules give 158)");
+            t.Equals(static_cast<int>(run.raw[8]), 197, "Y1 (0,0) with the two-byte level 200");
+            t.Equals((run.control >> 14) & 1u, 0u, "no error");
+        });
+
+        tc.Run("IPU BDEC intra with CTRL.IVF uses table B-15", [](TestCase &t)
+        {
+            // B-15: '10s' = run 0 level 1, EOB '0110' (in B-14 '10' would be EOB). QSC 16: F = 32.
+            BdecRun run;
+            runBdec(run, 1u << 21, kBdecIntra | (16u << 16),
+                    "100 100 0110  100 0110  100 0110  100 0110  00 0110  00 0110", flatMatrix(16));
+            t.IsTrue(run.raw[0] == 134 && run.raw[7] == 122, "F[0][1] = 32 from the B-15 code");
+            t.Equals((run.control >> 14) & 1u, 0u, "no error");
+        });
+
+        tc.Run("IPU BDEC flags bitstream errors with CTRL.ECD and outputs nothing", [](TestCase &t)
+        {
+            BdecRun overrun; // escape run 63 after the DC: past coefficient 63
+            runBdec(overrun, 0u, kBdecIntra, "100 000001 111111 000000000001 10", flatMatrix(16));
+            t.IsTrue(!overrun.busyAfter && ((overrun.control >> 14) & 1u) == 1u && overrun.qwords == 0u, "run past the block");
+            BdecRun cbp; // nine zeros: not a B-9 code
+            runBdec(cbp, 0u, 0u, "000000000 1", flatMatrix(16), true);
+            t.IsTrue(!cbp.busyAfter && ((cbp.control >> 14) & 1u) == 1u && cbp.qwords == 0u, "invalid coded_block_pattern");
+        });
+
+        tc.Run("IPU BDEC runs through toIPU and fromIPU DMA", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kIn = 0x004A0000u, kOut = 0x004B0000u;
+            const std::vector<PS2Ipu::Qword> stream = ipuBits("100 10  01 11 10  00 0 10  100 10  00 10  110 000 10");
+            std::memcpy(rdram + kIn, stream.data(), stream.size() * 16u);
+            mem.writeIORegister(0x10002000u, (2u << 28) | kBdecIntra);
+            mem.writeIORegister(0x1000B010u, kOut);
+            mem.writeIORegister(0x1000B020u, 48u);
+            mem.writeIORegister(0x1000B000u, 0x100u);
+            mem.writeIORegister(0x1000B410u, kIn);
+            mem.writeIORegister(0x1000B420u, static_cast<uint32_t>(stream.size()));
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            int16_t y0 = 0, cr = 0;
+            std::memcpy(&y0, rdram + kOut, 2u);
+            std::memcpy(&cr, rdram + kOut + 766u, 2u);
+            t.IsTrue(y0 == 128 && cr == 121, "the RAW16 macroblock reaches memory");
+            t.IsTrue(!mem.ipu().busy() && (mem.readIORegister(0x1000E010u) & (1u << 3)) != 0u, "BDEC completes and fromIPU raises CIS3");
         });
 
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)

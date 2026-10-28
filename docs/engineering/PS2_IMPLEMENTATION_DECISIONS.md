@@ -93,3 +93,23 @@ one stay unverified until the stated measurement exists.
 - **Against:** a single reference. PCSX2's indexed PACK was not compared, and the distance metric and tie rule are
   not documented anywhere available here.
 - **Settles it:** an IPU probe packing a macroblock against a CLUT with equidistant entries.
+
+## D-IPU-3 — IPU BDEC reconstruction
+
+- **Chosen:** ISO/IEC 13818-2 as written (ISO/IEC 11172-2 with CTRL.MP1):
+  - the SETIQ matrices are taken in zigzag order whatever CTRL.AS, as the standard transmits them;
+  - inverse quantisation divides with truncation toward zero, then saturates to [-2048, 2047];
+  - MPEG-2 applies mismatch control to F[7][7]; MPEG-1 makes each non-zero AC value odd instead;
+  - the inverse DCT is the exact separable cosine transform of Annex A in double precision, rounded to nearest, then
+    saturated to [-256, 255];
+  - intra samples are clamped to 0-255; non-intra samples stay signed;
+  - DC predictors are reset only by the DCR option.
+- **For:** the standard is the only complete specification available. PCSX2 (libmpeg2-derived) also clamps intra
+  output and resets the predictors only on DCR.
+- **Against:** the IPU's own IDCT is integer hardware, and any IEEE 1180 implementation may differ from this reference
+  by 1 in some samples. The references also disagree:
+  - PCSX2 weights a coefficient by its scan position (equal to this choice for zigzag, different for alternate scan)
+    and shifts escape levels arithmetically;
+  - DobieStation odd-ifies every format, with no mismatch control.
+- **Settles it:** an IPU probe decoding blocks with alternate scan, escape levels of both signs and a DC that rounds
+  at .5, compared with RAW16 output from a physical PS2.

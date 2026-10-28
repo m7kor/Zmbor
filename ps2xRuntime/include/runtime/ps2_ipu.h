@@ -12,9 +12,18 @@
 // The input FIFO holds 8 qwords fed by toIPU (DMA channel 4) or the IPU_in_FIFO window; the bitstream is the bytes in
 // memory order, each read MSB first (MPEG bit order).
 //
-// Implemented commands: BCLR (0), VDEC (3), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), PACK (8), SETTH (9). IDEC (1)
-// and BDEC (2) are not implemented: such a command is reported through unimplementedCommand() and completes without
-// output, so a caller can see that no decoding happened.
+// Implemented commands: BCLR (0), BDEC (2), VDEC (3), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), PACK (8), SETTH (9).
+// IDEC (1) is not implemented: it is reported through unimplementedCommand() and completes without output, so a
+// caller can see that no decoding happened.
+//
+// BDEC decodes one macroblock's block layer (ISO/IEC 13818-2 7.2-7.6, MPEG-1 rules with CTRL.MP1): for a non-intra
+// macroblock (option MBI clear) the coded_block_pattern (B-9) first, then for each coded block of Y0-Y3, Cb, Cr the
+// intra DC (B-12/B-13, predictors reset to 128 << IDP by option DCR) and the AC coefficients (B-14, or B-15 for intra
+// with CTRL.IVF), inverse scan by CTRL.AS, inverse quantisation (QSC option bits 16-20, linear or non-linear by
+// CTRL.QST, matrices from SETIQ in zigzag order), mismatch control (MPEG-2) or oddification (MPEG-1), saturation and
+// an IEEE 1180 reference IDCT (decision D-IPU-3). The output is RAW16: Y as 16x16 (frame or, option DT, field block
+// order), Cb 8x8, Cr 8x8, 48 qwords of little-endian int16; intra samples are clamped to 0-255. A bitstream error
+// sets CTRL.ECD and ends the command.
 //
 // VDEC decodes one MPEG-2 VLC symbol (ISO/IEC 13818-2 tables B-1, B-2..B-4 by CTRL.PCT, B-10, B-11) and returns
 // (code length << 16) | value (16-bit two's complement); a code not in the table sets CTRL.ECD.
@@ -60,6 +69,7 @@ public:
 
     [[nodiscard]] uint8_t intraQuantizer(size_t i) const { return m_intraIq[i & 63u]; }
     [[nodiscard]] uint8_t nonIntraQuantizer(size_t i) const { return m_nonIntraIq[i & 63u]; }
+    [[nodiscard]] int32_t dcPredictor(size_t component) const { return m_dcPredictor[component % 3u]; }
     [[nodiscard]] uint16_t vqClut(size_t i) const { return m_vqClut[i & 15u]; }
     [[nodiscard]] uint16_t threshold0() const noexcept { return m_th0; }
     [[nodiscard]] uint16_t threshold1() const noexcept { return m_th1; }
@@ -78,6 +88,23 @@ private:
     void emitRgb16(const uint8_t *rgb32, bool dither);
     [[nodiscard]] static std::array<uint16_t, 256> toRgb16(const uint8_t *rgb32, bool dither);
     void refillOutput();
+    // BDEC: decodes as far as the input allows; false when it must wait for more data.
+    bool decodeBlocks();
+    // One coefficient symbol of the current block: 1 decoded, 0 more data needed, -1 bitstream error.
+    int decodeCoefficient(bool &endOfBlock);
+    void reconstructBlock();
+    void emitRaw16();
+    struct BdecState
+    {
+        uint32_t stage = 0;       // 0 skip FB, 1 CBP, 2 blocks, 3 output
+        uint32_t block = 0;       // 0-5
+        bool dcDone = false;
+        uint32_t index = 0;       // next scan position
+        std::array<int32_t, 64> coefficients{}; // QF by scan position
+        std::array<std::array<int16_t, 64>, 6> blocks{};
+    } m_bdec;
+    std::array<int32_t, 3> m_dcPredictor{128, 128, 128};
+    uint32_t m_codedBlockPattern = 0;
     std::array<uint8_t, 1024> m_rgbBlock{};
 
     std::deque<Qword> m_outputPending; // converted data not yet in the 8-qword output FIFO

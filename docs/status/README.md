@@ -98,9 +98,9 @@ No overall completeness percentage is shown: the requirements of most components
 
 | section | components | `VERIFIED_COMPLETE` | `VERIFIED_PARTIAL` | `IMPLEMENTED_UNVERIFIED` | `HLE_OR_STUB` | `MISSING` | `NOT_APPLICABLE` | `UNKNOWN` |
 |---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 174 | 18 | 52 | 58 | 20 | 22 | 3 | 1 |
+| PS2 Hardware & Runtime | 174 | 18 | 52 | 59 | 20 | 21 | 3 | 1 |
 | Recompiler, Tools & Compatibility | 53 | 4 | 29 | 11 | 0 | 1 | 0 | 8 |
-| **all** | **227** | **22** | **81** | **69** | **20** | **23** | **3** | **9** |
+| **all** | **227** | **22** | **81** | **70** | **20** | **22** | **3** | **9** |
 
 ## PS2 Hardware & Runtime
 
@@ -220,7 +220,7 @@ Only GS SIGNAL/LABEL behaviour has hardware results (ps2autotests gs/*). Everyth
 | `dma.c1` | Ch 1 VIF1 | `VERIFIED_PARTIAL` |  | — | hw: `dma_vif_basic` 12/12, `dma_vif_unpack` 56/56, `dma_vif_intstall` 18/18, `dma_vif_stcycl` 510/510, `dma_vif_stmod` 134/134; 1 test ref(s) |  |
 | `dma.c2` | Ch 2 GIF | `IMPLEMENTED_UNVERIFIED` |  | No hardware program checks GIF-channel DMA directly | 2 test ref(s) |  |
 | `dma.c3` | Ch 3 fromIPU | `MISSING` |  | Channel not modelled (IPU is HLE); **blocker:** IPU hardware model (E) | — | unscheduled |
-| `dma.c4` | Ch 4 toIPU | `MISSING` |  | Channel not modelled (IPU is HLE); **blocker:** IPU hardware model (E) | — | unscheduled |
+| `dma.c4` | Ch 4 toIPU | `IMPLEMENTED_UNVERIFIED` | toIPU normal mode: MADR/QWC qwords into the 8-qword IPU input FIFO with flow control (STR held while the FIFO is full), CIS4 when all data is in | Source-chain mode; no hardware program; transfer timing; **blocker:** IPU probe on a physical PS2 | 2 test ref(s) | 8 |
 | `dma.c5` | Ch 5 SIF0 (IOP to EE) | `HLE_OR_STUB` | Served by the SIF HLE (sceSifGetOtherData, RPC replies) | No DMAC channel model | 1 test ref(s) |  |
 | `dma.c6` | Ch 6 SIF1 (EE to IOP) | `IMPLEMENTED_UNVERIFIED` | Register-level channel 6: normal and source-chain mode with TTE, stall-control drain (STD=3), stream split into IOP packets (16-byte IOP tag, address bits 0-23, end bits 31/30, word count & 0xFFFFC) written into IOP memory with a SIF transfer notification, CIS6; sceSifSetDma (HLE syscall) still copies descriptors directly | No hardware program drives channel 6; SIF FIFO depth and transfer timing are not modelled; IOP channel 10 interrupt is not raised; **blocker:** SIF1 probe on a physical PS2 (channel 6 programmed directly, IOP buffer read back) | 5 test ref(s) | 8 |
 | `dma.c7` | Ch 7 SIF2 | `MISSING` |  | Not modelled | — | unscheduled |
@@ -255,8 +255,8 @@ Only GS SIGNAL/LABEL behaviour has hardware results (ps2autotests gs/*). Everyth
 | `vif.dbf` | Double buffering (BASE, OFFSET, TOPS, ITOPS) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `vif.mscal` | MSCAL, MSCALF, MSCNT, FLUSH, FLUSHE, FLUSHA | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `vif.direct` | DIRECT/DIRECTHL to PATH2 | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
-| `ipu.dma` | IPU0/IPU1 FIFOs and DMA | `MISSING` |  | Not modelled | — | unscheduled |
-| `ipu.cmd` | IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `MISSING` | sceIpuInit/Stop/RestartDMA return without decoding | No command decoding | — | unscheduled |
+| `ipu.dma` | IPU0/IPU1 FIFOs and DMA | `MISSING` | Input FIFO (8 qwords, bit pointer) fed by toIPU and IPU_in_FIFO (6ecc5f3) | Output FIFO data path and fromIPU (channel 3) are not modelled | — | unscheduled |
+| `ipu.cmd` | IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...) | `MISSING` | IPU register file (CMD/CTRL/BP/TOP) and the non-decoding commands BCLR, FDEC, SETIQ, SETVQ, SETTH, CTRL.RST (6ecc5f3); sceIpu* HLE still returns without decoding | IDEC, BDEC, VDEC, CSC and PACK are not implemented (they complete without output and are reported as unimplemented) | 2 test ref(s) | unscheduled |
 | `ipu.mpeg` | MPEG playback (libmpeg HLE) | `HLE_OR_STUB` | sceMpeg* replaced; optional FFmpeg decode (PS2X_ENABLE_FFMPEG) | — | 1 test ref(s) |  |
 
 ### F. IOP and system services
@@ -499,7 +499,7 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `dma.c1` | `ps2xRuntime/src/lib/ps2_memory.cpp` | `ps2xTest/src/ps2_memory_tests.cpp::VIF1 DMA DIRECT forwards payload to GIF callback and clears channel` |
 | `dma.c2` | `ps2xRuntime/src/lib/ps2_memory.cpp` | `ps2xTest/src/ps2_memory_tests.cpp::GIF DMA mode0 copies RDRAM packet and clears channel`<br>`ps2xTest/src/ps2_memory_tests.cpp::GIF DMA chain longer than 4096 tags` |
 | `dma.c3` | — | — |
-| `dma.c4` | — | — |
+| `dma.c4` | `ps2xRuntime/src/lib/ps2_memory.cpp`<br>`ps2xRuntime/src/lib/ps2_ipu.cpp` | `ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4`<br>`ps2xTest/src/ps2_memory_tests.cpp::IPU toIPU stays active while the input FIFO is full and completes when a command frees it` |
 | `dma.c5` | `ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp` | `ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifGetOtherData copies payload` |
 | `dma.c6` | `ps2xRuntime/src/lib/ps2_memory.cpp`<br>`ps2xRuntime/src/lib/ps2_runtime.cpp`<br>`ps2xRuntime/src/lib/Kernel/Stubs/SIF.cpp` | `ps2xTest/src/ps2_sif_dma_tests.cpp::sceSifSetDma copies payload`<br>`ps2xTest/src/ps2_memory_tests.cpp::SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6`<br>`ps2xTest/src/ps2_memory_tests.cpp::SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)`<br>`ps2xTest/src/ps2_memory_tests.cpp::SIF1 without an IOP sink does not transfer or raise CIS6`<br>`ps2xTest/src/ps2_sif_dma_tests.cpp::DMAC channel 6 (SIF1) programmed directly writes its IOP packet into IOP memory` |
 | `dma.c7` | — | — |
@@ -530,7 +530,7 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `vif.mscal` | `ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::VIF MSCAL and MSCNT toggle DBF and keep TOPS/ITOPS coherent` |
 | `vif.direct` | `ps2xRuntime/src/lib/ps2_vif1_interpreter.cpp` | `ps2xTest/src/ps2_memory_tests.cpp::VIF DIRECTHL stalls behind queued PATH3 IMAGE packets` |
 | `ipu.dma` | — | — |
-| `ipu.cmd` | `ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp` | — |
+| `ipu.cmd` | `ps2xRuntime/src/lib/ps2_ipu.cpp`<br>`ps2xRuntime/src/lib/Kernel/Stubs/IPU.cpp` | `ps2xTest/src/ps2_memory_tests.cpp::IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP`<br>`ps2xTest/src/ps2_memory_tests.cpp::IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4` |
 | `ipu.mpeg` | `ps2xRuntime/src/lib/Kernel/Stubs/MPEG.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::sceMpegDemuxPssRing dispatches registered video and audio stream callbacks` |
 | `iop.cpu` | `ps2xIOP/src/emulator/core/iop_cpu.cpp` | `ps2xIOP/tests/iop_emulator_tests.cpp`<br>`ps2xIOP/tests/iop_import_tests.cpp` |
 | `iop.mem` | `ps2xIOP/src/emulator/core/iop_memory.cpp` | `ps2xTest/src/ps2_sif_dma_tests.cpp::IOP heap DMA uses private backing instead of aliasing EE RDRAM` |

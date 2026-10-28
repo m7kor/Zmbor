@@ -10,11 +10,11 @@ committed.
   `ec4a32d`. Push with the explicit URL `https://github.com/m7kor/Zmbor.git` (`origin` in the worktrees is upstream).
 - One PR only. No merge, no force-push, no history rewrite.
 
-## Verified baseline (batch 9 gate, `6f93475`, clean tree)
+## Verified baseline (batch 10 gate, `2dd2583`, clean tree)
 
 ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 crashes, timeouts or regressions;
-`ps2x_tests` 574/574; ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs (separate measurement): 23/23 exact,
-1306/1306 lines. Hardware inventory (174): 18 / 52 / 61 / 20 / 19 / 3 / 1.
+`ps2x_tests` 596/596 (also 596/596 under ASan, 0 reports); ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs
+(separate measurement): 23/23 exact, 1306/1306 lines. Hardware inventory (174): 18 / 52 / 62 / 20 / 18 / 3 / 1.
 
 ## Batches
 
@@ -22,6 +22,7 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 |---|---|---|---|
 | 1 | `5fab12b`..`0e47a2b` | `gs.dither`, `dma.mfifo`: MISSING → IMPLEMENTED_UNVERIFIED | 4/4 GS and 8/8 DMA mutants killed; 30,977 ASan fuzz runs |
 | 2 | `78b17e6`..`c64f357` | `dma.stall`: MISSING → IMPLEMENTED_UNVERIFIED | 5 unit tests, 10/10 mutants killed, 26,801 ASan fuzz runs; contracts for all 174 components with a checked dependency DAG |
+| 10 | `a915237`..`d82a40a` | `ipu.cmd` MISSING → IMPLEMENTED_UNVERIFIED | IPU BDEC (D-IPU-3) and IDEC (D-IPU-4); bit-exact on 6 ffmpeg MPEG-1/2 fixtures; pause/resume, truncation, RST, 576 corrupted slices; 30/30 non-equivalent mutants; semantics ledger `PS2_IPU_SEMANTICS.md` |
 | 9 | `b2f7ce1`..`6f93475` | none (`ipu.cmd` stays MISSING) | IPU VDEC (MPEG-2 VLC tables); 4/4 mutants |
 | 8 | `ff3a138`..`af37990` | none (`ipu.cmd` stays MISSING) | IPU PACK (D-IPU-2); 3/3 mutants |
 | 7 | `0828791`..`d15ce5a` | `dma.c3`, `ipu.dma` MISSING → IMPLEMENTED_UNVERIFIED | IPU CSC (D-IPU-1), output FIFO, fromIPU; 6/6 CSC mutants |
@@ -35,8 +36,11 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 - No physical PS2, ps2link or ps2sdk here: every probe in `PS2_HARDWARE_VERIFICATION.md` is unrun and no new
   hardware observation can be taken. Hardware evidence comes only from real-PS2 output that already exists
   (ps2autotests `.expected`, EE and IOP).
-- SIF0, SIF1 and fromIPU have no DMA channel model in `PS2Memory` (HLE only). Stall control with those channels is
-  blocked on the models.
+- SIF0 (EE channel 5 / IOP channel 9) has no DMA channel model: an unresolved architectural task, not settled by the
+  HLE path, which is not a permanent substitute. Both ends (IOP sifman, EE reception) are HLE and no program drives
+  channel 5. SIF1 (batch 5) and toIPU/fromIPU (batches 6-7) are modelled.
+- The IPU's PS2-specific behaviour (timing, IPU_CMD after decoding, IDCT rounding, error recovery: B1-B11 in
+  `PS2_IPU_SEMANTICS.md`) needs an IPU probe on a physical PS2.
 
 ## Known failures
 
@@ -53,5 +57,7 @@ probes.
 
 ## Next action
 
-IPU BDEC: DC size tables B-12/B-13, DCT coefficient tables B-14/B-15 with escape, inverse scan, dequantisation, IDCT,
-RAW16 output. Then IDEC (macroblock layer + CSC), then GS (`gs.aa`) and SPU2. SIF0 stays deferred (see batch 6).
+GS AA1 (`gs.aa`): edge coverage for lines and triangles as the blend alpha, with a decision record (PCSX2 is the only
+reference that models it, and its bounds are partly heuristic). Then SPU2 in dependency order: register model and
+sound RAM (`spu.cores`, `spu.ram`), voices, ADSR, pitch, mixer, reverb, interrupts. SIF0 stays an open architectural
+task.

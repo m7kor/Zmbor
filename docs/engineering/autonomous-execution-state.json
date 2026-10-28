@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "6f93475",
+    "commit": "2dd2583",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
-    "ps2x_tests": "574/574",
+    "ps2x_tests": "596/596 (ASan 596/596, 0 reports)",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate9.manifest.json (local)",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate10.manifest.json",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -196,20 +196,44 @@
       ],
       "mutants": "VDEC 4/4 killed",
       "gate": "6f93475: 53/55, 8202/8250, 0 regressions; unit 574/574, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 10,
+      "commits": [
+        "a915237",
+        "d0432bc",
+        "b916ea6",
+        "a8e4992",
+        "71ca2cb",
+        "c708b8d",
+        "2dd2583",
+        "960e6de",
+        "d82a40a"
+      ],
+      "components": {
+        "ipu.cmd": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "IPU BDEC (D-IPU-3) and IDEC (D-IPU-4); CTRL.RST raises the interrupt of a running command",
+        "ffmpeg 8.0.1 fixtures (tools/ipu/make_ipu_fixtures.py): 6 pictures bit-exact, field DCT and per-MB quantiser exercised",
+        "semantics ledger docs/engineering/PS2_IPU_SEMANTICS.md (A1-A12 departures, B1-B11 unknown PS2 behaviour)"
+      ],
+      "mutants": "BDEC 15/15, IDEC 15/15 non-equivalent (I15 equivalent: redundant code removed)",
+      "gate": "2dd2583: 53/55, 8202/8250, 0 regressions; unit 596/596 (ASan 596/596), ctest 54/54, e2e 4/4, IOP 4/4; IOP corpus 23/23"
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
     "VERIFIED_PARTIAL": 52,
-    "IMPLEMENTED_UNVERIFIED": 61,
+    "IMPLEMENTED_UNVERIFIED": 62,
     "HLE_OR_STUB": 20,
-    "MISSING": 19,
+    "MISSING": 18,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
   },
   "hardware_blockers": [
-    "no physical PS2, ps2link or ps2sdk toolchain in this environment: every hardware probe in PS2_HARDWARE_VERIFICATION.md is unrun",
-    "SIF0 (EE channel 5 / IOP channel 9) and fromIPU have no channel model; SIF1 is modelled at register level (0ad6e4b) but no hardware program drives it"
+    "SIF0 (EE channel 5 / IOP channel 9) has no DMA channel model: open architectural task, HLE is not a permanent substitute",
+    "No physical PS2: IPU behaviour B1-B11 (PS2_IPU_SEMANTICS.md), timing and every probe in PS2_HARDWARE_VERIFICATION.md are unrun"
   ],
   "known_failures": [
     "cpu_ee_fpu_sqrt 59/66 (RSQRT.S)",
@@ -226,7 +250,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "IPU BDEC: DC size tables B-12/B-13 and DC differential, DCT coefficient tables B-14/B-15 with escape, inverse scan (zigzag/alternate), dequantisation (intra/non-intra matrices, linear/non-linear QSC, MPEG-1 mismatch rules), IDCT, RAW16 output; then IDEC (macroblock layer + CSC); then GS gs.aa and SPU2",
+  "next_action": "GS AA1 (gs.aa) with a decision record; then SPU2 in dependency order: spu.cores/spu.ram, voices, ADSR, pitch, mixer, reverb, interrupts; SIF0 stays open",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

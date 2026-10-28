@@ -826,6 +826,10 @@ namespace
         setTsa(0u, 0x12345u);
         ok = ok && expect(memory.read16(kSpu + 0x1ACu) == 0xAAAAu && memory.read16(kSpu + 0x1ACu) == 0xBBBBu,
                           "data-port reads return sound RAM at the advancing address");
+        memory.write16(kSpu + 0x1A8u, 0xFFF1u);
+        memory.write16(kSpu + 0x1AAu, 0x0000u);
+        ok = ok && expect(memory.read16(kSpu + 0x1A8u) == 0x0001u && spu.transferAddress(0) == 0x10000u,
+                          "TSA's high half keeps address bits 16-19");
         setTsa(0u, 0xFFFFFu);
         memory.write16(kSpu + 0x1ACu, 0x5A5Au);
         ok = ok && expect(spu.ram(0xFFFFFu) == 0x5A5Au && spu.transferAddress(0) == 0u, "the transfer address wraps in 2 MB");

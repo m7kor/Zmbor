@@ -69,3 +69,17 @@ one stay unverified until the stated measurement exists.
   destination-chain CNTS tag are not modelled (those channels have no DMA model in `PS2Memory`).
 - **Settles it:** a stall-control probe on hardware reading drain MADR/QWC, D_STADR and SIS while a fromSPR source and
   a GIF/VIF1 drain overlap, in normal mode and with REFS tags.
+
+## D-IPU-1 — IPU colour-space conversion (CSC)
+
+- **Chosen:** the integer BT.601 method with Y bias 16 and coefficients 0x95 (Y), 0xCC (R from Cr), -0x68 (G from Cr),
+  -0x32 (G from Cb), 0x102 (B from Cb) in 1/64 units, each term shifted right by 6, summed, plus 1, shifted right by 1,
+  clamped to 0-255. Alpha is 0 below TH0 in all channels, 0x40 below TH1, else 0x80. RGB16 takes the top 5 bits,
+  optionally after a 4x4 dither, with bit 15 set for alpha 0x40.
+- **For:** PCSX2 (`IPU/yuv2rgb.cpp` yuv2rgb_reference) describes this as the precise documented integer method used by
+  the hardware. Its dither matrix and RGB16 packing (`IPU/IPUdither.cpp`) agree with DobieStation's.
+- **Against:** DobieStation (`ee/ipu/ipu.cpp` process_CSC) uses full-range float coefficients (1.402, 0.34414,
+  0.71414, 1.772) without the Y bias; the two give different colours. The alpha threshold rule is DobieStation's.
+  The value read from an empty IPU_out_FIFO (zero here) is unknown.
+- **Settles it:** an IPU probe converting known macroblocks (grey ramp, saturated chroma, values around TH0/TH1)
+  and reading the RGB32/RGB16 output back.

@@ -12,9 +12,14 @@
 // The input FIFO holds 8 qwords fed by toIPU (DMA channel 4) or the IPU_in_FIFO window; the bitstream is the bytes in
 // memory order, each read MSB first (MPEG bit order).
 //
-// Implemented commands: BCLR (0), FDEC (4), SETIQ (5), SETVQ (6), SETTH (9). IDEC (1), BDEC (2), VDEC (3), CSC (7)
+// Implemented commands: BCLR (0), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), SETTH (9). IDEC (1), BDEC (2), VDEC (3)
 // and PACK (8) are not implemented: such a command is reported through unimplementedCommand() and completes without
 // output, so a caller can see that no decoding happened.
+//
+// CSC converts YCbCr 4:2:0 macroblocks (Y 16x16, then Cb 8x8, Cr 8x8: 384 bytes) to RGB32 (64 qwords) or RGB16
+// (32 qwords, optional 4x4 dither) with the integer BT.601 method PCSX2 documents as the hardware's (decision D-IPU-1;
+// DobieStation uses full-range float coefficients instead); alpha is 0, 0x40 or 0x80 by TH0/TH1. The 8-qword output
+// FIFO refills from the converted macroblock as it drains.
 //
 // Semantics follow the register layout of ps2tek and the behaviour DobieStation models (src/core/ee/ipu, studied, not
 // copied); no hardware program checks the IPU yet.
@@ -65,6 +70,13 @@ private:
     [[nodiscard]] bool peekBits(uint32_t count, uint32_t &value) const;
     bool advanceBits(uint32_t count);
     void finish();
+    void convertMacroblock();
+    void refillOutput();
+
+    std::deque<Qword> m_outputPending; // converted data not yet in the 8-qword output FIFO
+    std::array<uint8_t, 384> m_macroblock{};
+    uint32_t m_macroblockBytes = 0;
+    uint32_t m_macroblocksLeft = 0;
 
     std::deque<Qword> m_input;
     std::deque<Qword> m_output;

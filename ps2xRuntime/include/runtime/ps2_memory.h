@@ -538,6 +538,9 @@ private:
     std::deque<PS2Ipu::Qword> m_toIpuPending; // qwords of a running toIPU transfer not yet in the FIFO
     bool m_toIpuActive = false;
     uint32_t m_toIpuEndMadr = 0u;
+    bool m_fromIpuActive = false; // fromIPU (channel 3) waiting for IPU output
+    uint32_t m_fromIpuMadr = 0u;
+    uint32_t m_fromIpuLeft = 0u;
 
 public:
     // SIF1 (EE DMAC channel 6, EE -> IOP). The channel's data stream reaches IOP DMA channel 10, which reads a 16-byte

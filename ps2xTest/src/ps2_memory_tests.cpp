@@ -3013,6 +3013,52 @@ void register_ps2_memory_tests()
             t.Equals(mem.ipu().unimplementedCommand(), 1, "an unimplemented command is reported, not decoded");
         });
 
+        // CSC: integer BT.601 (D-IPU-1); expected values computed by hand from the formula.
+        tc.Run("IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)", [](TestCase &t)
+        {
+            struct Case
+            {
+                uint32_t option;   // CSC option bits (RGB16 bit 27, dither bit 26)
+                uint32_t setth;    // SETTH option
+                uint32_t qwc;      // output qwords
+                uint32_t firstWord; // first 32 bits of the output
+            };
+            const Case cases[] = {
+                {0u, 0u, 64u, 0x80801980u | 0xFFu},                        // RGBA (255, 25, 128, 0x80)
+                {1u << 27, 0u, 32u, 0x407Fu | (0x407Fu << 16)},            // RGB16 31 | 3 << 5 | 16 << 10
+                {(1u << 27) | (1u << 26), 0u, 32u, 0x3C5Fu},               // dithered pixel (0,0), d = -4
+                {1u << 27, 256u << 16, 32u, 0xC07Fu | (0xC07Fu << 16)},    // TH1 = 256: alpha 0x40 sets bit 15
+            };
+            for (const Case &c : cases)
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                uint8_t *rdram = mem.getRDRAM();
+                constexpr uint32_t kIn = 0x00440000u, kOut = 0x00450000u;
+                std::memset(rdram + kIn, 126, 256);       // Y
+                std::memset(rdram + kIn + 256, 128, 64);  // Cb
+                std::memset(rdram + kIn + 320, 255, 64);  // Cr
+                std::memset(rdram + kOut, 0xEE, 1024);
+                mem.writeIORegister(0x10002000u, (9u << 28) | c.setth);
+                mem.writeIORegister(0x10002000u, (7u << 28) | c.option | 1u); // CSC, one macroblock
+                mem.writeIORegister(0x1000B010u, kOut);
+                mem.writeIORegister(0x1000B020u, c.qwc);
+                mem.writeIORegister(0x1000B000u, 0x100u); // fromIPU, normal, STR
+                mem.writeIORegister(0x1000B410u, kIn);
+                mem.writeIORegister(0x1000B420u, 24u);
+                mem.writeIORegister(0x1000B400u, 0x101u); // toIPU, normal, STR
+                uint32_t first = 0u;
+                std::memcpy(&first, rdram + kOut, 4u);
+                const uint32_t mask = (c.option & (1u << 26)) != 0u ? 0xFFFFu : 0xFFFFFFFFu;
+                t.Equals(first & mask, c.firstWord & mask, "first output word matches the integer BT.601 result");
+                uint32_t last = 0u;
+                std::memcpy(&last, rdram + kOut + c.qwc * 16u - 4u, 4u);
+                t.IsTrue(last != 0xEEEEEEEEu, "the whole macroblock reached memory");
+                t.IsTrue((mem.readIORegister(0x1000E010u) & ((1u << 3) | (1u << 4))) == ((1u << 3) | (1u << 4)), "CIS3 and CIS4 are raised");
+                t.IsTrue(!mem.ipu().busy(), "CSC completes once its output has drained");
+            }
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

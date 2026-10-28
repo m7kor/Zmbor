@@ -364,6 +364,8 @@ bool PS2Memory::initialize(size_t ramSize)
     m_ipu.reset();
     m_toIpuPending.clear();
     m_toIpuActive = false;
+    m_fromIpuActive = false;
+    m_fromIpuLeft = 0u;
     m_pendingIpuInterrupt.store(false, std::memory_order_relaxed);
     m_codeRegions.clear();
     m_path3Masked = false;
@@ -896,6 +898,13 @@ __m128i PS2Memory::read128(uint32_t address)
     {
         inRange(physAddr, sizeof(__m128i), PS2_SCRATCHPAD_SIZE, "read128 scratchpad", address);
         return _mm_loadu_si128(reinterpret_cast<__m128i *>(&m_scratchpad[physAddr]));
+    }
+    if (physAddr == 0x10007000u) // IPU_out_FIFO: an empty FIFO reads zero
+    {
+        PS2Ipu::Qword qword{};
+        (void)m_ipu.popOutput(qword);
+        serviceIpu();
+        return _mm_loadu_si128(reinterpret_cast<const __m128i *>(qword.data()));
     }
     if (physAddr < PS2_RAM_SIZE)
     {
@@ -1444,6 +1453,16 @@ void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
     if (channelBase == 0x1000C400u)
     {
         startSif1Transfer(value);
+        return;
+    }
+    if (channelBase == 0x1000B000u) // fromIPU, normal mode: QWC qwords from the IPU output FIFO to MADR
+    {
+        if (((value >> 2u) & 0x3u) != 0u)
+            return; // destination chain on fromIPU is not modelled
+        m_fromIpuMadr = m_ioRegisters[channelBase + 0x10u];
+        m_fromIpuLeft = m_ioRegisters[channelBase + 0x20u] & 0xFFFFu;
+        m_fromIpuActive = true;
+        serviceIpu();
         return;
     }
     if (channelBase == 0x1000B400u) // toIPU, normal mode: QWC qwords from MADR into the IPU input FIFO
@@ -2197,7 +2216,7 @@ bool PS2Memory::isDrainChannelHeld(uint32_t channelBase) const
 {
     return (m_mfifoDrainStalled && channelBase == mfifoDrainChannel()) ||
            (m_stallHeldChannel != 0u && channelBase == m_stallHeldChannel) ||
-           (m_toIpuActive && channelBase == 0x1000B400u);
+           (m_toIpuActive && channelBase == 0x1000B400u) || (m_fromIpuActive && channelBase == 0x1000B000u);
 }
 
 // toIPU moves qwords into the IPU input FIFO while it has room (8 qwords) and the IPU consumes them as its command
@@ -2219,6 +2238,33 @@ void PS2Memory::serviceIpu()
         if (m_ipu.takeCompletion())
             m_pendingIpuInterrupt.store(true, std::memory_order_release);
         progressed = progressed || m_ipu.inputQwords() != before || m_ipu.busy() != wasBusy;
+        PS2Ipu::Qword qword{};
+        while (m_fromIpuActive && m_fromIpuLeft != 0u && m_ipu.popOutput(qword))
+        {
+            uint32_t phys = PS2_RAM_SIZE;
+            try
+            {
+                phys = translateAddress(m_fromIpuMadr);
+            }
+            catch (const std::exception &)
+            {
+            }
+            if (phys <= PS2_RAM_SIZE - 16u)
+            {
+                std::memcpy(m_rdram + phys, qword.data(), 16u);
+                markModified(phys, 16u);
+            }
+            m_fromIpuMadr = (m_fromIpuMadr + 16u) & 0x7FFFFFF0u;
+            --m_fromIpuLeft;
+            progressed = true;
+        }
+        if (m_fromIpuActive && m_fromIpuLeft == 0u)
+        {
+            m_fromIpuActive = false;
+            m_ioRegisters[0x1000B010u] = m_fromIpuMadr;
+            m_ioRegisters[0x1000B020u] = 0u;
+            completeDmacChannel(0x1000B000u, 3u);
+        }
         if (!progressed)
             break;
     }

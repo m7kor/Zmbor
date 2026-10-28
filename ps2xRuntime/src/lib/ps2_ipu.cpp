@@ -8,6 +8,20 @@ namespace
     constexpr uint32_t kFdec = 4u;
     constexpr uint32_t kSetiq = 5u;
     constexpr uint32_t kSetvq = 6u;
+    constexpr uint32_t kCsc = 7u;
+    // Integer BT.601 conversion (1/64 units), rounded by a final shift with +1 (PCSX2 yuv2rgb_reference, D-IPU-1).
+    constexpr int32_t kYBias = 16;
+    constexpr int32_t kYCoeff = 0x95;
+    constexpr int32_t kRCrCoeff = 0xCC;
+    constexpr int32_t kGCrCoeff = -0x68;
+    constexpr int32_t kGCbCoeff = -0x32;
+    constexpr int32_t kBCbCoeff = 0x102;
+    constexpr int kDither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
+
+    int32_t clampByte(int32_t v)
+    {
+        return std::max(0, std::min(255, v));
+    }
     constexpr uint32_t kSetth = 9u;
     // IPU_CTRL fields the EE writes: IDP 16-17, AS 20, IVF 21, QST 22, MP1 23, PCT 24-26.
     constexpr uint32_t kControlWritable = 0x07F30000u;
@@ -102,7 +116,78 @@ bool PS2Ipu::popOutput(Qword &qword)
         return false;
     qword = m_output.front();
     m_output.pop_front();
+    refillOutput();
     return true;
+}
+
+void PS2Ipu::refillOutput()
+{
+    while (m_output.size() < kFifoQwords && !m_outputPending.empty())
+    {
+        m_output.push_back(m_outputPending.front());
+        m_outputPending.pop_front();
+    }
+}
+
+void PS2Ipu::convertMacroblock()
+{
+    const bool rgb16 = (m_option & (1u << 27)) != 0u;
+    const bool dither = (m_option & (1u << 26)) != 0u;
+    std::array<uint8_t, 256u * 4u> rgb32{};
+    for (uint32_t y = 0; y < 16u; ++y)
+    {
+        for (uint32_t x = 0; x < 16u; ++x)
+        {
+            const uint32_t chroma = (y >> 1) * 8u + (x >> 1);
+            const int32_t cb = static_cast<int32_t>(m_macroblock[256u + chroma]) - 128;
+            const int32_t cr = static_cast<int32_t>(m_macroblock[320u + chroma]) - 128;
+            const int32_t lum = (kYCoeff * std::max(0, static_cast<int32_t>(m_macroblock[y * 16u + x]) - kYBias)) >> 6;
+            const int32_t r = clampByte((lum + ((kRCrCoeff * cr) >> 6) + 1) >> 1);
+            const int32_t g = clampByte((lum + ((kGCrCoeff * cr) >> 6) + ((kGCbCoeff * cb) >> 6) + 1) >> 1);
+            const int32_t b = clampByte((lum + ((kBCbCoeff * cb) >> 6) + 1) >> 1);
+            uint8_t alpha = 0x80u;
+            if (r < m_th0 && g < m_th0 && b < m_th0)
+                alpha = 0u;
+            else if (r < m_th1 && g < m_th1 && b < m_th1)
+                alpha = 0x40u;
+            uint8_t *p = &rgb32[(y * 16u + x) * 4u];
+            p[0] = static_cast<uint8_t>(r);
+            p[1] = static_cast<uint8_t>(g);
+            p[2] = static_cast<uint8_t>(b);
+            p[3] = alpha;
+        }
+    }
+    if (!rgb16)
+    {
+        for (uint32_t q = 0; q < 64u; ++q)
+        {
+            Qword qword{};
+            std::copy_n(rgb32.begin() + q * 16u, 16u, qword.begin());
+            m_outputPending.push_back(qword);
+        }
+    }
+    else
+    {
+        for (uint32_t q = 0; q < 32u; ++q)
+        {
+            Qword qword{};
+            for (uint32_t i = 0; i < 8u; ++i)
+            {
+                const uint32_t pixel = q * 8u + i;
+                const uint32_t y = pixel / 16u, x = pixel % 16u;
+                const int d = dither ? kDither[y & 3u][x & 3u] : 0;
+                const uint8_t *p = &rgb32[pixel * 4u];
+                const uint32_t r = static_cast<uint32_t>(clampByte(p[0] + d)) >> 3;
+                const uint32_t g = static_cast<uint32_t>(clampByte(p[1] + d)) >> 3;
+                const uint32_t b = static_cast<uint32_t>(clampByte(p[2] + d)) >> 3;
+                const uint16_t value = static_cast<uint16_t>(r | (g << 5) | (b << 10) | ((p[3] == 0x40u ? 1u : 0u) << 15));
+                qword[i * 2u] = static_cast<uint8_t>(value);
+                qword[i * 2u + 1u] = static_cast<uint8_t>(value >> 8);
+            }
+            m_outputPending.push_back(qword);
+        }
+    }
+    refillOutput();
 }
 
 void PS2Ipu::finish()
@@ -138,6 +223,10 @@ bool PS2Ipu::writeCommand(uint32_t value)
     case kSetvq: // 16 halfwords of the VQ CLUT
         m_remaining = 32u;
         break;
+    case kCsc: // option bits 0-10 macroblock count, bit 26 dither (RGB16), bit 27 RGB16
+        m_macroblocksLeft = m_option & 0x7FFu;
+        m_macroblockBytes = 0u;
+        break;
     case kSetth: // TH0 bits 0-8, TH1 bits 16-24
         m_th0 = static_cast<uint16_t>(m_option & 0x1FFu);
         m_th1 = static_cast<uint16_t>((m_option >> 16) & 0x1FFu);
@@ -159,6 +248,9 @@ void PS2Ipu::writeControl(uint32_t value)
     {
         m_input.clear();
         m_output.clear();
+        m_outputPending.clear();
+        m_macroblockBytes = 0u;
+        m_macroblocksLeft = 0u;
         m_bitPointer = 0u;
         m_command = 0u;
         m_busy = false;
@@ -202,6 +294,28 @@ void PS2Ipu::run()
         }
         finish();
         return;
+    case kCsc:
+        for (;;)
+        {
+            if (!m_outputPending.empty())
+                return; // the previous macroblock is still entering the output FIFO
+            if (m_macroblocksLeft == 0u)
+            {
+                finish();
+                return;
+            }
+            while (m_macroblockBytes < m_macroblock.size())
+            {
+                uint32_t byte = 0u;
+                if (!peekBits(8u, byte))
+                    return;
+                (void)advanceBits(8u);
+                m_macroblock[m_macroblockBytes++] = static_cast<uint8_t>(byte);
+            }
+            convertMacroblock();
+            m_macroblockBytes = 0u;
+            --m_macroblocksLeft;
+        }
     case kSetvq:
         while (m_remaining != 0u)
         {

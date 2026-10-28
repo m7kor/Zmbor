@@ -8,11 +8,11 @@
 <rect x="158.65999999999997" y="64" width="12" height="12" rx="2" fill="#d29922" stroke="#30363d"/>
 <text x="175.65999999999997" y="74" fill="#e6edf3" font-size="11">verified partial 52</text>
 <rect x="289.88" y="64" width="12" height="12" rx="2" fill="#484f58" stroke="#30363d"/>
-<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 62</text>
+<text x="306.88" y="74" fill="#e6edf3" font-size="11">implemented, unverified 63</text>
 <rect x="473.24" y="64" width="12" height="12" rx="2" fill="#8957e5" stroke="#30363d"/>
 <text x="490.24" y="74" fill="#e6edf3" font-size="11">HLE / stub 20</text>
 <rect x="581.58" y="64" width="12" height="12" rx="2" fill="#da3633" stroke="#30363d"/>
-<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 18</text>
+<text x="598.58" y="74" fill="#e6edf3" font-size="11">missing 17</text>
 <rect x="672.5400000000001" y="64" width="12" height="12" rx="2" fill="#21262d" stroke="#30363d"/>
 <text x="689.5400000000001" y="74" fill="#e6edf3" font-size="11">not applicable 3</text>
 <rect x="793.2" y="64" width="12" height="12" rx="2" fill="#30363d" stroke="#30363d"/>
@@ -730,11 +730,13 @@ blocker: GS output capture on a physical PS2 (dither probe, docs/engineering/PS2
 <text x="796.9" y="687" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>gs.aa — Antialiasing (AA1)
-status: MISSING
-missing: Not implemented</title>
-<rect x="580.6" y="693" width="146.2" height="34.1" fill="#da3633" stroke="#0d1117" stroke-width="1"/>
-<text x="584.6" y="708" fill="#ffffff" font-size="11">Antialiasing (AA1)</text>
-<text x="722.8" y="723.1" fill="#ffffff" font-size="8" text-anchor="end" opacity="0.8">MISS</text>
+status: IMPLEMENTED_UNVERIFIED
+implemented: PRIM.AA1 for lines and triangles (0765383, D-GS-1): coverage replaces the source alpha (with ABE only an alpha of 0x80) and blends through ALPHA whether or not ABE is set; edge pixels do not write Z; lines as two distance-weighted pixels per column, triangles with an exact-area fringe; 11 of 11 mutants killed
+missing: No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently)
+blocker: GS probe drawing AA1 lines and triangles on a physical PS2</title>
+<rect x="580.6" y="693" width="146.2" height="34.1" fill="#484f58" stroke="#0d1117" stroke-width="1"/>
+<text x="584.6" y="708" fill="#f0f6fc" font-size="11">Antialiasing (AA1)</text>
+<text x="722.8" y="723.1" fill="#f0f6fc" font-size="8" text-anchor="end" opacity="0.8">UNV</text>
 </g>
 <g><title>gs.cpu — CPU rasteriser backend (reference path)
 status: IMPLEMENTED_UNVERIFIED</title>

@@ -98,9 +98,9 @@ No overall completeness percentage is shown: the requirements of most components
 
 | section | components | `VERIFIED_COMPLETE` | `VERIFIED_PARTIAL` | `IMPLEMENTED_UNVERIFIED` | `HLE_OR_STUB` | `MISSING` | `NOT_APPLICABLE` | `UNKNOWN` |
 |---|---|---|---|---|---|---|---|---|
-| PS2 Hardware & Runtime | 174 | 18 | 52 | 62 | 20 | 18 | 3 | 1 |
+| PS2 Hardware & Runtime | 174 | 18 | 52 | 63 | 20 | 17 | 3 | 1 |
 | Recompiler, Tools & Compatibility | 53 | 4 | 29 | 11 | 0 | 1 | 0 | 8 |
-| **all** | **227** | **22** | **81** | **73** | **20** | **19** | **3** | **9** |
+| **all** | **227** | **22** | **81** | **74** | **20** | **18** | **3** | **9** |
 
 ## PS2 Hardware & Runtime
 
@@ -203,7 +203,7 @@ Only GS SIGNAL/LABEL behaviour has hardware results (ps2autotests gs/*). Everyth
 | `gs.fog` | Fog (FOG, FOGCOL) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `gs.mask` | Scissor, FBMSK, XYOFFSET | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `gs.dither` | Dithering (DTHE, DIMX) | `IMPLEMENTED_UNVERIFIED` | DIMX[y&3][x&3] (3-bit two's complement) added to RGB after blending and before COLCLAMP, for 16-bit frame buffers (PCSX2 model) | No hardware capture; PCSX2 and DobieStation disagree on the DIMX encoding and on dithering 32-bit buffers (decision D-GS-1); **blocker:** GS output capture on a physical PS2 (dither probe, docs/engineering/PS2_HARDWARE_VERIFICATION.md) | 1 test ref(s) | 8 |
-| `gs.aa` | Antialiasing (AA1) | `MISSING` |  | Not implemented | — | unscheduled |
+| `gs.aa` | Antialiasing (AA1) | `IMPLEMENTED_UNVERIFIED` | PRIM.AA1 for lines and triangles (0765383, D-GS-1): coverage replaces the source alpha (with ABE only an alpha of 0x80) and blends through ALPHA whether or not ABE is set; edge pixels do not write Z; lines as two distance-weighted pixels per column, triangles with an exact-area fringe; 11 of 11 mutants killed | No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently); **blocker:** GS probe drawing AA1 lines and triangles on a physical PS2 | 2 test ref(s) | 8 |
 | `gs.cpu` | CPU rasteriser backend (reference path) | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
 | `gs.cache` | Texture and CLUT page caches | `IMPLEMENTED_UNVERIFIED` |  | — | 2 test ref(s) |  |
 | `gs.fb` | Framebuffers, PMODE circuit merge | `IMPLEMENTED_UNVERIFIED` |  | — | 1 test ref(s) |  |
@@ -487,7 +487,7 @@ Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs an
 | `gs.fog` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS fog blends the shaded color toward FOGCOL before framebuffer blending` |
 | `gs.mask` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_runtime_expansion_tests.cpp::GS sprite draw applies XYOFFSET and fully-outside scissor should not render` |
 | `gs.dither` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp`<br>`ps2xRuntime/src/lib/gs/gs_frontend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS dithering adds DIMX[y&3][x&3] to RGB for 16-bit frame buffers only` |
-| `gs.aa` | — | — |
+| `gs.aa` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::GS AA1 line: two edge pixels per column weighted by distance, blended through ALPHA, no Z write`<br>`ps2xTest/src/ps2_gs_tests.cpp::GS AA1 triangle: interior pixels at alpha 0x80, the uncovered-centre fringe at its exact coverage` |
 | `gs.cpu` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp`<br>`ps2xRuntime/include/runtime/gs/gs_backend.h` | `ps2xTest/src/ps2_gs_tests.cpp::GS backend replacement preserves canonical local memory` |
 | `gs.cache` | `ps2xRuntime/include/runtime/gs/gs_texture_page_cache.h` | `ps2xTest/gs_cache/gs_texture_cache_tests.cpp`<br>`ps2xTest/gs_cache/gs_clut_cache_tests.cpp` |
 | `gs.fb` | `ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp` | `ps2xTest/src/ps2_gs_tests.cpp::latched host presentation merges both enabled PMODE circuits` |

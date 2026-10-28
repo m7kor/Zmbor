@@ -3460,15 +3460,20 @@
         {
          "id": "gs.aa",
          "name": "Antialiasing (AA1)",
-         "status": "MISSING",
+         "status": "IMPLEMENTED_UNVERIFIED",
          "short": "AA1",
-         "implemented": "",
-         "missing": "Not implemented",
-         "src": [],
-         "tests": [],
+         "implemented": "PRIM.AA1 for lines and triangles (0765383, D-GS-1): coverage replaces the source alpha (with ABE only an alpha of 0x80) and blends through ALPHA whether or not ABE is set; edge pixels do not write Z; lines as two distance-weighted pixels per column, triangles with an exact-area fringe; 11 of 11 mutants killed",
+         "missing": "No hardware program checks AA1; the fringe pixel set and coverage values are this model's definition (PCSX2, the only reference that models AA1, selects edge pixels differently)",
+         "src": [
+          "ps2xRuntime/src/lib/gs/gs_cpu_backend.cpp"
+         ],
+         "tests": [
+          "ps2xTest/src/ps2_gs_tests.cpp::GS AA1 line: two edge pixels per column weighted by distance, blended through ALPHA, no Z write",
+          "ps2xTest/src/ps2_gs_tests.cpp::GS AA1 triangle: interior pixels at alpha 0x80, the uncovered-centre fringe at its exact coverage"
+         ],
          "hw": [],
-         "blocker": "",
-         "target": "unscheduled",
+         "blocker": "GS probe drawing AA1 lines and triangles on a physical PS2",
+         "target": "8",
          "verified_at": null
         },
         {

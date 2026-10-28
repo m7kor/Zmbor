@@ -5381,7 +5381,7 @@
     "DobieStation 68dd073: gs.cpp, gsthread.cpp, gif.cpp",
     "Arntzen-Software parallel-gs (GS semantics in compute shaders)"
    ],
-   "known_divergences": "not implemented"
+   "known_divergences": "AA1 for lines and triangles per decision D-GS-1 (coverage alpha, ALPHA blending, no Z write on edges); the fringe pixel set and coverage are the model's own definition"
   },
   "gs.cpu": {
    "block": "CPU rasteriser backend (reference path, runtime)",

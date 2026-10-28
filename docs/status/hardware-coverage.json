@@ -3,8 +3,8 @@
   "inventory": "docs/status/components.json",
   "hardware_results": "docs/hwtest/dashboard.json",
   "unit_results": "docs/status/test-results.json",
-  "unit_results_commit": "67b7810b7b5a477b7453ef9b5022f881ad21d1a4",
-  "unit_results_binary_sha256": "60e2708b3889407dd382406b525a120a7fd232d9e017402772a98949f84baae1"
+  "unit_results_commit": "539db0128df56be9237252568664670a1a403403",
+  "unit_results_binary_sha256": "a0a8ba98e51213bdb2f98d7390176c35aaca1cd48c2e61a5d04224fd682e68d4"
  },
  "levels": [
   "contract_specified",
@@ -4120,7 +4120,7 @@
    "name": "IPU commands (BCLR, IDEC, BDEC, VDEC, FDEC, CSC, ...)",
    "category": "E",
    "status": "MISSING",
-   "missing": "IDEC, BDEC, VDEC and PACK are not implemented (they complete without output and are reported as unimplemented)",
+   "missing": "The MPEG decoders IDEC, BDEC and VDEC are not implemented (they complete without output and are reported as unimplemented)",
    "blocker": "",
    "target": "unscheduled",
    "levels": {
@@ -4136,9 +4136,9 @@
     "ipu.dma"
    ],
    "named_tests": {
-    "cited": 4,
-    "executed": 4,
-    "passed": 4
+    "cited": 5,
+    "executed": 5,
+    "passed": 5
    },
    "hardware_programs": {
     "cited": 0,

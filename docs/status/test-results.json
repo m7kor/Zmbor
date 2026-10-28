@@ -1,12 +1,12 @@
 {
- "commit": "67b7810b7b5a477b7453ef9b5022f881ad21d1a4",
+ "commit": "539db0128df56be9237252568664670a1a403403",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "60e2708b3889407dd382406b525a120a7fd232d9e017402772a98949f84baae1",
+ "binary_sha256": "a0a8ba98e51213bdb2f98d7390176c35aaca1cd48c2e61a5d04224fd682e68d4",
  "exit_code": 0,
  "totals": {
-  "PASS": 572,
+  "PASS": 573,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -159,6 +159,7 @@
   "IPU CSC converts a macroblock through toIPU and fromIPU DMA (RGB32, RGB16, dither, alpha thresholds)": "PASS",
   "IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample": "PASS",
   "IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP": "PASS",
+  "IPU PACK converts RGB32 to RGB16 and to 4-bit nearest VQ CLUT indices (first minimum wins)": "PASS",
   "IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4": "PASS",
   "IPU init executes its guest helper as a scheduler invocation": "PASS",
   "IPU init skips missing optional helper instead of dispatching the default trap": "PASS",

@@ -1,9 +1,9 @@
 {
- "commit": "4aeb1110265797c53cfb82f3f31bf89391afbdc6",
+ "commit": "713127b3119e86397c95264ce61d72f4ab2b1ef0",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "290ddf8a303d38c010d65306b16f27d74b25ca86ac884b72216498b637ba879f",
+ "binary_sha256": "79ab742270f12612e09d6c9196c6ceea7efd220bf83a36a6a4a0d4ad822a03a7",
  "exit_code": 0,
  "totals": {
   "PASS": 598,

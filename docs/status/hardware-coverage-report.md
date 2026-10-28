@@ -3,7 +3,7 @@
 
 Evidence levels per PS2 hardware and runtime component. The levels are independent: a passing unit test is not a hardware result, and no component has timing verified against hardware yet.
 
-Unit-test run: commit `4aeb11102657`, binary sha256 `290ddf8a303d38c0`.
+Unit-test run: commit `713127b3119e`, binary sha256 `79ab742270f12612`.
 
 | category | components | `contract_specified` | `test_exists` | `test_executed` | `test_passed` | `vectors_passed` | `hardware_verified` | `timing_verified` |
 |---|---|---|---|---|---|---|---|---|
@@ -13,9 +13,9 @@ Unit-test run: commit `4aeb11102657`, binary sha256 `290ddf8a303d38c0`.
 | D | 24 | 24 | 22 | 22 | 22 | 0 | 10 | 0 |
 | E | 13 | 13 | 13 | 13 | 13 | 0 | 5 | 0 |
 | F | 17 | 17 | 14 | 7 | 7 | 0 | 9 | 0 |
-| G | 13 | 13 | 2 | 2 | 2 | 0 | 0 | 0 |
+| G | 13 | 13 | 5 | 2 | 2 | 0 | 0 | 0 |
 | H | 18 | 18 | 7 | 7 | 7 | 0 | 2 | 0 |
-| **all** | **174** | **174** | **133** | **124** | **124** | **4** | **64** | **0** |
+| **all** | **174** | **174** | **136** | **124** | **124** | **4** | **64** | **0** |
 
 | component | status | named tests passed / executed / cited | hardware programs matching / cited | levels |
 |---|---|---|---|---|
@@ -162,14 +162,14 @@ Unit-test run: commit `4aeb11102657`, binary sha256 `290ddf8a303d38c0`.
 | `svc.rpcsrv` | `HLE_OR_STUB` | 0 / 0 / 1 | 0 / 0 | contract_specified, test_exists |
 | `svc.modload` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `sys.boot` | `VERIFIED_PARTIAL` | 1 / 1 / 1 | 1 / 1 | contract_specified, test_exists, test_executed, test_passed, hardware_verified |
-| `spu.cores` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
-| `spu.ram` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
+| `spu.cores` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
+| `spu.ram` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
 | `spu.voices` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `spu.adsr` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `spu.pitch` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `spu.mix` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
 | `spu.reverb` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
-| `spu.irq` | `MISSING` | 0 / 0 / 0 | 0 / 0 | contract_specified |
+| `spu.irq` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified, test_exists |
 | `spu.dma` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `spu.libsd` | `HLE_OR_STUB` | 1 / 1 / 1 | 0 / 0 | contract_specified, test_exists, test_executed, test_passed |
 | `spu.adpcm` | `IMPLEMENTED_UNVERIFIED` | 0 / 0 / 0 | 0 / 0 | contract_specified |

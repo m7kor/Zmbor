@@ -162,14 +162,14 @@ Every PS2 hardware and runtime component that is not `VERIFIED_COMPLETE`, with w
 
 | component | status | missing | blocker | target | unverified dependencies | evidence levels |
 |---|---|---|---|---|---|---|
-| `spu.cores` SPU2 cores and registers | `MISSING` | Register range mapped on the IOP side, no register model | — | 8 | — | contract_specified |
-| `spu.ram` Sound RAM (2 MB) | `MISSING` | No sound RAM model | — | 8 | `spu.cores` | contract_specified |
+| `spu.cores` SPU2 cores and registers | `IMPLEMENTED_UNVERIFIED` | No hardware program checks the SPU2; core 0 output routing into core 1 and every voice-engine effect (spu.voices, spu.adsr, spu.pitch, spu.mix, spu.reverb) are not modelled; power-on register state unknown | SPU2 register probe on a physical PS2 | 8 | — | contract_specified, test_exists |
+| `spu.ram` Sound RAM (2 MB) | `IMPLEMENTED_UNVERIFIED` | No hardware program checks the SPU2; the fixed core input/output areas are not used yet (no mixer or ADMA); the DMA completion delay is the existing estimate | SPU2 register probe on a physical PS2 | 8 | `spu.cores` | contract_specified, test_exists |
 | `spu.voices` Voice engine (48 voices) | `MISSING` | No voice engine; libsd calls play decoded clips | — | 8 | `spu.ram`, `spu.adpcm`, `spu.adsr`, `spu.pitch` | contract_specified |
 | `spu.adsr` ADSR envelopes | `MISSING` | No envelope generator | — | 8 | `spu.cores` | contract_specified |
 | `spu.pitch` Pitch and interpolation | `MISSING` | No pitch counter or interpolation | — | 8 | `spu.cores` | contract_specified |
 | `spu.mix` Core mixing, volumes | `MISSING` | No SPU2 mixer | — | 8 | `spu.voices`, `spu.reverb` | contract_specified |
 | `spu.reverb` Reverb | `MISSING` | No reverb | — | unscheduled | `spu.ram`, `spu.voices` | contract_specified |
-| `spu.irq` SPU2 IRQ (address match) | `MISSING` | No SPU2 interrupts | — | 8 | `spu.cores` | contract_specified |
+| `spu.irq` SPU2 IRQ (address match) | `IMPLEMENTED_UNVERIFIED` | No hardware program checks the SPU2; IRQA checks for voice fetches, reverb and ADMA accesses wait for those engines | SPU2 register probe on a physical PS2 | 8 | `spu.cores` | contract_specified, test_exists |
 | `spu.dma` Sound DMA (IOP channels 4/7) | `HLE_OR_STUB` | — | — | — | `spu.ram` | contract_specified, test_exists, test_executed, test_passed |
 | `spu.libsd` libsd / sceSd* HLE | `HLE_OR_STUB` | Many sceSd*/sceSSyn* entries are TODO_NAMED placeholders | — | — | `spu.cores`, `spu.dma` | contract_specified, test_exists, test_executed, test_passed |
 | `spu.adpcm` VAG/ADPCM decoding | `IMPLEMENTED_UNVERIFIED` | No test | — | — | `spu.ram` | contract_specified |

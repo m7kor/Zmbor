@@ -748,6 +748,16 @@ namespace
                 return false;
             freeBlock(block);
         }
+        // Two blocks freed in address order: the second must merge with the range freed before it, or the whole
+        // heap (one block of 4056 - 8 bytes) no longer fits.
+        const int32_t first = alloc(0x100u);
+        const int32_t second = alloc(0x100u);
+        freeBlock(first);
+        freeBlock(second);
+        const int32_t whole = alloc(4048u);
+        if (!expect(first > 0 && second > 0 && whole > 0 && sizes(pool).second == 0, "freed neighbours coalesce in both directions"))
+            return false;
+        freeBlock(whole);
         return expect(alloc(0x1000u) == -427 && alloc(0x8000u) == -427, "a size above the pool size is KE_ILLEGAL_MEMSIZE") &&
                expect(alloc(static_cast<uint32_t>(-8)) == -400 && alloc(static_cast<uint32_t>(-128)) == -400, "-8 and -128 wrap to huge sizes: KE_NO_MEMORY") &&
                expect(rig.call(&IopKernel::dispatchVariablePoolImport, 7u, host, {~0u, 0x100u}) == -411, "an invalid pool is KE_UNKNOWN_VPLID") &&

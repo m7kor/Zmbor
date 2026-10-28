@@ -1,12 +1,12 @@
 {
- "commit": "0254b6808e78fb16a657f0ea912e01a432771b15",
+ "commit": "22f683047083b23dbf6f93b706c1030a70ea515a",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "8d12a6b3416f153e205c8e2d3f107ba1b0deca0d9b58c2172e15298d5c1b0158",
+ "binary_sha256": "c9b9e0d51c558f0dbd340a2b12cff3e3d7aef7f52210b5fbc367cf98015acd84",
  "exit_code": 0,
  "totals": {
-  "PASS": 567,
+  "PASS": 570,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -156,8 +156,11 @@
   "IOP SIFCMD publishes a command buffer and answers INIT_CMD with SET_SREG(RPCINIT, 1)": "PASS",
   "IOP SIFRPC binds the ROM FILEIO server and answers a tty write call": "PASS",
   "IOP heap DMA uses private backing instead of aliasing EE RDRAM": "PASS",
+  "IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP": "PASS",
+  "IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4": "PASS",
   "IPU init executes its guest helper as a scheduler invocation": "PASS",
   "IPU init skips missing optional helper instead of dispatching the default trap": "PASS",
+  "IPU toIPU stays active while the input FIFO is full and completes when a command frees it": "PASS",
   "IRQ callbacks use an isolated invocation stack": "PASS",
   "ITOF converts the raw signed integer bits without float normalization": "PASS",
   "InterVectorXYZ_w_from_a": "PASS",

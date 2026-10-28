@@ -2862,6 +2862,88 @@ void register_ps2_memory_tests()
             t.IsTrue(!rig.gifActive(), "END completes the channel");
         });
 
+        // SIF1 (channel 6): IOP packets = 16-byte IOP tag (address bits 0-23, bit 31/30 end, word count) + data
+        // (PCSX2 Sif1.cpp and DobieStation iop_dma.cpp agree). No hardware program drives channel 6 directly.
+        tc.Run("SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<PS2Memory::Sif1Packet> got;
+            mem.setSif1Sink([&](const std::vector<PS2Memory::Sif1Packet> &p) { got.insert(got.end(), p.begin(), p.end()); });
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kSrc = 0x00400000u;
+            const uint32_t stream[] = {0x00012340u, 4u, 0u, 0u, 0xA1u, 0xA2u, 0xA3u, 0xA4u,           // packet 1: 4 words
+                                       0x80056780u, 8u, 0u, 0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u}; // packet 2, IRQ: end
+            std::memcpy(rdram + kSrc, stream, sizeof(stream));
+            mem.writeIORegister(0x1000C410u, kSrc);
+            mem.writeIORegister(0x1000C420u, sizeof(stream) / 16u);
+            mem.writeIORegister(0x1000C400u, 0x101u); // from memory, normal, STR
+            t.Equals(got.size(), static_cast<size_t>(2u), "two IOP packets");
+            if (got.size() == 2u)
+            {
+                t.Equals(got[0].iopAddress, 0x00012340u, "packet 1 IOP address");
+                t.Equals(got[0].data.size(), static_cast<size_t>(16u), "packet 1 carries 4 words");
+                t.IsTrue(!got[0].end && got[1].end, "bit 31 of the IOP tag ends the transfer");
+                t.Equals(got[1].iopAddress, 0x00056780u, "packet 2 IOP address (flags masked)");
+                uint32_t last = 0u;
+                std::memcpy(&last, got[1].data.data() + 28u, 4u);
+                t.Equals(last, 8u, "packet 2 data arrives in order");
+            }
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) != 0u, "CIS6 is raised");
+            t.IsTrue((mem.readIORegister(0x1000C400u) & 0x100u) == 0u, "the channel completes");
+            t.Equals(mem.readIORegister(0x1000C410u), kSrc + static_cast<uint32_t>(sizeof(stream)), "MADR ends past the data");
+        });
+
+        tc.Run("SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            std::vector<PS2Memory::Sif1Packet> got;
+            mem.setSif1Sink([&](const std::vector<PS2Memory::Sif1Packet> &p) { got.insert(got.end(), p.begin(), p.end()); });
+            uint8_t *rdram = mem.getRDRAM();
+            mem.writeIORegister(0x1000E000u, 1u | (3u << 6)); // STD = SIF1
+            // CNT carries the IOP tag (packet of 4 words, end), REFS carries its data from kStallData.
+            writeDmaTag(rdram, kStallChain, makeDmaTag(1u, 1u, 0u));
+            const uint32_t header[4] = {0x40002000u, 4u, 0u, 0u};
+            std::memcpy(rdram + kStallChain + 16u, header, sizeof(header));
+            writeDmaTag(rdram, kStallChain + 32u, makeDmaTag(1u, 4u, kStallData));
+            writeDmaTag(rdram, kStallChain + 48u, makeDmaTag(0u, 7u, 0u));
+            const uint32_t data[4] = {0xD0u, 0xD1u, 0xD2u, 0xD3u};
+            std::memcpy(rdram + kStallData, data, sizeof(data));
+            mem.writeIORegister(0x1000C430u, kStallChain);
+            mem.writeIORegister(0x1000C420u, 0u);
+            mem.writeIORegister(0x1000C400u, 0x105u); // chain, STR
+            t.Equals(got.size(), static_cast<size_t>(0u), "nothing reaches the IOP while the packet's data is behind D_STADR");
+            t.IsTrue((mem.readIORegister(0x1000C400u) & 0x100u) != 0u, "SIF1 stays active");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & kSis) != 0u, "SIS is raised");
+            mem.writeIORegister(kDStadr, kStallData + 0x10u);
+            t.Equals(got.size(), static_cast<size_t>(1u), "the packet is delivered once");
+            if (!got.empty())
+            {
+                t.Equals(got[0].iopAddress, 0x00002000u, "IOP address");
+                t.Equals(got[0].data.size(), static_cast<size_t>(16u), "the whole packet, header and REFS data together");
+                t.IsTrue(got[0].end, "bit 30 ends the transfer");
+            }
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) != 0u, "CIS6 after the chain's END");
+        });
+
+        tc.Run("SIF1 without an IOP sink does not transfer or raise CIS6", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            mem.writeIORegister(0x1000C410u, 0x00400000u);
+            mem.writeIORegister(0x1000C420u, 1u);
+            mem.writeIORegister(0x1000C400u, 0x101u);
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 6)) == 0u, "no CIS6 without a receiver");
+            const std::vector<uint8_t> stream(48u, 0u);
+            const auto packets = PS2Memory::splitSif1Stream(stream);
+            t.Equals(packets.size(), static_cast<size_t>(3u), "zero-length packets without an end flag continue");
+            std::vector<uint8_t> masked(32u, 0u);
+            masked[4] = 0x07u; // 7 words: the IOP channel takes 4 (count & 0xFFFFC)
+            const auto one = PS2Memory::splitSif1Stream(masked);
+            t.IsTrue(!one.empty() && one[0].data.size() == 16u, "the word count is masked to whole qwords");
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

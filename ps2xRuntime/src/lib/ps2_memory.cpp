@@ -360,6 +360,7 @@ bool PS2Memory::initialize(size_t ramSize)
     m_mfifoEmptyRaised = false;
     m_stallHeldChannel = 0u;
     m_stallSisRaised = false;
+    m_sif1Stream.clear();
     m_codeRegions.clear();
     m_path3Masked = false;
     m_path3MaskedFifo.clear();
@@ -1436,6 +1437,11 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
 // walks the tags (an MFIFO drain stops where fromSPR has not written yet and stays active).
 void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
 {
+    if (channelBase == 0x1000C400u)
+    {
+        startSif1Transfer(value);
+        return;
+    }
     const uint32_t madr = m_ioRegisters[channelBase + 0x10];
     const uint32_t qwc = m_ioRegisters[channelBase + 0x20];
     if ((channelBase == 0x1000A000u || channelBase == 0x10009000u || channelBase == 0x10008000u) && (m_gsVRAM || channelBase == 0x10008000u))
@@ -2042,7 +2048,83 @@ void PS2Memory::resumeMfifoDrain()
 uint32_t PS2Memory::stallDrainChannel() const
 {
     const uint32_t std = (ioReg(m_ioRegisters, 0x1000E000u) >> 6u) & 0x3u; // D_CTRL.STD
-    return std == 1u ? 0x10009000u : std == 2u ? 0x1000A000u : 0u;
+    return std == 1u ? 0x10009000u : std == 2u ? 0x1000A000u : std == 3u ? 0x1000C400u : 0u;
+}
+
+std::vector<PS2Memory::Sif1Packet> PS2Memory::splitSif1Stream(const std::vector<uint8_t> &stream)
+{
+    std::vector<Sif1Packet> packets;
+    size_t offset = 0u;
+    while (stream.size() - offset >= 16u)
+    {
+        uint32_t tag = 0u, words = 0u;
+        std::memcpy(&tag, stream.data() + offset, 4u);
+        std::memcpy(&words, stream.data() + offset + 4u, 4u);
+        offset += 16u;
+        Sif1Packet packet;
+        packet.iopAddress = tag & 0x00FFFFFFu;
+        packet.end = (tag & 0xC0000000u) != 0u;
+        // The IOP channel counts whole qwords of words (DobieStation masks the count with 0xFFFFC).
+        const size_t bytes = std::min<size_t>(static_cast<size_t>(words & 0xFFFFCu) * 4u, stream.size() - offset);
+        packet.data.assign(stream.begin() + static_cast<std::ptrdiff_t>(offset), stream.begin() + static_cast<std::ptrdiff_t>(offset + bytes));
+        offset += bytes;
+        packets.push_back(std::move(packet));
+        if (packets.back().end)
+            break;
+    }
+    return packets;
+}
+
+// SIF1 source channel: normal mode (MADR/QWC) or source chain (with TTE the tag's upper 64 bits enter the stream),
+// stall-control drain with STD=3 (both references), then the IOP packets go to the sink and CIS6 is raised.
+void PS2Memory::startSif1Transfer(uint32_t chcr)
+{
+    constexpr uint32_t kChannel = 0x1000C400u;
+    if (!m_sif1Sink)
+        return;
+    const uint32_t mode = (chcr >> 2u) & 0x3u;
+    const uint32_t madr = m_ioRegisters[kChannel + 0x10u];
+    const uint32_t qwc = m_ioRegisters[kChannel + 0x20u] & 0xFFFFu;
+    if (m_stallHeldChannel == kChannel)
+        m_stallHeldChannel = 0u;
+    // A stalled chain resumes from its REFS tag later; the stream gathered so far is kept, so an IOP packet whose
+    // header and data span the stall reaches the IOP whole.
+    std::vector<uint8_t> &stream = m_sif1Stream;
+    if (mode != 1u)
+    {
+        if (qwc != 0u && stallDrainChannel() == kChannel)
+        {
+            if (stallDrainBlocked(madr, qwc))
+            {
+                m_stallHeldChannel = kChannel;
+                raiseStallInterrupt();
+                return;
+            }
+            m_stallSisRaised = false;
+        }
+        uint32_t base = PS2_RAM_SIZE + 1u;
+        try
+        {
+            base = translateAddress(madr);
+        }
+        catch (const std::exception &)
+        {
+        }
+        if (base <= PS2_RAM_SIZE && qwc * 16u <= PS2_RAM_SIZE - base)
+            stream.insert(stream.end(), m_rdram + base, m_rdram + base + qwc * 16u);
+        m_ioRegisters[kChannel + 0x10u] = (madr + qwc * 16u) & 0x7FFFFFF0u;
+    }
+    else
+    {
+        walkSourceChain(kChannel, chcr, (chcr & 0x40u) != 0u, stream);
+        if (m_stallHeldChannel == kChannel)
+            return;
+    }
+    const std::vector<Sif1Packet> packets = splitSif1Stream(stream);
+    stream.clear();
+    m_sif1Sink(packets);
+    m_ioRegisters[kChannel + 0x20u] = 0u;
+    completeDmacChannel(kChannel, 6u);
 }
 
 // The drain may read up to, but not past, D_STADR (PCSX2 Gif.cpp / Vif1_Dma.cpp and DobieStation dmac.cpp both stall

@@ -521,6 +521,26 @@ public:
     bool isDrainChannelHeld(uint32_t channelBase) const;
     uint32_t m_stallHeldChannel = 0u;
     bool m_stallSisRaised = false;
+
+public:
+    // SIF1 (EE DMAC channel 6, EE -> IOP). The channel's data stream reaches IOP DMA channel 10, which reads a 16-byte
+    // IOP tag per packet (word 0: IOP address in bits 0-23, bit 31 IRQ / bit 30 end; word 1: word count; words 2-3
+    // unused) followed by that many words (PCSX2 Sif1.cpp, DobieStation iop_dma.cpp process_SIF1 agree).
+    struct Sif1Packet
+    {
+        uint32_t iopAddress = 0;
+        std::vector<uint8_t> data;
+        bool end = false;
+    };
+    using Sif1Sink = std::function<void(const std::vector<Sif1Packet> &)>;
+    // Without a sink (no IOP attached) channel 6 does not transfer.
+    void setSif1Sink(Sif1Sink sink) { m_sif1Sink = std::move(sink); }
+    [[nodiscard]] static std::vector<Sif1Packet> splitSif1Stream(const std::vector<uint8_t> &stream);
+
+private:
+    void startSif1Transfer(uint32_t chcr);
+    Sif1Sink m_sif1Sink;
+    std::vector<uint8_t> m_sif1Stream;
 };
 
 #endif // PS2_MEMORY_H

@@ -72,6 +72,10 @@ def start_codes(data):
 
 
 def parse(data):
+    # A video sequence ends with sequence_end_code (13818-2 6.2.1); ffmpeg's raw muxer omits it, so the last slice
+    # would end without a start code. It is appended here when missing.
+    if not data.endswith(b'\x00\x00\x01\xB7'):
+        data += b'\x00\x00\x01\xB7'
     info = {'mpeg2': False, 'idp': 0, 'as': 0, 'ivf': 0, 'qst': 0, 'dtd': 0,
             'matrix': [DEFAULT_INTRA[ZIGZAG[k]] for k in range(64)], 'slices': []}
     codes = list(start_codes(data))

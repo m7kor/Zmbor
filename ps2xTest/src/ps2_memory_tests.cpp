@@ -3090,8 +3090,8 @@ void register_ps2_memory_tests()
             t.IsTrue(mem.ipu().threshold0() == 0u && mem.ipu().threshold1() == 0u && mem.ipu().busy(),
                      "a command written while the IPU is busy is ignored");
             mem.writeIORegister(0x10002010u, 1u << 30);
-            mem.writeIORegister(0x10002000u, (1u << 28)); // IDEC: not implemented
-            t.Equals(mem.ipu().unimplementedCommand(), 1, "an unimplemented command is reported, not decoded");
+            mem.writeIORegister(0x10002000u, (0xAu << 28)); // command 10: not an IPU command
+            t.Equals(mem.ipu().unimplementedCommand(), 10, "an undefined command is reported, not executed");
         });
 
         // CSC: integer BT.601 (D-IPU-1); expected values computed by hand from the formula.

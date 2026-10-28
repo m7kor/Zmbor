@@ -113,3 +113,30 @@ one stay unverified until the stated measurement exists.
   - DobieStation odd-ifies every format, with no mismatch control.
 - **Settles it:** an IPU probe decoding blocks with alternate scan, escape levels of both signs and a DC that rounds
   at .5, compared with RAW16 output from a physical PS2.
+
+## D-IPU-4 — IPU IDEC slice decoding
+
+- **Chosen:** IDEC starts at the slice's first macroblock_type, after software has read the slice header and the
+  first macroblock_address_increment.
+  - **Per macroblock:**
+    - macroblock_type from B-2 (intra only);
+    - dct_type when option DTD is set;
+    - a 5-bit quantiser_scale_code when the type has macroblock_quant. It holds for the following macroblocks;
+      before the first one, the option's QSC applies.
+  - **Blocks:** six intra blocks as BDEC decodes them, then CSC (OFM, DTE, and SGN after the alpha thresholds).
+  - **DC predictors:** reset to 128 << IDP at the command start and after an address increment above 1.
+  - **Pacing:** the next macroblock is decoded only after the converted one has entered the output FIFO.
+  - **End of slice:** where an increment is due but none is coded, next_start_code must follow (zero bits to the byte
+    boundary, zero bytes, then 0x000001). The start code is left in the FIFO and CTRL.SCD is set. Anything else sets
+    CTRL.ECD, and so does an escape with no increment after it.
+- **For:** this is ISO/IEC 13818-2 6.2.4-6.2.5 and 7.2.1. PCSX2's IDEC follows the same order: modes, quantiser,
+  blocks, CSC, output, then the address increment. It resets the predictors the same way and leaves the start code
+  for software. DobieStation reads dct_type before the quantiser too.
+- **Against:**
+  - PCSX2 ends the slice without a flag when the bits after a macroblock are neither an increment nor zero, where
+    this model sets ECD.
+  - DobieStation reads dct_type and then ignores it.
+  - Neither reference documents IPU_CMD's value after IDEC; this model leaves it unchanged.
+  - The hardware's pacing between the macroblocks of one command is unknown.
+- **Settles it:** an IDEC probe on a physical PS2. Feed slices that end in garbage, in a start code at an odd bit
+  position, and after macroblock_escape. Record CTRL.SCD/ECD, IPU_CMD, IPU_TOP and BP after each.

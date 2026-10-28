@@ -12,6 +12,7 @@ namespace
     constexpr uint32_t kSetvq = 6u;
     constexpr uint32_t kCsc = 7u;
     constexpr uint32_t kPack = 8u;
+    constexpr uint32_t kIdec = 1u;
     constexpr uint32_t kBdec = 2u;
     // Scan position -> raster index (ISO/IEC 13818-2 figures 7-2 and 7-3).
     constexpr uint8_t kZigzag[64] = {0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48,
@@ -245,6 +246,8 @@ void PS2Ipu::convertMacroblock()
 {
     const bool rgb16 = (m_option & (1u << 27)) != 0u;
     const bool dither = (m_option & (1u << 26)) != 0u;
+    // IDEC option SGN: each colour channel minus 128, wrapping, after the alpha thresholds.
+    const int32_t sign = m_command == kIdec && (m_option & (1u << 25)) != 0u ? 0x80 : 0;
     std::array<uint8_t, 256u * 4u> rgb32{};
     for (uint32_t y = 0; y < 16u; ++y)
     {
@@ -263,9 +266,9 @@ void PS2Ipu::convertMacroblock()
             else if (r < m_th1 && g < m_th1 && b < m_th1)
                 alpha = 0x40u;
             uint8_t *p = &rgb32[(y * 16u + x) * 4u];
-            p[0] = static_cast<uint8_t>(r);
-            p[1] = static_cast<uint8_t>(g);
-            p[2] = static_cast<uint8_t>(b);
+            p[0] = static_cast<uint8_t>(r ^ sign);
+            p[1] = static_cast<uint8_t>(g ^ sign);
+            p[2] = static_cast<uint8_t>(b ^ sign);
             p[3] = alpha;
         }
     }
@@ -363,7 +366,7 @@ void PS2Ipu::packMacroblock()
 // once all of its bits (sign, escape run and level) are in the FIFO.
 int PS2Ipu::decodeCoefficient(bool &endOfBlock)
 {
-    const bool intra = (m_option & (1u << 27)) != 0u;
+    const bool intra = m_bdec.intra;
     const bool mpeg1 = (m_controlFields & (1u << 23)) != 0u;
     const bool tableB15 = intra && !mpeg1 && (m_controlFields & (1u << 21)) != 0u;
     const auto peek = [this](uint32_t count, uint32_t &value) { return peekBits(count, value); };
@@ -445,12 +448,12 @@ int PS2Ipu::decodeCoefficient(bool &endOfBlock)
 // Inverse scan, inverse quantisation (13818-2 7.4; 11172-2 2.4.4 with CTRL.MP1), then the inverse DCT (D-IPU-3).
 void PS2Ipu::reconstructBlock()
 {
-    const bool intra = (m_option & (1u << 27)) != 0u;
+    const bool intra = m_bdec.intra;
     const bool mpeg1 = (m_controlFields & (1u << 23)) != 0u;
     const bool alternate = (m_controlFields & (1u << 20)) != 0u;
     const bool nonLinear = !mpeg1 && (m_controlFields & (1u << 22)) != 0u;
     const uint32_t precision = (m_controlFields >> 16) & 0x3u;
-    const uint32_t scaleCode = (m_option >> 16) & 0x1Fu;
+    const uint32_t scaleCode = m_bdec.scaleCode;
     // MPEG-1's quantizer_scale with its /16 is the same as twice the code with MPEG-2's /32.
     const int32_t scale = nonLinear ? kNonLinearScale[scaleCode] : static_cast<int32_t>(2u * scaleCode);
     const std::array<uint8_t, 64> &matrix = intra ? m_intraIq : m_nonIntraIq;
@@ -504,10 +507,10 @@ void PS2Ipu::reconstructBlock()
         }
 }
 
-// RAW16: Y 16x16 (frame blocks in quadrants, field blocks on alternate lines with option DT), Cb 8x8, Cr 8x8.
-void PS2Ipu::emitRaw16()
+// Y 16x16 (frame blocks in quadrants, field blocks on alternate lines), Cb 8x8, Cr 8x8.
+std::array<int16_t, 384> PS2Ipu::assembleMacroblock() const
 {
-    const bool field = (m_option & (1u << 25)) != 0u;
+    const bool field = m_bdec.field;
     std::array<int16_t, 384> raw{};
     for (uint32_t b = 0; b < 4u; ++b)
         for (uint32_t r = 0; r < 8u; ++r)
@@ -518,6 +521,13 @@ void PS2Ipu::emitRaw16()
         }
     std::copy(m_bdec.blocks[4].begin(), m_bdec.blocks[4].end(), raw.begin() + 256);
     std::copy(m_bdec.blocks[5].begin(), m_bdec.blocks[5].end(), raw.begin() + 320);
+    return raw;
+}
+
+// RAW16: the assembled macroblock as 48 qwords of little-endian int16.
+void PS2Ipu::emitRaw16()
+{
+    const std::array<int16_t, 384> raw = assembleMacroblock();
     for (uint32_t q = 0; q < 48u; ++q)
     {
         Qword qword{};
@@ -532,23 +542,11 @@ void PS2Ipu::emitRaw16()
     refillOutput();
 }
 
-bool PS2Ipu::decodeBlocks()
+int PS2Ipu::decodeBlocks()
 {
-    const bool intra = (m_option & (1u << 27)) != 0u;
+    const bool intra = m_bdec.intra;
     const auto peek = [this](uint32_t count, uint32_t &value) { return peekBits(count, value); };
-    const auto fail = [this]
-    {
-        m_errorCode = true;
-        finish();
-        return true;
-    };
     if (m_bdec.stage == 0u)
-    {
-        if (!advanceBits(m_option & 0x3Fu))
-            return false;
-        m_bdec.stage = 1u;
-    }
-    if (m_bdec.stage == 1u)
     {
         if (intra)
             m_codedBlockPattern = 0x3Fu;
@@ -556,21 +554,18 @@ bool PS2Ipu::decodeBlocks()
         {
             const ps2_ipu_tables::CodeValue *code = nullptr;
             const int found = matchCode(ps2_ipu_tables::kCodedBlockPattern, peek, code);
-            if (found == 0)
-                return false;
-            if (found < 0)
-                return fail();
+            if (found <= 0)
+                return found;
             (void)advanceBits(code->length);
             m_codedBlockPattern = code->value;
         }
-        m_bdec.stage = 2u;
+        m_bdec.stage = 1u;
     }
-    while (m_bdec.stage == 2u)
+    while (m_bdec.stage == 1u)
     {
         if (m_bdec.block == 6u)
         {
-            emitRaw16();
-            m_bdec.stage = 3u;
+            m_bdec.stage = 2u;
             break;
         }
         if (((m_codedBlockPattern >> (5u - m_bdec.block)) & 1u) != 0u)
@@ -580,13 +575,11 @@ bool PS2Ipu::decodeBlocks()
                 const ps2_ipu_tables::CodeValue *size = nullptr;
                 const int found = m_bdec.block < 4u ? matchCode(ps2_ipu_tables::kDcLuminance, peek, size)
                                                     : matchCode(ps2_ipu_tables::kDcChrominance, peek, size);
-                if (found == 0)
-                    return false;
-                if (found < 0)
-                    return fail();
+                if (found <= 0)
+                    return found;
                 uint32_t bits = 0u;
                 if (!peekBits(size->length + size->value, bits))
-                    return false;
+                    return 0;
                 (void)advanceBits(size->length + size->value);
                 int32_t differential = 0;
                 if (size->value != 0u)
@@ -606,10 +599,8 @@ bool PS2Ipu::decodeBlocks()
             {
                 bool endOfBlock = false;
                 const int decoded = decodeCoefficient(endOfBlock);
-                if (decoded == 0)
-                    return false;
-                if (decoded < 0)
-                    return fail();
+                if (decoded <= 0)
+                    return decoded;
                 if (endOfBlock)
                     break;
             }
@@ -622,9 +613,165 @@ bool PS2Ipu::decodeBlocks()
         m_bdec.index = 0u;
         m_bdec.dcDone = false;
     }
+    return 1;
+}
+
+void PS2Ipu::fail()
+{
+    m_errorCode = true;
+    finish();
+}
+
+void PS2Ipu::runBdec()
+{
+    if (!m_advanced)
+    {
+        if (!advanceBits(m_option & 0x3Fu))
+            return;
+        m_advanced = true;
+    }
+    if (m_bdec.stage < 3u)
+    {
+        const int decoded = decodeBlocks();
+        if (decoded == 0)
+            return;
+        if (decoded < 0)
+        {
+            fail();
+            return;
+        }
+        emitRaw16();
+        m_bdec.stage = 3u;
+    }
     if (m_outputPending.empty())
         finish(); // the whole macroblock has entered the output FIFO
-    return true;
+}
+
+void PS2Ipu::runIdec()
+{
+    const auto peek = [this](uint32_t count, uint32_t &value) { return peekBits(count, value); };
+    const uint32_t precision = (m_controlFields >> 16) & 0x3u;
+    for (;;)
+    {
+        switch (m_idec.stage)
+        {
+        case 0u: // FB, then the slice's first macroblock_type
+            if (!advanceBits(m_option & 0x3Fu))
+                return;
+            m_dcPredictor.fill(128 << precision);
+            m_idec.scaleCode = (m_option >> 16) & 0x1Fu;
+            m_idec.stage = 1u;
+            break;
+        case 1u: // macroblock_modes and quantiser_scale_code, consumed together once all their bits are in
+        {
+            const Vlc *type = nullptr;
+            const int found = matchCode(kMbTypeI, peek, type);
+            if (found == 0)
+                return;
+            if (found < 0)
+            {
+                fail();
+                return;
+            }
+            const bool dctType = (m_option & (1u << 24)) != 0u;
+            const bool quant = (type->value & 0x10) != 0;
+            const uint32_t total = type->length + (dctType ? 1u : 0u) + (quant ? 5u : 0u);
+            uint32_t bits = 0u;
+            if (!peekBits(total, bits))
+                return;
+            (void)advanceBits(total);
+            const uint32_t after = total - type->length; // the dct_type and quantiser bits, MSB first
+            m_bdec = BdecState{};
+            m_bdec.intra = true;
+            m_bdec.field = dctType && ((bits >> (after - 1u)) & 1u) != 0u;
+            if (quant)
+                m_idec.scaleCode = bits & 0x1Fu;
+            m_bdec.scaleCode = m_idec.scaleCode;
+            m_idec.stage = 2u;
+            break;
+        }
+        case 2u:
+        {
+            const int decoded = decodeBlocks();
+            if (decoded == 0)
+                return;
+            if (decoded < 0)
+            {
+                fail();
+                return;
+            }
+            const std::array<int16_t, 384> samples = assembleMacroblock();
+            for (size_t i = 0; i < samples.size(); ++i)
+                m_macroblock[i] = static_cast<uint8_t>(samples[i]); // intra samples are 0-255
+            convertMacroblock();
+            ++m_idec.macroblocks;
+            m_idec.increment = 0u;
+            m_idec.stage = 3u;
+            break;
+        }
+        case 3u: // the converted macroblock enters the output FIFO before the next one is decoded
+            if (!m_outputPending.empty())
+                return;
+            m_idec.stage = 4u;
+            break;
+        case 4u: // macroblock_address_increment, or the end of the slice
+        {
+            const Vlc *code = nullptr;
+            const int found = matchCode(kMbai, peek, code);
+            if (found == 0)
+                return;
+            if (found < 0)
+            {
+                m_idec.stage = m_idec.increment == 0u ? 5u : 6u;
+                break;
+            }
+            (void)advanceBits(code->length);
+            if (code->value == 34)
+                break; // macroblock_stuffing
+            m_idec.increment += code->value == 35 ? 33u : static_cast<uint32_t>(code->value);
+            if (code->value == 35)
+                break; // macroblock_escape: the increment continues
+            if (m_idec.increment > 1u)
+                m_dcPredictor.fill(128 << precision); // a skipped macroblock resets the predictors (7.2.1)
+            m_idec.stage = 1u;
+            break;
+        }
+        case 5u: // next_start_code: zero bits to the byte boundary, zero bytes, then 0x000001
+        {
+            const uint32_t misalign = (8u - m_bitPointer % 8u) % 8u;
+            uint32_t bits = 0u;
+            if (misalign != 0u)
+            {
+                if (!peekBits(misalign, bits))
+                    return;
+                if (bits != 0u)
+                {
+                    fail();
+                    return;
+                }
+                (void)advanceBits(misalign);
+            }
+            if (!peekBits(24u, bits))
+                return;
+            if (bits == 1u)
+            {
+                m_startCode = true; // the start code stays in the FIFO for the caller
+                finish();
+                return;
+            }
+            if ((bits >> 16) != 0u)
+            {
+                fail();
+                return;
+            }
+            (void)advanceBits(8u);
+            break;
+        }
+        default: // an escape not followed by an increment
+            fail();
+            return;
+        }
+    }
 }
 
 void PS2Ipu::finish()
@@ -666,8 +813,15 @@ bool PS2Ipu::writeCommand(uint32_t value)
         m_macroblocksLeft = m_option & 0x7FFu;
         m_macroblockBytes = 0u;
         break;
+    case kIdec: // FB 0-5, QSC 16-20, DTD 24, SGN 25, DTE 26, OFM 27
+        m_idec = IdecState{};
+        m_bdec = BdecState{};
+        break;
     case kBdec: // FB 0-5, QSC 16-20, DT 25, DCR 26 (reset the DC predictors), MBI 27 (intra)
         m_bdec = BdecState{};
+        m_bdec.intra = (m_option & (1u << 27)) != 0u;
+        m_bdec.field = (m_option & (1u << 25)) != 0u;
+        m_bdec.scaleCode = (m_option >> 16) & 0x1Fu;
         if ((m_option & (1u << 26)) != 0u)
             m_dcPredictor.fill(128 << ((m_controlFields >> 16) & 0x3u));
         break;
@@ -700,6 +854,8 @@ void PS2Ipu::writeControl(uint32_t value)
         m_busy = false;
         m_decoding = false;
         m_remaining = 0u;
+        m_bdec = BdecState{};
+        m_idec = IdecState{};
     }
 }
 
@@ -833,8 +989,11 @@ void PS2Ipu::run()
             m_macroblockBytes = 0u;
             --m_macroblocksLeft;
         }
+    case kIdec:
+        runIdec();
+        return;
     case kBdec:
-        (void)decodeBlocks();
+        runBdec();
         return;
     case kSetvq:
         while (m_remaining != 0u)

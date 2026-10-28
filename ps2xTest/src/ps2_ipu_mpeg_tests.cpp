@@ -1,5 +1,6 @@
 #include "MiniTest.h"
 #include "runtime/ps2_ipu.h"
+#include "runtime/ps2_memory.h"
 #include "ipu_mpeg_fixtures.h"
 
 #include <algorithm>
@@ -246,6 +247,102 @@ namespace
         return p;
     }
 
+    constexpr uint32_t kIdec = 1u << 28, kCsc = 7u << 28;
+    constexpr uint32_t kOfm = 1u << 27, kDte = 1u << 26, kSgn = 1u << 25;
+    [[nodiscard]] size_t macroblockBytes(uint32_t format) { return (format & kOfm) != 0u ? 32u * 16u : 64u * 16u; }
+
+    // IDEC on one slice as PS2 software starts it: VDEC reads the first address increment, then IDEC decodes the
+    // slice to its end with the slice's quantiser_scale_code and the picture's dct_type rule.
+    Outcome decodeSliceWithIdec(Driver &d, const Fixture &f, const Slice &s, uint32_t format)
+    {
+        d.ipu.writeControl(f.control | (1u << 24));
+        d.loadMatrix(f.intraMatrix);
+        d.exec(kBclr);
+        d.feeder.load(s.data, s.size);
+        uint32_t increment = 0u;
+        const Outcome o = readAddressIncrement(d, s.headerBits, increment);
+        if (o != Outcome::Done || increment == 0u)
+            return o == Outcome::Done ? Outcome::Error : o;
+        if (!d.exec(kIdec | (s.qsc << 16) | (f.dtd ? (1u << 24) : 0u) | format))
+            return Outcome::Stalled;
+        return d.error() ? Outcome::Error : Outcome::Done;
+    }
+
+    // The IDEC reference: CSC of the BDEC macroblocks with the same output options. SGN is applied to the colour
+    // channels afterwards as ps2tek documents it (minus 128, wrapping); without dither that flips bit 4 of each
+    // 5-bit RGB16 channel.
+    std::vector<uint8_t> cscOf(const std::vector<uint8_t> &raw16, uint32_t format)
+    {
+        std::vector<uint8_t> out;
+        for (size_t mb = 0; mb * kRawBytes < raw16.size(); ++mb)
+        {
+            const Raw raw = rawAt(raw16, mb);
+            std::array<uint8_t, 384> bytes{};
+            for (size_t i = 0; i < bytes.size(); ++i)
+                bytes[i] = static_cast<uint8_t>(std::clamp<int>(raw[i], 0, 255));
+            Driver c;
+            c.feeder.load(bytes.data(), bytes.size());
+            c.exec(kCsc | (format & (kOfm | kDte)) | 1u);
+            if ((format & kSgn) != 0u)
+            {
+                for (size_t i = 0; i < c.out.size(); ++i)
+                {
+                    if ((format & kOfm) == 0u && i % 4u != 3u)
+                        c.out[i] ^= 0x80u;
+                    else if ((format & kOfm) != 0u && i % 2u == 0u)
+                    {
+                        uint16_t v = static_cast<uint16_t>(c.out[i] | (c.out[i + 1u] << 8));
+                        v ^= 0x4210u;
+                        c.out[i] = static_cast<uint8_t>(v);
+                        c.out[i + 1u] = static_cast<uint8_t>(v >> 8);
+                    }
+                }
+            }
+            out.insert(out.end(), c.out.begin(), c.out.end());
+        }
+        return out;
+    }
+
+    // Hand-built IDEC slice bits, MSB first, after the first macroblock_address_increment.
+    std::vector<uint8_t> sliceBits(const std::string &bits)
+    {
+        std::vector<uint8_t> bytes;
+        uint32_t count = 0u;
+        for (const char c : bits)
+        {
+            if (c != '0' && c != '1')
+                continue;
+            if (count % 8u == 0u)
+                bytes.push_back(0u);
+            if (c == '1')
+                bytes.back() |= static_cast<uint8_t>(0x80u >> (count % 8u));
+            ++count;
+        }
+        return bytes;
+    }
+
+    // Pads to the byte boundary and appends the next slice's start code (00 00 01 01).
+    std::string endSlice(std::string bits)
+    {
+        const size_t count = static_cast<size_t>(std::count_if(bits.begin(), bits.end(), [](char c) { return c == '0' || c == '1'; }));
+        bits.append((8u - count % 8u) % 8u, '0');
+        return bits + " 00000000 00000000 00000001 00000001";
+    }
+
+    // Runs IDEC on hand-built bits with flat intra matrix 16 and PCT = I.
+    Driver runIdecBits(const std::string &bits, uint32_t option, uint32_t control = 0u)
+    {
+        Driver d;
+        const std::array<uint8_t, 64> flat = [] { std::array<uint8_t, 64> m{}; m.fill(16); return m; }();
+        d.ipu.writeControl(control | (1u << 24));
+        d.loadMatrix(flat.data());
+        d.exec(kBclr);
+        const std::vector<uint8_t> bytes = sliceBits(bits);
+        d.feeder.load(bytes.data(), bytes.size());
+        d.exec(kIdec | option);
+        return d;
+    }
+
     // Deterministic xorshift for the malformed-stream cases.
     uint32_t nextRandom(uint32_t &state)
     {
@@ -425,6 +522,196 @@ void register_ps2_ipu_mpeg_tests()
             }
             t.Equals(bad, static_cast<size_t>(0u), "every corrupted slice: same result twice, whole macroblocks, an idle IPU after an error");
             t.IsTrue(errors != 0u, "corruption is detected as a bitstream error in " + std::to_string(errors) + "/" + std::to_string(cases) + " cases");
+        });
+
+        // IDEC = the slice loop + BDEC + CSC; its reference is CSC applied to the BDEC macroblocks (the BDEC path is
+        // itself checked against ffmpeg above).
+        tc.Run("IDEC decodes every fixture slice to its start code; the output equals CSC of the BDEC macroblocks", [](TestCase &t)
+        {
+            const uint32_t formats[] = {0u, kOfm, kOfm | kDte, kSgn, kOfm | kSgn};
+            for (const Fixture &f : ipu_mpeg_fixtures::kFixtures)
+            {
+                for (size_t si = 0; si < f.sliceCount; ++si)
+                {
+                    const Slice &s = f.slices[si];
+                    Driver b;
+                    std::vector<uint32_t> columns;
+                    (void)decodeSliceWithBdec(b, f, s, columns);
+                    for (const uint32_t format : formats)
+                    {
+                        Driver d;
+                        const Outcome o = decodeSliceWithIdec(d, f, s, format);
+                        const std::string what = std::string(f.name) + " slice " + std::to_string(si) + " format 0x" + std::to_string(format >> 25);
+                        t.IsTrue(o == Outcome::Done && !d.ipu.busy(), what + ": IDEC completes without error");
+                        t.IsTrue((d.ipu.readControl() & (1u << 15)) != 0u && (static_cast<uint32_t>(d.ipu.readTop()) >> 8) == 0x000001u,
+                                 what + ": the next start code sets CTRL.SCD and stays at the front of the FIFO");
+                        t.Equals(d.ipu.idecMacroblocks(), kMbPerSlice, what + ": every macroblock of the slice");
+                        t.Equals((d.ipu.readControl() >> 8) & 0x3Fu, 0x3Fu, what + ": CBP 0x3F (intra)");
+                        t.IsTrue(d.out.size() == kMbPerSlice * macroblockBytes(format) && d.out == cscOf(b.out, format),
+                                 what + ": the output equals CSC of the BDEC result");
+                    }
+                }
+            }
+        });
+
+        tc.Run("IDEC paused at every qword resumes exactly; it is repeatable under lazy and full-FIFO feeding", [](TestCase &t)
+        {
+            for (const Fixture &f : ipu_mpeg_fixtures::kFixtures)
+            {
+                const Slice &s = f.slices[1];
+                Driver whole, eager;
+                eager.eager = true;
+                (void)decodeSliceWithIdec(whole, f, s, kOfm | kDte);
+                (void)decodeSliceWithIdec(eager, f, s, kOfm | kDte);
+                t.IsTrue(!whole.out.empty() && whole.out == eager.out, std::string(f.name) + ": lazy and eager feeding agree");
+                size_t pauses = 0u, clean = 0u;
+                for (size_t cut = 1u; cut < (s.size + 15u) / 16u; ++cut)
+                {
+                    Driver d;
+                    d.feeder.pauseAt = cut;
+                    d.onPause = [&](Driver &paused)
+                    {
+                        ++pauses;
+                        clean += paused.ipu.busy() && !paused.error() && paused.out.size() % macroblockBytes(kOfm) == 0u ? 1u : 0u;
+                    };
+                    t.IsTrue(decodeSliceWithIdec(d, f, s, kOfm | kDte) == Outcome::Done && d.out == whole.out,
+                             std::string(f.name) + ": resumed after qword " + std::to_string(cut));
+                }
+                t.IsTrue(pauses != 0u && clean == pauses, std::string(f.name) + ": every pause found IDEC waiting with whole macroblocks out");
+            }
+        });
+
+        tc.Run("IDEC on randomly corrupted slices ends deterministically with whole macroblocks or an error", [](TestCase &t)
+        {
+            uint32_t seed = 0x9E3779B9u;
+            size_t errors = 0u, bad = 0u, cases = 0u;
+            for (const Fixture &f : ipu_mpeg_fixtures::kFixtures)
+            {
+                for (size_t si = 0; si < f.sliceCount; ++si)
+                {
+                    const Slice &s = f.slices[si];
+                    for (int variant = 0; variant < 24; ++variant)
+                    {
+                        std::vector<uint8_t> bytes(s.data, s.data + s.size);
+                        const uint32_t flips = 1u + nextRandom(seed) % 4u;
+                        for (uint32_t k = 0; k < flips; ++k)
+                        {
+                            const uint32_t bit = s.headerBits + nextRandom(seed) % (static_cast<uint32_t>(s.size) * 8u - s.headerBits);
+                            bytes[bit / 8u] ^= static_cast<uint8_t>(0x80u >> (bit % 8u));
+                        }
+                        Slice corrupt = s;
+                        corrupt.data = bytes.data();
+                        Driver first, second;
+                        const Outcome o1 = decodeSliceWithIdec(first, f, corrupt, 0u);
+                        const Outcome o2 = decodeSliceWithIdec(second, f, corrupt, 0u);
+                        ++cases;
+                        errors += o1 == Outcome::Error ? 1u : 0u;
+                        bad += o1 == o2 && first.out == second.out && first.out.size() % macroblockBytes(0u) == 0u &&
+                                       first.out.size() / macroblockBytes(0u) == first.ipu.idecMacroblocks() &&
+                                       (o1 != Outcome::Error || !first.ipu.busy())
+                                   ? 0u
+                                   : 1u;
+                    }
+                }
+            }
+            t.Equals(bad, static_cast<size_t>(0u), "every corrupted slice: same result twice, whole macroblocks, idle after an error");
+            t.IsTrue(errors != 0u, "corruption is detected in " + std::to_string(errors) + "/" + std::to_string(cases) + " cases");
+        });
+
+        // Hand-built slices (after the first address increment). DC-only macroblock: type '1', Y0-Y3 size 0 + EOB,
+        // Cb, Cr size 0 + EOB.
+        tc.Run("IDEC slice syntax: address increments, stuffing, escape, skipped-macroblock DC reset, dct_type and quantiser_scale_code", [](TestCase &t)
+        {
+            const std::string flat = "1 100 10 100 10 100 10 100 10 00 10 00 10";
+            const std::string brightY0 = "1 01 11 10 100 10 100 10 100 10 00 10 00 10"; // Y0 +3: predictor 131
+            Driver two = runIdecBits(endSlice(flat + " 1 " + flat), 0u);
+            t.IsTrue(!two.ipu.busy() && !two.error() && two.ipu.idecMacroblocks() == 2u && two.out.size() == 2u * 1024u,
+                     "two macroblocks separated by increment 1");
+            t.Equals(static_cast<uint32_t>(two.ipu.readTop()), 0x00000101u, "the start code is left at the front of the FIFO");
+
+            Driver adjacent = runIdecBits(endSlice(brightY0 + " 1 " + flat), 0u);
+            Driver skipped = runIdecBits(endSlice(brightY0 + " 011 " + flat), 0u);
+            t.IsTrue(adjacent.ipu.dcPredictor(0) == 131 && skipped.ipu.dcPredictor(0) == 128,
+                     "increment 2 resets the DC predictors; increment 1 keeps them");
+
+            Driver stuffed = runIdecBits(endSlice(flat + " 00000001111 00000001111 1 " + flat), 0u);
+            t.IsTrue(!stuffed.error() && stuffed.out == two.out, "macroblock_stuffing is skipped");
+            Driver escaped = runIdecBits(endSlice(flat + " 00000001000 1 " + flat), 0u);
+            t.IsTrue(!escaped.error() && escaped.ipu.idecMacroblocks() == 2u, "macroblock_escape adds 33 to the next increment");
+            Driver escapeAtEnd = runIdecBits(endSlice(flat + " 00000001000"), 0u);
+            t.IsTrue(escapeAtEnd.error() && !escapeAtEnd.ipu.busy() && escapeAtEnd.ipu.idecMacroblocks() == 1u,
+                     "an escape without an increment is an error");
+
+            Driver badType = runIdecBits(endSlice("00 " + flat), 0u);
+            t.IsTrue(badType.error() && badType.out.empty() && !badType.ipu.busy(), "'00' is not an I macroblock_type");
+            Driver garbage = runIdecBits(flat + " 0000000010000000 11111111 00000000 00000001 00000001", 0u);
+            t.IsTrue(garbage.error() && garbage.ipu.idecMacroblocks() == 1u && (garbage.ipu.readControl() & (1u << 15)) == 0u,
+                     "non-zero bits where an increment or a start code is due are an error, not a slice end");
+
+            // dct_type (option DTD): '1 1' = intra, field DCT. Y0 = 131 then lands on the even lines of the left half.
+            // Y0 +3 (131), Y1 -3 (back to 128: the four Y blocks share one predictor), Y2, Y3 128.
+            const std::string fieldY0 = "1 1 01 11 10 01 00 10 100 10 100 10 00 10 00 10";
+            const std::string frameY0 = "1 0 01 11 10 01 00 10 100 10 100 10 00 10 00 10";
+            Driver field = runIdecBits(endSlice(fieldY0), 1u << 24);
+            Driver frame = runIdecBits(endSlice(frameY0), 1u << 24);
+            const auto pixel = [](const Driver &d, uint32_t line, uint32_t x)
+            {
+                uint32_t v = 0u;
+                std::memcpy(&v, d.out.data() + (line * 16u + x) * 4u, 4u);
+                return v;
+            };
+            t.IsTrue(!field.error() && !frame.error() && pixel(field, 0, 0) != pixel(field, 1, 0) &&
+                         pixel(frame, 0, 0) == pixel(frame, 1, 0) && pixel(field, 8, 0) == pixel(field, 0, 0),
+                     "dct_type 1 puts Y0 on lines 0, 2, .. 14; dct_type 0 on lines 0-7");
+
+            // quantiser_scale_code: macroblock 1 is intra+quant ('01' + 5 bits); macroblock 2 inherits its scale.
+            const std::string acY0 = "1 100 000001 000000 000001100100 10 100 10 100 10 100 10 00 10 00 10";
+            Driver q4 = runIdecBits(endSlice("01 00100 100 10 100 10 100 10 100 10 00 10 00 10 1 " + acY0), 0u);
+            Driver q8 = runIdecBits(endSlice("01 01000 100 10 100 10 100 10 100 10 00 10 00 10 1 " + acY0), 0u);
+            Driver single = runIdecBits(endSlice(acY0), 4u << 16);
+            const std::vector<uint8_t> second4(q4.out.begin() + 1024, q4.out.end());
+            const std::vector<uint8_t> second8(q8.out.begin() + 1024, q8.out.end());
+            t.IsTrue(!q4.error() && second4 == single.out && second4 != second8,
+                     "quantiser_scale_code carries to later macroblocks and replaces the option's QSC");
+        });
+
+        tc.Run("IDEC through toIPU and fromIPU DMA writes the slice's RGB32 macroblocks to RAM and raises the IPU interrupt", [](TestCase &t)
+        {
+            const Fixture &f = ipu_mpeg_fixtures::kFixtures[3]; // field DCT
+            const Slice &s = f.slices[0];
+            Driver direct;
+            t.IsTrue(decodeSliceWithIdec(direct, f, s, 0u) == Outcome::Done, "the direct decode succeeds");
+
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kIn = 0x00500000u, kOut = 0x00540000u;
+            const uint32_t qwords = static_cast<uint32_t>((s.size + 15u) / 16u);
+            std::memset(rdram + kIn, 0, qwords * 16u);
+            std::memcpy(rdram + kIn, s.data, s.size);
+            std::memset(rdram + kOut, 0xEE, direct.out.size() + 16u);
+            mem.writeIORegister(0x10002010u, f.control | (1u << 24));
+            mem.writeIORegister(0x10002000u, kSetiq);
+            for (uint32_t q = 0; q < 4u; ++q)
+                mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(f.intraMatrix + q * 16u)));
+            mem.writeIORegister(0x10002000u, kBclr);
+            mem.writeIORegister(0x1000B410u, kIn);
+            mem.writeIORegister(0x1000B420u, qwords);
+            mem.writeIORegister(0x1000B400u, 0x101u); // toIPU, normal, STR
+            mem.writeIORegister(0x10002000u, kVdec | s.headerBits);
+            t.Equals(mem.readIORegister(0x10002000u) & 0xFFFFu, 1u, "VDEC reads the first address increment");
+            (void)mem.takePendingIpuInterrupt();
+            mem.writeIORegister(0x1000B010u, kOut);
+            mem.writeIORegister(0x1000B020u, static_cast<uint32_t>(direct.out.size() / 16u));
+            mem.writeIORegister(0x1000B000u, 0x100u); // fromIPU, normal, STR
+            mem.writeIORegister(0x10002000u, kIdec | (s.qsc << 16) | (f.dtd ? (1u << 24) : 0u));
+            t.IsTrue(std::memcmp(rdram + kOut, direct.out.data(), direct.out.size()) == 0, "RAM holds the decoded slice");
+            t.Equals(static_cast<uint32_t>(rdram[kOut + direct.out.size()]), 0xEEu, "nothing is written past the slice");
+            const uint32_t ctrl = mem.readIORegister(0x10002010u);
+            t.IsTrue((ctrl & (1u << 31)) == 0u && (ctrl & (1u << 15)) != 0u && (ctrl & (1u << 14)) == 0u, "IDEC idle with SCD, no ECD");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & ((1u << 3) | (1u << 4))) == ((1u << 3) | (1u << 4)), "CIS3 and CIS4");
+            t.IsTrue(mem.takePendingIpuInterrupt(), "the completed IDEC raises the IPU interrupt");
+            t.Equals(mem.readIORegister(0x10002030u) >> 8, 0x000001u, "TOP shows the next start code");
         });
     });
 }

@@ -258,7 +258,8 @@ def selftest(inv):
     case("missing category", lambda d: d["sections"][0]["children"].pop())
     case("hle marked complete", lambda d: first_leaf(d, lambda l: l.get("implementation") == "hle").update(status="VERIFIED_COMPLETE", missing="", blocker=""))
     case("tampered measurement", lambda d: d["measurements"]["hardware"].update(lines_match=d["measurements"]["hardware"]["lines"]))
-    case("tampered IOP measurement", lambda d: d["measurements"]["iop_hardware"].update(programs_pass=d["measurements"]["iop_hardware"]["programs"]))
+    # Off by one from the measured value, so the case stays a tamper whatever the real result is (23/23 now).
+    case("tampered IOP measurement", lambda d: d["measurements"]["iop_hardware"].update(programs_pass=d["measurements"]["iop_hardware"]["programs_pass"] - 1))
     case("invalid percentage", lambda d: d["measurements"]["isa_coverage"]["classes"]["mmi"].update(numerator=999))
     case("complete without enumerated scope", lambda d: first_leaf(d, lambda l: l["id"] == "vif.stcycl").update(status="VERIFIED_COMPLETE", missing="", blocker=""))
     case("missing with hardware evidence", lambda d: first_leaf(d, lambda l: l["status"] == "MISSING")["hw"].append("cpu_ee_alu"))

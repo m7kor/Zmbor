@@ -15,14 +15,14 @@
     "no .expected edits; no hardware results without a physical PS2 run"
   ],
   "baseline": {
-    "commit": "0765383",
+    "commit": "34d48e0",
     "ps2autotests_programs": "53/55",
     "ps2autotests_lines": "8202/8250",
     "ps2x_tests": "598/598",
     "ctest": "54/54",
     "e2e": "4/4",
     "iop": "4/4",
-    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate11.manifest.json",
+    "gate_manifest": "D:/Project/Zmbor/hwtest_work/p8/hw_gate12.manifest.json",
     "gate_note": "clean tree",
     "iop_programs": "23/23 exact, 1306/1306 lines (separate measurement)"
   },
@@ -236,14 +236,34 @@
       ],
       "mutants": "AA1 11/11 killed",
       "gate": "0765383: 53/55, 8202/8250, 0 regressions; unit 598/598, ctest 54/54, e2e 4/4, IOP 4/4"
+    },
+    {
+      "id": 12,
+      "commits": [
+        "944a3e5",
+        "fa440ad",
+        "34d48e0",
+        "713127b",
+        "adaecc7"
+      ],
+      "components": {
+        "spu.cores": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "spu.ram": "MISSING -> IMPLEMENTED_UNVERIFIED",
+        "spu.irq": "MISSING -> IMPLEMENTED_UNVERIFIED"
+      },
+      "notes": [
+        "SPU2 register file, 2 MB sound RAM, data port, IRQA, IOP DMA 4/7 (decision D-SPU-1); no voice engine"
+      ],
+      "mutants": "SPU2 14/14 non-equivalent (S12 equivalent: dead guard removed)",
+      "gate": "34d48e0: 53/55, 8202/8250, 0 regressions; unit 598/598, ctest 54/54, e2e 4/4, IOP 4/4; IOP corpus 23/23; IOP ASan clean"
     }
   ],
   "hardware_inventory": {
     "VERIFIED_COMPLETE": 18,
     "VERIFIED_PARTIAL": 52,
-    "IMPLEMENTED_UNVERIFIED": 63,
+    "IMPLEMENTED_UNVERIFIED": 66,
     "HLE_OR_STUB": 20,
-    "MISSING": 17,
+    "MISSING": 14,
     "NOT_APPLICABLE": 3,
     "UNKNOWN": 1
   },
@@ -266,7 +286,7 @@
     "contracts": "python -I tools/hwcoverage/hwcoverage.py selftest",
     "dashboard": "python -I tools/status/generate_dashboard.py && python -I tools/status/validate_dashboard.py"
   },
-  "next_action": "SPU2: spu.cores + spu.ram register model (both cores, 16-bit access, TSA data port, IRQA, IOP DMA 4/7); then voices, ADSR, pitch, mixer, reverb, interrupts; SIF0 stays open",
+  "next_action": "SPU2 voice engine: spu.adpcm + spu.voices (KON/KOFF per 48 kHz tick, NAX/ENDX, IRQA on fetch), then spu.pitch, spu.adsr, spu.mix, spu.reverb, ADMA; SIF0 stays open",
   "owner_decisions": {
     "per.bios, per.ps1, per.dvdv": "kept NOT_APPLICABLE for the native recompilation/runtime scope (owner, 2026-10-28)",
     "merge": "not authorised"

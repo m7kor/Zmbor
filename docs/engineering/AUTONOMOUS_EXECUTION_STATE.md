@@ -10,11 +10,11 @@ committed.
   `ec4a32d`. Push with the explicit URL `https://github.com/m7kor/Zmbor.git` (`origin` in the worktrees is upstream).
 - One PR only. No merge, no force-push, no history rewrite.
 
-## Verified baseline (batch 11 gate, `0765383`, clean tree)
+## Verified baseline (batch 12 gate, `34d48e0`, clean tree)
 
 ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 crashes, timeouts or regressions;
-`ps2x_tests` 598/598 (batch 10: 596/596 under ASan, 0 reports); ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs
-(separate measurement): 23/23 exact, 1306/1306 lines. Hardware inventory (174): 18 / 52 / 63 / 20 / 17 / 3 / 1.
+`ps2x_tests` 598/598 (batch 10: 596/596 under ASan, 0 reports; batch 12: IOP import and emulator suites clean under ASan); ctest 54/54; e2e 4/4; IOP 4/4. ps2autotests IOP programs
+(separate measurement): 23/23 exact, 1306/1306 lines. Hardware inventory (174): 18 / 52 / 66 / 20 / 14 / 3 / 1.
 
 ## Batches
 
@@ -22,6 +22,7 @@ ps2autotests 53/55 programs and 8202/8250 lines (`.expected` unmodified), 0 cras
 |---|---|---|---|
 | 1 | `5fab12b`..`0e47a2b` | `gs.dither`, `dma.mfifo`: MISSING → IMPLEMENTED_UNVERIFIED | 4/4 GS and 8/8 DMA mutants killed; 30,977 ASan fuzz runs |
 | 2 | `78b17e6`..`c64f357` | `dma.stall`: MISSING → IMPLEMENTED_UNVERIFIED | 5 unit tests, 10/10 mutants killed, 26,801 ASan fuzz runs; contracts for all 174 components with a checked dependency DAG |
+| 12 | `944a3e5`..`adaecc7` | `spu.cores`, `spu.ram`, `spu.irq` MISSING → IMPLEMENTED_UNVERIFIED | SPU2 register file, 2 MB sound RAM, data port, IRQA, IOP DMA 4/7 (D-SPU-1); 14/14 non-equivalent mutants; IOP corpus 23/23 |
 | 11 | `0765383`..`0e345dc` | `gs.aa` MISSING → IMPLEMENTED_UNVERIFIED | GS PRIM.AA1 for lines and triangles (D-GS-1); 11/11 mutants |
 | 10 | `a915237`..`d82a40a` | `ipu.cmd` MISSING → IMPLEMENTED_UNVERIFIED | IPU BDEC (D-IPU-3) and IDEC (D-IPU-4); bit-exact on 6 ffmpeg MPEG-1/2 fixtures; pause/resume, truncation, RST, 576 corrupted slices; 30/30 non-equivalent mutants; semantics ledger `PS2_IPU_SEMANTICS.md` |
 | 9 | `b2f7ce1`..`6f93475` | none (`ipu.cmd` stays MISSING) | IPU VDEC (MPEG-2 VLC tables); 4/4 mutants |
@@ -58,7 +59,11 @@ probes.
 
 ## Next action
 
-SPU2 in dependency order: a register model for both cores and the 2 MB sound RAM (`spu.cores`, `spu.ram`), with
-16-bit register access, the TSA data port, IRQA and the IOP DMA channels 4 and 7. Then voices, ADSR, pitch, mixer,
-reverb and interrupts. No ps2autotests program exercises the SPU2, so it can reach IMPLEMENTED_UNVERIFIED at most.
+SPU2 voice engine in dependency order:
+1. `spu.adpcm` VAG block decoding on sound RAM, then `spu.voices`: KON/KOFF consumed per 48 kHz tick, NAX/ENDX/loop
+   flags, and IRQA on voice fetches.
+2. `spu.pitch` (pitch counter, 4-point interpolation) and `spu.adsr` (envelope).
+3. `spu.mix` (VMIX dry/wet, core 0 -> core 1, volumes) and `spu.reverb`.
+4. ADMA through the MEMIN areas.
+
 SIF0 stays an open architectural task.

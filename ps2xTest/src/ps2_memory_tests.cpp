@@ -3365,10 +3365,12 @@ void register_ps2_memory_tests()
             // Y0: escape level 100 -> F = 200, odd-ified to 199. Y1: escape 0x00 then 200 -> F = 399.
             BdecRun run;
             runBdec(run, 1u << 23, kBdecIntra | (1u << 16),
-                    "100 000001 000000 01100100 10  100 000001 000000 00000000 11001000 10  100 10  100 10  00 10  00 10",
+                    "100 000001 000000 01100100 10  100 000001 000000 00000000 11001000 10  100 110 110 110 10  100 10  00 10  00 10",
                     flatMatrix(16));
             t.Equals(static_cast<int>(run.raw[3 * 16 + 1]), 157, "Y0 (3,1) with F = 199 (MPEG-2 rules give 158)");
             t.Equals(static_cast<int>(run.raw[8]), 197, "Y1 (0,0) with the two-byte level 200");
+            // Y2: three level-1 coefficients, F = 2 each, odd-ified to 1 (without oddification (8,1) would be 129).
+            t.IsTrue(run.raw[128] == 129 && run.raw[129] == 128, "Y2: oddification alone decides the rounding");
             t.Equals((run.control >> 14) & 1u, 0u, "no error");
         });
 

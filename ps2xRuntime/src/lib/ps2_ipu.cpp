@@ -23,6 +23,62 @@ namespace
     {
         return std::max(0, std::min(255, v));
     }
+
+    constexpr uint32_t kVdec = 3u;
+
+    // MPEG-2 VLC tables used by VDEC (ISO/IEC 13818-2 Annex B). Codes are written MSB first.
+    struct Vlc
+    {
+        uint16_t code;
+        uint8_t length;
+        int16_t value;
+    };
+
+    // B-1 macroblock_address_increment; stuffing decodes to 34 and escape to 35 (the IPU's convention as the
+    // references model it).
+    constexpr Vlc kMbai[] = {
+        {0b1, 1, 1}, {0b011, 3, 2}, {0b010, 3, 3}, {0b0011, 4, 4}, {0b0010, 4, 5}, {0b00011, 5, 6}, {0b00010, 5, 7},
+        {0b0000111, 7, 8}, {0b0000110, 7, 9}, {0b00001011, 8, 10}, {0b00001010, 8, 11}, {0b00001001, 8, 12},
+        {0b00001000, 8, 13}, {0b00000111, 8, 14}, {0b00000110, 8, 15}, {0b0000010111, 10, 16},
+        {0b0000010110, 10, 17}, {0b0000010101, 10, 18}, {0b0000010100, 10, 19}, {0b0000010011, 10, 20},
+        {0b0000010010, 10, 21}, {0b00000100011, 11, 22}, {0b00000100010, 11, 23}, {0b00000100001, 11, 24},
+        {0b00000100000, 11, 25}, {0b00000011111, 11, 26}, {0b00000011110, 11, 27}, {0b00000011101, 11, 28},
+        {0b00000011100, 11, 29}, {0b00000011011, 11, 30}, {0b00000011010, 11, 31}, {0b00000011001, 11, 32},
+        {0b00000011000, 11, 33}, {0b00000001111, 11, 34}, {0b00000001000, 11, 35},
+    };
+    // B-2/B-3/B-4 macroblock_type as flag bits: quant 0x10, motion forward 0x08, motion backward 0x04,
+    // pattern 0x02, intra 0x01.
+    constexpr Vlc kMbTypeI[] = {{0b1, 1, 0x01}, {0b01, 2, 0x11}};
+    constexpr Vlc kMbTypeP[] = {{0b1, 1, 0x0A}, {0b01, 2, 0x02}, {0b001, 3, 0x08}, {0b00011, 5, 0x01},
+                                {0b00010, 5, 0x1A}, {0b00001, 5, 0x12}, {0b000001, 6, 0x11}};
+    constexpr Vlc kMbTypeB[] = {{0b10, 2, 0x0C}, {0b11, 2, 0x0E}, {0b010, 3, 0x04}, {0b011, 3, 0x06},
+                                {0b0010, 4, 0x08}, {0b0011, 4, 0x0A}, {0b00011, 5, 0x01}, {0b00010, 5, 0x1E},
+                                {0b000011, 6, 0x1A}, {0b000010, 6, 0x16}, {0b000001, 6, 0x11}};
+    // B-10 motion_code: the last bit is the sign (0 positive).
+    constexpr Vlc kMotionCode[] = {
+        {0b1, 1, 0}, {0b010, 3, 1}, {0b011, 3, -1}, {0b0010, 4, 2}, {0b0011, 4, -2}, {0b00010, 5, 3},
+        {0b00011, 5, -3}, {0b0000110, 7, 4}, {0b0000111, 7, -4}, {0b00001010, 8, 5}, {0b00001011, 8, -5},
+        {0b00001000, 8, 6}, {0b00001001, 8, -6}, {0b00000110, 8, 7}, {0b00000111, 8, -7},
+        {0b0000010110, 10, 8}, {0b0000010111, 10, -8}, {0b0000010100, 10, 9}, {0b0000010101, 10, -9},
+        {0b0000010010, 10, 10}, {0b0000010011, 10, -10}, {0b00000100010, 11, 11}, {0b00000100011, 11, -11},
+        {0b00000100000, 11, 12}, {0b00000100001, 11, -12}, {0b00000011110, 11, 13}, {0b00000011111, 11, -13},
+        {0b00000011100, 11, 14}, {0b00000011101, 11, -14}, {0b00000011010, 11, 15}, {0b00000011011, 11, -15},
+        {0b00000011000, 11, 16}, {0b00000011001, 11, -16},
+    };
+    // B-11 dmvector.
+    constexpr Vlc kDmVector[] = {{0b0, 1, 0}, {0b10, 2, 1}, {0b11, 2, -1}};
+
+    struct VlcTable
+    {
+        const Vlc *codes;
+        size_t count;
+    };
+
+    template <size_t N>
+    constexpr VlcTable table(const Vlc (&codes)[N])
+    {
+        return {codes, N};
+    }
     constexpr uint32_t kSetth = 9u;
     // IPU_CTRL fields the EE writes: IDP 16-17, AS 20, IVF 21, QST 22, MP1 23, PCT 24-26.
     constexpr uint32_t kControlWritable = 0x07F30000u;
@@ -273,6 +329,7 @@ bool PS2Ipu::writeCommand(uint32_t value)
         finish();
         return true;
     case kFdec: // skip option bits 0-5, then the next 32 bits are the result (not consumed)
+    case kVdec: // skip option bits 0-5, then one VLC symbol of table TBL (option bits 26-27)
         m_decoding = true;
         break;
     case kSetiq: // skip option bits 0-5, then 64 bytes into the intra (bit 27 = 0) or non-intra matrix
@@ -334,6 +391,57 @@ void PS2Ipu::run()
         if (peekBits(32u, m_result))
             finish();
         return;
+    case kVdec:
+    {
+        if (!m_advanced)
+        {
+            if (!advanceBits(m_option & 0x3Fu))
+                return;
+            m_advanced = true;
+        }
+        // TBL 0 address increment, 1 macroblock type of the picture type in CTRL.PCT (1 I, 2 P, 3 B), 2 motion
+        // code, 3 dmvector.
+        VlcTable codes{nullptr, 0u};
+        const uint32_t pictureType = (m_controlFields >> 24) & 0x7u;
+        switch ((m_option >> 26) & 0x3u)
+        {
+        case 0u: codes = table(kMbai); break;
+        case 1u:
+            codes = pictureType == 1u ? table(kMbTypeI) : pictureType == 2u ? table(kMbTypeP)
+                                                         : pictureType == 3u ? table(kMbTypeB) : VlcTable{nullptr, 0u};
+            break;
+        case 2u: codes = table(kMotionCode); break;
+        default: codes = table(kDmVector); break;
+        }
+        if (codes.codes == nullptr)
+        {
+            m_errorCode = true; // no macroblock-type table for this picture type
+            finish();
+            return;
+        }
+        uint32_t maxLength = 0u;
+        for (size_t i = 0; i < codes.count; ++i)
+            maxLength = std::max<uint32_t>(maxLength, codes.codes[i].length);
+        for (uint32_t length = 1u; length <= maxLength; ++length)
+        {
+            uint32_t bits = 0u;
+            if (!peekBits(length, bits))
+                return; // wait for more data
+            for (size_t i = 0; i < codes.count; ++i)
+            {
+                if (codes.codes[i].length == length && codes.codes[i].code == bits)
+                {
+                    (void)advanceBits(length);
+                    m_result = (length << 16) | static_cast<uint16_t>(codes.codes[i].value);
+                    finish();
+                    return;
+                }
+            }
+        }
+        m_errorCode = true; // not a code of the table
+        finish();
+        return;
+    }
     case kSetiq:
         if (!m_advanced)
         {

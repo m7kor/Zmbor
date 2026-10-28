@@ -3141,6 +3141,50 @@ void register_ps2_memory_tests()
             }
         });
 
+        // VDEC: MPEG-2 VLC tables (ISO/IEC 13818-2 Annex B); result = (code length << 16) | value.
+        tc.Run("IPU VDEC decodes address increment, macroblock type, motion code and dmvector symbols", [](TestCase &t)
+        {
+            struct Case
+            {
+                uint8_t byte0, byte1;
+                uint32_t table;       // TBL, option bits 26-27
+                uint32_t picture;     // CTRL.PCT
+                uint32_t result;      // expected IPU_CMD result
+                uint32_t bitPointer;  // expected BP after the symbol
+                bool error;
+            };
+            const Case cases[] = {
+                {0b00000101, 0b11000000, 0u, 0u, (10u << 16) | 16u, 10u, false},   // B-1: 0000 0101 11 -> 16
+                {0b00000001, 0b00000000, 0u, 0u, (11u << 16) | 35u, 11u, false},   // B-1: escape 0000 0001 000 -> 35
+                {0b00010000, 0b00000000, 1u, 2u, (5u << 16) | 0x1Au, 5u, false},   // B-3 (P): 0001 0 -> quant+fwd+pattern
+                {0b01000000, 0b00000000, 1u, 1u, (2u << 16) | 0x11u, 2u, false},   // B-2 (I): 01 -> quant+intra
+                {0b00001011, 0b00000000, 2u, 0u, (8u << 16) | 0xFFFBu, 8u, false}, // B-10: 0000 1011 -> -5
+                {0b11000000, 0b00000000, 3u, 0u, (2u << 16) | 0xFFFFu, 2u, false}, // B-11: 11 -> -1
+                {0b00000000, 0b00000000, 0u, 0u, 0u, 0u, true},                    // no B-1 code is all zeros
+                {0b10000000, 0b00000000, 1u, 0u, 0u, 0u, true},                    // TBL 1 needs PCT 1-3
+            };
+            for (const Case &c : cases)
+            {
+                PS2Memory mem;
+                t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+                mem.writeIORegister(0x10002010u, c.picture << 24);
+                mem.writeIORegister(0x10002000u, (3u << 28) | (c.table << 26)); // VDEC, no skip
+                // Without a valid picture type there is no macroblock-type table: the error needs no data.
+                const bool noTable = c.table == 1u && (c.picture < 1u || c.picture > 3u);
+                t.IsTrue(mem.ipu().busy() != noTable, "VDEC waits for data (or fails at once without a table)");
+                uint8_t q[16] = {c.byte0, c.byte1};
+                mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(q)));
+                t.IsTrue(!mem.ipu().busy(), "VDEC completes once the symbol is in the FIFO");
+                const bool ecd = (mem.readIORegister(0x10002010u) & (1u << 14)) != 0u;
+                t.Equals(ecd, c.error, "CTRL.ECD flags an invalid symbol");
+                if (!c.error)
+                {
+                    t.Equals(mem.readIORegister(0x10002000u), c.result, "VDEC result = length << 16 | value");
+                    t.Equals(mem.readIORegister(0x10002020u) & 0x7Fu, c.bitPointer, "the symbol's bits are consumed");
+                }
+            }
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

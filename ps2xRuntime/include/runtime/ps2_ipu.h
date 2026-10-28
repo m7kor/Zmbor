@@ -12,9 +12,12 @@
 // The input FIFO holds 8 qwords fed by toIPU (DMA channel 4) or the IPU_in_FIFO window; the bitstream is the bytes in
 // memory order, each read MSB first (MPEG bit order).
 //
-// Implemented commands: BCLR (0), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), PACK (8), SETTH (9). IDEC (1), BDEC (2)
-// and VDEC (3) are not implemented: such a command is reported through unimplementedCommand() and completes without
+// Implemented commands: BCLR (0), VDEC (3), FDEC (4), SETIQ (5), SETVQ (6), CSC (7), PACK (8), SETTH (9). IDEC (1)
+// and BDEC (2) are not implemented: such a command is reported through unimplementedCommand() and completes without
 // output, so a caller can see that no decoding happened.
+//
+// VDEC decodes one MPEG-2 VLC symbol (ISO/IEC 13818-2 tables B-1, B-2..B-4 by CTRL.PCT, B-10, B-11) and returns
+// (code length << 16) | value (16-bit two's complement); a code not in the table sets CTRL.ECD.
 //
 // CSC converts YCbCr 4:2:0 macroblocks (Y 16x16, then Cb 8x8, Cr 8x8: 384 bytes) to RGB32 (64 qwords) or RGB16
 // (32 qwords, optional 4x4 dither) with the integer BT.601 method PCSX2 documents as the hardware's (decision D-IPU-1;

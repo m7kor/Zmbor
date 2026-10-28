@@ -3059,6 +3059,33 @@ void register_ps2_memory_tests()
             }
         });
 
+        tc.Run("IPU CSC rounds the half-scale result and maps each 2x2 pixel group to its chroma sample", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            uint8_t *rdram = mem.getRDRAM();
+            constexpr uint32_t kIn = 0x00460000u, kOut = 0x00470000u;
+            std::memset(rdram + kIn, 20, 256);        // Y = 20: lum = (0x95 * 4) >> 6 = 9 (odd)
+            std::memset(rdram + kIn + 256, 128, 64);  // Cb neutral
+            std::memset(rdram + kIn + 320, 128, 64);  // Cr neutral ...
+            for (uint32_t row = 0; row < 8u; ++row)
+                rdram[kIn + 320 + row * 8 + 7] = 255; // ... except chroma column 7 (pixels x = 14, 15)
+            mem.writeIORegister(0x10002000u, (7u << 28) | 1u);
+            mem.writeIORegister(0x1000B010u, kOut);
+            mem.writeIORegister(0x1000B020u, 64u);
+            mem.writeIORegister(0x1000B000u, 0x100u);
+            mem.writeIORegister(0x1000B410u, kIn);
+            mem.writeIORegister(0x1000B420u, 24u);
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            uint32_t p0 = 0u, p13 = 0u, p15 = 0u;
+            std::memcpy(&p0, rdram + kOut, 4u);
+            std::memcpy(&p13, rdram + kOut + 13u * 4u, 4u);
+            std::memcpy(&p15, rdram + kOut + 15u * 4u, 4u);
+            t.Equals(p0, 0x80050505u, "(9 + 1) >> 1 = 5 in every channel: the +1 rounds the half-scale sum");
+            t.Equals(p13, 0x80050505u, "pixel x = 13 uses chroma column 6");
+            t.Equals(p15, 0x800500CFu, "pixel x = 15 uses chroma column 7: R (9 + 404 + 1) >> 1 = 207, G clamps to 0, B 5");
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

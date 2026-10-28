@@ -3,6 +3,7 @@
 #include "emulator/core/iop_memory.h"
 #include "emulator/imports/iop_cdvd.h"
 #include "emulator/imports/iop_imports.h"
+#include "emulator/imports/iop_intrman.h"
 #include "emulator/imports/iop_loadcore.h"
 #include "emulator/imports/iop_stdio.h"
 #include "emulator/imports/iop_sysclib.h"
@@ -10,8 +11,14 @@
 #include "emulator/services/iop_rpc.h"
 #include "ps2x/iop/iop_host.h"
 
+#include "emulator/iop_emulator_const.h"
+
 #include <cstdint>
 #include <chrono>
+#include <initializer_list>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 #include <cstring>
 #include <iostream>
 #include <fstream>
@@ -191,7 +198,7 @@ namespace
         clear.gpr[4] = static_cast<uint32_t>(eventId);
         clear.gpr[5] = ~0x29u;
         if (!expect(kernel.dispatchEventImport(8u, clear), "ClearEventFlag was not handled") ||
-            !pollEvent(kernel, eventId, 0x29u, eventResult, -418))
+            !pollEvent(kernel, eventId, 0x29u, eventResult, -421)) // KE_EVF_COND (real PS2: kernel/iop/eventflag/poll)
             return false;
 
         cpu = {};
@@ -465,9 +472,354 @@ namespace
     }
 }
 
+namespace
+{
+    // Kernel-level checks of the IOP kernel against what a real PS2 printed for the ps2autotests kernel/iop programs
+    // (values transcribed from their .expected files; the third-party programs are not needed here).
+    struct KernelRig
+    {
+        IopMemory memory;
+        IopKernel kernel{memory};
+        IopThread *running = nullptr;
+        KernelRig() { kernel.reset(); }
+
+        int32_t call(bool (IopKernel::*dispatch)(uint16_t, IopCpuState &), uint16_t ordinal, IopCpuState &cpu,
+                     std::initializer_list<uint32_t> args)
+        {
+            uint32_t reg = 4u;
+            for (uint32_t a : args)
+                cpu.gpr[reg++] = a;
+            if (!(kernel.*dispatch)(ordinal, cpu))
+                return 0x7FFFFFFF;
+            return static_cast<int32_t>(cpu.gpr[2]);
+        }
+        int32_t thread(uint16_t ordinal, IopCpuState &cpu, std::initializer_list<uint32_t> args)
+        {
+            uint32_t reg = 4u;
+            for (uint32_t a : args)
+                cpu.gpr[reg++] = a;
+            return kernel.dispatchThreadImport(ordinal, cpu, 0u) ? static_cast<int32_t>(cpu.gpr[2]) : 0x7FFFFFFF;
+        }
+        int32_t createThread(uint32_t attr, uint32_t entry, uint32_t stack, uint32_t priority, IopCpuState &cpu)
+        {
+            constexpr uint32_t kParam = 0x30000u;
+            memory.write32(kParam + 0u, attr);
+            memory.write32(kParam + 4u, 0u);
+            memory.write32(kParam + 8u, entry);
+            memory.write32(kParam + 12u, stack);
+            memory.write32(kParam + 16u, priority);
+            return thread(4u, cpu, {kParam});
+        }
+        // Makes `id` the running thread, as the scheduler would.
+        IopThread &run(int id)
+        {
+            IopThread *next = kernel.beginNextReady(0u);
+            if (next == nullptr || next->id != id)
+                throw std::runtime_error("the scheduler did not pick the expected thread");
+            return *(running = next);
+        }
+    };
+
+    bool testKernelThreadChecksMatchRealPs2()
+    {
+        KernelRig rig;
+        IopCpuState host{};
+        constexpr uint32_t kEntry = 0x40000u;
+        // kernel/iop/thread/create
+        if (!expect(rig.createThread(0xFFFFFFFFu, kEntry, 0x800u, 10u, host) == -401, "attr ~0 must be KE_ILLEGAL_ATTR") ||
+            !expect(rig.createThread(0x00100000u, kEntry, 0x800u, 10u, host) == -401, "TH_NO_FILLSTACK is refused on a real PS2") ||
+            !expect(rig.createThread(0x00200000u, kEntry, 0x800u, 10u, host) == -401, "TH_CLEAR_STACK is refused on a real PS2") ||
+            !expect(rig.createThread(0x02000000u, 3u, 0x800u, 10u, host) == -402, "entry 3 must be KE_ILLEGAL_ENTRY") ||
+            !expect(rig.createThread(0x02000000u, kEntry, 0x800u, 0u, host) == -403, "priority 0 must be KE_ILLEGAL_PRIORITY") ||
+            !expect(rig.createThread(0x02000000u, kEntry, 0x800u, 127u, host) == -403, "priority 127 must be KE_ILLEGAL_PRIORITY") ||
+            !expect(rig.createThread(0x02000000u, kEntry, 300u, 10u, host) == -404, "stack 300 must be KE_ILLEGAL_SIZE") ||
+            !expect(rig.createThread(0x02000000u, kEntry, 0xFFFFFFFFu, 10u, host) == -400, "stack ~0 must be KE_NO_MEMORY") ||
+            !expect(rig.createThread(0x00000000u, 0u, 0x800u, 10u, host) > 0, "a NULL entry is accepted"))
+            return false;
+        const int32_t low = rig.createThread(0x03000008u, kEntry, 0x800u, 9u, host);
+        constexpr uint32_t kInfo = 0x31000u;
+        if (!expect(low > 0, "TH_UMODE | TH_ASM | TH_C is accepted") ||
+            !expect(rig.thread(22u, host, {static_cast<uint32_t>(low), kInfo}) == 0, "ReferThreadStatus of a dormant thread") ||
+            !expect(rig.memory.read32(kInfo + 8u) == 0x10u && rig.memory.read32(kInfo + 28u) == 9u && rig.memory.read32(kInfo + 32u) == 0u,
+                    "a never-started thread is DORMANT with current priority 0") ||
+            !expect(rig.thread(22u, host, {0x7777u, kInfo}) == -407, "stat with invalid thread id must be KE_UNKNOWN_THID") ||
+            !expect(rig.thread(5u, host, {0x7777u}) == -407, "delete with invalid tid must be KE_UNKNOWN_THID") ||
+            !expect(rig.thread(18u, host, {static_cast<uint32_t>(low)}) == -416, "release-wait of a dormant thread must be KE_NOT_WAIT"))
+            return false;
+
+        // A running thread of priority 8 starts the priority-9 one: no preemption, and the new one is READY.
+        const int32_t main = rig.createThread(0x02000000u, kEntry, 0x800u, 8u, host);
+        if (!expect(rig.thread(6u, host, {static_cast<uint32_t>(main), 0u}) == 0, "StartThread"))
+            return false;
+        IopThread &self = rig.run(main);
+        IopCpuState &cpu = self.cpu;
+        if (!expect(rig.thread(6u, cpu, {static_cast<uint32_t>(low), 0u}) == 0 && !cpu.yielded, "a lower-priority start does not preempt") ||
+            !expect(rig.thread(22u, cpu, {0u, kInfo}) == 0 && rig.memory.read32(kInfo + 8u) == 0x01u && rig.memory.read32(kInfo + 32u) == 8u,
+                    "TH_SELF reads the RUNNING caller at priority 8") ||
+            !expect(rig.thread(22u, cpu, {static_cast<uint32_t>(low), kInfo}) == 0 && rig.memory.read32(kInfo + 8u) == 0x02u &&
+                        rig.memory.read32(kInfo + 32u) == 9u,
+                    "a started thread is READY at its initial priority") ||
+            !expect(rig.thread(5u, cpu, {0u}) == -406, "delete with TH_SELF must be KE_ILLEGAL_THID") ||
+            !expect(rig.thread(5u, cpu, {static_cast<uint32_t>(main)}) == -414, "delete of the running thread must be KE_NOT_DORMANT") ||
+            !expect(rig.thread(5u, cpu, {static_cast<uint32_t>(low)}) == -414, "delete after start must be KE_NOT_DORMANT") ||
+            !expect(rig.thread(18u, cpu, {0u}) == -406 && rig.thread(18u, cpu, {static_cast<uint32_t>(main)}) == -406,
+                    "release-wait of self must be KE_ILLEGAL_THID") ||
+            !expect(rig.thread(18u, cpu, {static_cast<uint32_t>(low)}) == -416, "release-wait of a ready thread must be KE_NOT_WAIT"))
+            return false;
+        // CancelWakeupThread(TH_SELF) after four wakeup requests returns 4, then 0.
+        self.wakeupCount = 4;
+        if (!expect(rig.thread(27u, cpu, {0u}) == 4 && rig.thread(27u, cpu, {0u}) == 0, "CancelWakeupThread(TH_SELF) returns the count, then 0") ||
+            !expect(rig.thread(27u, cpu, {0x7777u}) == -407, "cancel wakeup of an invalid id must be KE_UNKNOWN_THID"))
+            return false;
+        // A higher-priority thread started by the running one preempts it.
+        const int32_t high = rig.createThread(0x02000000u, kEntry, 0x800u, 7u, host);
+        cpu.yielded = false;
+        return expect(rig.thread(6u, cpu, {static_cast<uint32_t>(high), 0u}) == 0 && cpu.yielded,
+                      "starting a higher-priority thread preempts the caller") &&
+               expect(rig.thread(10u, cpu, {static_cast<uint32_t>(low)}) == 0 && rig.thread(10u, cpu, {static_cast<uint32_t>(low)}) == -413,
+                      "TerminateThread twice: 0, then KE_DORMANT") &&
+               expect(rig.thread(5u, cpu, {static_cast<uint32_t>(low)}) == 0 && rig.thread(5u, cpu, {static_cast<uint32_t>(low)}) == -407,
+                      "delete after terminate succeeds, delete after delete is KE_UNKNOWN_THID");
+    }
+
+    bool testKernelWaitsAndEventFlagsMatchRealPs2()
+    {
+        KernelRig rig;
+        IopCpuState host{};
+        constexpr uint32_t kParam = 0x32000u, kResult = 0x32100u;
+        rig.memory.write32(kParam + 0u, 0u);
+        rig.memory.write32(kParam + 4u, 0u);
+        rig.memory.write32(kParam + 8u, 0xFu);
+        const int32_t flag = rig.call(&IopKernel::dispatchEventImport, 4u, host, {kParam});
+        rig.memory.write32(kResult, 0xCCCCu);
+        // kernel/iop/eventflag/poll
+        if (!expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {static_cast<uint32_t>(flag), 0xF0u, 1u, kResult}) == -421 &&
+                        rig.memory.read32(kResult) == 0xCCCCu,
+                    "an unmatched poll is KE_EVF_COND and leaves the result untouched") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {static_cast<uint32_t>(flag), 0u, 1u, kResult}) == -423,
+                    "a zero pattern is KE_EVF_ILPAT") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {0x7777u, 1u, 1u, kResult}) == -409,
+                    "an invalid id is KE_UNKNOWN_EVFID") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {static_cast<uint32_t>(flag), 0x3u, 0x11u, kResult}) == 0 &&
+                        rig.memory.read32(kResult) == 0xFu,
+                    "OR | CLEAR returns the bits before clearing") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {static_cast<uint32_t>(flag), 0x3u, 1u, 0u}) == -421,
+                    "the second poll after CLEAR fails"))
+            return false;
+
+        // A thread waiting on the flag: a single-waiter flag refuses a second waiter, deletion releases the waiter.
+        IopCpuState scratch{};
+        const int32_t waiter = rig.createThread(0x02000000u, 0x40000u, 0x800u, 7u, scratch);
+        (void)rig.thread(6u, scratch, {static_cast<uint32_t>(waiter), 0u});
+        IopThread &thread = rig.run(waiter);
+        if (!expect(rig.call(&IopKernel::dispatchEventImport, 10u, thread.cpu, {static_cast<uint32_t>(flag), ~0u, 0x11u, 0u}) == 0 &&
+                        thread.cpu.yielded,
+                    "WaitEventFlag blocks the calling thread"))
+            return false;
+        rig.kernel.endTimeslice(thread, kThreadReturnSentinel);
+        constexpr uint32_t kInfo = 0x32200u;
+        if (!expect(rig.thread(22u, host, {static_cast<uint32_t>(waiter), kInfo}) == 0 && rig.memory.read32(kInfo + 8u) == 0x04u &&
+                        rig.memory.read32(kInfo + 36u) == 4u,
+                    "a thread waiting on an event flag is WAIT with wait type 4") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 11u, host, {static_cast<uint32_t>(flag), 1u, 1u, kResult}) == -422,
+                    "a busy single-waiter flag is KE_EVF_MULTI") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 5u, host, {static_cast<uint32_t>(flag)}) == 0, "delete while a thread waits") ||
+            !expect(static_cast<int32_t>(thread.cpu.gpr[2]) == -425 && thread.state == IopThreadState::Ready,
+                    "the waiter returns KE_WAIT_DELETE") ||
+            !expect(rig.call(&IopKernel::dispatchEventImport, 5u, host, {static_cast<uint32_t>(flag)}) == -409,
+                    "deleting a deleted flag is KE_UNKNOWN_EVFID"))
+            return false;
+
+        // kernel/iop/thread/releasewait: a released sleeper returns KE_RELEASE_WAIT.
+        IopThread &again = rig.run(waiter);
+        (void)rig.thread(24u, again.cpu, {});
+        rig.kernel.endTimeslice(again, kThreadReturnSentinel);
+        return expect(rig.thread(18u, host, {static_cast<uint32_t>(waiter)}) == 0, "ReleaseWaitThread of a sleeper") &&
+               expect(static_cast<int32_t>(again.cpu.gpr[2]) == -418, "the sleeper returns KE_RELEASE_WAIT");
+    }
+
+    bool testMessageBoxOrderAndLinkingMatchRealPs2()
+    {
+        KernelRig rig;
+        IopCpuState host{};
+        constexpr uint32_t kParam = 0x33000u, kMsg = 0x33100u, kVar = 0x33200u, kInfo = 0x33300u;
+        const auto createBox = [&](uint32_t attr)
+        {
+            rig.memory.write32(kParam + 0u, attr);
+            rig.memory.write32(kParam + 4u, 0u);
+            return rig.call(&IopKernel::dispatchMessageBoxImport, 4u, host, {kParam});
+        };
+        const auto message = [&](uint32_t i, uint8_t priority)
+        {
+            const uint32_t m = kMsg + i * 16u;
+            rig.memory.write32(m, 0u);
+            rig.memory.write8(m + 4u, priority);
+            return m;
+        };
+        // kernel/iop/messagebox/poll and send
+        const int32_t fifo = createBox(0u);
+        const uint32_t m0 = message(0u, 3u);
+        if (!expect(rig.call(&IopKernel::dispatchMessageBoxImport, 9u, host, {kVar, static_cast<uint32_t>(fifo)}) == -424,
+                    "polling an empty box is KE_MBOX_NOMSG") ||
+            !expect(rig.call(&IopKernel::dispatchMessageBoxImport, 9u, host, {kVar, 0x7777u}) == -410, "an invalid box is KE_UNKNOWN_MBXID") ||
+            !expect(rig.call(&IopKernel::dispatchMessageBoxImport, 6u, host, {static_cast<uint32_t>(fifo), m0}) == 0 &&
+                        rig.memory.read32(m0) == m0,
+                    "a single message points at itself"))
+            return false;
+        const int32_t prio = createBox(4u);
+        const uint32_t m1 = message(1u, 3u), m2 = message(2u, 2u), m3 = message(3u, 1u);
+        for (uint32_t m : {m1, m2, m3})
+            (void)rig.call(&IopKernel::dispatchMessageBoxImport, 6u, host, {static_cast<uint32_t>(prio), m});
+        (void)rig.call(&IopKernel::dispatchMessageBoxImport, 11u, host, {static_cast<uint32_t>(prio), kInfo});
+        if (!expect(rig.memory.read32(kInfo + 12u) == 3u && rig.memory.read32(kInfo + 16u) == m3 &&
+                        rig.memory.read32(m3) == m2 && rig.memory.read32(m2) == m1,
+                    "MBA_MSPRI keeps messages in ascending priority (3 -> 2 -> 1 sent, 1, 2, 3 queued)") ||
+            !expect(rig.call(&IopKernel::dispatchMessageBoxImport, 9u, host, {kVar, static_cast<uint32_t>(prio)}) == 0 &&
+                        rig.memory.read32(kVar) == m3,
+                    "polling takes the first message"))
+            return false;
+
+        // kernel/iop/messagebox/receive: three waiters of priority 7, 6, 5 on a priority-ordered box receive in
+        // priority order; with FIFO order they receive in arrival order.
+        for (const bool byPriority : {false, true})
+        {
+            KernelRig r;
+            IopCpuState h{};
+            r.memory.write32(kParam + 0u, byPriority ? 1u : 0u);
+            r.memory.write32(kParam + 4u, 0u);
+            const int32_t box = r.call(&IopKernel::dispatchMessageBoxImport, 4u, h, {kParam});
+            std::vector<int32_t> ids;
+            for (uint32_t i = 0; i < 3u; ++i)
+            {
+                const int32_t id = r.createThread(0x02000000u, 0x40000u, 0x800u, 7u - i, h);
+                (void)r.thread(6u, h, {static_cast<uint32_t>(id), 0u});
+                IopThread &t = r.run(id);
+                (void)r.call(&IopKernel::dispatchMessageBoxImport, 8u, t.cpu, {kVar + i * 4u, static_cast<uint32_t>(box)});
+                r.kernel.endTimeslice(t, kThreadReturnSentinel);
+                ids.push_back(id);
+            }
+            for (uint32_t i = 0; i < 3u; ++i)
+                (void)r.call(&IopKernel::dispatchMessageBoxImport, 6u, h, {static_cast<uint32_t>(box), kMsg + i * 16u});
+            const bool fifoOrder = r.memory.read32(kVar) == kMsg && r.memory.read32(kVar + 8u) == kMsg + 32u;
+            const bool prioOrder = r.memory.read32(kVar + 8u) == kMsg && r.memory.read32(kVar) == kMsg + 32u;
+            if (!expect(byPriority ? prioOrder : fifoOrder, byPriority ? "MBA_THPRI wakes the highest-priority waiter first"
+                                                                       : "MBA_THFIFO wakes waiters in arrival order"))
+                return false;
+        }
+        return true;
+    }
+
+    bool testVariablePoolSizesMatchRealPs2()
+    {
+        KernelRig rig;
+        IopCpuState host{};
+        constexpr uint32_t kParam = 0x34000u, kInfo = 0x34100u;
+        const auto create = [&](uint32_t attr, uint32_t size)
+        {
+            rig.memory.write32(kParam + 0u, attr);
+            rig.memory.write32(kParam + 4u, 0x1234u);
+            rig.memory.write32(kParam + 8u, size);
+            return rig.call(&IopKernel::dispatchVariablePoolImport, 4u, host, {kParam});
+        };
+        const auto sizes = [&](int32_t id)
+        {
+            (void)rig.call(&IopKernel::dispatchVariablePoolImport, 11u, host, {static_cast<uint32_t>(id), kInfo});
+            return std::pair<int32_t, int32_t>(static_cast<int32_t>(rig.memory.read32(kInfo + 8u)), static_cast<int32_t>(rig.memory.read32(kInfo + 12u)));
+        };
+        // kernel/iop/vpool/create
+        if (!expect(create(2u, 0x2000u) == -401 && create(~0u, 0x2000u) == -401 && create(~0u, static_cast<uint32_t>(-0x2000)) == -401,
+                    "bad attributes are KE_ILLEGAL_ATTR, checked before the size"))
+            return false;
+        const int32_t valid = create(0x200u, 0x2000u);
+        const int32_t huge = create(0x200u, 0x20000000u);
+        if (!expect(sizes(valid) == std::pair<int32_t, int32_t>(8152, 8152), "a 0x2000 pool has 8152 bytes") ||
+            !expect(sizes(huge) == std::pair<int32_t, int32_t>(-4, -4), "a pool without a heap reports -4"))
+            return false;
+        // kernel/iop/vpool/pallocate
+        const int32_t pool = create(0u, 0x1000u);
+        const auto alloc = [&](uint32_t size) { return rig.call(&IopKernel::dispatchVariablePoolImport, 7u, host, {static_cast<uint32_t>(pool), size}); };
+        const auto freeBlock = [&](int32_t address) { (void)rig.call(&IopKernel::dispatchVariablePoolImport, 9u, host, {static_cast<uint32_t>(pool), static_cast<uint32_t>(address)}); };
+        struct Row { uint32_t size; int32_t free; };
+        for (const Row row : {Row{128u, 3920}, Row{129u, 3912}, Row{136u, 3912}, Row{137u, 3904}, Row{2048u, 2000},
+                              Row{static_cast<uint32_t>(-1), 4048}, Row{static_cast<uint32_t>(-5), 4048}})
+        {
+            const int32_t block = alloc(row.size);
+            if (!expect(block > 0 && sizes(pool).second == row.free, "pAllocateVpl block cost differs from the real PS2"))
+                return false;
+            freeBlock(block);
+        }
+        return expect(alloc(0x1000u) == -427 && alloc(0x8000u) == -427, "a size above the pool size is KE_ILLEGAL_MEMSIZE") &&
+               expect(alloc(static_cast<uint32_t>(-8)) == -400 && alloc(static_cast<uint32_t>(-128)) == -400, "-8 and -128 wrap to huge sizes: KE_NO_MEMORY") &&
+               expect(rig.call(&IopKernel::dispatchVariablePoolImport, 7u, host, {~0u, 0x100u}) == -411, "an invalid pool is KE_UNKNOWN_VPLID") &&
+               expect(sizes(pool).second == 4056, "freed blocks coalesce back");
+    }
+
+    // intrman RegisterIntrHandler/ReleaseIntrHandler results a real PS2 printed (kernel/iop/interrupt).
+    bool testIntrHandlerRegistrationMatchesRealPs2()
+    {
+        struct NoExecutor final : IopGuestExecutor
+        {
+            uint32_t executeGuestFunction(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) override { return 0u; }
+            uint32_t executeGuestFunctionWithBudget(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) override { return 0u; }
+        } executor;
+        IopMemory memory;
+        IopIntrman intrman(memory);
+        intrman.reset();
+        const auto call = [&](uint16_t ordinal, uint32_t irq, uint32_t mode, uint32_t handler)
+        {
+            IopCpuState cpu{};
+            cpu.gpr[4] = irq;
+            cpu.gpr[5] = mode;
+            cpu.gpr[6] = handler;
+            (void)intrman.dispatchImport(ordinal, cpu, executor);
+            return static_cast<int32_t>(cpu.gpr[2]);
+        };
+        constexpr uint32_t kHandler = 0x40000u;
+        return expect(call(4u, 0u, 0u, kHandler) == 0 && call(4u, 0u, 0u, kHandler) == -104, "a second handler is KE_FOUND_HANDLER") &&
+               expect(call(5u, 0u, 0u, 0u) == 0 && call(5u, 0u, 0u, 0u) == -105, "release after release is KE_NOTFOUND_HANDLER") &&
+               expect(call(4u, 0u, 0u, 0u) == 0 && call(4u, 0u, 0u, 0u) == 0, "a NULL handler leaves the line free") &&
+               expect(call(5u, 0u, 0u, 0u) == -105, "releasing a NULL handler is KE_NOTFOUND_HANDLER") &&
+               expect(call(4u, 0u, 0u, kHandler) == 0 && call(4u, 0u, 0u, 0u) == -104, "NULL after a handler is KE_FOUND_HANDLER") &&
+               expect(call(4u, ~0u, 0u, kHandler) == -101 && call(5u, ~0u, 0u, 0u) == -101, "an invalid line is KE_ILLEGAL_INTRCODE") &&
+               expect(call(5u, 0u, 0u, 0u) == 0 && call(4u, 0u, 0x80000000u, kHandler) == 0, "any mode value is accepted");
+    }
+
+    bool testStrtokMatchesRealPs2()
+    {
+        IopMemory memory;
+        IopSysclib sysclib(memory);
+        constexpr uint32_t kText = 0x35000u, kDelim = 0x35100u;
+        putString(memory, kText, "val1, val2,   val3,val4");
+        putString(memory, kDelim, ", ");
+        std::vector<std::string> tokens;
+        for (uint32_t s = kText;; s = 0u)
+        {
+            IopCpuState cpu{};
+            cpu.gpr[4] = s;
+            cpu.gpr[5] = kDelim;
+            (void)sysclib.dispatchImport(35u, cpu);
+            if (cpu.gpr[2] == 0u)
+                break;
+            tokens.push_back(memory.readString(cpu.gpr[2], 64u));
+        }
+        putString(memory, kText, "val1,val2,val3,val4");
+        IopCpuState whole{};
+        whole.gpr[4] = kText;
+        whole.gpr[5] = 0u;
+        (void)sysclib.dispatchImport(35u, whole);
+        IopCpuState after{};
+        (void)sysclib.dispatchImport(35u, after);
+        return expect(tokens == std::vector<std::string>{"val1", "val2", "val3", "val4"}, "strtok tokens differ from the real PS2") &&
+               expect(whole.gpr[2] == kText && memory.readString(kText, 64u) == "val1,val2,val3,val4", "a NULL delimiter set returns the whole string") &&
+               expect(after.gpr[2] == 0u, "strtok(NULL, NULL) after the whole string returns NULL");
+    }
+}
+
 int main()
 {
-    if (!testJalrReadsTargetBeforeLink())
+    if (!testJalrReadsTargetBeforeLink() || !testKernelThreadChecksMatchRealPs2() || !testKernelWaitsAndEventFlagsMatchRealPs2() ||
+        !testMessageBoxOrderAndLinkingMatchRealPs2() || !testVariablePoolSizesMatchRealPs2() || !testStrtokMatchesRealPs2() ||
+        !testIntrHandlerRegistrationMatchesRealPs2())
         return 1;
     if (!testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdvdSearchFile() ||
         !testTimrmanPeriodicCallback() || !testSprintfMatchesRealPs2Rows() || !testPrintfStackArgumentsAndVaList())

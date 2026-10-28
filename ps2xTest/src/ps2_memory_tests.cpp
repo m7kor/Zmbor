@@ -2944,6 +2944,70 @@ void register_ps2_memory_tests()
             t.IsTrue(!one.empty() && one[0].data.size() == 16u, "the word count is masked to whole qwords");
         });
 
+        // IPU: register file, input FIFO and the non-decoding commands. Expected values from the register layout
+        // (ps2tek) and the MPEG bit order (bytes in memory order, MSB first); no hardware program checks the IPU.
+        tc.Run("IPU FDEC returns the next 32 bits after its skip without consuming them; BCLR sets BP", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            const uint8_t bytes[16] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0, 0, 0, 0, 0, 0, 0, 0};
+            mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(bytes)));
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 1u, "CTRL.IFC counts the input qword");
+            mem.writeIORegister(0x10002000u, (4u << 28) | 4u); // FDEC, skip 4 bits
+            t.Equals(mem.readIORegister(0x10002000u), 0x23456789u, "FDEC result: 32 bits after the first 4, MSB first");
+            t.IsTrue((mem.readIORegister(0x10002004u) & 0x80000000u) == 0u && (mem.readIORegister(0x10002010u) & 0x80000000u) == 0u,
+                     "FDEC completes (CMD bit 63 and CTRL.BUSY clear)");
+            t.Equals(mem.readIORegister(0x10002020u) & 0x7Fu, 4u, "FDEC consumed only its skip (BP = 4)");
+            t.Equals(mem.readIORegister(0x10002030u), 0x23456789u, "TOP shows the same 32 bits");
+            t.IsTrue(mem.takePendingIpuInterrupt(), "a completed command raises the IPU interrupt");
+
+            mem.writeIORegister(0x10002000u, (0u << 28) | 112u); // BCLR, BP = 112
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 0u, "BCLR empties the input FIFO");
+            mem.write128(0x10007010u, _mm_loadu_si128(reinterpret_cast<const __m128i *>(bytes)));
+            t.Equals(mem.readIORegister(0x10002020u), 112u | (1u << 16), "BP 112 in a partly consumed qword: FP = 1, IFC = 0");
+            // 16 bits left (bytes 14-15 = 0): TOP left-aligns them and sets bit 63 for "fewer than 32 bits".
+            t.IsTrue((mem.readIORegister(0x10002034u) & 0x80000000u) != 0u, "TOP bit 63 flags fewer than 32 bits");
+        });
+
+        tc.Run("IPU SETIQ loads a quantizer matrix through toIPU DMA, which completes with CIS4", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            constexpr uint32_t kSrc = 0x00420000u;
+            uint8_t *rdram = mem.getRDRAM();
+            for (uint32_t i = 0; i < 64u; ++i)
+                rdram[kSrc + i] = static_cast<uint8_t>(i + 1u);
+            mem.writeIORegister(0x10002000u, (5u << 28) | (1u << 27)); // SETIQ, non-intra, no skip
+            t.IsTrue((mem.readIORegister(0x10002010u) & 0x80000000u) != 0u, "SETIQ waits for data (BUSY)");
+            mem.writeIORegister(0x1000B410u, kSrc);
+            mem.writeIORegister(0x1000B420u, 4u);
+            mem.writeIORegister(0x1000B400u, 0x101u); // toIPU, normal, STR
+            t.IsTrue((mem.readIORegister(0x10002010u) & 0x80000000u) == 0u, "SETIQ completes once 64 bytes arrived");
+            t.IsTrue(mem.ipu().nonIntraQuantizer(0) == 1u && mem.ipu().nonIntraQuantizer(63) == 64u && mem.ipu().intraQuantizer(0) == 0u,
+                     "bit 27 selects the non-intra matrix, filled in stream order");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u, "CIS4 is raised");
+            t.Equals(mem.readIORegister(0x1000B410u), kSrc + 64u, "toIPU MADR ends past the data");
+        });
+
+        tc.Run("IPU toIPU stays active while the input FIFO is full and completes when a command frees it", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+            mem.writeIORegister(0x1000B410u, 0x00430000u);
+            mem.writeIORegister(0x1000B420u, 10u);
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 8u, "the FIFO holds 8 qwords");
+            t.IsTrue((mem.readIORegister(0x1000B400u) & 0x100u) != 0u, "toIPU waits for FIFO space (STR set)");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) == 0u, "no CIS4 yet");
+            mem.writeIORegister(0x10002000u, 0u); // BCLR frees the FIFO
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFu, 2u, "the last 2 qwords enter");
+            t.IsTrue((mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u, "CIS4 once all data is in");
+            mem.writeIORegister(0x10002010u, 1u << 30); // CTRL.RST
+            t.Equals(mem.readIORegister(0x10002010u) & 0xFFu, 0u, "RST empties the FIFOs");
+            mem.writeIORegister(0x10002000u, (1u << 28)); // IDEC: not implemented
+            t.Equals(mem.ipu().unimplementedCommand(), 1, "an unimplemented command is reported, not decoded");
+        });
+
         tc.Run("stall control: changing D_CTRL.STD releases a waiting drain", [](TestCase &t)
         {
             MfifoRig rig(0x30u, 0u);

@@ -12,6 +12,8 @@
 #include <mutex>
 
 #include "gs/ps2_gif_arbiter.h"
+#include "runtime/ps2_ipu.h"
+#include <deque>
 #if defined(_MSC_VER)
 #include <intrin.h>
 #elif defined(USE_SSE2NEON)
@@ -521,6 +523,21 @@ public:
     bool isDrainChannelHeld(uint32_t channelBase) const;
     uint32_t m_stallHeldChannel = 0u;
     bool m_stallSisRaised = false;
+
+public:
+    // IPU (registers 0x10002000-0x10002030, IPU_in_FIFO 0x10007010, toIPU = DMA channel 4).
+    PS2Ipu &ipu() noexcept { return m_ipu; }
+    bool takePendingIpuInterrupt() noexcept { return m_pendingIpuInterrupt.exchange(false, std::memory_order_acq_rel); }
+
+private:
+    // Feeds a held toIPU transfer into the input FIFO as space frees, runs the IPU, and completes the channel when its
+    // data is in; an IPU command that finishes raises INTC line 8.
+    void serviceIpu();
+    PS2Ipu m_ipu;
+    std::atomic<bool> m_pendingIpuInterrupt{false};
+    std::deque<PS2Ipu::Qword> m_toIpuPending; // qwords of a running toIPU transfer not yet in the FIFO
+    bool m_toIpuActive = false;
+    uint32_t m_toIpuEndMadr = 0u;
 
 public:
     // SIF1 (EE DMAC channel 6, EE -> IOP). The channel's data stream reaches IOP DMA channel 10, which reads a 16-byte

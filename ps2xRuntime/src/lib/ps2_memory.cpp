@@ -361,6 +361,10 @@ bool PS2Memory::initialize(size_t ramSize)
     m_stallHeldChannel = 0u;
     m_stallSisRaised = false;
     m_sif1Stream.clear();
+    m_ipu.reset();
+    m_toIpuPending.clear();
+    m_toIpuActive = false;
+    m_pendingIpuInterrupt.store(false, std::memory_order_relaxed);
     m_codeRegions.clear();
     m_path3Masked = false;
     m_path3MaskedFifo.clear();
@@ -1125,6 +1129,14 @@ void PS2Memory::write128(uint32_t address, __m128i value)
         processVIF0Data(fifoData, sizeof(fifoData));
         return;
     }
+    if (!scratch && physAddr == 0x10007010u) // IPU_in_FIFO
+    {
+        PS2Ipu::Qword qword{};
+        _mm_storeu_si128(reinterpret_cast<__m128i *>(qword.data()), value);
+        (void)m_ipu.pushInput(qword); // a write to a full FIFO is lost
+        serviceIpu();
+        return;
+    }
     if (!scratch && physAddr == 0x10005000u) // VIF1_FIFO
     {
         alignas(16) uint8_t fifoData[16];
@@ -1229,20 +1241,12 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
 
     if (address >= 0x10002000 && address <= 0x10002030)
     {
-        if (address == 0x10002010)
-        {
-            m_ioRegisters[address] = value & ~(1u << 31);
-            if (value & (1u << 30))
-            {
-                m_ioRegisters[0x10002000] = 0;
-                m_ioRegisters[0x10002020] = 0;
-                m_ioRegisters[0x10002030] = 0;
-            }
-        }
-        else
-        {
-            m_ioRegisters[address] = value;
-        }
+        // IPU_CMD starts a command, IPU_CTRL sets the decode fields (RST clears the FIFOs); BP and TOP are read-only.
+        if (address == 0x10002000u)
+            (void)m_ipu.writeCommand(value);
+        else if (address == 0x10002010u)
+            m_ipu.writeControl(value);
+        serviceIpu();
         return true;
     }
 
@@ -1440,6 +1444,34 @@ void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
     if (channelBase == 0x1000C400u)
     {
         startSif1Transfer(value);
+        return;
+    }
+    if (channelBase == 0x1000B400u) // toIPU, normal mode: QWC qwords from MADR into the IPU input FIFO
+    {
+        const uint32_t madr = m_ioRegisters[channelBase + 0x10u];
+        const uint32_t qwc = m_ioRegisters[channelBase + 0x20u] & 0xFFFFu;
+        if (((value >> 2u) & 0x3u) != 0u)
+            return; // source chain on toIPU is not modelled; the channel stays as written
+        m_toIpuPending.clear();
+        for (uint32_t i = 0; i < qwc; ++i)
+        {
+            PS2Ipu::Qword qword{};
+            try
+            {
+                const uint32_t phys = translateAddress(madr + i * 16u);
+                if (phys > PS2_RAM_SIZE - 16u)
+                    break;
+                std::memcpy(qword.data(), m_rdram + phys, 16u);
+            }
+            catch (const std::exception &)
+            {
+                break;
+            }
+            m_toIpuPending.push_back(qword);
+        }
+        m_toIpuEndMadr = (madr + qwc * 16u) & 0x7FFFFFF0u;
+        m_toIpuActive = true;
+        serviceIpu();
         return;
     }
     const uint32_t madr = m_ioRegisters[channelBase + 0x10];
@@ -2164,7 +2196,39 @@ void PS2Memory::resumeStallDrain()
 bool PS2Memory::isDrainChannelHeld(uint32_t channelBase) const
 {
     return (m_mfifoDrainStalled && channelBase == mfifoDrainChannel()) ||
-           (m_stallHeldChannel != 0u && channelBase == m_stallHeldChannel);
+           (m_stallHeldChannel != 0u && channelBase == m_stallHeldChannel) ||
+           (m_toIpuActive && channelBase == 0x1000B400u);
+}
+
+// toIPU moves qwords into the IPU input FIFO while it has room (8 qwords) and the IPU consumes them as its command
+// runs; the channel completes with CIS4 once all its data is in the FIFO. Each completed IPU command raises INTC 8.
+void PS2Memory::serviceIpu()
+{
+    for (int guard = 0; guard < 1 << 20; ++guard)
+    {
+        bool progressed = false;
+        while (m_toIpuActive && !m_toIpuPending.empty() && m_ipu.canAcceptInput())
+        {
+            (void)m_ipu.pushInput(m_toIpuPending.front());
+            m_toIpuPending.pop_front();
+            progressed = true;
+        }
+        const size_t before = m_ipu.inputQwords();
+        const bool wasBusy = m_ipu.busy();
+        m_ipu.run();
+        if (m_ipu.takeCompletion())
+            m_pendingIpuInterrupt.store(true, std::memory_order_release);
+        progressed = progressed || m_ipu.inputQwords() != before || m_ipu.busy() != wasBusy;
+        if (!progressed)
+            break;
+    }
+    if (m_toIpuActive && m_toIpuPending.empty())
+    {
+        m_toIpuActive = false;
+        m_ioRegisters[0x1000B410u] = m_toIpuEndMadr;
+        m_ioRegisters[0x1000B420u] = 0u;
+        completeDmacChannel(0x1000B400u, 4u);
+    }
 }
 
 void PS2Memory::processPendingTransfers()
@@ -2818,26 +2882,19 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
         return 0u;
     }
 
-    if (address >= 0x10002000 && address <= 0x10002030)
+    if (address >= 0x10002000 && address <= 0x10002034)
     {
-        uint32_t val = 0;
+        // 64-bit IPU_CMD and IPU_TOP read as two words; BUSY is bit 31 of the upper word.
         switch (address)
         {
-        case 0x10002000:
-            val = m_ioRegisters[address];
-            break;
-        case 0x10002010:
-            val = m_ioRegisters[address] & ~(1u << 31);
-            break;
-        case 0x10002020:
-        case 0x10002030:
-            val = m_ioRegisters[address];
-            break;
-        default:
-            val = 0;
-            break;
+        case 0x10002000u: return static_cast<uint32_t>(m_ipu.readCommand());
+        case 0x10002004u: return static_cast<uint32_t>(m_ipu.readCommand() >> 32);
+        case 0x10002010u: return m_ipu.readControl();
+        case 0x10002020u: return m_ipu.readBitPointer();
+        case 0x10002030u: return static_cast<uint32_t>(m_ipu.readTop());
+        case 0x10002034u: return static_cast<uint32_t>(m_ipu.readTop() >> 32);
+        default: return 0u;
         }
-        return val;
     }
 
     // VIF registers live in vif0_regs / vif1_regs, R0-R3 and C0-C3 included (dma/vif/stmod reads R0-R3).

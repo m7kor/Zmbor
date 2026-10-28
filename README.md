@@ -19,9 +19,10 @@ engineering effort on accuracy, verification and integration (the "PS2Recomp Ult
 [CHANGELOG.md](CHANGELOG.md)). The upstream documentation is preserved at the end of this file and still applies.
 
 Static recompilation means the guest's EE code is translated ahead of time; it is not an interpreter or JIT for the
-EE. The vector units and the IOP are executed by interpreters inside the runtime, and many system libraries (audio,
-pads, memory cards, CD/DVD, MPEG) are replaced at call level by high-level emulation (HLE). The dashboard below shows
-which is which.
+EE. The vector units and the IOP are executed by interpreters inside the runtime. The hardware units are modelled at
+register level: DMAC (with MFIFO and stall control), VIF, GIF/GS, the IPU and the SPU2 registers and sound RAM. Many
+system libraries (audio playback, pads, memory cards, CD/DVD, MPEG) are still replaced at call level by high-level
+emulation (HLE). The dashboard below shows which is which.
 
 ## Architecture
 
@@ -32,8 +33,8 @@ flowchart LR
   A --> R
   R --> CPP[generated C++]
   CPP --> CC[host C++ compiler]
-  RT[ps2xRuntime<br/>memory, DMAC, VIF, GIF/GS, VU0/VU1,<br/>EE kernel HLE, scheduler] --> CC
-  IOP[ps2xIOP<br/>R3000A interpreter, IRX loader,<br/>IOP kernel and module HLE] --> RT
+  RT[ps2xRuntime<br/>memory, DMAC, VIF, GIF/GS, IPU, VU0/VU1,<br/>EE kernel HLE, scheduler] --> CC
+  IOP[ps2xIOP<br/>R3000A interpreter, IRX loader, IOP kernel,<br/>SPU2 registers and sound RAM, module HLE] --> RT
   CC --> EXE[native executable]
 ```
 
@@ -41,8 +42,8 @@ flowchart LR
 |---|---|
 | `ps2xAnalyzer` | scans an ELF, classifies SDK functions, writes the TOML configuration (stubs, skips, patches) |
 | `ps2xRecomp` | parses the ELF, decodes R5900 instructions, builds control flow and emits C++ |
-| `ps2xRuntime` | guest memory, DMAC, VIF0/VIF1, GIF and the GS (CPU rasteriser), VU0/VU1 interpreters, EE kernel and library HLE |
-| `ps2xIOP` | R3000A interpreter for physical IRX modules, IOP kernel and generic HLE services, SIF transport |
+| `ps2xRuntime` | guest memory, DMAC (MFIFO, stall control, SIF1, toIPU/fromIPU), VIF0/VIF1, GIF and the GS (CPU rasteriser), IPU, VU0/VU1 interpreters, EE kernel and library HLE |
+| `ps2xIOP` | R3000A interpreter for physical IRX modules, IOP kernel (threads, waits, message boxes, pools), SPU2 registers and sound RAM, generic HLE services, SIF transport |
 | `ps2xStudio` | desktop GUI for inspecting recompilation (experimental) |
 | `ps2xTest` | unit tests, end-to-end ELF-to-native tests, hardware result tests, GS cache tests |
 | `tools/` | hardware result pipeline, acceptance gate, compatibility matrix, probe lab, fuzzers, Z3 proofs, status dashboard |
@@ -99,17 +100,41 @@ Programs that do not match yet:
 
 <!-- status-dashboard:end -->
 
+## Hardware results beyond the EE
+
+The 23 ps2autotests IOP programs (`cpu/iop`, `kernel/iop`; `.irx` with real-PS2 `.expected`) run on the ps2xIOP
+interpreter through `tools/hwtest/iop_hwtest.py`. **23 / 23 programs and 1306 / 1306 lines match** (crashes 0,
+timeouts 0): `cpu/iop` 7/7 (981 lines), `kernel/iop` 16/16 (325 lines). This is a separate measurement and is not
+added to the EE counts above. See [docs/hwtest](docs/hwtest/README.md).
+
+Hardware coverage over the 174 PS2 components ([hardware-coverage-report.md](docs/status/hardware-coverage-report.md)):
+every component has a verification contract; 136 cite tests, 124 have those tests executed and passing, 64 are backed
+by real-PS2 results, and **none has timing verified against hardware**.
+
 ## Current limitations
 
 * No commercial or homebrew game has been run; every game-level stage (main loop, rendering, input, sound, saves,
   extended play, completion) is **unknown**, not failed.
+* No new hardware measurement was taken during the hardware program: there is no physical PS2, ps2link or ps2sdk
+  here. Everything implemented since then without existing real-PS2 output is `IMPLEMENTED_UNVERIFIED`, and the
+  hardware probes that would settle it are specified in
+  [PS2_HARDWARE_VERIFICATION.md](docs/engineering/PS2_HARDWARE_VERIFICATION.md) but unrun.
 * Only GS SIGNAL/LABEL behaviour has hardware results. The rest of the GS (rasterisation, texturing, blending,
-  CLUT) is tested against the GS manual, not against hardware output.
-* There is no SPU2 model: audio libraries are replaced at call level and VAG clips are played on the host.
-* The IPU, MFIFO, DMAC stall control, dithering, antialiasing, TLB translation and the EE caches are not emulated.
-* Peripherals (pads, memory cards, CD/DVD) are library-level HLE; USB, DEV9, HDD and network are not emulated.
-* The IOP CPU has no hardware results yet (ps2autotests `cpu/iop/*` exists and is not run).
-* Performance has no gate; the VU1 interpreter was made 2x faster on a synthetic workload in Phase 6; no whole-game timing exists.
+  CLUT, dithering, AA1 antialiasing) is tested against documentation and reference emulators, not hardware output.
+* **IPU:** all ten commands are implemented, including BDEC and IDEC. BDEC decodes six ffmpeg-encoded MPEG-1/MPEG-2
+  intra pictures bit-exactly, which shows the model follows the MPEG standards, not that it matches the PS2. The
+  PS2-specific behaviour (timing, IPU_CMD after decoding, IDCT rounding, error recovery) is unknown; see
+  [PS2_IPU_SEMANTICS.md](docs/engineering/PS2_IPU_SEMANTICS.md). The `sceMpeg*` library is still HLE.
+* **SPU2:** the register file, 2 MB sound RAM, data port, IRQA and IOP DMA channels 4/7 are modelled. The voice
+  engine (voices, ADSR, pitch, mixer, reverb) is **missing** on `main`, and audio is still played through the
+  `sceSd*` HLE and host VAG playback.
+* **SIF:** the SIF1 channel (EE DMAC channel 6) is modelled. **SIF0 (channel 5) has no DMA model**; it remains an open
+  architectural task, and SIF transport goes through HLE.
+* TLB translation, the EE caches, a GPU backend and the peripherals beyond library HLE are not emulated. Pads, memory
+  cards and CD/DVD are library-level HLE; SIO2, USB, DEV9, HDD and network are missing.
+* Two EE programs still mismatch real-PS2 output (RSQRT.S rounding, VU EFU last bits); both need hardware probes.
+* Performance has no gate. The VU1 interpreter was made 2x faster on a synthetic workload in Phase 6. No whole-game
+  timing exists.
 
 ## Development history
 
@@ -126,18 +151,35 @@ phase recorded in [CHANGELOG.md](CHANGELOG.md).
 | 5 | shared VU FMAC contract, SSE2 lowering, floating-point build guard, probe lab | 53/55 (8202/8250) | 541 |
 | 6 | VU1 interpreter 2x, acceptance gate with identity manifest, compatibility matrix | 53/55 (8202/8250) | 545 |
 | 7 | sanitizers, six fuzzers, Z3 integer proofs; three defects fixed (signed-overflow UB, looping DMA chains, ELF null dereference) | 53/55 (8202/8250) | 551 (550 on Linux: one Windows-only test) |
+| hardware program ([#7](https://github.com/m7kor/Zmbor/pull/7)) | verification contracts for all 174 components; GS dithering, MFIFO, DMAC stall control; IOP CPU fixes and kernel model; SIF1; IPU (all commands); GS AA1; SPU2 registers and sound RAM | EE 53/55 (8202/8250); IOP 0/23 → 23/23 (1306/1306) | 551 → 598 |
 
-## Roadmap (Phase 8)
+The hardware program ran in twelve batches. Each batch was gated on a clean tree:
+- the EE and IOP corpora were rerun with the `.expected` files untouched;
+- ctest, e2e and IOP suites passed;
+- mutation testing killed every non-equivalent mutant;
+- sanitizers ran clean.
 
-[docs/architecture/phase8-roadmap.md](docs/architecture/phase8-roadmap.md) lists the next work with its evidence,
-blockers and acceptance criteria:
+Decisions where references disagree or the hardware is unknown are recorded in
+[PS2_IMPLEMENTATION_DECISIONS.md](docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md), each with the probe that would
+settle it.
 
-1. RSQRT.S and EFU hardware probe specifications (results need a physical PS2).
-2. GS / parallel-gs feasibility spike with trace capture; the CPU rasteriser stays the reference.
-3. A minimal SPU2 architecture (registers, sound RAM, ADPCM voices, ADSR, mixer).
-4. SIF/IOP scheduling and synchronisation tests.
-5. Homebrew compatibility stages 5–9 with recorded evidence.
-6. Performance and stability gates.
+## Roadmap
+
+The next work, in dependency order. The resumable state, with the exact next action, is in
+[AUTONOMOUS_EXECUTION_STATE.md](docs/engineering/AUTONOMOUS_EXECUTION_STATE.md):
+
+1. **SPU2 voice engine:**
+   - ADPCM voices with loop flags and ENDX;
+   - Gaussian interpolation and pitch modulation;
+   - ADSR and volume sweep;
+   - mixing, core 0 → core 1 routing, ADMA;
+   - reverb;
+   - a deterministic null audio sink, driven by guest time.
+2. **SIF0 DMA channel model:** the remaining SIF direction.
+3. **The other missing components:** see the [gap matrix](docs/engineering/PS2_COMPONENT_GAP_MATRIX.md).
+4. **Hardware probes:** RSQRT.S, EFU, GS, IPU, SPU2. These need a physical PS2; until then those components stay
+   unverified.
+5. **Homebrew and game compatibility, with recorded evidence; performance and stability gates.**
 
 The longer-term direction is in [ROADMAP.md](ROADMAP.md).
 
@@ -152,7 +194,13 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPS2X_BUILD_STUDIO=OFF 
 cmake --build build
 ```
 
-CI builds Windows (MSVC), Linux GCC and Linux Clang on every push. Local release gates use Windows 11 with MSVC 14.44.
+CI runs on every push and pull request:
+- Windows (MSVC), Linux GCC and Linux Clang builds;
+- Linux Clang with ASan and UBSan;
+- a fuzzing smoke run;
+- the status-dashboard consistency check.
+
+Local release gates use Windows 11 with MSVC 14.44.
 
 ## Usage
 
@@ -172,6 +220,9 @@ workflow and game override hooks are described in the upstream documentation bel
 | ctest | `ctest --test-dir build/ps2xTest -LE hwtest` | research DB, GS cache, probe lab, compat matrix, Z3 proofs, e2e |
 | IOP | `ctest --test-dir build/ps2xIOP` | IOP emulator and module tests |
 | hardware results | `tools/hwtest/hwtest.py` with a local ps2autotests clone ([TESTING.md](TESTING.md), level 5) | output compared with real-PS2 `.expected` files |
+| IOP hardware results | `tools/hwtest/iop_hwtest.py --tests <ps2autotests/tests> --runner build/ps2xIOP/ps2_iop_autotest_runner` | the 23 IOP programs against real-PS2 `.expected` files |
+| MPEG fixtures | `tools/ipu/make_ipu_fixtures.py` (needs ffmpeg) | regenerates the IPU fixtures in `ps2xTest/src/ipu_mpeg_fixtures.h`; the reference is another decoder, not a PS2 |
+| hardware coverage | `python tools/hwcoverage/hwcoverage.py record --tests-exe build/ps2xTest/ps2x_tests` then `report` | which evidence level each of the 174 components has reached |
 | acceptance gate | `tools/acceptance/gate.ps1` ([acceptance-gate.md](docs/architecture/acceptance-gate.md)) | all of the above on one commit, with a binary identity manifest |
 | sanitizers, fuzzing | `-DPS2X_SANITIZE=address[,undefined]`, `-DPS2X_BUILD_FUZZERS=ON` ([fuzzing.md](docs/architecture/fuzzing.md)) | memory errors, undefined behaviour, robustness of input parsers |
 | status dashboard | `python tools/status/validate_dashboard.py` | inventory evidence links, measurements and generated files are consistent |
@@ -191,12 +242,20 @@ A passing unit or end-to-end test says nothing about commercial game compatibili
 | [raylib](https://github.com/raysan5/raylib) | window, input, audio | zlib |
 | [Dear ImGui](https://github.com/ocornut/imgui), [rlImGui](https://github.com/raylib-extras/rlImGui) | debug UI | MIT, zlib |
 | FFmpeg (optional, `PS2X_ENABLE_FFMPEG`) | MPEG video decoding | LGPL/GPL depending on the build |
+| FFmpeg (tool, not linked) | encodes and decodes the synthetic IPU test fixtures | LGPL/GPL |
 | [ps2autotests](https://github.com/unknownbrackets/ps2autotests) (not vendored) | real-PS2 reference output | ISC |
 | [Z3](https://github.com/Z3Prover/z3) (test tool) | integer proofs | MIT |
 
 Zmbor builds on PS2Recomp by ran-j and its contributors (see the upstream acknowledgments below). Hardware reference
-results come from ps2autotests by unknownbrackets and contributors. PCSX2 was consulted as a behaviour reference only;
-no PCSX2 code was copied. Evaluated tools and their licenses: [phase7-tool-evaluation.md](docs/architecture/phase7-tool-evaluation.md).
+results come from ps2autotests by unknownbrackets and contributors.
+
+Behaviour references were studied and their disagreements recorded; no code was copied from any of them:
+- PCSX2 and DobieStation (GPL), and Play!;
+- ps2sdk (AFL);
+- the [ps2tek](https://psi-rockin.github.io/ps2tek/) documentation;
+- ISO/IEC 13818-2 and 11172-2, for the MPEG table values.
+
+Evaluated tools and their licenses: [phase7-tool-evaluation.md](docs/architecture/phase7-tool-evaluation.md).
 
 ## Contributing
 
@@ -214,7 +273,14 @@ no PCSX2 code was copied. Evaluated tools and their licenses: [phase7-tool-evalu
 * [TESTING.md](TESTING.md), [BENCHMARKS.md](BENCHMARKS.md), [CHANGELOG.md](CHANGELOG.md), [HANDOFF.md](HANDOFF.md), [ROADMAP.md](ROADMAP.md)
 * [docs/architecture](docs/architecture): acceptance gate, evidence register, hardware probes, VU/EE arithmetic
   semantics, fuzzing, gap matrix, Phase 8 roadmap
-* [docs/hwtest](docs/hwtest/README.md): hardware result dashboard
+* [docs/engineering](docs/engineering): the hardware program:
+  - [verification contracts](docs/engineering/PS2_HARDWARE_REQUIREMENTS.json) for all 174 components;
+  - [implementation decisions](docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md);
+  - the [IPU semantics ledger](docs/engineering/PS2_IPU_SEMANTICS.md);
+  - [hardware probes](docs/engineering/PS2_HARDWARE_VERIFICATION.md);
+  - the [gap matrix](docs/engineering/PS2_COMPONENT_GAP_MATRIX.md);
+  - the [resumable state](docs/engineering/AUTONOMOUS_EXECUTION_STATE.md).
+* [docs/hwtest](docs/hwtest/README.md): hardware result dashboards (EE and IOP)
 * [docs/INTEGRATION_MATRIX.md](docs/INTEGRATION_MATRIX.md): upstream and community changes considered
 
 ## License

@@ -1,12 +1,12 @@
 {
- "commit": "c64f357fd4418753ad24e5e65a82f151a97782b2",
+ "commit": "0254b6808e78fb16a657f0ea912e01a432771b15",
  "tree_clean": true,
  "platform": "Windows-10",
  "binary": "ps2x_tests.exe",
- "binary_sha256": "82dd798b35314f8d9a37bc9514ffa5c248a47c07da74f77c08be6d9ea582410a",
+ "binary_sha256": "8d12a6b3416f153e205c8e2d3f107ba1b0deca0d9b58c2172e15298d5c1b0158",
  "exit_code": 0,
  "totals": {
-  "PASS": 563,
+  "PASS": 567,
   "FAIL": 0,
   "ERROR": 0
  },
@@ -50,6 +50,7 @@
   "DMAC D_STAT toggles masks and clears channel status on write-one": "PASS",
   "DMAC SPR_FROM copies scratchpad to RDRAM and completes channel 8": "PASS",
   "DMAC SPR_TO copies RDRAM to scratchpad and completes channel 9": "PASS",
+  "DMAC channel 6 (SIF1) programmed directly writes its IOP packet into IOP memory": "PASS",
   "DMAC suspend and resume polls through D_ENABLEW and D_ENABLER terminate": "PASS",
   "D_STAT MEIS clears on write-one and raises the INT1 line only when MEIM is set": "PASS",
   "DivVectorXYZ_w_passthrough": "PASS",
@@ -242,6 +243,9 @@
   "RotateThreadReadyQueue is the only same-priority rotation": "PASS",
   "SA holds a byte count for MTSA, MTSAB, MTSAH and MFSA": "PASS",
   "SC requires matching LL reservation address": "PASS",
+  "SIF1 chain stalled at a REFS tag delivers the packet whole once D_STADR moves (STD=3)": "PASS",
+  "SIF1 normal mode delivers each IOP packet to the sink and completes with CIS6": "PASS",
+  "SIF1 without an IOP sink does not transfer or raise CIS6": "PASS",
   "SQRT.S reads its operand from ft, not fs": "PASS",
   "SYSCALL fallthrough is a resumable entry": "PASS",
   "SYSCALL publishes its continuation before entering the runtime": "PASS",

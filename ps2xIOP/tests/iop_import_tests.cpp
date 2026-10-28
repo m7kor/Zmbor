@@ -794,6 +794,112 @@ namespace
                expect(call(5u, 0u, 0u, 0u) == 0 && call(4u, 0u, 0x80000000u, kHandler) == 0, "any mode value is accepted");
     }
 
+    // SPU2 register file and sound RAM (decision D-SPU-1): values computed by hand from the register layout.
+    bool testSpu2RegistersAndSoundRam()
+    {
+        constexpr uint32_t kSpu = 0x1F900000u, kCore1 = 0x400u;
+        IopMemory memory;
+        Spu2 &spu = memory.spu2();
+        const auto setTsa = [&](uint32_t core, uint32_t address)
+        {
+            memory.write16(kSpu + core + 0x1A8u, static_cast<uint16_t>(address >> 16));
+            memory.write16(kSpu + core + 0x1AAu, static_cast<uint16_t>(address));
+        };
+
+        memory.write16(kSpu + 3u * 0x10u, 0x1234u);
+        bool ok = expect(memory.read16(kSpu + 3u * 0x10u) == 0x1234u && memory.read16(kSpu + kCore1 + 3u * 0x10u) == 0u,
+                         "a voice register reads back as written, per core");
+        memory.write16(kSpu + 0x1C0u, 0xFFFFu);
+        ok = ok && expect(memory.read16(kSpu + 0x1C0u) == 0x000Fu, "SSA's high half holds address bits 16-19");
+        memory.write32(kSpu + 0x10u, 0xBEEF1234u);
+        ok = ok && expect(memory.read16(kSpu + 0x10u) == 0x1234u && memory.read16(kSpu + 0x12u) == 0xBEEFu &&
+                              memory.read32(kSpu + 0x10u) == 0xBEEF1234u,
+                          "a 32-bit access is two 16-bit accesses, low half first");
+
+        setTsa(0u, 0x12345u);
+        memory.write16(kSpu + 0x1ACu, 0xAAAAu);
+        memory.write16(kSpu + 0x1ACu, 0xBBBBu);
+        ok = ok && expect(spu.ram(0x12345u) == 0xAAAAu && spu.ram(0x12346u) == 0xBBBBu && spu.transferAddress(0) == 0x12347u,
+                          "data-port writes land at TSA and advance the transfer address");
+        ok = ok && expect(memory.read16(kSpu + 0x1A8u) == 0x0001u && memory.read16(kSpu + 0x1AAu) == 0x2345u,
+                          "the TSA registers keep the written start address");
+        setTsa(0u, 0x12345u);
+        ok = ok && expect(memory.read16(kSpu + 0x1ACu) == 0xAAAAu && memory.read16(kSpu + 0x1ACu) == 0xBBBBu,
+                          "data-port reads return sound RAM at the advancing address");
+        setTsa(0u, 0xFFFFFu);
+        memory.write16(kSpu + 0x1ACu, 0x5A5Au);
+        ok = ok && expect(spu.ram(0xFFFFFu) == 0x5A5Au && spu.transferAddress(0) == 0u, "the transfer address wraps in 2 MB");
+
+        // IRQA: core 0 at 0x12346 with ATTR bit 6; a write at 0x12345 does not hit, one at 0x12346 does.
+        memory.write16(kSpu + 0x19Cu, 0x0001u);
+        memory.write16(kSpu + 0x19Eu, 0x2346u);
+        memory.write16(kSpu + 0x19Au, 1u << 6);
+        setTsa(0u, 0x12345u);
+        memory.write16(kSpu + 0x1ACu, 1u);
+        ok = ok && expect((memory.interruptStatus() & (1u << 9)) == 0u, "no interrupt before IRQA is accessed");
+        memory.write16(kSpu + 0x1ACu, 2u);
+        ok = ok && expect((memory.interruptStatus() & (1u << 9)) != 0u && memory.read16(kSpu + 0x7C2u) == 0x0004u,
+                          "an access at IRQA raises IOP INTC 9 and sets IRQINFO bit 2 (core 0)");
+        memory.write16(kSpu + 0x7C2u, 0u);
+        ok = ok && expect(memory.read16(kSpu + 0x7C2u) == 0x0004u, "IRQINFO is not cleared by a write");
+        memory.write16(kSpu + 0x19Au, 0u);
+        ok = ok && expect(memory.read16(kSpu + 0x7C2u) == 0u, "clearing ATTR bit 6 clears the core's IRQINFO bit");
+        memory.setInterruptStatus(0u);
+        memory.write16(kSpu + kCore1 + 0x19Cu, 0x0000u);
+        memory.write16(kSpu + kCore1 + 0x19Eu, 0x0040u);
+        memory.write16(kSpu + kCore1 + 0x19Au, 1u << 6);
+        setTsa(0u, 0x40u);
+        memory.write16(kSpu + 0x1ACu, 3u); // core 0's transfer reaches core 1's IRQA
+        ok = ok && expect(memory.read16(kSpu + 0x7C2u) == 0x0008u && (memory.interruptStatus() & (1u << 9)) != 0u,
+                          "any core's access is checked against both IRQAs (IRQINFO bit 3: core 1)");
+        memory.write16(kSpu + kCore1 + 0x19Au, 0u);
+        memory.setInterruptStatus(0u);
+        setTsa(0u, 0x40u);
+        memory.write16(kSpu + 0x1ACu, 3u);
+        ok = ok && expect((memory.interruptStatus() & (1u << 9)) == 0u, "without ATTR bit 6 there is no interrupt");
+
+        // KON: voice 5 of core 1 restarts from SSA = 0x34567; KON's high half holds voices 16-23.
+        const uint32_t ssa5 = kSpu + kCore1 + 0x1C0u + 5u * 0xCu;
+        memory.write16(ssa5, 0x0003u);
+        memory.write16(ssa5 + 2u, 0x4567u);
+        memory.write16(kSpu + kCore1 + 0x1A0u, 1u << 5);
+        ok = ok && expect(memory.read16(ssa5 + 8u) == 0x0003u && memory.read16(ssa5 + 10u) == 0x4567u,
+                          "KON loads the voice's NAX from SSA");
+        memory.write16(kSpu + kCore1 + 0x1A2u, 0x01FFu);
+        ok = ok && expect(spu.pendingKeyOn(1) == (0xFF0000u | (1u << 5)) && memory.read16(kSpu + kCore1 + 0x1A0u) == 0x0020u,
+                          "KON latches voices 0-23 (the high half keeps 8 bits) and reads back");
+
+        // IOP DMA channel 4 (core 0) from IOP RAM, channel 7 (core 1) back to IOP RAM.
+        const uint16_t samples[4] = {0x1111u, 0x2222u, 0x3333u, 0x4444u};
+        (void)memory.writeRam(0x10000u, samples, sizeof(samples));
+        setTsa(0u, 0x500u);
+        memory.write32(0x1F8010C0u, 0x10000u);
+        memory.write32(0x1F8010C4u, (1u << 16) | 2u); // 1 block of 2 words
+        memory.write32(0x1F8010C8u, 0x01000201u);     // start, from memory
+        ok = ok && expect(spu.ram(0x500u) == 0x1111u && spu.ram(0x503u) == 0x4444u && spu.transferAddress(0) == 0x504u,
+                          "channel 4 writes 4 halfwords at core 0's TSA");
+        ok = ok && expect((memory.read16(kSpu + 0x344u) & 0x80u) != 0u && (memory.read32(0x1F8010C8u) & (1u << 24)) == 0u,
+                          "the transfer sets STAT bit 7 and clears CHCR's start bit");
+        const auto dma = memory.takeDmaStart();
+        ok = ok && expect(dma.has_value() && dma->irq == 0x24, "the channel 4 completion is scheduled");
+        memory.write16(kSpu + 0x19Au, 1u << 15);
+        ok = ok && expect((memory.read16(kSpu + 0x344u) & 0x80u) == 0u && (memory.read16(kSpu + 0x19Au) & 0x8000u) == 0u,
+                          "ATTR bit 15 clears STAT bit 7 and does not read back");
+        setTsa(kCore1, 0x501u);
+        memory.write32(0x1F801500u, 0x20000u);
+        memory.write32(0x1F801504u, (1u << 16) | 1u);
+        memory.write32(0x1F801508u, 0x01000200u); // start, to memory
+        uint16_t back[2] = {};
+        (void)memory.readRam(0x20000u, back, sizeof(back));
+        ok = ok && expect(back[0] == 0x2222u && back[1] == 0x3333u && spu.transferAddress(1) == 0x503u,
+                          "channel 7 reads core 1's TSA into IOP RAM");
+
+        memory.write16(kSpu + 0x760u, 0x3FFFu);
+        ok = ok && expect(memory.read16(kSpu + 0x760u) == 0x3FFFu && memory.read8(kSpu + 0x761u) == 0x3Fu,
+                          "the volume block reads back; byte reads see the register");
+        return ok;
+    }
+
     bool testStrtokMatchesRealPs2()
     {
         IopMemory memory;
@@ -829,7 +935,7 @@ int main()
 {
     if (!testJalrReadsTargetBeforeLink() || !testKernelThreadChecksMatchRealPs2() || !testKernelWaitsAndEventFlagsMatchRealPs2() ||
         !testMessageBoxOrderAndLinkingMatchRealPs2() || !testVariablePoolSizesMatchRealPs2() || !testStrtokMatchesRealPs2() ||
-        !testIntrHandlerRegistrationMatchesRealPs2())
+        !testIntrHandlerRegistrationMatchesRealPs2() || !testSpu2RegistersAndSoundRam())
         return 1;
     if (!testLoadcoreRebootLibraryMode() || !testCdvdSpecialControl() || !testCdvdSearchFile() ||
         !testTimrmanPeriodicCallback() || !testSprintfMatchesRealPs2Rows() || !testPrintfStackArgumentsAndVaList())

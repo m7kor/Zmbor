@@ -163,3 +163,30 @@ one stay unverified until the stated measurement exists.
   - No GS manual text was available here.
 - **Settles it:** a GS probe that draws AA1 lines at known sub-pixel offsets and AA1 triangles with known edge slopes,
   then reads the framebuffer and Z buffer back.
+
+## D-SPU-1 — SPU2 register file and sound RAM
+
+- **Chosen:**
+  - **Layout:** two cores at IOP 0x1F900000 and 0x1F900400, plus the volume/SPDIF block at 0x1F900760. Registers
+    are 16 bits wide, and a 32-bit access is two 16-bit accesses, low half first.
+  - **Read-back:** every register reads back as written. Address high halves keep 4 bits (20-bit halfword
+    addresses), and ATTR bit 15 does not read back.
+  - **Data port and DMA:** both move sound RAM at the core's transfer address. Writing TSA sets that address; data
+    moves advance it and wrap in the 2 MB RAM. IOP DMA channels 4 and 7 move their data when the channel starts, and
+    STAT bit 7 is set at the end. ATTR bit 15 clears STAT bit 7.
+  - **IRQA:** every sound-RAM access is checked against both cores' IRQA. A hit on a core with ATTR bit 6 sets
+    IRQINFO bit 2 + core and raises IOP INTC line 9. Clearing ATTR bit 6 clears that bit; writes to IRQINFO are
+    ignored.
+  - **KON:** loads NAX from SSA and clears the voice's ENDX bit. KON/KOFF latch until a voice engine consumes them.
+  - **ENDX writes:** a write to 0x340 clears bits 0-15, and a write to 0x342 clears bits 16-23.
+- **For:** PCSX2 (spu2sys.cpp) and DobieStation (iop/spu/spu.cpp) agree on the layout, the 20-bit addresses, the
+  data port, the IRQA check and IRQINFO bits, KON's NAX/ENDX effects and the ENDX write rule.
+- **Against:**
+  - The ENDX write rule looks inconsistent: each half's write clears the other half. Both references have it this
+    way.
+  - The power-on register state, IRQINFO's write behaviour and STAT's other bits are unknown.
+  - The IOP DMA completion delay is the existing estimate (two cycles per word, at least 64). It is not a measured
+    figure.
+  - No ps2autotests program exercises the SPU2.
+- **Settles it:** an SPU2 register probe on a physical PS2. Read back every register after reset and after writes,
+  move data through the data port and DMA with IRQA set, and read ENDX after writes to each half.

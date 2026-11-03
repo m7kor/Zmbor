@@ -10,6 +10,21 @@
 #include <atomic>
 #include <iostream>
 #include <mutex>
+#include <stdexcept>
+
+// Phase 15: a TLB miss is a distinct failure, not a generic address error.
+// translateAddress() throws this (derived from std::runtime_error, so
+// existing std::exception handlers in DMA/loader paths still catch it);
+// the EE load/store path maps it to the TLB-refill exception instead of
+// the address-error exception it used to report for every memory failure.
+struct Ps2TlbMissError : std::runtime_error
+{
+    uint32_t vaddr;
+    explicit Ps2TlbMissError(uint32_t v)
+        : std::runtime_error("TLB miss for address: 0x" + std::to_string(v)), vaddr(v)
+    {
+    }
+};
 
 #include "gs/ps2_gif_arbiter.h"
 #include "runtime/ps2_ipu.h"

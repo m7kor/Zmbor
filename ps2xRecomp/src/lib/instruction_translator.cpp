@@ -338,7 +338,13 @@ namespace ps2recomp
                                "{}; }}",
                                inst.rs, inst.simmediate, genRead(64, "aligned_addr"), inst.rt, genWrite(64, "aligned_addr", "new_data"));
         case OPCODE_CACHE:
-            return "// CACHE instruction (ignored)";
+            // Phase 15: no longer silently ignored. The op field is inst.rt
+            // (cache in bits 1-0, operation in bits 4-2); the runtime
+            // validates the cache field and treats valid I/D ops as no-ops
+            // (no cache state exists in this model), raising a reserved
+            // instruction exception for a cache field naming no cache.
+            return fmt::format("runtime->handleCacheOp(rdram, ctx, {}u, ADD32(GPR_U32(ctx, {}), {}));",
+                               inst.rt, inst.rs, inst.simmediate);
         case OPCODE_PREF:
             return "// PREF instruction (ignored)";
         case OPCODE_LL:

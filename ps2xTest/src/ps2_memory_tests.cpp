@@ -318,6 +318,44 @@ void register_ps2_memory_tests()
             t.Equals(mem.translateAddress(PS2_SCRATCHPAD_ALIAS_BASE + 0x123u), 0x123u, "0xF000 scratchpad alias should translate to local offset");
         });
 
+        tc.Run("Phase15 KSEG2 TLB hit translates, miss throws Ps2TlbMissError", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            t.IsTrue(mem.tlbWrite(0u, 0xC0001000u, 1u, 0u, true),
+                     "TLB entry install should succeed");
+            t.Equals(mem.translateAddress(0xC0001000u), 0x1000u,
+                     "KSEG2 TLB hit must translate to the mapped physical page");
+            t.Equals(mem.translateAddress(0xC0001004u), 0x1004u,
+                     "TLB hit must preserve the page offset");
+
+            bool threw = false;
+            try
+            {
+                (void)mem.translateAddress(0xC0002000u);
+            }
+            catch (const Ps2TlbMissError &e)
+            {
+                threw = true;
+                t.Equals(e.vaddr, 0xC0002000u, "TLB miss must carry the faulting address");
+            }
+            t.IsTrue(threw, "KSEG2 address with no TLB entry must miss");
+
+            // The miss type stays a std::runtime_error, so DMA/loader paths
+            // that catch std::exception keep behaving as before.
+            threw = false;
+            try
+            {
+                (void)mem.translateAddress(0xC0002000u);
+            }
+            catch (const std::runtime_error &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "TLB miss must still be catchable as std::runtime_error");
+        });
+
         tc.Run("EE timer0 count advances from scheduler cycles and can be reset", [](TestCase &t)
         {
             PS2Memory mem;

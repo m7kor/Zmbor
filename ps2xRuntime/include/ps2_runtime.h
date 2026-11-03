@@ -377,6 +377,7 @@ public:
     void handleBreak(uint8_t *rdram, R5900Context *ctx);
 
     void handleTrap(uint8_t *rdram, R5900Context *ctx);
+    void handleCacheOp(uint8_t *rdram, R5900Context *ctx, uint32_t op, uint32_t addr);
     void handleTLBR(uint8_t *rdram, R5900Context *ctx);
     void handleTLBWI(uint8_t *rdram, R5900Context *ctx);
     void handleTLBWR(uint8_t *rdram, R5900Context *ctx);

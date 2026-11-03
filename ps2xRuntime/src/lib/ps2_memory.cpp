@@ -666,7 +666,7 @@ uint32_t PS2Memory::translateAddress(uint32_t virtualAddress)
                 }
             }
         }
-        throw std::runtime_error("TLB miss for address: 0x" + std::to_string(virtualAddress));
+        throw Ps2TlbMissError(virtualAddress);
     }
 
     return virtualAddress;

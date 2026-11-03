@@ -736,21 +736,28 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
         ? runtime->Load8(rdram, ctx, _addr)                   \
         : FAST_READ8(_addr); }())
 
+// Phase 15: a misaligned access must raise AdEL/AdES, not silently succeed
+// through the memcpy-based fast helpers. Route misaligned addresses to the
+// slow path, whose PS2Memory access throws on misalignment and whose
+// Load/Store converts that into the exception (and aborts the block).
+// Aligned accesses keep the exact fast path (one extra predictable test).
+// 128-bit accesses keep masking the low four bits: that is the pre-existing
+// model choice for LQ/SQ, unchanged here.
 #define READ16(addr) ([&]() -> uint16_t {                     \
     uint32_t _addr = (uint32_t)(addr);                        \
-    return PS2Runtime::isSpecialAddress(_addr)                \
+    return (PS2Runtime::isSpecialAddress(_addr) || (_addr & 1u)) \
         ? runtime->Load16(rdram, ctx, _addr)                  \
         : FAST_READ16(_addr); }())
 
 #define READ32(addr) ([&]() -> uint32_t {                     \
     uint32_t _addr = (uint32_t)(addr);                        \
-    return PS2Runtime::isSpecialAddress(_addr)                \
+    return (PS2Runtime::isSpecialAddress(_addr) || (_addr & 3u)) \
         ? runtime->Load32(rdram, ctx, _addr)                  \
         : FAST_READ32(_addr); }())
 
 #define READ64(addr) ([&]() -> uint64_t {                     \
     uint32_t _addr = (uint32_t)(addr);                        \
-    return PS2Runtime::isSpecialAddress(_addr)                \
+    return (PS2Runtime::isSpecialAddress(_addr) || (_addr & 7u)) \
         ? runtime->Load64(rdram, ctx, _addr)                  \
         : FAST_READ64(_addr); }())
 
@@ -777,7 +784,7 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
     do                                                                                 \
     {                                                                                  \
         uint32_t _addr = (addr);                                                       \
-        if (PS2Runtime::isSpecialAddress(_addr))                                       \
+        if (PS2Runtime::isSpecialAddress(_addr) || (_addr & 1u))                       \
             runtime->Store16(rdram, ctx, _addr, (val));                                \
         else                                                                           \
         {                                                                              \
@@ -790,7 +797,7 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
     do                                                                                 \
     {                                                                                  \
         uint32_t _addr = (addr);                                                       \
-        if (PS2Runtime::isSpecialAddress(_addr))                                       \
+        if (PS2Runtime::isSpecialAddress(_addr) || (_addr & 3u))                       \
             runtime->Store32(rdram, ctx, _addr, (val));                                \
         else                                                                           \
         {                                                                              \
@@ -803,7 +810,7 @@ static inline void Ps2FastWrite128(uint8_t *rdram, uint32_t addr, __m128i value)
     do                                                                                 \
     {                                                                                  \
         uint32_t _addr = (addr);                                                       \
-        if (PS2Runtime::isSpecialAddress(_addr))                                       \
+        if (PS2Runtime::isSpecialAddress(_addr) || (_addr & 7u))                       \
             runtime->Store64(rdram, ctx, _addr, (val));                                \
         else                                                                           \
         {                                                                              \

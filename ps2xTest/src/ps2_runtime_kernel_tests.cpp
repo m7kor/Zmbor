@@ -1335,6 +1335,351 @@ void register_ps2_runtime_kernel_tests()
             t.IsTrue(threw, "TODO should throw for the unknown stub");
         });
 
+        // Phase 15: COP0 exception delivery. The fast-path memory macros used
+        // to route every non-special address through memcpy helpers with no
+        // alignment check, so a misaligned RAM access silently succeeded.
+        // Misaligned accesses must now raise AdEL/AdES with BadVAddr set and
+        // abort the block via the dispatcher transfer (otherwise the block's
+        // terminal branch would overwrite the vector PC and lose the
+        // exception). Cause codes: AdEL 4, AdES 5, TLB refill 2, RI 10,
+        // breakpoint 9, trap 13; general vector 0x80000080, refill 0x80000000.
+        tc.Run("Phase15 misaligned loads raise AdEL with BadVAddr and abort", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+
+            const uint32_t faultPc = 0x80001000u;
+            const std::pair<uint32_t (*)(PS2Runtime &, uint8_t *, R5900Context *, uint32_t), uint32_t> cases[] = {
+                {[](PS2Runtime &rt, uint8_t *rdram, R5900Context *ctx, uint32_t a) {
+                     return static_cast<uint32_t>(rt.Load16(rdram, ctx, a));
+                 },
+                 0x1001u},
+                {[](PS2Runtime &rt, uint8_t *rdram, R5900Context *ctx, uint32_t a) {
+                     return rt.Load32(rdram, ctx, a);
+                 },
+                 0x1002u},
+                {[](PS2Runtime &rt, uint8_t *rdram, R5900Context *ctx, uint32_t a) {
+                     return static_cast<uint32_t>(rt.Load64(rdram, ctx, a));
+                 },
+                 0x1004u},
+            };
+            for (const auto &[load, addr] : cases)
+            {
+                env.ctx.pc = faultPc;
+                env.ctx.cop0_cause = 0u;
+                env.ctx.cop0_status = 0u;
+                env.ctx.cop0_badvaddr = 0u;
+                env.ctx.in_delay_slot = false;
+                bool threw = false;
+                try
+                {
+                    (void)load(env.runtime, env.runtime.memory().getRDRAM(), &env.ctx, addr);
+                }
+                catch (const EeDispatcherTransfer &)
+                {
+                    threw = true;
+                }
+                t.IsTrue(threw, "misaligned load must abort via dispatcher transfer");
+                t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 4u, "misaligned load must raise AdEL");
+                t.Equals(env.ctx.cop0_badvaddr, addr, "AdEL must record the faulting address");
+                t.Equals(env.ctx.cop0_epc, faultPc, "AdEL EPC must be the faulting PC");
+                t.Equals(env.ctx.pc, 0x80000080u, "AdEL must vector to the general handler");
+                t.IsTrue((env.ctx.cop0_status & 0x2u) != 0u, "AdEL must set EXL");
+            }
+
+            // Aligned control: same addresses aligned must work, with no
+            // exception state left behind.
+            env.ctx.pc = faultPc;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            t.Equals(env.runtime.Load32(env.runtime.memory().getRDRAM(), &env.ctx, 0x1000u), 0xDEADBEEFu,
+                     "aligned load must still return the value");
+            t.Equals(env.ctx.cop0_cause, 0u, "aligned load must not raise");
+            t.Equals(env.ctx.pc, faultPc, "aligned load must not redirect PC");
+        });
+
+        tc.Run("Phase15 misaligned stores raise AdES and leave memory unchanged", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+
+            const uint32_t faultPc = 0x80001000u;
+            env.ctx.pc = faultPc;
+            env.ctx.in_delay_slot = false;
+            bool threw = false;
+            try
+            {
+                env.runtime.Store32(env.runtime.memory().getRDRAM(), &env.ctx, 0x1002u, 0x11223344u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "misaligned store must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 5u, "misaligned store must raise AdES");
+            t.Equals(env.ctx.cop0_badvaddr, 0x1002u, "AdES must record the faulting address");
+            t.Equals(env.ctx.cop0_epc, faultPc, "AdES EPC must be the faulting PC");
+            t.Equals(env.ctx.pc, 0x80000080u, "AdES must vector to the general handler");
+            t.Equals(env.runtime.memory().read32(0x1000u), 0xDEADBEEFu,
+                     "faulting store must not modify memory");
+
+            env.ctx.pc = faultPc;
+            env.ctx.cop0_cause = 0u;
+            env.runtime.Store32(env.runtime.memory().getRDRAM(), &env.ctx, 0x1000u, 0x11223344u);
+            t.Equals(env.runtime.memory().read32(0x1000u), 0x11223344u,
+                     "aligned store must still write");
+        });
+
+        tc.Run("Phase15 misaligned load in a delay slot reports BD and branch PC", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.ctx.pc = 0x80002004u;
+            env.ctx.branch_pc = 0x80002000u;
+            env.ctx.in_delay_slot = true;
+            bool threw = false;
+            try
+            {
+                (void)env.runtime.Load32(env.runtime.memory().getRDRAM(), &env.ctx, 0x1002u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "delay-slot fault must abort via dispatcher transfer");
+            t.Equals(env.ctx.cop0_epc, 0x80002000u, "delay-slot EPC must be the branch PC");
+            t.IsTrue((env.ctx.cop0_cause & 0x80000000u) != 0u, "delay-slot fault must set BD");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 4u, "delay-slot fault must still be AdEL");
+        });
+
+        tc.Run("Phase15 fast-path macros route misaligned accesses to the slow path", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+            uint8_t *rdram = env.runtime.memory().getRDRAM();
+            R5900Context *ctx = &env.ctx;
+            PS2Runtime *runtime = &env.runtime;
+
+            // Every width in both directions through the macros: an earlier
+            // version of this test covered only READ16/WRITE32, so removing
+            // the READ32 alignment routing survived the suite (a genuine
+            // test gap, found by the M1 mutant). Each width must now fail.
+            env.ctx.pc = 0x80001000u;
+            env.ctx.in_delay_slot = false;
+            bool threw = false;
+            try
+            {
+                (void)READ16(0x1001u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned READ16 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 4u, "macro misaligned READ16 must raise AdEL");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                (void)READ32(0x1002u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned READ32 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 4u, "macro misaligned READ32 must raise AdEL");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                (void)READ64(0x1004u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned READ64 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 4u, "macro misaligned READ64 must raise AdEL");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                WRITE16(0x1001u, static_cast<uint16_t>(0x1122u));
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned WRITE16 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 5u, "macro misaligned WRITE16 must raise AdES");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                WRITE32(0x1002u, 0x11223344u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned WRITE32 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 5u, "macro misaligned WRITE32 must raise AdES");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                WRITE64(0x1004u, 0x1122334455667788ull);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "macro misaligned WRITE64 must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 5u, "macro misaligned WRITE64 must raise AdES");
+
+            // Aligned macro accesses keep the fast path: same values, no
+            // exception state.
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            t.Equals(READ32(0x1000u), 0xDEADBEEFu, "macro aligned READ32 must still read");
+            WRITE32(0x1000u, 0x11223344u);
+            t.Equals(READ32(0x1000u), 0x11223344u, "macro aligned WRITE32 must still write");
+            t.Equals(env.ctx.cop0_cause, 0u, "macro aligned accesses must not raise");
+            (void)rdram;
+            (void)ctx;
+            (void)runtime;
+        });
+
+        tc.Run("Phase15 KSEG2 TLB hit translates, TLB miss raises refill", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+            t.IsTrue(env.runtime.memory().tlbWrite(0u, 0xC0001000u, 1u, 0u, true),
+                     "TLB entry install should succeed");
+
+            uint8_t *rdram = env.runtime.memory().getRDRAM();
+            R5900Context *ctx = &env.ctx;
+            PS2Runtime *runtime = &env.runtime;
+            env.ctx.pc = 0x80001000u;
+            env.ctx.in_delay_slot = false;
+            t.Equals(env.runtime.Load32(rdram, &env.ctx, 0xC0001000u), 0xDEADBEEFu,
+                     "KSEG2 TLB hit must translate to RAM");
+            t.Equals(READ32(0xC0001000u), 0xDEADBEEFu,
+                     "macro KSEG2 access must also translate via the slow path");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            bool threw = false;
+            try
+            {
+                (void)env.runtime.Load32(rdram, &env.ctx, 0xC0002000u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "KSEG2 TLB miss must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 2u,
+                     "KSEG2 TLB miss must raise refill, not AdEL");
+            t.Equals(env.ctx.cop0_badvaddr, 0xC0002000u, "TLB miss must record BadVAddr");
+            t.Equals(env.ctx.pc, 0x80000000u, "TLB refill must vector to 0x80000000");
+        });
+
+        tc.Run("Phase15 CACHE valid ops are no-ops, invalid cache field raises RI", [](TestCase &t)
+        {
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+            uint8_t *rdram = env.runtime.memory().getRDRAM();
+
+            env.ctx.pc = 0x80001000u;
+            for (uint32_t op : {0u, 1u, 4u, 5u, 0x10u, 0x11u, 0x14u, 0x1Du})
+            {
+                env.runtime.handleCacheOp(rdram, &env.ctx, op, 0x1000u);
+            }
+            t.Equals(env.ctx.cop0_cause, 0u, "valid CACHE ops must not raise");
+            t.Equals(env.ctx.pc, 0x80001000u, "valid CACHE ops must not redirect PC");
+            t.Equals(env.runtime.memory().read32(0x1000u), 0xDEADBEEFu,
+                     "valid CACHE ops must not modify memory");
+
+            for (uint32_t op : {2u, 3u, 6u, 7u, 0x1Eu})
+            {
+                env.ctx.pc = 0x80001000u;
+                env.ctx.cop0_cause = 0u;
+                env.ctx.cop0_status = 0u;
+                bool threw = false;
+                try
+                {
+                    env.runtime.handleCacheOp(rdram, &env.ctx, op, 0x1000u);
+                }
+                catch (const EeDispatcherTransfer &)
+                {
+                    threw = true;
+                }
+                t.IsTrue(threw, "CACHE with a cache field naming no cache must abort");
+                t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 10u,
+                         "CACHE with an invalid cache field must raise RI");
+            }
+        });
+
+        tc.Run("Phase15 BREAK and TRAP abort to the exception vector", [](TestCase &t)
+        {
+            TestEnv env;
+            uint8_t *rdram = env.runtime.memory().getRDRAM();
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.in_delay_slot = false;
+            bool threw = false;
+            try
+            {
+                env.runtime.handleBreak(rdram, &env.ctx);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "BREAK must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 9u, "BREAK must raise breakpoint");
+            t.Equals(env.ctx.pc, 0x80000080u, "BREAK must vector to the general handler");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            threw = false;
+            try
+            {
+                env.runtime.handleTrap(rdram, &env.ctx);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "TRAP must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 13u, "TRAP must raise trap");
+            t.Equals(env.ctx.pc, 0x80000080u, "TRAP must vector to the general handler");
+        });
+
         tc.Run("ReleaseAlarm aliases CancelAlarm and cache syscalls succeed", [](TestCase &t)
         {
             TestEnv env;

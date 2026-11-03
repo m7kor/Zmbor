@@ -434,12 +434,41 @@ namespace ps2x::iop::detail
     {
         if (core < 0 || core > 1)
             return;
+        // Phase 10b (D-REV-10b-4): a parameter rewrite PRESERVES
+        // the delay buffers, held output and pair state — the tail
+        // must survive reprogramming, exactly as libsd's
+        // sceSdSetEffectAttr rewrites params without clearing the
+        // work area unless CLEAR is set. The explicit clearing path
+        // is resetReverb; Phase 10's zeroing behaviour moved there.
+        // Note: changing workSizeSamples here re-sizes the buffers
+        // (a model-API reconfiguration, not a guest write — guest
+        // writes never change the work size), which necessarily
+        // discards buffer contents for the new size.
         ReverbState &state = m_reverb[static_cast<size_t>(core)];
+        const uint32_t oldSize = static_cast<uint32_t>(state.bufL.size());
         state.params = params;
-        // Re-initialising the parameters clears the work area, exactly as
-        // reprogramming the unit would: stale delay data must not leak
-        // into the new configuration (D-REV-3/6).
         const uint32_t n = params.workSizeSamples == 0u ? 1u : params.workSizeSamples;
+        if (n != oldSize)
+        {
+            state.bufL.assign(n, 0);
+            state.bufR.assign(n, 0);
+            state.cursor = 0u;
+            state.prevWetL = 0;
+            state.prevWetR = 0;
+            state.heldL = 0;
+            state.heldR = 0;
+        }
+    }
+
+    void Spu2::resetReverb(int core)
+    {
+        if (core < 0 || core > 1)
+            return;
+        // The explicit clear (Phase 10's old setReverbParams
+        // behaviour): buffers, cursor, pair state and held output
+        // are zeroed, params and enable flag untouched.
+        ReverbState &state = m_reverb[static_cast<size_t>(core)];
+        const uint32_t n = state.params.workSizeSamples == 0u ? 1u : state.params.workSizeSamples;
         state.bufL.assign(n, 0);
         state.bufR.assign(n, 0);
         state.cursor = 0u;
@@ -447,6 +476,134 @@ namespace ps2x::iop::detail
         state.prevWetR = 0;
         state.heldL = 0;
         state.heldR = 0;
+    }
+
+    uint16_t Spu2::sharedPReg(int core, uint32_t pReg) const
+    {
+        if (core < 0 || core > 1 || pReg > 0x26u)
+            return 0u;
+        return m_shared[static_cast<size_t>(core) * 20u + pReg / 2u];
+    }
+
+    uint32_t Spu2::reverbEsaAddress(int core) const
+    {
+        if (core < 0 || core > 1)
+            return 0u;
+        const Core &c = m_cores[static_cast<size_t>(core)];
+        const uint64_t hi = c.regs[0x170u];
+        const uint64_t lo = c.regs[0x171u];
+        return static_cast<uint32_t>((hi << 17) | (lo << 1));
+    }
+
+    uint32_t Spu2::reverbEeaAddress(int core) const
+    {
+        if (core < 0 || core > 1)
+            return 0u;
+        const Core &c = m_cores[static_cast<size_t>(core)];
+        const uint64_t hi = c.regs[0x19Eu];
+        return static_cast<uint32_t>((hi << 17) | 0x1FFFFu);
+    }
+
+    bool Spu2::reverbWorkWindowValid(int core) const
+    {
+        if (core < 0 || core > 1)
+            return false;
+        const Core &c = m_cores[static_cast<size_t>(core)];
+        const uint64_t esa = (static_cast<uint64_t>(c.regs[0x170u]) << 17) |
+                             (static_cast<uint64_t>(c.regs[0x171u]) << 1);
+        uint64_t eea = (static_cast<uint64_t>(c.regs[0x19Eu]) << 17) | 0x1FFFFu;
+        if (eea > 0x1FFFFFu)
+            eea = 0x1FFFFFu; // truncated to the RAM top (D-REV-10b-3)
+        return esa < 0x200000u && esa <= eea;
+    }
+
+    bool Spu2::guestEffectsEnabled(int core) const
+    {
+        if (core < 0 || core > 1)
+            return false;
+        return m_reverb[static_cast<size_t>(core)].guestEffectsEnabled;
+    }
+
+    const Spu2::ReverbParams &Spu2::reverbParams(int core) const
+    {
+        static const ReverbParams kDefault{};
+        if (core < 0 || core > 1)
+            return kDefault;
+        return m_reverb[static_cast<size_t>(core)].params;
+    }
+
+    void Spu2::applyGuestPWrite(int core, uint32_t pReg)
+    {
+        if (core < 0 || core > 1 || pReg > 0x26u)
+            return;
+        Core &c = m_cores[static_cast<size_t>(core)];
+        ReverbState &rev = m_reverb[static_cast<size_t>(core)];
+        const auto v = [&]() { return static_cast<int16_t>(sharedPReg(core, pReg)); };
+        // Exactly one field per register (D-REV-10b-7): a partial
+        // guest write must not clobber the other coefficients.
+        switch (pReg)
+        {
+        case 0x00u: case 0x02u: c.mvolWritten = true; break;
+        case 0x04u: rev.params.effectVolumeL = v(); break;
+        case 0x06u: rev.params.effectVolumeR = v(); break;
+        case 0x08u: case 0x0Au: break; // AVOL: stored, feeds nothing (D-REV-10b-6)
+        case 0x0Cu: case 0x0Eu: c.bvolWritten = true; break;
+        case 0x10u: case 0x12u: break; // MVOLXL/XR: mirrors, overwritten by MVOL on mixTick
+        case 0x14u: break; // IIR_ALPHA: stored only, ambiguous role (D-REV-10b-7)
+        case 0x16u: rev.params.vComb[0] = v(); break;
+        case 0x18u: rev.params.vComb[1] = v(); break;
+        case 0x1Au: rev.params.vComb[2] = v(); break;
+        case 0x1Cu: rev.params.vComb[3] = v(); break;
+        case 0x1Eu: rev.params.vIir = v(); break;
+        case 0x20u: rev.params.vWall = v(); break;
+        case 0x22u: break; // FB_X: stored only, ambiguous role (D-REV-10b-7)
+        case 0x24u: rev.params.vLin = v(); break;
+        case 0x26u: rev.params.vRin = v(); break;
+        default: break;
+        }
+    }
+
+    void Spu2::applyGuestRWrite(int core, uint32_t rReg)
+    {
+        if (core < 0 || core > 1 || rReg > 0x58u)
+            return;
+        const Core &c = m_cores[static_cast<size_t>(core)];
+        ReverbState &rev = m_reverb[static_cast<size_t>(core)];
+        // Pair reconstruction (libsd SetEffectRegister, D-REV-10b-2):
+        // hi at the base halfword, lo at the next; value =
+        // (hi << 14) | (lo >> 2). The tap takes the low 16 bits,
+        // signed; the engine takes taps modulo the work size.
+        const uint32_t base = 0x170u + rReg / 2u;
+        const uint32_t value = (static_cast<uint32_t>(c.regs[base]) << 14) |
+                               (static_cast<uint32_t>(c.regs[base + 1u]) >> 2);
+        const int16_t tap = static_cast<int16_t>(value & 0xFFFFu);
+        switch (rReg)
+        {
+        case 0x00u: case 0x5Cu: break; // ESA / EEA: window is read live, no engine field
+        case 0x04u: rev.params.dSameL = tap; break;
+        case 0x08u: rev.params.dSameR = tap; break;
+        case 0x0Cu: rev.params.mSameL = tap; break;
+        case 0x10u: rev.params.mDiffL = tap; break;
+        case 0x14u: rev.params.mCombL[0] = tap; break;
+        case 0x18u: rev.params.mCombL[1] = tap; break;
+        case 0x1Cu: rev.params.mCombL[2] = tap; break;
+        case 0x20u: rev.params.mCombL[3] = tap; break;
+        case 0x24u: rev.params.dDiffL = tap; break;
+        case 0x28u: break; // IIR_SRC_A1: stored only (D-REV-10b-7)
+        case 0x2Cu: rev.params.mSameR = tap; break;
+        case 0x30u: rev.params.mDiffR = tap; break;
+        case 0x34u: rev.params.mCombR[0] = tap; break;
+        case 0x38u: rev.params.mCombR[1] = tap; break;
+        case 0x3Cu: rev.params.mCombR[2] = tap; break;
+        case 0x40u: rev.params.mCombR[3] = tap; break;
+        case 0x44u: break; // IIR_SRC_B1: stored only (D-REV-10b-7)
+        case 0x48u: rev.params.dDiffR = tap; break;
+        case 0x4Cu: rev.params.mApfL[0] = tap; break;
+        case 0x50u: rev.params.mApfL[1] = tap; break;
+        case 0x54u: rev.params.mApfR[0] = tap; break;
+        case 0x58u: rev.params.mApfR[1] = tap; break;
+        default: break;
+        }
     }
 
     void Spu2::setReverbEnabled(int core, bool enabled)
@@ -649,23 +806,47 @@ namespace ps2x::iop::detail
                 prevOutx = outx;
             }
         }
+        // Phase 10b: MVOLXL/XR track MVOLL/R on each mix tick, like
+        // VOLXL/VOLXR track VOLL/VOLR above (only once a guest has
+        // written MVOL; unwritten MVOL stays at exact unity).
+        for (int core = 0; core < 2; ++core)
+        {
+            Core &c = m_cores[static_cast<size_t>(core)];
+            if (c.mvolWritten)
+            {
+                const size_t pBase = static_cast<size_t>(core) * 20u;
+                m_shared[pBase + 8u] = m_shared[pBase + 0u];
+                m_shared[pBase + 9u] = m_shared[pBase + 1u];
+            }
+        }
         // Phase 11 ADMA (D-ADMA-2): one stereo frame per mix tick per
         // enabled core, consumed from the core's input area in sound
         // RAM; an empty buffer contributes silence. ADMA is not fed
-        // to reverb and is not volume-scaled (unity, D-ADMA-3).
+        // to reverb. Since Phase 10b the frame is scaled by BVOL
+        // (D-REV-10b-6): unwritten BVOL is exact unity 0x8000, so
+        // Phase 11 output reproduces bit-for-bit.
         for (int core = 0; core < 2; ++core)
         {
             AdmaState &adma = m_adma[static_cast<size_t>(core)];
             if (adma.enabled && adma.frames > 0u)
             {
+                const Core &c = m_cores[static_cast<size_t>(core)];
+                const int32_t bvolL = c.bvolWritten
+                                          ? static_cast<int16_t>(sharedPReg(core, 0x0Cu))
+                                          : 0x8000;
+                const int32_t bvolR = c.bvolWritten
+                                          ? static_cast<int16_t>(sharedPReg(core, 0x0Eu))
+                                          : 0x8000;
                 const uint32_t base = kAdmaAreaBase + static_cast<uint32_t>(core) * kAdmaAreaWords;
-                out.coreAdmaL[static_cast<size_t>(core)] =
-                    static_cast<int16_t>(m_ram[base + adma.readPos]);
+                const int16_t frameL = static_cast<int16_t>(m_ram[base + adma.readPos]);
                 adma.readPos = (adma.readPos + 1u) % kAdmaAreaWords;
-                out.coreAdmaR[static_cast<size_t>(core)] =
-                    static_cast<int16_t>(m_ram[base + adma.readPos]);
+                const int16_t frameR = static_cast<int16_t>(m_ram[base + adma.readPos]);
                 adma.readPos = (adma.readPos + 1u) % kAdmaAreaWords;
                 --adma.frames;
+                out.coreAdmaL[static_cast<size_t>(core)] =
+                    floorDivBy32768(static_cast<int64_t>(frameL) * bvolL);
+                out.coreAdmaR[static_cast<size_t>(core)] =
+                    floorDivBy32768(static_cast<int64_t>(frameR) * bvolR);
             }
         }
         // Phase 10 reverb (D-REV-2): one reverb tick per two output
@@ -678,9 +859,15 @@ namespace ps2x::iop::detail
         for (int core = 0; core < 2; ++core)
         {
             ReverbState &rev = m_reverb[static_cast<size_t>(core)];
+            // Phase 10b effective enable (D-REV-10b-5/3): model
+            // enable AND the ATTR-bit-7 guest gate AND a valid work
+            // window. A gated/invalid core does not step (buffers
+            // and held output preserved, tail frozen) and contributes
+            // 0 this tick; the pair phase still toggles below.
+            const bool effective = rev.enabled && rev.guestEffectsEnabled && reverbWorkWindowValid(core);
             if (m_reverbSecondTick)
             {
-                if (rev.enabled)
+                if (effective)
                 {
                     const int32_t inL =
                         floorDivBy2(rev.prevWetL + out.coreWetL[static_cast<size_t>(core)]);
@@ -694,17 +881,33 @@ namespace ps2x::iop::detail
                 rev.prevWetL = out.coreWetL[static_cast<size_t>(core)];
                 rev.prevWetR = out.coreWetR[static_cast<size_t>(core)];
             }
-            out.coreReverbL[static_cast<size_t>(core)] = rev.heldL;
-            out.coreReverbR[static_cast<size_t>(core)] = rev.heldR;
+            out.coreReverbL[static_cast<size_t>(core)] = effective ? rev.heldL : 0;
+            out.coreReverbR[static_cast<size_t>(core)] = effective ? rev.heldR : 0;
         }
         m_reverbSecondTick = !m_reverbSecondTick;
         // Clamping happens exactly once, at the final output (D-REV-7):
-        // dry sums plus reverb outputs plus ADMA frames (Phase 11),
-        // per core summed, then clamped.
-        out.left = clamp16(out.coreDryL[0] + out.coreDryL[1] + out.coreReverbL[0] + out.coreReverbL[1] +
-                           out.coreAdmaL[0] + out.coreAdmaL[1]);
-        out.right = clamp16(out.coreDryR[0] + out.coreDryR[1] + out.coreReverbR[0] + out.coreReverbR[1] +
-                            out.coreAdmaR[0] + out.coreAdmaR[1]);
+        // since Phase 10b, each core's dry + reverb + ADMA sum is
+        // scaled by that core's MVOL (D-REV-10b-6; unwritten MVOL is
+        // exact unity 0x8000, so Phase 9/10/11 values reproduce
+        // exactly), the cores are summed, then clamped.
+        int32_t sumL = 0;
+        int32_t sumR = 0;
+        for (int core = 0; core < 2; ++core)
+        {
+            const Core &c = m_cores[static_cast<size_t>(core)];
+            const int32_t mvolL = c.mvolWritten ? static_cast<int16_t>(sharedPReg(core, 0x00u)) : 0x8000;
+            const int32_t mvolR = c.mvolWritten ? static_cast<int16_t>(sharedPReg(core, 0x02u)) : 0x8000;
+            sumL += floorDivBy32768(static_cast<int64_t>(out.coreDryL[static_cast<size_t>(core)] +
+                                                          out.coreReverbL[static_cast<size_t>(core)] +
+                                                          out.coreAdmaL[static_cast<size_t>(core)]) *
+                                    mvolL);
+            sumR += floorDivBy32768(static_cast<int64_t>(out.coreDryR[static_cast<size_t>(core)] +
+                                                          out.coreReverbR[static_cast<size_t>(core)] +
+                                                          out.coreAdmaR[static_cast<size_t>(core)]) *
+                                    mvolR);
+        }
+        out.left = clamp16(sumL);
+        out.right = clamp16(sumR);
         return out;
     }
 
@@ -855,6 +1058,16 @@ namespace ps2x::iop::detail
         if (offset >= kSharedBase)
         {
             m_shared[(offset - kSharedBase) / 2u] = value; // IRQINFO reads the interrupt status, not this value
+            // Phase 10b: the P-block (0x760 + core*40, regs to 0x26)
+            // drives the reverb/volume model; other shared offsets
+            // (SPDIF, IRQINFO) have no engine side effect here.
+            if (offset < 0x7B0u)
+            {
+                const int pCore = static_cast<int>((offset - kSharedBase) / 40u);
+                const uint32_t pReg = (offset - kSharedBase) % 40u;
+                if (pReg <= 0x26u)
+                    applyGuestPWrite(pCore, pReg);
+            }
             return;
         }
         const int c = offset >= kCoreStride ? 1 : 0;
@@ -868,6 +1081,10 @@ namespace ps2x::iop::detail
             if ((value & kAttrReset) != 0u)
                 core.stat &= static_cast<uint16_t>(~(kStatDmaReady | kStatDmaBusy));
             core.regs[kAttr / 2u] = static_cast<uint16_t>(value & ~kAttrReset);
+            // Phase 10b (D-REV-10b-5): ATTR bit 7 (libsd
+            // ENABLE_EFFECTS) gates this core's reverb output; it
+            // preserves buffers, unlike setReverbEnabled(false).
+            m_reverb[static_cast<size_t>(c)].guestEffectsEnabled = (value & 0x0080u) != 0u;
             return;
         case kKeyOn:
         case kKeyOn + 2u:
@@ -929,6 +1146,12 @@ namespace ps2x::iop::detail
             return;
         }
         core.regs[local / 2u] = value;
+        // Phase 10b: the R-block (local 0x2E0-0x33F) drives the
+        // reverb taps / work window; the pair base is the offset
+        // rounded down to a multiple of 4, so a write to either
+        // half of a pair recomputes that pair (D-REV-10b-2).
+        if (local >= 0x2E0u && local < 0x340u)
+            applyGuestRWrite(c, (local - 0x2E0u) & ~3u);
     }
 
     void Spu2::dmaWrite(int core, const uint16_t *data, size_t count)

@@ -44,10 +44,11 @@ namespace ps2x::iop::detail
     // Reverb is modelled (Phase 10, see ReverbParams
     // and stepReverbCore): the documented psx-spx reflection/comb/allpass
     // structure, stepped at 24 kHz, fed by the Phase 9 wet buses, with
-    // model-level parameters — the SPU2 guest reverb-register offsets are
-    // unpinned (see D-REV-8), so no guest register drives reverb yet, and the
-    // work area is internal, never sound RAM, so reverb cannot corrupt voice
-    // sample data. Mixing is modelled (Phase 9, see mixTick):
+    // model-level parameters. Since Phase 10b (see D-REV-10b) the guest
+    // P-block and R-block registers drive those parameters (addresses
+    // source-pinned from ps2sdk spu2regs.h), while the work area stays
+    // internal, never sound RAM, so reverb cannot corrupt voice sample
+    // data. Mixing is modelled (Phase 9, see mixTick):
     // per-voice volumes, dry/wet routing and core outputs, and PMON pitch modulation.
     // There is still no audio sink: mixTick returns the mixed sample; nothing plays it.
     // Pitch is modelled (Phase 7, see nextSample): the PITCH register steps a 12-bit
@@ -247,11 +248,10 @@ namespace ps2x::iop::detail
         //     retrieved source, so applying it to the dry sum would
         //     double-count core 0 against the iris final-sum rule; it stays
         //     deferred (see D-REV-4).
-        //     MVOL/EVOL/AVOL/BVOL register offsets are NOT pinned by any source
-        //     retrieved for this milestone and are not established anywhere
-        //     in-repo, so no master-volume scaling is applied (unity master);
-        //     wiring MVOL from a guessed offset would be a pseudo-hardware claim
-        //     and stays deferred (see D-REV-8).
+        //     MVOL/EVOL/AVOL/BVOL offsets are source-pinned since
+        //     Phase 10b (ps2sdk spu2regs.h, see D-REV-10b-1/6): MVOL
+        //     scales the per-core final sum, EVOL the effect volume,
+        //     BVOL the ADMA feed; AVOL feeds nothing yet.
         //     scope: VOLXL/VOLXR (the current volumes) track VOLL/VOLR
         //     immediately on every mix tick, so a guest write to VOLXL/VOLXR
         //     directly is overwritten on the next tick, as psx-spx notes the
@@ -331,12 +331,15 @@ namespace ps2x::iop::detail
         //     future work once ESA/EEA are pinned.
         //  4. Volumes and feeds: vLIN/vRIN, vIIR, vWALL, vCOMB, vAPF and
         //     the effect volume are MODEL parameters (ReverbParams),
-        //     not guest registers. Defaults: vLIN/vRIN 0x7FFF (near unity;
-        //     avoids psx-spx's -8000h negation quirk, which is not
-        //     modelled), effect volume 0x7FFF (near unity). Reverb input
-        //     is the wet bus only: sound-data input (BVOL) and external
-        //     input (AVOL, CORE1 only) do not exist in this model, and
-        //     the MMIX effect-path feed stays deferred because its bit
+        //     driven since Phase 10b by the guest P-block
+        //     coefficients (see D-REV-10b-7) and EVOL. Defaults:
+        //     vLIN/vRIN 0x7FFF (near unity; avoids psx-spx's -8000h
+        //     negation quirk, which is not modelled), effect volume
+        //     0x7FFF (near unity). Reverb input is the wet bus only:
+        //     sound-data input is the Phase 11 ADMA feed (BVOL-
+        //     scaled since Phase 10b, but NOT fed to reverb) and
+        //     external input (AVOL) still feeds nothing, and the
+        //     MMIX effect-path feed stays deferred because its bit
         //     semantics are not pinned by any retrieved source.
         //  5. Default preset: vIIR 0x4000, vCOMB1 0x4000, all other
         //     volumes 0, APF passthrough (vAPF 0, dAPF 0 — with vAPF 0 an
@@ -361,27 +364,158 @@ namespace ps2x::iop::detail
         //     bus stage; the reverb output is added to the dry sums and
         //     clamping to int16 happens exactly once, at the final stereo
         //     output, as in Phase 9. Buffer writes saturate (see D-REV-1).
-        //  8. Register pinning, Step 1 result (honest status, not a gap
-        //     to paper over): the SPU2 Overview v6.0 (Sony, April 2002)
-        //     register list was retrieved in full and pins the EXISTENCE
-        //     and semantics of MVOLL/MVOLR, EVOLL/EVOLR, AVOLL/AVOLR,
-        //     BVOLL/BVOLR, MVOLXL/MVOLXR, ESAH/ESAL and EEAH, but it
-        //     contains NO IOP addresses anywhere, so it pins no offsets.
-        //     psx-spx gives PS1 addresses only (reverb block
-        //     1F801DC0h-1F801DFFh, EVOL 1F801D84h/86h, ESA 1F801DA2h),
-        //     which do not transfer to the SPU2 map. Iris corroborates
-        //     the dual-core layout and the final-sum rule but gives no
-        //     MVOL/EVOL/AVOL/BVOL or reverb offsets. PCSX2 SPU2 source
-        //     text, DobieStation SPU2 source text and ps2sdk libsd
-        //     register tables were NOT retrieved (search surfaced only
-        //     secondary summaries), and a repo-wide grep finds MVOL/EVOL/
-        //     AVOL/BVOL only as name lists in the requirements record.
-        //     Therefore NO guest register is wired to reverb or to master
-        //     volumes in this milestone: wiring one from a guessed offset
-        //     would be the pseudo-hardware error Phase 9 refused to make.
-        //     The model API below (setReverbParams/setReverbEnabled) is
-        //     the seam a later milestone connects once the offsets are
-        //     pinned from a retrieved source.
+        //  8. Register pinning, Step 1 result (Phase 10 status, now
+        //     SUPERSEDED by Phase 10b below — kept for the record): the
+        //     SPU2 Overview v6.0 (Sony, April 2002) register list was
+        //     retrieved in full and pins the EXISTENCE and semantics of
+        //     MVOLL/MVOLR, EVOLL/EVOLR, AVOLL/AVOLR, BVOLL/BVOLR,
+        //     MVOLXL/MVOLXR, ESAH/ESAL and EEAH, but it contains NO IOP
+        //     addresses anywhere, so it pins no offsets. psx-spx gives
+        //     PS1 addresses only, which do not transfer to the SPU2
+        //     map. Iris corroborates the dual-core layout and the
+        //     final-sum rule but gives no offsets. PCSX2/DobieStation/
+        //     ps2sdk source text was NOT retrieved in Phase 10, so NO
+        //     guest register was wired to reverb or master volumes
+        //     then: wiring one from a guessed offset would be the
+        //     pseudo-hardware error Phase 9 refused to make.
+        // Phase 10b guest-register integration (D-REV-10b; the tests pin
+        // these, so a contradicting source falsifies them by design).
+        // Source: ps2sdk spu2regs.h (read in full from an anonymous
+        // ps2sdk clone, iop/sound/libsd/include/spu2regs.h), cross-
+        // checked against the repo's existing layout (voice/S/A/VA
+        // blocks, ENDX 0x340, STAT 0x344 all agree) and libsd
+        // effect.c (SetEffectRegister/SetEffectData/sceSdSetEffectAttr)
+        // and freesd.c (init sequences). Offsets are from 0x1F900000;
+        // ps2sdk's 0xBF900000 is the uncached alias, same offsets.
+        //  1. Pinned map. P-block at 0x760 + core*40 + reg: MVOLL/R
+        //     0x00/0x02, EVOLL/R 0x04/0x06, AVOLL/R 0x08/0x0A, BVOLL/R
+        //     0x0C/0x0E, MVOLXL/R 0x10/0x12, IIR_ALPHA 0x14,
+        //     ACC_COEF_A/B/C/D 0x16/0x18/0x1A/0x1C, IIR_COEF 0x1E,
+        //     FB_ALPHA 0x20, FB_X 0x22, IN_COEF_L/R 0x24/0x26.
+        //     R-block at 0x2E0 + (core<<10) + reg: ESA_HI/LO 0x00/0x02,
+        //     then 22 pair parameters stepping 4 bytes each from
+        //     0x04 (FB_SRC_A, FB_SRC_B, IIR_DEST_A0/A1, ACC_SRC_A0/A1/
+        //     B0/B1, IIR_SRC_A0/A1, IIR_DEST_B0/B1, ACC_SRC_C0/C1/D0/
+        //     D1, IIR_SRC_B1/B0, MIX_DEST_A0/A1/B0/B1) to 0x58,
+        //     EEA_HI/LO 0x5C/0x5E. ATTR bits from libsd-common.h:
+        //     SPU2_ON bit 15, ENABLE_EFFECTS bit 7 (this CORRECTS
+        //     Phase 10's "ATTR bit 7 unpinned on SPU2" note).
+        //     Addresses are source-pinned; behaviours and timing
+        //     below are model decisions, NOT hardware-confirmed.
+        //  2. Pair packing (libsd SetEffectRegister, literally):
+        //     a pair value V is stored as hi = V >> 14 at the base
+        //     halfword and lo = V << 2 (truncated to 16 bits) at the
+        //     next halfword, and reconstructed as (hi << 14) |
+        //     (lo >> 2). P-block coefficients are single halfwords.
+        //     A guest write to one half of a pair updates that half
+        //     of the stored value; the engine field follows the
+        //     recomputed pair. Read-back is always the stored halves,
+        //     so a pair round-trips exactly.
+        //  3. ESA/EEA and the work window. ESA byte address =
+        //     (ESA_HI << 17) | (ESA_LO << 1) (libsd SetESA);
+        //     EEA end = (EEA_HI << 17) | 0x1FFFF (libsd GetEEA:
+        //     128 KB-aligned end). The Phase 10 internal buffers stay
+        //     the engine: ESA/EEA anchor only a logical window used
+        //     for validity, and reverb writes stay internal — they
+        //     NEVER become guest-visible RAM writes, so no existing
+        //     output changes and voice data cannot be corrupted.
+        //     Window validity: ESA < 2 MB and ESA <= EEA (with EEA
+        //     truncated to the RAM top 0x1FFFFF for the comparison).
+        //     An invalid window mutes that core's reverb output
+        //     (held output and buffers preserved, stepping frozen)
+        //     and restoring validity resumes the tail; it never
+        //     crashes and never touches RAM. Consequences recorded
+        //     explicitly: libsd's default EEA_HI 0xF for core 1 gives
+        //     EEA 0x1FFFFF — exactly the RAM top, NOT past RAM (an
+        //     earlier concern that it overflowed was mistaken);
+        //     only EEA_HI >= 0x10 exceeds RAM, and that truncates.
+        //     A window overlapping voice data is harmless because
+        //     buffers are internal (tested: voice RAM unchanged).
+        //     Whether delay lines physically live in sound RAM is
+        //     NOT settled by this: libsd clears the work area via
+        //     VoiceTrans, which is library behaviour, not a hardware
+        //     probe, so it is recorded as an open question.
+        //  4. Mid-pair / reprogramming semantics (the sharpest rule).
+        //     libsd sceSdSetEffectAttr disables effects (ATTR bit 7
+        //     off), writes EVOL + params + ESA, re-enables, and
+        //     clears work-area RAM ONLY when the CLEAR flag is set.
+        //     Therefore: a guest coefficient/EVOL/R-pair write updates
+        //     exactly its engine field and PRESERVES buffers, held
+        //     output and pair state, including across a 24 kHz pair
+        //     boundary (held output survives the write); an ESA/EEA
+        //     re-anchor moves only the logical window and likewise
+        //     preserves the tail (the RAM-defined tail of a
+        //     RAM-resident engine is future work if buffers ever
+        //     migrate to RAM, and is NOT claimed here). The old
+        //     setReverbParams behaviour (zero buffers + held) is now
+        //     resetReverb only. ATTR bit 7 off gates output but
+        //     preserves buffers; disabling via setReverbEnabled
+        //     still zeroes held output at once (Phase 10 behaviour,
+        //     kept). The 24 kHz pair phase itself is never reset by
+        //     a guest write.
+        //  5. ATTR gating. Effective reverb for a core =
+        //     modelEnabled AND guestGate AND windowValid, where
+        //     guestGate starts true (libsd init writes ATTR with
+        //     ENABLE_EFFECTS set, so a fresh guest is gated on) and
+        //     a guest ATTR write sets it to bit 7. With effects
+        //     gated off the core contributes dry only.
+        //  6. Volumes. MVOL scales the final sum per core (Overview
+        //     §2.6 final volume): final = clamp(sum over cores of
+        //     ((dry + reverb + ADMA) * MVOL) >> 15, per side, with
+        //     MVOLXL/XR tracking MVOLL/R on each mix tick like
+        //     VOLXL/VOLXR track VOLL/VOLR. Until a guest writes
+        //     MVOL, the effective master is exactly 0x8000 (unity
+        //     in >> 15 arithmetic), so unwritten behaviour is
+        //     bit-identical to Phase 9/10/11; a guest MVOL of 0
+        //     mutes, 0x4000 halves (floor). This is a model choice:
+        //     libsd Reset writes MVOL 0 during init and games then
+        //     set it explicitly, so the model cannot distinguish
+        //     "init wrote 0" from "guest muted" — power-on is treated
+        //     as unity, a guest 0 write as mute. EVOL drives the
+        //     effect volume directly (guest write replaces the model
+        //     value; unwritten EVOL leaves the Phase 10 default
+        //     0x7FFF in place). BVOL scales the ADMA feed: ADMA
+        //     contribution = (frame * BVOL) >> 15, unwritten BVOL
+        //     = exact unity 0x8000, so Phase 11 ADMA output is
+        //     bit-identical until a guest writes BVOL. AVOL feeds
+        //     nothing: external input has no source in this model
+        //     (freesd notes core 1's external input is core 0's
+        //     output, which is the deferred MMIX effect-path feed,
+        //     not a standalone input), so AVOL is stored/read back
+        //     only and its default is silence.
+        //  7. Coefficient/tap mapping (MODEL mapping, not a hardware
+        //     claim — derived from psx-spx structure + libsd names,
+        //     pinned by tests as chosen). P-block: IN_COEF_L/R ->
+        //     vLin/vRin, IIR_COEF -> vIir, FB_ALPHA -> vWall,
+        //     ACC_COEF_A..D -> vComb[0..3]. IIR_ALPHA and FB_X are
+        //     stored and read back but drive no Phase 10 field:
+        //     the single-multiplier reflection stage does not
+        //     distinguish an IIR alpha from an IIR coefficient, and
+        //     the DIFF path reuses vWall, so their hardware roles
+        //     are recorded as ambiguous, not guessed into the
+        //     engine. R-block taps: FB_SRC_A/B -> dSameL/R,
+        //     IIR_DEST_A0/B0 -> mSameL/R, IIR_DEST_A1/B1 ->
+        //     mDiffL/R, ACC_SRC_A0/A1/B0/B1 -> mCombL[0..3],
+        //     ACC_SRC_C0/C1/D0/D1 -> mCombR[0..3], IIR_SRC_A0/B0 ->
+        //     dDiffL/R, MIX_DEST_A0/A1 -> mApfL[0..1],
+        //     MIX_DEST_B0/B1 -> mApfR[0..1]. IIR_SRC_A1/B1 (the
+        //     second IIR sources) are stored only. A tap takes the
+        //     low 16 bits of the reconstructed pair value, signed;
+        //     the engine already takes taps modulo the work size,
+        //     so any guest value is safe. A guest write to a P/R
+        //     register updates exactly its mapped field (per-
+        //     register sync): writing only EVOL does NOT zero the
+        //     other coefficients, because libsd always writes the
+        //     full set and a partial writer must not clobber it.
+        //  8. Open questions, NOT guessed: the unnamed 0x1AE/0x1B0
+        //     entries in libsd's ParamRegList (libsd's own comment:
+        //     "both related to core attr & dma somehow"; block.c
+        //     writes 0x1AE in BlockTransRead and 0x1B0 for DMA
+        //     block transfers) are left untouched — Phase 11's
+        //     ADMA model seam is unchanged. The ATTR bit 14 MUTE
+        //     and bit 15 SPU2_ON semantics are untouched (pre-
+        //     existing ATTR handling, including the bit-15 STAT-
+        //     clear rule, is out of this milestone's scope).
         struct ReverbParams
         {
             int16_t vLin = 0x7FFF;  // reverb input volume, left (model-level vLIN)
@@ -408,14 +542,33 @@ namespace ps2x::iop::detail
             uint32_t workSizeSamples = 256u; // circular delay-buffer size, samples
         };
         static ReverbParams defaultReverbParams() { return ReverbParams{}; }
-        // Model-level reverb control (see D-REV-8: NOT guest registers).
-        // Setting params re-initialises the core's delay buffers (zeroed)
-        // and clears its held output and pair state; enabling/disabling
-        // never touches the params. Disabling zeroes the held output at
-        // once. Out-of-range core is ignored.
+        // Model-level reverb control. Since Phase 10b, setting params
+        // PRESERVES the core's delay buffers, held output and pair
+        // state (see D-REV-10b-4: a parameter rewrite must not cut the
+        // tail); resetReverb is the explicit clearing path (the old
+        // setReverbParams behaviour) and is what Spu2::reset uses.
+        // Enabling/disabling never touches the params. Disabling
+        // zeroes the held output at once. Out-of-range core is ignored.
         void setReverbParams(int core, const ReverbParams &params);
+        void resetReverb(int core);
         void setReverbEnabled(int core, bool enabled);
         [[nodiscard]] bool reverbEnabled(int core) const;
+        // Guest-visible reverb state (Phase 10b, D-REV-10b): ESA/EEA
+        // byte addresses decoded from the stored R-block halves, and
+        // whether the resulting work window is usable (see
+        // D-REV-10b-3). guestEffectsEnabled is the ATTR-bit-7 gate
+        // (true until a guest ATTR write says otherwise).
+        [[nodiscard]] uint32_t reverbEsaAddress(int core) const;
+        [[nodiscard]] uint32_t reverbEeaAddress(int core) const;
+        [[nodiscard]] bool reverbWorkWindowValid(int core) const;
+        [[nodiscard]] bool guestEffectsEnabled(int core) const;
+        // Current engine parameters for a core (model defaults until
+        // a guest register or setReverbParams changes a field). This
+        // is the observable that pins pair packing: the high half of
+        // a pair vanishes modulo the 256-sample work buffer, so no
+        // engine-output test can distinguish a wrong pair shift —
+        // the mapped tap value itself must be asserted.
+        [[nodiscard]] const ReverbParams &reverbParams(int core) const;
 
         // ADMA, sound-data input (Phase 11). Decisions (D-ADMA-1/2/3; the
         // tests pin them so a contradicting source falsifies them by design):
@@ -489,12 +642,13 @@ namespace ps2x::iop::detail
         //     enabled core holds fewer than one half-buffer (256
         //     frames) — the model-level reading of the Overview's
         //     "requests a data transfer when half of the area is
-        //     processed". ADMA samples are added to the final stereo
-        //     output at unity (input-volume BVOL/AVOL offsets are
-        //     unpinned per D-REV-8, so no scaling is applied) and are
-        //     NOT fed to reverb (reverb input is the voice wet bus
-        //     only, Phase 10); clamping still happens exactly once,
-        //     at the final output.
+        //     processed". ADMA samples are scaled by BVOL since
+        //     Phase 10b (unwritten BVOL = exact unity, so Phase 11
+        //     output is bit-identical) and then by that core's MVOL
+        //     as part of the final sum, and are NOT fed to reverb
+        //     (reverb input is the voice wet bus only, Phase 10);
+        //     clamping still happens exactly once, at the final
+        //     output.
         void setAdmaEnabled(int core, bool enabled);
         [[nodiscard]] bool admaEnabled(int core) const;
         // DMA-side ADMA feed (halfwords, L/R interleaved). When ADMA is
@@ -512,10 +666,10 @@ namespace ps2x::iop::detail
             std::array<int32_t, 2> coreWetR{};
             std::array<int32_t, 2> coreReverbL{}; // per-core reverb outputs (post effect volume), unclamped
             std::array<int32_t, 2> coreReverbR{};
-            std::array<int32_t, 2> coreAdmaL{}; // per-core ADMA stream frames consumed this tick, unclamped
+            std::array<int32_t, 2> coreAdmaL{}; // per-core ADMA contributions this tick (post-BVOL), unclamped
             std::array<int32_t, 2> coreAdmaR{};
-            int16_t left = 0;  // clamped coreDryL[0] + coreDryL[1] + coreReverbL[0] + coreReverbL[1] + coreAdmaL[0] + coreAdmaL[1]
-            int16_t right = 0; // clamped coreDryR[0] + coreDryR[1] + coreReverbR[0] + coreReverbR[1] + coreAdmaR[0] + coreAdmaR[1]
+            int16_t left = 0;  // clamped per-core MVOL-scaled sums of dry + reverb + ADMA (Phase 10b)
+            int16_t right = 0; // (unwritten MVOL = exact unity, so Phase 9/10/11 values reproduce exactly)
         };
         MixTick mixTick();
         // ADSR envelope phase (Phase 6). Idle means no envelope is running: either the voice was
@@ -650,6 +804,8 @@ namespace ps2x::iop::detail
             uint32_t keyOff = 0;
             uint32_t endx = 0;
             uint16_t stat = 0;
+            bool mvolWritten = false; // a guest MVOL(L/R) write has set the master (Phase 10b)
+            bool bvolWritten = false; // a guest BVOL(L/R) write has set the ADMA input volume (Phase 10b)
         };
 
         // One core's reverb unit (Phase 10, D-REV-3/6). The delay buffers
@@ -658,6 +814,7 @@ namespace ps2x::iop::detail
         {
             ReverbParams params{};
             bool enabled = false;
+            bool guestEffectsEnabled = true; // ATTR bit 7 gate (Phase 10b): true until a guest ATTR write clears it
             std::vector<int16_t> bufL;
             std::vector<int16_t> bufR;
             uint32_t cursor = 0;   // current buffer address, < work size
@@ -705,6 +862,16 @@ namespace ps2x::iop::detail
         // output. Callers pass already-saturated int16-range inputs; the
         // method saturates again defensively, since the wet bus is int32.
         void stepReverbCore(ReverbState &state, int32_t wetL, int32_t wetR);
+        // Guest P-block / R-block write handlers (Phase 10b, D-REV-10b):
+        // `pReg` is the P-block register offset (0x00..0x26), `rReg`
+        // the R-block register offset (0x00..0x5E). Both read the
+        // stored halves and update exactly the mapped engine field
+        // (or, for MVOL/BVOL, the written flag), preserving buffers,
+        // held output and pair state. Out-of-range core ignored.
+        void applyGuestPWrite(int core, uint32_t pReg);
+        void applyGuestRWrite(int core, uint32_t rReg);
+        // The P-block halfword value for a core, from shared storage.
+        [[nodiscard]] uint16_t sharedPReg(int core, uint32_t pReg) const;
 
         std::array<Core, 2> m_cores{};
         std::array<AdmaState, 2> m_adma{};

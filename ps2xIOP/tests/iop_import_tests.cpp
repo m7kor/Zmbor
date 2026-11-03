@@ -2323,6 +2323,475 @@ namespace
         return ok;
     }
 
+    // Guest-visible SPU2 registers (Phase 10b, D-REV-10b): the
+    // ps2sdk-pinned P-block (0x760 + core*40) and R-block
+    // (0x2E0 + core*0x400) drive the Phase 10 reverb engine and the
+    // Phase 9/11 final sum / ADMA feed. Addresses are source-pinned;
+    // the behaviours below are the model's documented decisions.
+    bool testSpu2GuestReverbRegs()
+    {
+        constexpr uint32_t kSpu = 0x1F900000u;
+        constexpr uint32_t kCore1 = 0x400u;
+        const auto writeBlock = [&](IopMemory &memory, uint32_t core, uint32_t address, uint16_t header)
+        {
+            memory.write16(kSpu + core + 0x1A8u, static_cast<uint16_t>(address >> 16));
+            memory.write16(kSpu + core + 0x1AAu, static_cast<uint16_t>(address));
+            memory.write16(kSpu + core + 0x1ACu, header);
+            for (int i = 0; i < 7; ++i)
+                memory.write16(kSpu + core + 0x1ACu, 0x1111u);
+        };
+        const auto setVoice = [&](IopMemory &memory, uint32_t core, uint32_t address)
+        {
+            const uint32_t base = kSpu + core;
+            memory.write16(base + 0u, 0x7FFFu);
+            memory.write16(base + 2u, 0x7FFFu);
+            memory.write16(base + 4u, 0x1000u); // pitch 1.0
+            memory.write16(base + 6u, 0x000Fu);
+            memory.write16(base + 8u, 0x1FC0u);
+            memory.write16(kSpu + core + 0x1C0u, 0u);
+            memory.write16(kSpu + core + 0x1C0u + 2u, static_cast<uint16_t>(address));
+            memory.write16(kSpu + core + 0x1A0u, 0x0001u);
+        };
+        const auto setVmix = [&](IopMemory &memory, uint32_t core, uint32_t dry, uint32_t wet)
+        {
+            memory.write16(kSpu + core + 0x188u, static_cast<uint16_t>(dry));
+            memory.write16(kSpu + core + 0x190u, static_cast<uint16_t>(dry));
+            memory.write16(kSpu + core + 0x18Cu, static_cast<uint16_t>(wet));
+            memory.write16(kSpu + core + 0x194u, static_cast<uint16_t>(wet));
+        };
+        // P-block halfword (core 0 at 0x760, core 1 at 0x788) and
+        // R-block halfword (core base + 0x2E0 + reg).
+        const auto pReg = [&](uint32_t core, uint32_t reg) { return kSpu + 0x760u + core * 40u + reg; };
+        const auto rReg = [&](uint32_t core, uint32_t reg) { return kSpu + core + 0x2E0u + reg; };
+        // Write one R pair for a 16-bit value (libsd SetEffectRegister).
+        const auto writePair = [&](IopMemory &memory, uint32_t core, uint32_t base, uint16_t value)
+        {
+            memory.write16(rReg(core, base), static_cast<uint16_t>(value >> 14));
+            memory.write16(rReg(core, base + 2u), static_cast<uint16_t>((value << 2) & 0xFFFFu));
+        };
+
+        bool ok = true;
+
+        // A: read-back and core isolation for P, R-pair, ESA/EEA.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            memory.write16(pReg(0u, 0x00u), 0x4000u);
+            memory.write16(pReg(0u, 0x02u), 0x2000u);
+            memory.write16(pReg(0u, 0x04u), 0x1234u);
+            memory.write16(pReg(0u, 0x06u), 0x5678u);
+            memory.write16(pReg(0u, 0x1Eu), 0x1111u);
+            memory.write16(pReg(0u, 0x24u), 0x2222u);
+            // Core 1 P-block is at 0x788 (0x760 + 40).
+            memory.write16(kSpu + 0x788u + 0x00u, 0x1111u);
+            memory.write16(kSpu + 0x788u + 0x02u, 0x2222u);
+            writePair(memory, 0u, 0x04u, 0x1234u); // FB_SRC_A, hi 0 / lo 0x48D0
+            writePair(memory, kCore1, 0x08u, 0x5678u); // core 1 FB_SRC_B, hi 1 / lo 0x59E0
+            memory.write16(rReg(0u, 0x00u), 0u); // ESA_HI 0
+            memory.write16(rReg(0u, 0x02u), 0x0800u); // ESA_LO -> ESA 0x1000
+            memory.write16(rReg(0u, 0x5Cu), 0x000Eu); // EEA_HI -> EEA 0x1DFFFF
+            const bool rb = expect(memory.read16(pReg(0u, 0x00u)) == 0x4000u &&
+                                       memory.read16(pReg(0u, 0x02u)) == 0x2000u &&
+                                       memory.read16(pReg(0u, 0x04u)) == 0x1234u &&
+                                       memory.read16(pReg(0u, 0x06u)) == 0x5678u &&
+                                       memory.read16(pReg(0u, 0x1Eu)) == 0x1111u &&
+                                       memory.read16(pReg(0u, 0x24u)) == 0x2222u,
+                                   "P-block MVOL/EVOL/coefficients read back as written");
+            ok = ok && rb;
+            const bool iso = expect(memory.read16(kSpu + 0x788u + 0x00u) == 0x1111u &&
+                                        memory.read16(kSpu + 0x788u + 0x02u) == 0x2222u &&
+                                        memory.read16(pReg(0u, 0x00u)) == 0x4000u,
+                                    "core 1 P-block writes at 0x788 do not touch core 0");
+            ok = ok && iso;
+            const bool pair = expect(memory.read16(rReg(0u, 0x04u)) == 0u &&
+                                         memory.read16(rReg(0u, 0x06u)) == 0x48D0u &&
+                                         memory.read16(rReg(kCore1, 0x08u)) == 1u &&
+                                         memory.read16(rReg(kCore1, 0x0Au)) == 0x59E0u,
+                                     "R pairs round-trip: 0x1234 -> hi 0 / lo 0x48D0, 0x5678 -> hi 1 / lo 0x59E0");
+            ok = ok && pair;
+            // Pair packing through the engine mapping, including the
+            // high half: 0x4008 -> (hi 1, lo 0x20) must land in the
+            // tap as 0x4008, not 0x2008. This assertion exists
+            // because the high bits vanish modulo the 256-sample
+            // work buffer, so no output value could catch a wrong
+            // pair shift (a mutant with << 13 survived until this
+            // assertion was added).
+            writePair(memory, 0u, 0x0Cu, 0x4008u); // IIR_DEST_A0 -> mSameL
+            const bool pack = expect(spu.reverbParams(0).mSameL == 0x4008 &&
+                                         spu.reverbParams(1).mSameL == 0 &&
+                                         memory.read16(rReg(0u, 0x0Cu)) == 1u &&
+                                         memory.read16(rReg(0u, 0x0Eu)) == 0x0020u,
+                                     "pair packing maps 0x4008 to tap 0x4008 (hi 1 / lo 0x20), core 1 untouched");
+            ok = ok && pack;
+            const bool esa = expect(spu.reverbEsaAddress(0) == 0x1000u &&
+                                        spu.reverbEeaAddress(0) == 0x1DFFFFu &&
+                                        spu.reverbEsaAddress(1) == 0u &&
+                                        spu.reverbWorkWindowValid(0) && spu.reverbWorkWindowValid(1),
+                                    "ESA = (HI<<17)|(LO<<1) = 0x1000, EEA = (0xE<<17)|0x1FFFF = 0x1DFFFF, both windows valid");
+            ok = ok && esa;
+        }
+
+        // B: guest taps drive the engine exactly like the model API.
+        // Guest core writes IIR_DEST_A0 (mSameL) = 8; model core sets
+        // mSameL = 8 via setReverbParams. Ticks 1..10 must agree.
+        // A second pair checks a lo-half-only write (tap 16) and a
+        // third checks stored-only fields (IIR_ALPHA, FB_X, second
+        // IIR sources) changing nothing.
+        {
+            IopMemory gm;
+            Spu2 &gspu = gm.spu2();
+            writeBlock(gm, 0u, 0x1000u, 0x0100u);
+            setVoice(gm, 0u, 0x1000u);
+            setVmix(gm, 0u, 0u, 1u);
+            gspu.setReverbEnabled(0, true);
+            writePair(gm, 0u, 0x0Cu, 8u); // IIR_DEST_A0, hi 0 / lo 32
+            IopMemory mm;
+            Spu2 &mspu = mm.spu2();
+            writeBlock(mm, 0u, 0x1000u, 0x0100u);
+            setVoice(mm, 0u, 0x1000u);
+            setVmix(mm, 0u, 0u, 1u);
+            Spu2::ReverbParams mp = Spu2::defaultReverbParams();
+            mp.mSameL = 8;
+            mspu.setReverbParams(0, mp);
+            mspu.setReverbEnabled(0, true);
+            bool same = true;
+            for (int i = 0; i < 10; ++i)
+            {
+                const auto g = gspu.mixTick();
+                const auto m = mspu.mixTick();
+                same = same && g.left == m.left && g.coreReverbL[0] == m.coreReverbL[0];
+            }
+            const bool tapEq = expect(same, "guest IIR_DEST_A0 pair = 8 drives mSameL exactly like the model API");
+            ok = ok && tapEq;
+        }
+        {
+            IopMemory gm;
+            Spu2 &gspu = gm.spu2();
+            writeBlock(gm, 0u, 0x1000u, 0x0100u);
+            setVoice(gm, 0u, 0x1000u);
+            setVmix(gm, 0u, 0u, 1u);
+            gspu.setReverbEnabled(0, true);
+            gm.write16(rReg(0u, 0x0Eu), 64u); // lo half only: tap (0<<14)|(64>>2) = 16
+            IopMemory mm;
+            Spu2 &mspu = mm.spu2();
+            writeBlock(mm, 0u, 0x1000u, 0x0100u);
+            setVoice(mm, 0u, 0x1000u);
+            setVmix(mm, 0u, 0u, 1u);
+            Spu2::ReverbParams mp = Spu2::defaultReverbParams();
+            mp.mSameL = 16;
+            mspu.setReverbParams(0, mp);
+            mspu.setReverbEnabled(0, true);
+            bool same = true;
+            for (int i = 0; i < 10; ++i)
+            {
+                const auto g = gspu.mixTick();
+                const auto m = mspu.mixTick();
+                same = same && g.left == m.left && g.coreReverbL[0] == m.coreReverbL[0];
+            }
+            const bool halfEq = expect(same, "a lo-half-only pair write updates half the parameter (tap 16)");
+            ok = ok && halfEq;
+        }
+        {
+            IopMemory gm;
+            Spu2 &gspu = gm.spu2();
+            writeBlock(gm, 0u, 0x1000u, 0x0100u);
+            setVoice(gm, 0u, 0x1000u);
+            setVmix(gm, 0u, 0u, 1u);
+            gspu.setReverbEnabled(0, true);
+            gm.write16(pReg(0u, 0x14u), 0x1234u); // IIR_ALPHA, stored only
+            gm.write16(pReg(0u, 0x22u), 0x5678u); // FB_X, stored only
+            writePair(gm, 0u, 0x28u, 0x1111u); // IIR_SRC_A1, stored only
+            writePair(gm, 0u, 0x44u, 0x2222u); // IIR_SRC_B1, stored only
+            IopMemory mm;
+            Spu2 &mspu = mm.spu2();
+            writeBlock(mm, 0u, 0x1000u, 0x0100u);
+            setVoice(mm, 0u, 0x1000u);
+            setVmix(mm, 0u, 0u, 1u);
+            mspu.setReverbParams(0, Spu2::defaultReverbParams());
+            mspu.setReverbEnabled(0, true);
+            bool same = true;
+            for (int i = 0; i < 10; ++i)
+            {
+                const auto g = gspu.mixTick();
+                const auto m = mspu.mixTick();
+                same = same && g.left == m.left;
+            }
+            const bool storedOnly = expect(same && gm.read16(pReg(0u, 0x14u)) == 0x1234u &&
+                                               gm.read16(pReg(0u, 0x22u)) == 0x5678u,
+                                           "stored-only coefficients (IIR_ALPHA, FB_X, second IIR sources) read back but do not change output");
+            ok = ok && storedOnly;
+        }
+
+        // C: MVOL scales the final sum per core; unwritten MVOL is
+        // exact unity (Phase 9 tick-4 dry 4076 reproduces).
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0700u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 1u, 0u);
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool def = expect(t4.left == 4076 && t4.coreDryL[0] == 4076,
+                                    "unwritten MVOL reproduces the Phase 9 tick-4 dry value 4076 exactly");
+            ok = ok && def;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0700u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 1u, 0u);
+            memory.write16(pReg(0u, 0x00u), 0x4000u);
+            memory.write16(pReg(0u, 0x02u), 0x4000u);
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool half = expect(t4.left == 2038 && t4.coreDryL[0] == 4076 &&
+                                         memory.read16(pReg(0u, 0x10u)) == 0x4000u &&
+                                         memory.read16(pReg(0u, 0x12u)) == 0x4000u,
+                                     "MVOL 0x4000 halves the final sum (4076 -> 2038), dry bus untouched, MVOLXL/XR track MVOL");
+            ok = ok && half;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0700u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 1u, 0u);
+            memory.write16(pReg(0u, 0x00u), 0u);
+            memory.write16(pReg(0u, 0x02u), 0u);
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool mute = expect(t4.left == 0 && t4.coreDryL[0] == 4076,
+                                     "MVOL 0 mutes the final sum while the dry bus still mixes 4076");
+            ok = ok && mute;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0700u);
+            writeBlock(memory, kCore1, 0x1000u, 0x0700u);
+            setVoice(memory, 0u, 0x1000u);
+            setVoice(memory, kCore1, 0x1000u);
+            setVmix(memory, 0u, 1u, 0u);
+            setVmix(memory, kCore1, 1u, 0u);
+            memory.write16(kSpu + 0x788u + 0x00u, 0x4000u);
+            memory.write16(kSpu + 0x788u + 0x02u, 0x4000u);
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool perCore = expect(t4.coreDryL[0] == 4076 && t4.coreDryL[1] == 4076 && t4.left == 6114,
+                                        "MVOL is per core: core 0 unity 4076 + core 1 half 2038 = 6114");
+            ok = ok && perCore;
+        }
+
+        // D: EVOL scales the reverb output; EVOL 0 removes it.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            memory.write16(pReg(0u, 0x04u), 0x4000u);
+            memory.write16(pReg(0u, 0x06u), 0x4000u);
+            (void)spu.mixTick();
+            const auto t2 = spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool evol = expect(t2.coreReverbL[0] == 33 && t4.coreReverbL[0] == 488 && t4.left == 488,
+                                     "guest EVOL 0x4000 gives reverb 33/488, matching the model half-volume values");
+            ok = ok && evol;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 1u, 1u);
+            spu.setReverbEnabled(0, true);
+            memory.write16(pReg(0u, 0x04u), 0u);
+            memory.write16(pReg(0u, 0x06u), 0u);
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            (void)spu.mixTick();
+            const auto t4 = spu.mixTick();
+            const bool zero = expect(t4.coreReverbL[0] == 0 && t4.coreDryL[0] == 4076 && t4.left == 4076,
+                                     "guest EVOL 0 removes reverb while the dry bus still mixes 4076");
+            ok = ok && zero;
+        }
+
+        // E: ATTR bit 7 gates output but preserves the tail. One-shot
+        // wet voice: tick 28 (stepping) holds 2036; disable for ticks
+        // 29-30 (output 0, buffers frozen); re-enable: tick 31 (first
+        // tick) shows the frozen 2036, tick 32 (stepping) decays to
+        // 1017 — the tail continues, it does not restart at 0.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            std::array<Spu2::MixTick, 32> ticks{};
+            for (int i = 0; i < 28; ++i)
+                ticks[static_cast<size_t>(i)] = spu.mixTick();
+            const bool steady = expect(ticks[27].coreReverbL[0] == 2036,
+                                       "one-shot wet tail reaches steady 2036 at tick 28 before gating");
+            ok = ok && steady;
+            memory.write16(kSpu + 0x19Au, 0x0000u); // ATTR bit 7 clear
+            ticks[28] = spu.mixTick();
+            ticks[29] = spu.mixTick();
+            const bool gated = expect(!spu.guestEffectsEnabled(0) && ticks[28].coreReverbL[0] == 0 &&
+                                          ticks[29].coreReverbL[0] == 0,
+                                      "ATTR bit 7 clear gates reverb output to 0 for ticks 29-30");
+            ok = ok && gated;
+            memory.write16(kSpu + 0x19Au, 0x0080u); // ATTR bit 7 set
+            ticks[30] = spu.mixTick();
+            ticks[31] = spu.mixTick();
+            const bool resumed = expect(spu.guestEffectsEnabled(0) && ticks[30].coreReverbL[0] == 2036 &&
+                                            ticks[31].coreReverbL[0] == 1017,
+                                        "re-enable resumes the frozen tail (2036, then decay 1017), not a restart at 0");
+            ok = ok && resumed;
+        }
+
+        // F: a guest coefficient rewrite preserves the tail across a
+        // pair boundary and mid-pair. After tick 28 (stepping, 2036),
+        // rewrite IIR_COEF; tick 29 (first tick) still holds 2036.
+        // Rewrite FB_ALPHA mid-pair (after tick 29); tick 30
+        // (stepping) still produces a tail sample, not 0.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            for (int i = 0; i < 28; ++i)
+                (void)spu.mixTick();
+            memory.write16(pReg(0u, 0x1Eu), 0x2000u); // IIR_COEF 0x4000 -> 0x2000
+            const auto t29 = spu.mixTick();
+            const bool held = expect(t29.coreReverbL[0] == 2036,
+                                     "a coefficient rewrite between pairs leaves the held output at 2036 (no zeroing)");
+            ok = ok && held;
+            memory.write16(pReg(0u, 0x20u), 0x1000u); // FB_ALPHA 0 -> 0x1000, mid-pair
+            const auto t30 = spu.mixTick();
+            const bool continues = expect(t30.coreReverbL[0] != 0,
+                                          "a mid-pair coefficient rewrite does not zero the tail before the next step");
+            ok = ok && continues;
+        }
+
+        // G: work-window bounds. ESA > EEA mutes reverb and restoring
+        // validity resumes it; EEA past RAM truncates (valid);
+        // ESA past RAM is invalid; an overlapping window never
+        // touches voice RAM.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            memory.write16(rReg(0u, 0x00u), 1u); // ESA_HI 1 -> ESA 0x20000
+            memory.write16(rReg(0u, 0x02u), 0u);
+            memory.write16(rReg(0u, 0x5Cu), 0u); // EEA_HI 0 -> EEA 0x1FFFF < ESA
+            const bool invalid = expect(!spu.reverbWorkWindowValid(0) && spu.mixTick().coreReverbL[0] == 0 &&
+                                            spu.mixTick().coreReverbL[0] == 0,
+                                        "ESA > EEA is an invalid window: reverb mutes, no crash");
+            ok = ok && invalid;
+            memory.write16(rReg(0u, 0x5Cu), 0x000Eu); // EEA 0x1DFFFF, valid again
+            bool resumed = false;
+            for (int i = 0; i < 4; ++i)
+                resumed = resumed || spu.mixTick().coreReverbL[0] != 0;
+            const bool back = expect(spu.reverbWorkWindowValid(0) && resumed,
+                                     "restoring a valid EEA resumes reverb output");
+            ok = ok && back;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0100u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            memory.write16(rReg(0u, 0x5Cu), 0x0010u); // EEA_HI 0x10 -> EEA 0x21FFFF, past RAM
+            const bool trunc = expect(spu.reverbEeaAddress(0) == 0x21FFFFu && spu.reverbWorkWindowValid(0),
+                                      "EEA_HI 0x10 decodes to 0x21FFFF and truncates to the RAM top for validity");
+            ok = ok && trunc;
+            (void)spu.mixTick();
+            const auto t2 = spu.mixTick();
+            const bool runs = expect(t2.coreReverbL[0] == 65,
+                                     "a past-RAM EEA still runs reverb (tick-2 head 65, as Phase 10)");
+            ok = ok && runs;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            memory.write16(rReg(0u, 0x00u), 0x0020u); // ESA_HI 0x20 -> ESA 0x400000, past RAM
+            const bool past = expect(!spu.reverbWorkWindowValid(0) && spu.reverbEsaAddress(0) == 0x400000u,
+                                     "ESA past 2 MB RAM is an invalid window");
+            ok = ok && past;
+        }
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            writeBlock(memory, 0u, 0x1000u, 0x0700u);
+            setVoice(memory, 0u, 0x1000u);
+            setVmix(memory, 0u, 0u, 1u);
+            spu.setReverbEnabled(0, true);
+            memory.write16(rReg(0u, 0x02u), 0x0800u); // ESA 0x1000, overlapping the voice block
+            memory.write16(rReg(0u, 0x5Cu), 0x000Eu);
+            for (int i = 0; i < 100; ++i)
+                (void)spu.mixTick();
+            const bool ramOk = expect(spu.ram(0x1000u) == 0x0700u && spu.reverbWorkWindowValid(0),
+                                      "an overlapping work window never writes voice RAM (buffers stay internal)");
+            ok = ok && ramOk;
+        }
+
+        // H: BVOL scales the ADMA feed; unwritten BVOL is exact unity
+        // (Phase 11 frames reproduce), and MVOL then scales the sum.
+        {
+            IopMemory memory;
+            Spu2 &spu = memory.spu2();
+            spu.setAdmaEnabled(0, true);
+            const uint16_t frames[10] = {16384u, static_cast<uint16_t>(-16384), 16384u,
+                                         static_cast<uint16_t>(-16384), 16384u, static_cast<uint16_t>(-16384),
+                                         16384u, static_cast<uint16_t>(-16384), 16384u,
+                                         static_cast<uint16_t>(-16384)};
+            spu.admaWrite(0, frames, 10u);
+            const auto t1 = spu.mixTick();
+            const bool unity = expect(t1.coreAdmaL[0] == 16384 && t1.coreAdmaR[0] == -16384 && t1.left == 16384,
+                                      "unwritten BVOL passes ADMA at exact unity (16384, -16384)");
+            ok = ok && unity;
+            memory.write16(pReg(0u, 0x0Cu), 0x4000u);
+            memory.write16(pReg(0u, 0x0Eu), 0x4000u);
+            const auto t2 = spu.mixTick();
+            const bool half = expect(t2.coreAdmaL[0] == 8192 && t2.coreAdmaR[0] == -8192 && t2.left == 8192,
+                                     "guest BVOL 0x4000 halves the ADMA feed (16384 -> 8192)");
+            ok = ok && half;
+            memory.write16(pReg(0u, 0x00u), 0x4000u);
+            memory.write16(pReg(0u, 0x02u), 0x4000u);
+            const auto t3 = spu.mixTick();
+            const bool both = expect(t3.coreAdmaL[0] == 8192 && t3.left == 4096,
+                                     "BVOL-half ADMA then MVOL-half final gives 4096");
+            ok = ok && both;
+            memory.write16(pReg(0u, 0x0Cu), 0u);
+            memory.write16(pReg(0u, 0x0Eu), 0u);
+            const auto t4 = spu.mixTick();
+            const bool bzero = expect(t4.coreAdmaL[0] == 0 && t4.left == 0,
+                                      "guest BVOL 0 silences the ADMA feed");
+            ok = ok && bzero;
+        }
+        return ok;
+    }
+
     // ADMA sound-data input (Phase 11, D-ADMA-1/2/3): a per-core stereo
     // PCM stream fed by DMA and consumed one frame per 48 kHz mix tick.
     // The guest ADMA register offset is unpinned, so the tests drive
@@ -3396,6 +3865,7 @@ int main()
         !testIntrHandlerRegistrationMatchesRealPs2() || !testSpu2RegistersAndSoundRam() ||
         !testSpu2AdpcmBlockDecoding() || !testSpu2VoiceBlockProgression() || !testSpu2SampleClock() ||
         !testSpu2Adsr() || !testSpu2Pitch() || !testSpu2Mixing() || !testSpu2Reverb() || !testSpu2Adma() ||
+        !testSpu2GuestReverbRegs() ||
         !testSif0IopChainBasicEot() || !testSif0IopTagIrqIndependence() || !testSif0IopAcknowledgement() ||
         !testSif0IopChcrHeldOnFull() || !testSif0IopFifoStallResume() || !testSif0IopHeaderBlockedStart() ||
         !testSif0IopBoundsHold() || !testSif0IopPartialQwPaddingFromRam() || !testSif0IopTagBits62And63DoNotComplete() ||

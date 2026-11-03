@@ -333,6 +333,187 @@ namespace ps2recomp
             }
         }
 
+        // Phase 12 — second shape: the standard MIPS switch without an
+        // SLTIU bounds check in front of it: LUI table base, SLL index by 2
+        // (optional — the index may already be word-scaled), ADDU base +
+        // index, LW target, JR target. The existing shape above requires an
+        // SLTIU + branch pair and misses switches bounded any other way
+        // (ANDI mask, SLTU against a count register, or a constant index).
+        // Entry count comes from an SLTIU/SLTI bound on the unshifted index
+        // when one is found; otherwise entries are read sequentially while
+        // they are valid code targets. A table already found by the first
+        // shape (same base address) is not duplicated.
+        for (size_t jrIndex = 0; jrIndex < instructions.size(); jrIndex++)
+        {
+            const auto &jrInst = instructions[jrIndex];
+            if (jrInst.opcode != OPCODE_SPECIAL || jrInst.function != SPECIAL_JR || jrInst.rs == 31)
+            {
+                continue;
+            }
+            const uint32_t jrReg = jrInst.rs;
+
+            int lwIndex = -1;
+            uint32_t baseReg = 0;
+            int32_t lwOffset = 0;
+            for (int i = static_cast<int>(jrIndex) - 1; i >= 0 && i >= static_cast<int>(jrIndex) - 20; --i)
+            {
+                const auto &inst = instructions[static_cast<size_t>(i)];
+                if ((inst.opcode == OPCODE_LW || inst.opcode == OPCODE_LWU) && inst.rt == jrReg)
+                {
+                    lwIndex = i;
+                    baseReg = inst.rs;
+                    lwOffset = static_cast<int32_t>(inst.simmediate);
+                    break;
+                }
+            }
+            if (lwIndex == -1)
+            {
+                continue;
+            }
+
+            int adduIndex = -1;
+            uint32_t tableBaseReg = 0;
+            uint32_t indexReg = 0;
+            for (int i = lwIndex - 1; i >= 0 && i >= lwIndex - 10; --i)
+            {
+                const auto &inst = instructions[static_cast<size_t>(i)];
+                if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_ADDU && inst.rd == baseReg)
+                {
+                    adduIndex = i;
+                    tableBaseReg = inst.rs;
+                    indexReg = inst.rt;
+                    break;
+                }
+            }
+            if (adduIndex == -1)
+            {
+                continue;
+            }
+
+            uint32_t tableAddress = 0;
+            bool foundTableAddress = false;
+            for (int i = adduIndex - 1; i >= 0 && i >= adduIndex - 20; --i)
+            {
+                const auto &inst = instructions[static_cast<size_t>(i)];
+                if (inst.opcode != OPCODE_LUI || (inst.rt != tableBaseReg && inst.rt != indexReg))
+                {
+                    continue;
+                }
+                const uint32_t hiPart = (inst.immediate << 16);
+                uint32_t low = 0;
+                bool foundLow = false;
+                for (int j = i + 1; j < adduIndex; ++j)
+                {
+                    const auto &lowInst = instructions[static_cast<size_t>(j)];
+                    if (lowInst.rs == inst.rt && lowInst.rt == inst.rt)
+                    {
+                        if (lowInst.opcode == OPCODE_ADDIU)
+                        {
+                            low = lowInst.simmediate;
+                            foundLow = true;
+                        }
+                        else if (lowInst.opcode == OPCODE_ORI)
+                        {
+                            low = lowInst.immediate;
+                            foundLow = true;
+                        }
+                    }
+                }
+                if (foundLow)
+                {
+                    tableAddress = hiPart + low;
+                    foundTableAddress = true;
+                    break;
+                }
+                if (inst.rt == baseReg)
+                {
+                    tableAddress = hiPart + static_cast<uint32_t>(lwOffset);
+                    foundTableAddress = true;
+                    break;
+                }
+            }
+            if (!foundTableAddress)
+            {
+                continue;
+            }
+
+            const bool alreadyFound = std::any_of(
+                jumpTables.begin(), jumpTables.end(),
+                [tableAddress](const JumpTable &t) { return t.address == tableAddress; });
+            if (alreadyFound)
+            {
+                continue;
+            }
+
+            uint32_t numCases = 0;
+            for (int i = adduIndex - 1; i >= 0 && i >= adduIndex - 10; --i)
+            {
+                const auto &inst = instructions[static_cast<size_t>(i)];
+                if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_SLL && inst.rd == indexReg)
+                {
+                    const uint32_t unshiftedReg = inst.rt;
+                    for (int j = adduIndex - 1; j >= 0 && j >= adduIndex - 30; --j)
+                    {
+                        const auto &boundInst = instructions[static_cast<size_t>(j)];
+                        if ((boundInst.opcode == OPCODE_SLTIU || boundInst.opcode == OPCODE_SLTI) &&
+                            boundInst.rs == unshiftedReg)
+                        {
+                            numCases = boundInst.immediate;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            JumpTable table;
+            table.address = tableAddress;
+            table.baseRegister = baseReg;
+            bool tableOk = false;
+            if (numCases > 0 && numCases <= 1000)
+            {
+                uint32_t validCodeTargets = 0;
+                for (uint32_t e = 0; e < numCases; ++e)
+                {
+                    uint32_t target = 0;
+                    if (!readWord(tableAddress + e * 4u, target))
+                    {
+                        break;
+                    }
+                    JumpTableEntry entry;
+                    entry.index = e;
+                    entry.target = target;
+                    table.entries.push_back(entry);
+                    if (looksLikeCodeTarget(target))
+                    {
+                        validCodeTargets++;
+                    }
+                }
+                tableOk = table.entries.size() == numCases && validCodeTargets >= 2 &&
+                          validCodeTargets * 2 >= table.entries.size();
+            }
+            else if (numCases == 0)
+            {
+                for (uint32_t e = 0; e < 1024; ++e)
+                {
+                    uint32_t target = 0;
+                    if (!readWord(tableAddress + e * 4u, target) || !looksLikeCodeTarget(target))
+                    {
+                        break;
+                    }
+                    JumpTableEntry entry;
+                    entry.index = e;
+                    entry.target = target;
+                    table.entries.push_back(entry);
+                }
+                tableOk = table.entries.size() >= 2;
+            }
+            if (tableOk)
+            {
+                jumpTables.push_back(std::move(table));
+            }
+        }
+
         return jumpTables;
     }
 

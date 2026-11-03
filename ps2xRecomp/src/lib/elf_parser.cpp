@@ -1,5 +1,6 @@
 #include "ps2recomp/elf_parser.h"
 #include "ps2recomp/instructions.h"
+#include "ps2recomp/r5900_decoder.h"
 #include "ps2recomp/recompiler_reporter.h"
 #include "ps2recomp/types.h"
 #include <iostream>
@@ -1703,6 +1704,245 @@ namespace
 
 namespace
 {
+    using namespace ps2recomp;
+
+    // Phase 12 — recursive-descent discovery helpers. All bounds use the Phase 3
+    // 64-bit sectionEnd()/sectionContainsAddress() helpers; no uint32 address
+    // arithmetic here may wrap a section end into a small value.
+
+    // Bounds-checked word read from any section (code or data: jump tables live
+    // in .data/.rodata). Returns false for unaligned, out-of-section, or
+    // data-less (BSS) addresses instead of throwing.
+    bool ReadAnySectionWord(const std::vector<ps2recomp::Section> &sections, uint32_t address, uint32_t &outWord)
+    {
+        if ((address % MIPS_INSTRUCTION_SIZE) != 0)
+        {
+            return false;
+        }
+        for (const auto &section : sections)
+        {
+            if (section.data == nullptr || !sectionContainsAddress(section, address))
+            {
+                continue;
+            }
+            const uint64_t offset = static_cast<uint64_t>(address) - static_cast<uint64_t>(section.address);
+            if (offset + sizeof(uint32_t) > section.size)
+            {
+                return false;
+            }
+            std::memcpy(&outWord, section.data + offset, sizeof(uint32_t));
+            return true;
+        }
+        return false;
+    }
+
+    bool IsCodeTarget(const std::vector<ps2recomp::Section> &sections, uint32_t address)
+    {
+        return FindCodeSectionByAddress(sections, address) != nullptr;
+    }
+
+    // Recover one jump table for a JR switch using the standard MIPS switch
+    // shape: LUI base, SLL index by 2 (optional — the index may already be
+    // word-scaled), ADDU base+index, LW target, JR target. The backward walk
+    // windows (LW within 20, ADDU within 10, LUI within 20, bound within 30)
+    // deliberately mirror ControlFlowAnalyzer's JR walk, so every table this
+    // recovers is consumable by the CFA's existing configured-table lookup
+    // with no CFA change. Entries must land in executable sections (the
+    // assessment's rule); a table with a non-code entry is rejected whole.
+    // Entry count comes from an SLTIU/SLTI bound on the unshifted index when
+    // one is found; otherwise entries are read sequentially while they are
+    // valid code targets (a table terminated by non-code data is fine).
+    // At least two valid entries are required in both cases, matching the
+    // AnalysisPasses table rule and rejecting lone-pointer false positives.
+    bool TryRecoverSwitchTable(const std::vector<ps2recomp::Instruction> &block, size_t jrIndex,
+                               const std::vector<ps2recomp::Section> &sections, ps2recomp::JumpTable &outTable)
+    {
+        const ps2recomp::Instruction &jrInst = block[jrIndex];
+        if (jrInst.opcode != OPCODE_SPECIAL || jrInst.function != SPECIAL_JR || jrInst.rs == GPR_RA)
+        {
+            return false;
+        }
+        const uint32_t jrReg = jrInst.rs;
+
+        // LW/LWU loading the JR register, within 20 instructions back.
+        int lwIndex = -1;
+        uint32_t baseReg = 0;
+        int32_t lwOffset = 0;
+        for (int i = static_cast<int>(jrIndex) - 1; i >= 0 && i >= static_cast<int>(jrIndex) - 20; --i)
+        {
+            const auto &inst = block[static_cast<size_t>(i)];
+            if ((inst.opcode == OPCODE_LW || inst.opcode == OPCODE_LWU) && inst.rt == jrReg)
+            {
+                lwIndex = i;
+                baseReg = inst.rs;
+                lwOffset = static_cast<int32_t>(inst.simmediate);
+                break;
+            }
+        }
+        if (lwIndex == -1)
+        {
+            return false;
+        }
+
+        // ADDU producing the LW base register, within 10 instructions back.
+        int adduIndex = -1;
+        uint32_t tableBaseReg = 0;
+        uint32_t indexReg = 0;
+        for (int i = lwIndex - 1; i >= 0 && i >= lwIndex - 10; --i)
+        {
+            const auto &inst = block[static_cast<size_t>(i)];
+            if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_ADDU && inst.rd == baseReg)
+            {
+                adduIndex = i;
+                tableBaseReg = inst.rs;
+                indexReg = inst.rt;
+                break;
+            }
+        }
+        if (adduIndex == -1)
+        {
+            return false;
+        }
+
+        // LUI producing either ADDU operand, within 20 instructions back, with
+        // an optional ADDIU/ORI low adjustment (mirrors the CFA walk).
+        uint32_t tableAddress = 0;
+        bool foundTableAddress = false;
+        for (int i = adduIndex - 1; i >= 0 && i >= adduIndex - 20; --i)
+        {
+            const auto &inst = block[static_cast<size_t>(i)];
+            if (inst.opcode != OPCODE_LUI || (inst.rt != tableBaseReg && inst.rt != indexReg))
+            {
+                continue;
+            }
+            const uint32_t hiPart = inst.immediate << 16;
+            uint32_t low = 0;
+            bool foundLow = false;
+            for (int j = i + 1; j < adduIndex; ++j)
+            {
+                const auto &lowInst = block[static_cast<size_t>(j)];
+                if (lowInst.rs == inst.rt && lowInst.rt == inst.rt)
+                {
+                    if (lowInst.opcode == OPCODE_ADDIU)
+                    {
+                        low = lowInst.simmediate;
+                        foundLow = true;
+                    }
+                    else if (lowInst.opcode == OPCODE_ORI)
+                    {
+                        low = lowInst.immediate;
+                        foundLow = true;
+                    }
+                }
+            }
+            if (foundLow)
+            {
+                tableAddress = hiPart + low;
+                foundTableAddress = true;
+                break;
+            }
+            if (inst.rt == baseReg)
+            {
+                tableAddress = hiPart + static_cast<uint32_t>(lwOffset);
+                foundTableAddress = true;
+                break;
+            }
+        }
+        if (!foundTableAddress)
+        {
+            return false;
+        }
+
+        // Optional SLL scaling the index, then an SLTIU/SLTI bound on the
+        // unshifted index register, within 30 instructions back from ADDU.
+        uint32_t numCases = 0;
+        for (int i = adduIndex - 1; i >= 0 && i >= adduIndex - 10; --i)
+        {
+            const auto &inst = block[static_cast<size_t>(i)];
+            if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_SLL && inst.rd == indexReg)
+            {
+                const uint32_t unshiftedReg = inst.rt;
+                for (int j = adduIndex - 1; j >= 0 && j >= adduIndex - 30; --j)
+                {
+                    const auto &boundInst = block[static_cast<size_t>(j)];
+                    if ((boundInst.opcode == OPCODE_SLTIU || boundInst.opcode == OPCODE_SLTI) &&
+                        boundInst.rs == unshiftedReg)
+                    {
+                        numCases = boundInst.immediate;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        ps2recomp::JumpTable table;
+        table.address = tableAddress;
+        table.baseRegister = baseReg;
+        if (numCases > 0)
+        {
+            if (numCases > 1000)
+            {
+                return false;
+            }
+            for (uint32_t e = 0; e < numCases; ++e)
+            {
+                const uint64_t entryAddr64 = static_cast<uint64_t>(tableAddress) + static_cast<uint64_t>(e) * 4u;
+                if (entryAddr64 > 0xFFFFFFFFull)
+                {
+                    return false;
+                }
+                uint32_t target = 0;
+                if (!ReadAnySectionWord(sections, static_cast<uint32_t>(entryAddr64), target))
+                {
+                    return false;
+                }
+                if (!IsCodeTarget(sections, target))
+                {
+                    return false;
+                }
+                ps2recomp::JumpTableEntry entry;
+                entry.index = e;
+                entry.target = target;
+                table.entries.push_back(entry);
+            }
+        }
+        else
+        {
+            for (uint32_t e = 0; e < 1024; ++e)
+            {
+                const uint64_t entryAddr64 = static_cast<uint64_t>(tableAddress) + static_cast<uint64_t>(e) * 4u;
+                if (entryAddr64 > 0xFFFFFFFFull)
+                {
+                    break;
+                }
+                uint32_t target = 0;
+                if (!ReadAnySectionWord(sections, static_cast<uint32_t>(entryAddr64), target))
+                {
+                    break;
+                }
+                if (!IsCodeTarget(sections, target))
+                {
+                    break;
+                }
+                ps2recomp::JumpTableEntry entry;
+                entry.index = e;
+                entry.target = target;
+                table.entries.push_back(entry);
+            }
+        }
+
+        if (table.entries.size() < 2)
+        {
+            return false;
+        }
+        outTable = std::move(table);
+        return true;
+    }
+}
+
+namespace
+{
     // ELFIO's relocation accessor reads get_data() + index * sh_entsize without checking either: a section whose
     // data failed to load (sh_offset/sh_size past the end of the file leaves get_data() null while get_size()
     // keeps the header's value) or whose sh_entsize is smaller than one record is read out of bounds. The symbol
@@ -1971,6 +2211,40 @@ namespace ps2recomp
             addOrMerge(func);
         }
 
+        // Phase 12 — recursive-descent discovery, merged LAST and therefore
+        // lowest priority. Merge order, strictly: symbols > Ghidra map >
+        // config extras > discovered. addOrMerge() enforces the hard part:
+        // a discovered start inside an authoritative (sized-symbol, Ghidra,
+        // or named-extra) range is dropped, and a discovered start equal to
+        // an existing start keeps the existing name and authoritative end
+        // (discovered names are auto-generated and discovered ends are 0, so
+        // neither can replace them). Where discovery and a symbol disagree,
+        // the symbol wins; the disagreement is pinned by the Phase 12 merge
+        // test (a planted sized symbol range survives discovery unchanged),
+        // not silently resolved in favour of discovery. Discovered ends are
+        // inferred below from the next function start / section end, with
+        // the Phase 3 64-bit clamp helpers (ends stay exclusive).
+        // One pre-existing rule outranks discovery in the function-SET
+        // sense: when a Ghidra map is loaded, loadGhidraFunctionMap()
+        // erases every auto-named extra whose start is not in the map,
+        // treating the map as the complete auto-function set. Discovered
+        // functions are auto-named too, so the same rule applies here —
+        // otherwise discovery would silently re-add exactly the starts the
+        // map deliberately removed (regression: the ghidra-map test's
+        // fallback start would return). Discovery is therefore fully
+        // active when no map is loaded — the stripped-ELF case it exists
+        // for — and defers to a loaded map. This is a SET rule, not a
+        // range rule: a discovered start equal to a map start still merges
+        // under the map entry via addOrMerge().
+        for (const auto &func : discoverFromEntryPoint().functions)
+        {
+            if (m_hasLoadedGhidraMap && !m_ghidraMapStarts.contains(func.start))
+            {
+                continue;
+            }
+            addOrMerge(func);
+        }
+
         std::sort(functions.begin(), functions.end(),
                   [](const Function &a, const Function &b)
                   { return a.start < b.start; });
@@ -2011,6 +2285,243 @@ namespace ps2recomp
         }
 
         return functions;
+    }
+
+    ElfParser::FunctionDiscovery ElfParser::discoverFromEntryPoint() const
+    {
+        FunctionDiscovery result;
+        const uint32_t entry = getEntryPoint();
+        if (FindCodeSectionByAddress(m_sections, entry) == nullptr)
+        {
+            return result;
+        }
+
+        // Recursive descent, Phase 12 design (see the header comment):
+        //  - a worklist of function starts, seeded with the ELF entry point;
+        //  - per function, a worklist of block starts decoded linearly until a
+        //    transfer ends the block; edges become new block starts (same
+        //    function) or new function starts (direct JAL targets only);
+        //  - JR $ra ends a function; JR switches recover their tables, and
+        //    the recovered case targets become block starts of the switch
+        //    function (proven CFG edges — table targets are never turned
+        //    into functions here, and never fall back to entry points);
+        //  - direct J is an intra-function edge (tail-call splitting is
+        //    explicitly out of v1 scope: a J-absorbed callee still executes
+        //    correctly as blocks of the caller, it is just not split);
+        //  - JALR targets are unknown (indirect), so only the resume edge
+        //    is followed; SYSCALL/BREAK and other non-transfers fall through.
+        // Caps bound runaway decoding of malformed code; visited sets bound
+        // loops. Ends stay 0 here: extractFunctions() infers them.
+        constexpr size_t kMaxDiscoveredFunctions = 65536;
+        constexpr size_t kMaxInstructionsPerFunction = 1u << 20;
+
+        R5900Decoder decoder;
+        std::unordered_set<uint32_t> discoveredStarts;
+        std::unordered_set<uint32_t> tableAddresses;
+        std::vector<uint32_t> functionQueue;
+        auto queueFunction = [&](uint32_t start)
+        {
+            if (discoveredStarts.size() >= kMaxDiscoveredFunctions)
+            {
+                return;
+            }
+            if (discoveredStarts.insert(start).second)
+            {
+                functionQueue.push_back(start);
+            }
+        };
+        queueFunction(entry);
+
+        auto readCodeWord = [&](uint32_t address, uint32_t &outRaw) -> bool
+        {
+            const Section *section = FindCodeSectionByAddress(m_sections, address);
+            if (section == nullptr || section->data == nullptr || (address % MIPS_INSTRUCTION_SIZE) != 0)
+            {
+                return false;
+            }
+            const uint64_t offset = static_cast<uint64_t>(address) - static_cast<uint64_t>(section->address);
+            if (offset + sizeof(uint32_t) > section->size)
+            {
+                return false;
+            }
+            std::memcpy(&outRaw, section->data + offset, sizeof(uint32_t));
+            return true;
+        };
+
+        for (size_t functionIndex = 0; functionIndex < functionQueue.size(); ++functionIndex)
+        {
+            const uint32_t functionStart = functionQueue[functionIndex];
+            Function func;
+            func.name = MakeAutoFunctionName(functionStart);
+            func.start = functionStart;
+            func.end = 0;
+            func.isRecompiled = false;
+            func.isStub = false;
+            func.isSkipped = false;
+            result.functions.push_back(std::move(func));
+
+            std::unordered_set<uint32_t> decoded;
+            std::unordered_set<uint32_t> delaySlots;
+            std::vector<uint32_t> blockQueue;
+            std::unordered_set<uint32_t> blockQueued;
+            std::vector<Instruction> functionInstructions;
+            std::vector<size_t> jrIndices;
+            auto queueBlock = [&](uint32_t address) -> bool
+            {
+                if (address == 0 || (address % MIPS_INSTRUCTION_SIZE) != 0 ||
+                    !IsCodeTarget(m_sections, address))
+                {
+                    return false;
+                }
+                if (blockQueued.insert(address).second)
+                {
+                    blockQueue.push_back(address);
+                    return true;
+                }
+                return false;
+            };
+            queueBlock(functionStart);
+
+            // Blocks are decoded first and JR tables recovered afterwards,
+            // over the whole decoded function: a switch prologue may live in
+            // an earlier block than the JR block, and the backward walk must
+            // see it. New case blocks queue another round until fixpoint.
+            size_t blockIndex = 0;
+            size_t recoveredUpTo = 0;
+            while (true)
+            {
+                for (; blockIndex < blockQueue.size(); ++blockIndex)
+                {
+                    uint32_t pc = blockQueue[blockIndex];
+                    while (decoded.size() < kMaxInstructionsPerFunction)
+                    {
+                        if (decoded.contains(pc) || delaySlots.contains(pc))
+                        {
+                            // A delay-slot address reached as a block start
+                            // is a fresh block (its transfer's edges were
+                            // never explored); an already-decoded address
+                            // is not.
+                            if (decoded.contains(pc))
+                            {
+                                break;
+                            }
+                            delaySlots.erase(pc);
+                        }
+                        uint32_t raw = 0;
+                        if (!readCodeWord(pc, raw))
+                        {
+                            break;
+                        }
+                        Instruction inst = decoder.decodeInstruction(pc, raw, false);
+                        decoded.insert(pc);
+                        functionInstructions.push_back(inst);
+
+                        const bool isTransfer = inst.isBranch || inst.isJump;
+                        if (!isTransfer)
+                        {
+                            pc += MIPS_INSTRUCTION_SIZE;
+                            continue;
+                        }
+
+                        // The delay slot belongs to this transfer: decode
+                        // it, but never explore edges out of it (a transfer
+                        // in a delay slot is the CFA's special case, not
+                        // discovery's).
+                        bool delayDecoded = false;
+                        if (inst.hasDelaySlot)
+                        {
+                            const uint32_t delayAddr = pc + MIPS_INSTRUCTION_SIZE;
+                            uint32_t delayRaw = 0;
+                            if (readCodeWord(delayAddr, delayRaw))
+                            {
+                                Instruction delayInst = decoder.decodeInstruction(delayAddr, delayRaw, false);
+                                delaySlots.insert(delayAddr);
+                                functionInstructions.push_back(delayInst);
+                                delayDecoded = true;
+                            }
+                        }
+                        const uint32_t resume =
+                            pc + (inst.hasDelaySlot ? 2u * MIPS_INSTRUCTION_SIZE : MIPS_INSTRUCTION_SIZE);
+
+                        if (inst.opcode == OPCODE_JAL)
+                        {
+                            const uint32_t target =
+                                ((pc + MIPS_INSTRUCTION_SIZE) & MIPS_JUMP_REGION_MASK) | (inst.target << 2);
+                            if (target != functionStart)
+                            {
+                                queueFunction(target);
+                            }
+                            queueBlock(resume);
+                        }
+                        else if (inst.opcode == OPCODE_J)
+                        {
+                            const uint32_t target =
+                                ((pc + MIPS_INSTRUCTION_SIZE) & MIPS_JUMP_REGION_MASK) | (inst.target << 2);
+                            queueBlock(target);
+                        }
+                        else if (inst.isBranch)
+                        {
+                            const int64_t offsetBytes =
+                                static_cast<int64_t>(static_cast<int32_t>(inst.simmediate)) << 2;
+                            const uint32_t target =
+                                static_cast<uint32_t>(static_cast<int64_t>(pc) + 4 + offsetBytes);
+                            queueBlock(target);
+                            queueBlock(resume);
+                        }
+                        else if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_JR)
+                        {
+                            if (inst.rs != GPR_RA)
+                            {
+                                // Index of the JR in functionInstructions:
+                                // it was appended before the delay slot
+                                // (if one was actually decoded) above.
+                                const size_t jrIndex = delayDecoded
+                                                           ? functionInstructions.size() - 2
+                                                           : functionInstructions.size() - 1;
+                                jrIndices.push_back(jrIndex);
+                            }
+                            // Return (JR $ra) and unrecovered JR: no edges.
+                        }
+                        else if (inst.isCall)
+                        {
+                            // JALR: indirect target unknown; resume only.
+                            queueBlock(resume);
+                        }
+                        else
+                        {
+                            queueBlock(resume);
+                        }
+                        break;
+                    }
+                }
+
+                bool addedBlocks = false;
+                for (; recoveredUpTo < jrIndices.size(); ++recoveredUpTo)
+                {
+                    JumpTable table;
+                    if (!TryRecoverSwitchTable(functionInstructions, jrIndices[recoveredUpTo], m_sections, table))
+                    {
+                        continue;
+                    }
+                    for (const auto &entry : table.entries)
+                    {
+                        addedBlocks = queueBlock(entry.target) || addedBlocks;
+                    }
+                    if (tableAddresses.insert(table.address).second)
+                    {
+                        result.jumpTables.push_back(std::move(table));
+                    }
+                }
+                if (!addedBlocks && blockIndex >= blockQueue.size())
+                {
+                    break;
+                }
+            }
+        }
+
+        std::sort(result.functions.begin(), result.functions.end(),
+                  [](const Function &a, const Function &b) { return a.start < b.start; });
+        return result;
     }
 
     std::vector<Symbol> ElfParser::extractSymbols()

@@ -1549,6 +1549,27 @@ namespace ps2recomp
     void ElfAnalyzer::runJumpTablePass()
     {
         detectJumpTables();
+
+        // Phase 12 — the parser's recursive-descent discovery runs over
+        // reachable code (not just the functions the analyzer decoded from
+        // symbols), so its recovered LUI/ADDU/SLL/JR tables join the
+        // analyzer's own detections. Dedup is by table address; an
+        // analyzer-detected table at the same address wins (same content
+        // modulo entry order — both paths validate entries against
+        // executable sections).
+        if (m_elfParser)
+        {
+            for (const auto &table : m_elfParser->discoverFromEntryPoint().jumpTables)
+            {
+                const bool alreadyPresent = std::any_of(
+                    m_jumpTables.begin(), m_jumpTables.end(),
+                    [&table](const JumpTable &t) { return t.address == table.address; });
+                if (!alreadyPresent)
+                {
+                    m_jumpTables.push_back(table);
+                }
+            }
+        }
     }
 
     void ElfAnalyzer::runPerformancePass()

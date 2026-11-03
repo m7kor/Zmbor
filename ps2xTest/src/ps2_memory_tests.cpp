@@ -1607,10 +1607,14 @@ void register_ps2_memory_tests()
         tc.Run("GIF arbiter prioritizes PATH1 then PATH2 then PATH3", [](TestCase &t)
         {
             std::vector<uint8_t> order;
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            std::vector<GifPathId> paths;
+            GifArbiter arbiter([&](GifPathId path, const uint8_t *data, uint32_t sizeBytes)
             {
                 if (data && sizeBytes > 0u)
+                {
                     order.push_back(data[0]);
+                    paths.push_back(path);
+                }
             });
 
             const std::vector<uint8_t> p1(16u, 0x11u);
@@ -1626,6 +1630,12 @@ void register_ps2_memory_tests()
             t.Equals(order[0], static_cast<uint8_t>(0x11u), "PATH1 should be drained first");
             t.Equals(order[1], static_cast<uint8_t>(0x22u), "PATH2 should be drained second");
             t.Equals(order[2], static_cast<uint8_t>(0x33u), "PATH3 should be drained third");
+            // Stage 0 raw-GIF seam: drain must preserve the PATH index, not
+            // just the packet order, so a raw backend can tell paths apart.
+            t.Equals(paths.size(), static_cast<size_t>(3u), "all drained packets should carry a path");
+            t.IsTrue(paths[0] == GifPathId::Path1, "first drained packet should carry PATH1");
+            t.IsTrue(paths[1] == GifPathId::Path2, "second drained packet should carry PATH2");
+            t.IsTrue(paths[2] == GifPathId::Path3, "third drained packet should carry PATH3");
         });
 
         tc.Run("VIF DIRECTHL stalls behind queued PATH3 IMAGE packets", [](TestCase &t)
@@ -1634,7 +1644,7 @@ void register_ps2_memory_tests()
             t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
 
             std::vector<uint8_t> firstBytes;
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 if (data && sizeBytes > 0u)
                     firstBytes.push_back(data[0]);
@@ -3654,7 +3664,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3723,7 +3733,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3781,7 +3791,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3838,7 +3848,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });

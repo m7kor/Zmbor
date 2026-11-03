@@ -2800,6 +2800,12 @@ bool PS2Memory::tryProcessNativeGifImageUploadChain(GS &gs, uint32_t tadr, uint3
     static constexpr uint32_t D_STAT = 0x1000E010u;
     static constexpr uint32_t D_CTRL = 0x1000E000u;
 
+    // Stage 0 raw-GIF seam: the native fast path consumes packets without
+    // forwarding raw bytes, so it must decline in raw mode. The runtime
+    // entry falls back to the normal DMA path, which routes through the
+    // GIF arbiter and the pathed frontend entry (RawGif forwarding).
+    if (gs.wantsRawGif())
+        return false;
     if (!m_rdram || !m_gsVRAM || m_path3Masked)
         return false;
     if (m_gifArbiter && !m_gifArbiter->empty())
@@ -2985,6 +2991,11 @@ bool PS2Memory::tryProcessNativeGifPackedChain(GS &gs, uint32_t tadr, uint32_t c
     static constexpr uint32_t D_STAT = 0x1000E010u;
     static constexpr uint32_t D_CTRL = 0x1000E000u;
 
+    // Stage 0 raw-GIF seam: see tryProcessNativeGifImageUploadChain — the
+    // native fast path must decline in raw mode so packets flow through the
+    // arbiter and the pathed frontend entry instead.
+    if (gs.wantsRawGif())
+        return false;
     if (!m_rdram || !m_gsVRAM || m_path3Masked)
         return false;
     if (m_gifArbiter && !m_gifArbiter->empty())

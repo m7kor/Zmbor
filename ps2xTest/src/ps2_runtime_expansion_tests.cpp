@@ -1679,6 +1679,31 @@ void register_ps2_runtime_expansion_tests()
             t.IsTrue(threw, "syscall from delay slot should throw to preserve block atomicity");
         });
 
+        tc.Run("handleSyscall throws for an unknown syscall id", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
+            R5900Context ctx{};
+
+            // 0x5A5A is handled by no dispatchNumericSyscall branch (cases
+            // cover small ids and the negated-v1 forms only) and has no
+            // override in a bare runtime, so it reaches ps2_syscalls::TODO.
+            // The old TODO silently returned 0 for it, letting the guest
+            // continue as if an unimplemented service had succeeded.
+            bool threw = false;
+            try
+            {
+                runtime.handleSyscall(rdram.data(), &ctx, 0x5A5Au);
+            }
+            catch (const std::runtime_error &e)
+            {
+                threw = true;
+                t.IsTrue(std::string(e.what()).find("Unimplemented") != std::string::npos,
+                         "unknown-syscall failure should say it is unimplemented");
+            }
+            t.IsTrue(threw, "unknown syscall should throw instead of silently returning 0");
+        });
+
         tc.Run("VIF MSCAL and MSCNT toggle DBF and keep TOPS/ITOPS coherent", [](TestCase &t)
         {
             PS2Memory mem;

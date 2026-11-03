@@ -1,6 +1,9 @@
 #include "Common.h"
 #include "System.h"
 
+#include <sstream>
+#include <stdexcept>
+
 namespace ps2_syscalls
 {
     void GsSetCrt(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -382,8 +385,18 @@ namespace ps2_syscalls
             }
         }
 
-        // Bootstrap default: avoid hard-failing loops that probe syscall availability.
-        setReturnS32(ctx, 0);
+        // An unknown syscall is not a probe to paper over: returning 0 used to
+        // let the guest continue as if an unimplemented kernel service had
+        // succeeded, silently corrupting everything downstream. Fail loudly
+        // instead, naming the syscall id — the same convention as the
+        // delay-slot check in PS2Runtime::handleSyscall and the stub path in
+        // ps2_stubs::TODO_NAMED. (Exit, 0x04, is handled above and returns
+        // normally via ExitThread; that is real behaviour, not a silent pass.)
+        {
+            std::ostringstream message;
+            message << "Unimplemented PS2 syscall called: id=0x" << std::hex << syscallId;
+            throw std::runtime_error(message.str());
+        }
     }
 
     bool dispatchSyscallOverride(uint32_t syscallNumber, uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)

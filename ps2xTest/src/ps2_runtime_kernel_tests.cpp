@@ -1286,6 +1286,55 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(getRegS32(env.ctx, 2), -4, "__divdi3 should divide signed 64-bit values");
         });
 
+        tc.Run("TODO_NAMED fails loudly on every call, past the warning cap", [](TestCase &t)
+        {
+            TestEnv env;
+
+            // The old behaviour threw on calls 1..8 per stub name but silently
+            // returned -1 from call 9 on (cap 8, count never reset), so a stub
+            // called in a loop corrupted the guest silently. Every call must
+            // now throw, and $v0 must never be rewritten to -1 by the stub path.
+            constexpr const char *kStubName = "phase13-loud-stub";
+            setRegU32(env.ctx, 2, 0u);
+            for (int call = 1; call <= 12; ++call)
+            {
+                bool threw = false;
+                std::string message;
+                try
+                {
+                    ps2_stubs::TODO_NAMED(kStubName, env.rdram.data(), &env.ctx, &env.runtime);
+                }
+                catch (const std::runtime_error &e)
+                {
+                    threw = true;
+                    message = e.what();
+                }
+                t.IsTrue(threw, "TODO_NAMED should throw on every call, including past the warning cap");
+                t.IsTrue(message.find(kStubName) != std::string::npos,
+                         "TODO_NAMED failure should name the stub");
+                t.Equals(::getRegU32(&env.ctx, 2), 0u,
+                         "TODO_NAMED must not silently write -1 to $v0");
+            }
+        });
+
+        tc.Run("TODO unknown stub fails loudly", [](TestCase &t)
+        {
+            TestEnv env;
+
+            bool threw = false;
+            try
+            {
+                ps2_stubs::TODO(env.rdram.data(), &env.ctx, &env.runtime);
+            }
+            catch (const std::runtime_error &e)
+            {
+                threw = true;
+                t.IsTrue(std::string(e.what()).find("unknown") != std::string::npos,
+                         "TODO failure should name the unknown stub");
+            }
+            t.IsTrue(threw, "TODO should throw for the unknown stub");
+        });
+
         tc.Run("ReleaseAlarm aliases CancelAlarm and cache syscalls succeed", [](TestCase &t)
         {
             TestEnv env;

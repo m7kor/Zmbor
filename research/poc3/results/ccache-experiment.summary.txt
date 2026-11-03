@@ -1,0 +1,20 @@
+COLD-configure rc=0 wall_s=48.596917152404785
+  Cache size (GiB): 0.0 / 5.0 ( 0.00%)
+COLD-build-ps2_recomp rc=0 wall_s=134.00162315368652
+  Hits:               0 / 117 ( 0.00%)
+  Misses:           117 / 117 (100.0%)
+  Cache size (GiB): 0.0 / 5.0 ( 0.16%)
+  Hits:               0 / 117 ( 0.00%)
+  Misses:           117 / 117 (100.0%)
+WARM-configure rc=0 wall_s=11.06876516342163
+  Hits:               0 / 117 ( 0.00%)
+  Misses:           117 / 117 (100.0%)
+  Cache size (GiB): 0.0 / 5.0 ( 0.16%)
+  Hits:               0 / 117 ( 0.00%)
+  Misses:           117 / 117 (100.0%)
+WARM-build-ps2_recomp rc=0 wall_s=22.836281299591064
+  Hits:             117 / 234 (50.00%)
+  Misses:           117 / 234 (50.00%)
+  Cache size (GiB): 0.0 / 5.0 ( 0.16%)
+  Hits:             117 / 234 (50.00%)
+  Misses:           117 / 234 (50.00%)

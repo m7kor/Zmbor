@@ -331,6 +331,217 @@ static bool writePhase12DiscoveryElf(const std::filesystem::path &elfPath, bool 
     return writer.save(elfPath.string());
 }
 
+// Phase 14 — JALR / JR-constant synthetic ELF (no .data section).
+// .text at 0x00100000 (50 words):
+//   entry [0x100000,0x100040): lui $t9,0x10; addiu $t9,$t9,0x40;
+//                              jalr $t9 (funcA); lui $t9,0x10;
+//                              ori $t9,$t9,0x60; jalr $t9 (funcB);
+//                              jalr $t8 (never defined: unknown target);
+//                              lui $t0,0x10; addiu $t0,$t0,0xA0;
+//                              jr $t0 (computed jump to jrBlock); jr $ra
+//   funcA [0x100040,0x10004C): addiu $v0, 41; jr $ra
+//   funcB [0x100060,0x10006C): addiu $v0, 42; jr $ra
+//   jrBlock [0x1000A0,0x1000B0): jal funcD; jr $ra — reached ONLY
+//                              through the entry's constant jr $t0, so it
+//                              is an entry block, NOT a function start
+//   funcD [0x1000C0,0x1000C8): jr $ra — reached ONLY through jrBlock's
+//                              jal, so it is discovered ONLY if the
+//                              constant-jr edge is followed.
+// cutFirstAddiu replaces entry's first `addiu $t9,$t9,0x40` with nop, so
+// the first jalr targets the bare LUI value 0x100000 (entry itself) and
+// funcA must drop out. clobberDelay replaces the first jalr's delay-slot
+// nop with `addiu $t9,$zero,0x99`, so the target register is rewritten
+// in the delay slot (architecturally unpredictable) and funcA must NOT
+// be recovered from that jalr.
+static const std::array<uint32_t, 50> kPhase14JalrTextWords = {
+    0x3C190010u, // entry: lui $t9, 0x10
+    0x27390040u, // addiu $t9, $t9, 0x40 -> 0x100040
+    0x0320F809u, // jalr $t9 (funcA)
+    0x00000000u, // nop (delay)
+    0x3C190010u, // lui $t9, 0x10
+    0x37390060u, // ori $t9, $t9, 0x60 -> 0x100060
+    0x0320F809u, // jalr $t9 (funcB)
+    0x00000000u, // nop (delay)
+    0x0300F809u, // jalr $t8 (unknown: $t8 never defined)
+    0x00000000u, // nop (delay)
+    0x3C080010u, // lui $t0, 0x10
+    0x210800A0u, // addiu $t0, $t0, 0xA0 -> 0x1000A0
+    0x01000008u, // jr $t0 (computed jump to jrBlock)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra (unreached fallthrough words)
+    0x00000000u, // nop
+    0x24020029u, // funcA: addiu $v0, zero, 41
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x2402002Au, // funcB: addiu $v0, zero, 42
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x0C040030u, // jrBlock: jal funcD (0x1000C0)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x03E00008u, // funcD: jr $ra
+    0x00000000u, // nop
+};
+
+static bool writePhase14JalrElf(const std::filesystem::path &elfPath, bool cutFirstAddiu,
+                                bool clobberDelay)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    std::array<uint32_t, 50> textWords = kPhase14JalrTextWords;
+    if (cutFirstAddiu)
+    {
+        textWords[1] = 0x00000000u; // entry's first `addiu $t9,$t9,0x40` becomes nop
+    }
+    if (clobberDelay)
+    {
+        textWords[3] = 0x24190099u; // first jalr's delay slot: addiu $t9, $zero, 0x99
+    }
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+// Phase 14 — singleton data-pointer synthetic ELF.
+// .text at 0x00100000 (26 words):
+//   entry [0x100000,0x100010): jal plainFunc; jr $ra
+//   plainFunc [0x100020,0x10002C): addiu $v0, 51; jr $ra
+//   dataptrFunc [0x100040,0x100054): addiu $v0, 52; jal dataptrCallee;
+//                                    jr $ra — reachable ONLY through the
+//                                    .data pointer below
+//   dataptrCallee [0x100060,0x100068): jr $ra — reachable ONLY through
+//                                    dataptrFunc's jal, so it is discovered
+//                                    ONLY if dataptrFunc is descended into.
+// .data at 0x00100200 (14 words): a SINGLETON pointer to dataptrFunc at
+// offset 0 (no conservative neighbour within 32 bytes, so the fallback
+// scan's clustering rule must miss it), 9 junk words, a decoy pointer to
+// plainFunc's jr $ra (mid-function, offset 0x28 = 40 bytes away, so it
+// clusters with nothing either), junk, a self pointer, and an unaligned
+// code address. zeroDataPointer replaces the singleton word with 0, so
+// dataptrFunc (and hence dataptrCallee) must drop out of discovery.
+static const std::array<uint32_t, 26> kPhase14DataTextWords = {
+    0x0C040008u, // entry: jal plainFunc (0x100020)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x24020033u, // plainFunc: addiu $v0, zero, 51
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x24020034u, // dataptrFunc: addiu $v0, zero, 52
+    0x0C040018u, // jal dataptrCallee (0x100060)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x03E00008u, // dataptrCallee: jr $ra
+    0x00000000u, // nop
+};
+
+static bool writePhase14DataElf(const std::filesystem::path &elfPath, bool zeroDataPointer)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+    text->set_data(reinterpret_cast<const char *>(kPhase14DataTextWords.data()),
+                   static_cast<ELFIO::Elf_Word>(kPhase14DataTextWords.size() * sizeof(uint32_t)));
+
+    ELFIO::section *data = writer.sections.add(".data");
+    data->set_type(ELFIO::SHT_PROGBITS);
+    data->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_WRITE);
+    data->set_addr_align(4);
+    data->set_address(0x00100200u);
+    std::array<uint32_t, 14> dataWords = {
+        0x00100040u, // singleton pointer to dataptrFunc
+        0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu,
+        0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu,
+        0x00100024u, // decoy: plainFunc's jr $ra (mid-function)
+        0xDEADBEEFu,
+        0x00100200u, // self pointer (data, not code)
+        0x00100042u, // unaligned code address
+    };
+    if (zeroDataPointer)
+    {
+        dataWords[0] = 0x00000000u;
+    }
+    data->set_data(reinterpret_cast<const char *>(dataWords.data()),
+                   static_cast<ELFIO::Elf_Word>(dataWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    ELFIO::segment *dataSegment = writer.segments.add();
+    dataSegment->set_type(ELFIO::PT_LOAD);
+    dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
+    dataSegment->set_align(0x1000);
+    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
 static bool writeMinimalMipsElfWithVuMicroprogramSection(const std::filesystem::path &elfPath)
 {
     ELFIO::elfio writer;
@@ -2341,6 +2552,197 @@ void register_ps2_recompiler_tests()
             const auto bogusResult = withBogus.analyze(switchFn, instructions, &allFunctions);
             t.IsFalse(bogusResult.indirectFallbackEntryPoints.empty(),
                       "a table with an unaccounted target must still fall back");
+        });
+
+        tc.Run("Phase 14 JALR constant targets are proven discovery edges", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-jalr-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14JalrElf(elfPath, false, false);
+            t.IsTrue(writeOk, "temporary JALR ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            // Discovery is the proven set: both constant JALR targets and
+            // the function reached only through the constant JR edge.
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(4),
+                     "discovery should find exactly entry, funcA, funcB, funcD");
+            for (const uint32_t expected :
+                 {0x00100000u, 0x00100040u, 0x00100060u, 0x001000C0u})
+            {
+                t.IsTrue(starts.count(expected) == 1, "JALR/JR-constant reachable function should be discovered");
+            }
+            t.IsFalse(starts.count(0x001000A0u) == 1,
+                      "jrBlock is an entry block reached by a constant jump, not a function start");
+            t.IsTrue(discovery.jumpTables.empty(), "no switch table should be recovered from this ELF");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 14 JALR mutants drop only the affected callee", [](TestCase &t) {
+            for (const auto &[name, cutAddiu, clobber] :
+                 {std::tuple{"cut-addiu", true, false}, std::tuple{"clobber-delay", false, true}})
+            {
+                const auto uniqueSuffix = std::to_string(static_cast<unsigned long long>(
+                    std::chrono::steady_clock::now().time_since_epoch().count()));
+                const std::filesystem::path elfPath = std::filesystem::temp_directory_path() /
+                                                      ("ps2recomp-phase14-jalr-mutant-" + uniqueSuffix + ".elf");
+
+                const bool writeOk = writePhase14JalrElf(elfPath, cutAddiu, clobber);
+                t.IsTrue(writeOk, "temporary JALR mutant ELF should be generated");
+                if (!writeOk)
+                {
+                    continue;
+                }
+
+                ElfParser parser(elfPath.string());
+                const bool parseOk = parser.parse();
+                t.IsTrue(parseOk, "generated mutant ELF should parse");
+                if (!parseOk)
+                {
+                    std::error_code removeError;
+                    std::filesystem::remove(elfPath, removeError);
+                    continue;
+                }
+
+                const auto discovery = parser.discoverFromEntryPoint();
+                std::set<uint32_t> starts;
+                for (const auto &fn : discovery.functions)
+                {
+                    starts.insert(fn.start);
+                }
+                t.Equals(starts.size(), static_cast<size_t>(3),
+                         "mutant discovery should find exactly entry, funcB, funcD");
+                t.IsFalse(starts.count(0x00100040u) == 1,
+                          "funcA must drop out of discovery once its JALR edge is cut or clobbered");
+                t.IsTrue(starts.count(0x00100060u) == 1, "funcB should remain discovered in the mutant");
+                t.IsTrue(starts.count(0x001000C0u) == 1, "funcD should remain discovered in the mutant");
+
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                (void)name;
+            }
+        });
+
+        tc.Run("Phase 14 singleton data pointer discovers its function, decoy excluded", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-data-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14DataElf(elfPath, false);
+            t.IsTrue(writeOk, "temporary data-pointer ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(4),
+                     "discovery should find exactly entry, plainFunc, dataptrFunc, dataptrCallee");
+            for (const uint32_t expected :
+                 {0x00100000u, 0x00100020u, 0x00100040u, 0x00100060u})
+            {
+                t.IsTrue(starts.count(expected) == 1, "data-pointer reachable function should be discovered");
+            }
+            t.IsFalse(starts.count(0x00100024u) == 1,
+                      "decoy pointer to plainFunc's jr $ra is mid-function and must not be discovered");
+
+            // The merged output must carry dataptrFunc through the
+            // discovery merge: the fallback scan's clustering rule misses
+            // a singleton pointer with no conservative neighbour.
+            const auto functions = parser.extractFunctions();
+            t.IsTrue(std::any_of(functions.begin(), functions.end(),
+                                 [](const Function &fn) { return fn.start == 0x00100040u; }),
+                     "merged output should contain dataptrFunc via discovery");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 14 data-pointer deletion removes the function and its callee", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-data-mutant-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14DataElf(elfPath, true);
+            t.IsTrue(writeOk, "temporary data-pointer mutant ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(2),
+                     "deleting the data pointer should leave exactly entry and plainFunc");
+            t.IsFalse(starts.count(0x00100040u) == 1,
+                      "dataptrFunc must drop out of discovery once its data pointer is zeroed");
+            t.IsFalse(starts.count(0x00100060u) == 1,
+                      "dataptrCallee must drop out too: its only caller was dataptrFunc");
+
+            // Contrast: the merged output DOES still contain dataptrCallee,
+            // because the fallback scan sees dataptrFunc's `jal` word in
+            // dead code. This is what makes the test non-vacuous — it
+            // measures descent from the data pointer, not scanning.
+            const auto functions = parser.extractFunctions();
+            t.IsTrue(std::any_of(functions.begin(), functions.end(),
+                                 [](const Function &fn) { return fn.start == 0x00100060u; }),
+                     "merged output still contains dataptrCallee via the fallback scan");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
         });
 
         tc.Run("elf parser discovers address-taken callbacks in stripped ELFs", [](TestCase &t) {

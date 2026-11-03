@@ -4,6 +4,7 @@
 #include "ps2recomp/recompiler_reporter.h"
 #include "ps2recomp/types.h"
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <unordered_set>
 #define NOMINMAX
@@ -1741,6 +1742,395 @@ namespace
         return FindCodeSectionByAddress(sections, address) != nullptr;
     }
 
+    // Phase 14 — block-local constant resolution for indirect transfers.
+    //
+    // ResolveBlockConstant scans the straight-line instructions of one
+    // block, [blockStart, transferIndex), tracking a constant value per
+    // GPR. $zero is always 0. Recognized materialization: LUI, ORI/ANDI/
+    // XORI, ADDIU, ADDI (only when the signed result cannot overflow — an
+    // overflowing ADDI traps, so its value never reaches the transfer),
+    // SLTI/SLTIU, SLL/SRL/SRA, and ADDU/SUBU/AND/OR/XOR/NOR/SLT/SLTU over
+    // known operands (ADDU/OR with $zero cover register copies). Any
+    // other instruction that may write a GPR voids every tracked constant
+    // except $zero, EXCEPT instructions provably writing no GPR (stores,
+    // non-link branches, SYSCALL/BREAK/SYNC, CACHE/PREF, MTHI/MTLO,
+    // MULT/DIV which write only HI/LO), which are skipped, and REGIMM
+    // link branches, which void only $ra. Loads, coprocessor moves and
+    // MMI instructions void their destination (loads) or the whole set
+    // (unmodelled MMI forms void everything but $zero via the default).
+    //
+    // This is deliberately narrower than full function-wide dataflow: a
+    // constant materialized in an earlier block is NOT resolved here (the
+    // fallback scan's cross-block tracking covers some of those in merged
+    // output; discovery claims only what this block proves). Soundness
+    // direction: the scan may only fail to resolve (lose precision), never
+    // claim a value the block does not prove — every unrecognized
+    // potential GPR write voids the proof.
+    bool ResolveBlockConstant(const std::vector<ps2recomp::Instruction> &instructions,
+                              size_t blockStart, size_t transferIndex, uint32_t reg,
+                              uint32_t &outValue)
+    {
+        if (reg == GPR_ZERO)
+        {
+            outValue = 0;
+            return true;
+        }
+        std::array<std::optional<uint32_t>, 32> known{};
+        known[GPR_ZERO] = 0;
+        auto setReg = [&](uint32_t r, std::optional<uint32_t> value)
+        {
+            if (r != GPR_ZERO)
+            {
+                known[r] = value;
+            }
+        };
+        auto voidAll = [&]()
+        {
+            known.fill(std::nullopt);
+            known[GPR_ZERO] = 0;
+        };
+        for (size_t i = blockStart; i < transferIndex && i < instructions.size(); ++i)
+        {
+            const uint32_t raw = instructions[i].raw;
+            const uint32_t opcode = OPCODE(raw);
+            const uint32_t rs = RS(raw);
+            const uint32_t rt = RT(raw);
+            const uint32_t rd = RD(raw);
+            const uint32_t imm16 = IMMEDIATE(raw);
+            const int32_t simm = static_cast<int32_t>(static_cast<int16_t>(imm16));
+            const uint32_t funct = FUNCTION(raw);
+            if (opcode == OPCODE_LUI)
+            {
+                setReg(rt, imm16 << 16);
+                continue;
+            }
+            if (opcode == OPCODE_ORI)
+            {
+                setReg(rt, known[rs] ? std::optional<uint32_t>(*known[rs] | imm16) : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_ANDI)
+            {
+                setReg(rt, known[rs] ? std::optional<uint32_t>(*known[rs] & imm16) : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_XORI)
+            {
+                setReg(rt, known[rs] ? std::optional<uint32_t>(*known[rs] ^ imm16) : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_ADDIU)
+            {
+                setReg(rt, known[rs]
+                                 ? std::optional<uint32_t>(static_cast<uint32_t>(
+                                       static_cast<int64_t>(static_cast<int32_t>(*known[rs])) + simm))
+                                 : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_ADDI)
+            {
+                if (!known[rs])
+                {
+                    setReg(rt, std::nullopt);
+                }
+                else
+                {
+                    const int64_t sum = static_cast<int64_t>(static_cast<int32_t>(*known[rs])) + simm;
+                    setReg(rt, (sum >= INT32_MIN && sum <= INT32_MAX)
+                                   ? std::optional<uint32_t>(static_cast<uint32_t>(sum))
+                                   : std::nullopt);
+                }
+                continue;
+            }
+            if (opcode == OPCODE_SLTI)
+            {
+                setReg(rt, known[rs]
+                                 ? std::optional<uint32_t>(
+                                       (static_cast<int32_t>(*known[rs]) < simm) ? 1u : 0u)
+                                 : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_SLTIU)
+            {
+                setReg(rt, known[rs] ? std::optional<uint32_t>((*known[rs] < imm16) ? 1u : 0u)
+                                     : std::nullopt);
+                continue;
+            }
+            if (opcode == OPCODE_SPECIAL)
+            {
+                switch (funct)
+                {
+                case SPECIAL_ADDU:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(*known[rs] + *known[rt])
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_SUBU:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(*known[rs] - *known[rt])
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_AND:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(*known[rs] & *known[rt])
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_OR:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(*known[rs] | *known[rt])
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_XOR:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(*known[rs] ^ *known[rt])
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_NOR:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(~(*known[rs] | *known[rt]))
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_SLT:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>(
+                                         (static_cast<int32_t>(*known[rs]) < static_cast<int32_t>(*known[rt])) ? 1u : 0u)
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_SLTU:
+                    setReg(rd, (known[rs] && known[rt])
+                                   ? std::optional<uint32_t>((*known[rs] < *known[rt]) ? 1u : 0u)
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_SLL:
+                    // sa is bits 10-6 of the raw word.
+                    setReg(rd, known[rt] ? std::optional<uint32_t>(*known[rt] << ((raw >> 6) & 0x1F))
+                                         : std::nullopt);
+                    break;
+                case SPECIAL_SRL:
+                    setReg(rd, known[rt] ? std::optional<uint32_t>(*known[rt] >> ((raw >> 6) & 0x1F))
+                                         : std::nullopt);
+                    break;
+                case SPECIAL_SRA:
+                    setReg(rd, known[rt]
+                                   ? std::optional<uint32_t>(static_cast<uint32_t>(
+                                         static_cast<int32_t>(*known[rt]) >> ((raw >> 6) & 0x1F)))
+                                   : std::nullopt);
+                    break;
+                case SPECIAL_SYSCALL:
+                case SPECIAL_BREAK:
+                case SPECIAL_SYNC:
+                    // No GPR write.
+                    break;
+                case SPECIAL_JR:
+                    // Transfer: cannot appear mid-block; no GPR write.
+                    break;
+                case SPECIAL_JALR:
+                    // Transfer: cannot appear mid-block; voids its link register.
+                    setReg(rd, std::nullopt);
+                    break;
+                default:
+                    // MFHI/MFLO write rd with an unknown HI/LO value; MTHI/
+                    // MTLO/MULT/DIV write no GPR. Void rd for everything
+                    // else in SPECIAL (unmodelled forms must not keep a
+                    // stale constant for a register they may rewrite).
+                    if (funct == SPECIAL_MFHI || funct == SPECIAL_MFLO)
+                    {
+                        setReg(rd, std::nullopt);
+                    }
+                    else if (funct != SPECIAL_MTHI && funct != SPECIAL_MTLO &&
+                             funct != SPECIAL_MULT && funct != SPECIAL_MULTU &&
+                             funct != SPECIAL_DIV && funct != SPECIAL_DIVU)
+                    {
+                        // MTHI/MTLO/MULT/MULTU/DIV/DIVU write HI/LO only,
+                        // no GPR. Anything else voids rd.
+                        setReg(rd, std::nullopt);
+                    }
+                    break;
+                }
+                continue;
+            }
+            if (opcode == OPCODE_REGIMM)
+            {
+                // Link branches (BLTZAL/BGEZAL/BLTZALL/BGEZALL) write $ra;
+                // plain REGIMM branches write nothing.
+                if (rt >= REGIMM_BLTZAL && rt <= REGIMM_BGEZALL)
+                {
+                    setReg(GPR_RA, std::nullopt);
+                }
+                continue;
+            }
+            if (opcode == OPCODE_J)
+            {
+                continue; // Transfer, no GPR write.
+            }
+            if (opcode == OPCODE_JAL)
+            {
+                setReg(GPR_RA, std::nullopt);
+                continue;
+            }
+            switch (opcode)
+            {
+            case OPCODE_SB:
+            case OPCODE_SH:
+            case OPCODE_SWL:
+            case OPCODE_SW:
+            case OPCODE_SDL:
+            case OPCODE_SDR:
+            case OPCODE_SWR:
+            case OPCODE_SC:
+            case OPCODE_SCD:
+            case OPCODE_SD:
+            case OPCODE_SQ:
+            case OPCODE_BEQ:
+            case OPCODE_BNE:
+            case OPCODE_BLEZ:
+            case OPCODE_BGTZ:
+            case OPCODE_BEQL:
+            case OPCODE_BNEL:
+            case OPCODE_BLEZL:
+            case OPCODE_BGTZL:
+            case OPCODE_CACHE:
+            case OPCODE_PREF:
+                // Stores, non-link branches, cache/prefetch: no GPR write.
+                break;
+            case OPCODE_LB:
+            case OPCODE_LH:
+            case OPCODE_LWL:
+            case OPCODE_LW:
+            case OPCODE_LBU:
+            case OPCODE_LHU:
+            case OPCODE_LWR:
+            case OPCODE_LWU:
+            case OPCODE_LL:
+            case OPCODE_LD:
+            case OPCODE_LDL:
+            case OPCODE_LDR:
+            case OPCODE_LQ:
+                // Loads overwrite rt with memory: value unknown.
+                setReg(rt, std::nullopt);
+                break;
+            case 0x10: // COP0
+            case 0x11: // COP1
+            case 0x12: // COP2
+                // MFC* writes rt; MTC*/CTC* write control. Void rt.
+                setReg(rt, std::nullopt);
+                break;
+            case OPCODE_MMI:
+                // Unmodelled MMI forms: void everything but $zero.
+                voidAll();
+                break;
+            default:
+                // Any unrecognized opcode voids the proof rather than
+                // risking a stale constant.
+                voidAll();
+                break;
+            }
+        }
+        if (known[reg])
+        {
+            outValue = *known[reg];
+            return true;
+        }
+        return false;
+    }
+
+    // A delay-slot instruction that writes the transfer's target register
+    // makes the effective target architecturally unpredictable (the target
+    // may be the pre- or post-delay value), so the constant proof is void.
+    // A transfer in the delay slot is likewise unpredictable for this
+    // purpose. WritesGpr covers the core integer encodings; coprocessor
+    // moves (MFC*) and REGIMM link branches need explicit cases because
+    // WritesGpr does not list them.
+    bool DelaySlotWritesReg(const ps2recomp::Instruction &delay, uint32_t reg)
+    {
+        if (reg == GPR_ZERO)
+        {
+            return false;
+        }
+        if (delay.isBranch || delay.isJump)
+        {
+            return true;
+        }
+        const uint32_t raw = delay.raw;
+        if (WritesGpr(raw, reg))
+        {
+            return true;
+        }
+        const uint32_t opcode = OPCODE(raw);
+        if ((opcode == 0x10 || opcode == 0x11 || opcode == 0x12) && RT(raw) == reg)
+        {
+            return true;
+        }
+        if (opcode == OPCODE_REGIMM && RT(raw) >= REGIMM_BLTZAL && RT(raw) <= REGIMM_BGEZALL &&
+            reg == GPR_RA)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    // Phase 14 — non-trivial-body guard for singleton data pointers. A
+    // bare `jr $ra` fragment is the weakest possible "function": it is
+    // what padding, thunk fragments and taken code labels look like, and
+    // the tree pins that an isolated pointer to one must NOT become a
+    // function (the address-taken test's 0x100300 case: a plausible leaf
+    // entry with no pointer cluster). A singleton pointer is therefore
+    // accepted only when the target body is unambiguously a real function:
+    // a stack-frame allocation, an $ra save, or a call (JAL/JALR/REGIMM
+    // link) before the first return/tail jump, within a 32-word window.
+    // Singleton pointers to trivial leaf bodies stay unrecovered — a
+    // documented recall trade for precision. Clustered, descriptor and
+    // consumed pointers are unaffected: the fallback scan still recovers
+    // those, including trivial leaves.
+    bool HasNonTrivialBody(const std::vector<ps2recomp::Section> &sections, uint32_t address)
+    {
+        const ps2recomp::Section *section = FindCodeSectionByAddress(sections, address);
+        if (section == nullptr || section->data == nullptr)
+        {
+            return false;
+        }
+        const uint32_t startOffset = address - section->address;
+        for (uint32_t i = 0; i < 32; ++i)
+        {
+            uint32_t raw = 0;
+            if (!ReadSectionWord(*section, startOffset + (i * MIPS_INSTRUCTION_SIZE), raw))
+            {
+                return false;
+            }
+            const uint32_t opcode = OPCODE(raw);
+            if ((opcode == OPCODE_ADDIU || opcode == OPCODE_DADDIU) && RS(raw) == GPR_SP &&
+                RT(raw) == GPR_SP && (IMMEDIATE(raw) & MIPS_IMMEDIATE_SIGN_BIT) != 0)
+            {
+                return true;
+            }
+            if ((opcode == OPCODE_SW || opcode == OPCODE_SD || opcode == OPCODE_SQ) &&
+                RS(raw) == GPR_SP && RT(raw) == GPR_RA)
+            {
+                return true;
+            }
+            if (opcode == OPCODE_JAL)
+            {
+                return true;
+            }
+            if (opcode == OPCODE_SPECIAL && FUNCTION(raw) == SPECIAL_JALR)
+            {
+                return true;
+            }
+            if (opcode == OPCODE_REGIMM && RT(raw) >= REGIMM_BLTZAL && RT(raw) <= REGIMM_BGEZALL)
+            {
+                return true;
+            }
+            if ((opcode == OPCODE_SPECIAL && FUNCTION(raw) == SPECIAL_JR && RS(raw) == GPR_RA) ||
+                opcode == OPCODE_J ||
+                (opcode == OPCODE_SPECIAL &&
+                 (FUNCTION(raw) == SPECIAL_SYSCALL || FUNCTION(raw) == SPECIAL_BREAK)))
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
     // Recover one jump table for a JR switch using the standard MIPS switch
     // shape: LUI base, SLL index by 2 (optional — the index may already be
     // word-scaled), ADDU base+index, LW target, JR target. The backward walk
@@ -2308,8 +2698,19 @@ namespace ps2recomp
         //  - direct J is an intra-function edge (tail-call splitting is
         //    explicitly out of v1 scope: a J-absorbed callee still executes
         //    correctly as blocks of the caller, it is just not split);
-        //  - JALR targets are unknown (indirect), so only the resume edge
-        //    is followed; SYSCALL/BREAK and other non-transfers fall through.
+        //  - Phase 14: JALR/JR through a register holding a block-proven
+        //    constant (ResolveBlockConstant over the transfer's own block,
+        //    voided by a delay slot rewriting the register) resolve to a
+        //    proven edge — a new function for JALR, an intra-function
+        //    block for JR. Any other JALR/JR keeps the old behaviour
+        //    (resume only / switch-table recovery); SYSCALL/BREAK and
+        //    other non-transfers fall through;
+        //  - Phase 14: after descent, scanDataPointers (in the queue-loop
+        //    condition) recovers singleton data words pointing at plausible
+        //    (LooksLikeCallableEntry), not-yet-decoded, non-delay-slot code
+        //    addresses that are not recovered table targets, and descends
+        //    them as functions. Constants materialized in an earlier block
+        //    are NOT resolved here (cross-block dataflow is future work).
         // Caps bound runaway decoding of malformed code; visited sets bound
         // loops. Ends stay 0 here: extractFunctions() infers them.
         constexpr size_t kMaxDiscoveredFunctions = 65536;
@@ -2332,6 +2733,91 @@ namespace ps2recomp
         };
         queueFunction(entry);
 
+        // Phase 14 — data-pointer discovery. decodedAll is the union of
+        // every address decoded as an instruction (including delay slots)
+        // across all descended functions; a data word pointing at one is
+        // mid-function code, not a new function start. The scan runs as
+        // part of the function-queue loop condition: it executes only once
+        // descent is exhausted (short-circuit), appends newly found starts
+        // to the queue, and the loop then descends them too. It returns
+        // false when nothing new was queued, which ends the loop; each
+        // true return queues at least one new start, and queueFunction's
+        // cap bounds the total, so the loop terminates.
+        std::unordered_set<uint32_t> decodedAll;
+        auto scanDataPointers = [&]() -> bool
+        {
+            // Recovered switch-table targets are intra-function blocks, not
+            // functions: a data word pointing at one must not split the
+            // switch function.
+            std::unordered_set<uint32_t> tableTargets;
+            for (const auto &table : result.jumpTables)
+            {
+                for (const auto &entry : table.entries)
+                {
+                    tableTargets.insert(entry.target);
+                }
+            }
+            const size_t queuedBefore = functionQueue.size();
+            for (const auto &section : m_sections)
+            {
+                if (!section.isData || section.isCode || section.isBSS ||
+                    section.data == nullptr || section.size < sizeof(uint32_t))
+                {
+                    continue;
+                }
+                for (uint32_t offset = 0; offset + sizeof(uint32_t) <= section.size;
+                     offset += MIPS_INSTRUCTION_SIZE)
+                {
+                    uint32_t word = 0;
+                    std::memcpy(&word, section.data + offset, sizeof(uint32_t));
+                    if (word == 0 || (word % MIPS_INSTRUCTION_SIZE) != 0)
+                    {
+                        continue;
+                    }
+                    const Section *codeSection = FindCodeSectionByAddress(m_sections, word);
+                    if (codeSection == nullptr)
+                    {
+                        continue;
+                    }
+                    if (decodedAll.contains(word) || discoveredStarts.contains(word) ||
+                        tableTargets.contains(word))
+                    {
+                        continue;
+                    }
+                    // A delay slot belongs to the transfer before it and is
+                    // never a function start (same rule as the fallback
+                    // scan's delay-slot filter, MTSAB/MTSAH excepted: they
+                    // have no delay slot).
+                    const uint32_t wordOffset = word - codeSection->address;
+                    if (wordOffset >= MIPS_INSTRUCTION_SIZE)
+                    {
+                        uint32_t previous = 0;
+                        if (ReadSectionWord(*codeSection, wordOffset - MIPS_INSTRUCTION_SIZE, previous) &&
+                            IsControlTransfer(previous) &&
+                            !(OPCODE(previous) == OPCODE_REGIMM && RT(previous) >= REGIMM_MTSAB))
+                        {
+                            continue;
+                        }
+                    }
+                    // Plausibility uses the same rule as the fallback
+                    // scan's conservative shape (prologue, $ra save, leaf
+                    // return, or short tail jump in the entry window).
+                    // Unlike the scan, no clustering is required: a lone
+                    // callback pointer is exactly what this phase adds —
+                    // but only for a non-trivial body (HasNonTrivialBody),
+                    // since an isolated pointer to a bare leaf fragment is
+                    // pinned NOT to become a function (see that helper).
+                    if (!LooksLikeCallableEntry(m_sections, word, true) ||
+                        !HasNonTrivialBody(m_sections, word))
+                    {
+                        continue;
+                    }
+                    queueFunction(word);
+                }
+            }
+            return functionQueue.size() > queuedBefore;
+        };
+
         auto readCodeWord = [&](uint32_t address, uint32_t &outRaw) -> bool
         {
             const Section *section = FindCodeSectionByAddress(m_sections, address);
@@ -2348,7 +2834,8 @@ namespace ps2recomp
             return true;
         };
 
-        for (size_t functionIndex = 0; functionIndex < functionQueue.size(); ++functionIndex)
+        for (size_t functionIndex = 0;
+             functionIndex < functionQueue.size() || scanDataPointers(); ++functionIndex)
         {
             const uint32_t functionStart = functionQueue[functionIndex];
             Function func;
@@ -2393,6 +2880,10 @@ namespace ps2recomp
                 for (; blockIndex < blockQueue.size(); ++blockIndex)
                 {
                     uint32_t pc = blockQueue[blockIndex];
+                    // Phase 14 — start of this block's instructions in
+                    // functionInstructions; the constant scan for a block
+                    // transfer runs over [blockInstStart, transferIndex).
+                    const size_t blockInstStart = functionInstructions.size();
                     while (decoded.size() < kMaxInstructionsPerFunction)
                     {
                         if (decoded.contains(pc) || delaySlots.contains(pc))
@@ -2414,6 +2905,7 @@ namespace ps2recomp
                         }
                         Instruction inst = decoder.decodeInstruction(pc, raw, false);
                         decoded.insert(pc);
+                        decodedAll.insert(pc);
                         functionInstructions.push_back(inst);
 
                         const bool isTransfer = inst.isBranch || inst.isJump;
@@ -2436,6 +2928,7 @@ namespace ps2recomp
                             {
                                 Instruction delayInst = decoder.decodeInstruction(delayAddr, delayRaw, false);
                                 delaySlots.insert(delayAddr);
+                                decodedAll.insert(delayAddr);
                                 functionInstructions.push_back(delayInst);
                                 delayDecoded = true;
                             }
@@ -2478,13 +2971,63 @@ namespace ps2recomp
                                 const size_t jrIndex = delayDecoded
                                                            ? functionInstructions.size() - 2
                                                            : functionInstructions.size() - 1;
-                                jrIndices.push_back(jrIndex);
+                                // Phase 14 — a JR through a register holding
+                                // a block-proven constant is a computed jump
+                                // to a known address: an intra-function edge
+                                // (like direct J; tail-call splitting stays
+                                // out of scope), not a switch table and not
+                                // a function. A delay slot rewriting the
+                                // register voids the proof.
+                                uint32_t jrTarget = 0;
+                                bool jrResolved = false;
+                                if (!delayDecoded ||
+                                    !DelaySlotWritesReg(functionInstructions.back(), inst.rs))
+                                {
+                                    jrResolved = ResolveBlockConstant(functionInstructions, blockInstStart,
+                                                                      jrIndex, inst.rs, jrTarget);
+                                }
+                                if (jrResolved && (jrTarget % MIPS_INSTRUCTION_SIZE) == 0 &&
+                                    IsCodeTarget(m_sections, jrTarget))
+                                {
+                                    queueBlock(jrTarget);
+                                }
+                                else
+                                {
+                                    jrIndices.push_back(jrIndex);
+                                }
                             }
-                            // Return (JR $ra) and unrecovered JR: no edges.
+                            // Return (JR $ra) and unresolved JR: no edges
+                            // beyond switch-table recovery.
                         }
                         else if (inst.isCall)
                         {
-                            // JALR: indirect target unknown; resume only.
+                            // Phase 14 — JALR through a register holding a
+                            // block-proven constant is a proven call edge
+                            // to a new function (like direct JAL). Any
+                            // other JALR keeps the old behaviour: resume
+                            // only, target unknown. A delay slot rewriting
+                            // the register voids the proof. The SPECIAL/
+                            // JALR guard keeps any other isCall shape on
+                            // the old path.
+                            bool jalrResolved = false;
+                            uint32_t jalrTarget = 0;
+                            if (inst.opcode == OPCODE_SPECIAL && inst.function == SPECIAL_JALR)
+                            {
+                                const size_t jalrIndex = delayDecoded
+                                                             ? functionInstructions.size() - 2
+                                                             : functionInstructions.size() - 1;
+                                if (!delayDecoded ||
+                                    !DelaySlotWritesReg(functionInstructions.back(), inst.rs))
+                                {
+                                    jalrResolved = ResolveBlockConstant(functionInstructions, blockInstStart,
+                                                                        jalrIndex, inst.rs, jalrTarget);
+                                }
+                            }
+                            if (jalrResolved && (jalrTarget % MIPS_INSTRUCTION_SIZE) == 0 &&
+                                IsCodeTarget(m_sections, jalrTarget) && jalrTarget != functionStart)
+                            {
+                                queueFunction(jalrTarget);
+                            }
                             queueBlock(resume);
                         }
                         else

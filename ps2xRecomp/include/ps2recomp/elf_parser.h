@@ -34,7 +34,13 @@ namespace ps2recomp
                 // direct JAL targets become new functions, direct J branches and
                 // conditional branches stay inside the current function, JR $ra ends a
                 // function, and JR switches using the LUI/ADDU/SLL/JR pattern have
-                // their tables recovered (see discoverJumpTables below). The returned
+                // their tables recovered (see discoverJumpTables below). Phase 14
+                // adds: JALR through a register holding a block-proven constant
+                // becomes a new function (like JAL), JR through such a register
+                // becomes an intra-function edge (like J), and — after descent —
+                // singleton data words pointing at plausible, not-yet-decoded
+                // code addresses become new functions (lowest priority, same
+                // merge order as the rest of discovery). The returned
                 // functions carry start addresses and end == 0: ends are inferred by
                 // extractFunctions() from the next function start / section end with
                 // the Phase 3 64-bit clamp helpers, exactly like symbol-less extras.

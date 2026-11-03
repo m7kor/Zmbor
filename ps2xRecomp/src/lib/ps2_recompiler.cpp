@@ -324,7 +324,7 @@ namespace ps2recomp
                     {
                         continue;
                     }
-                    if (address >= section.address && address < (section.address + section.size))
+                    if (sectionContainsAddress(section, address))
                     {
                         return true;
                     }
@@ -336,11 +336,13 @@ namespace ps2recomp
             {
                 for (const auto &section : sections)
                 {
-                    if (!section.isCode || address < section.address || address >= section.address + section.size)
+                    if (!section.isCode || !sectionContainsAddress(section, address))
                     {
                         continue;
                     }
-                    return section.address + section.size;
+                    // Clamp, as in elf_parser: a wrapping uint32_t end would make the entry
+                    // function end before it starts and skip the function entirely.
+                    return clampFunctionEnd(sectionEnd(section));
                 }
                 return std::nullopt;
             };
@@ -2231,7 +2233,7 @@ namespace ps2recomp
 
         if (truncated)
         {
-            function.end = instructions.back().address + 4;
+            function.end = clampFunctionEnd(static_cast<uint64_t>(instructions.back().address) + 4u);
         }
 
         m_decodedFunctions.insert_or_assign(function.start, std::move(instructions));

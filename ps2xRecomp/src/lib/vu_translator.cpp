@@ -246,6 +246,10 @@ namespace ps2recomp
                     return m_codeGenerator.translateVU_VISWR(inst);
                 case VU0_S2_VABS:
                 {
+                    if (inst.rt == 0u)
+                    {
+                        return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+                    }
                     uint8_t dest_mask = inst.vectorInfo.vectorField;
                     return fmt::format("{{ __m128 res = _mm_and_ps(ctx->vu0_vf[{}], _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF))); "
                                        "__m128i mask = _mm_set_epi32({}, {}, {}, {}); "
@@ -257,6 +261,10 @@ namespace ps2recomp
                 }
                 case VU0_S2_VMOVE:
                 {
+                    if (inst.rt == 0u)
+                    {
+                        return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+                    }
                     uint8_t dest_mask = inst.vectorInfo.vectorField;
                     return fmt::format(
                         "{{ __m128i mask = _mm_set_epi32({}, {}, {}, {}); "
@@ -269,6 +277,10 @@ namespace ps2recomp
                 }
                 case VU0_S2_VMR32:
                 {
+                    if (inst.rt == 0u)
+                    {
+                        return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+                    }
                     uint8_t dest_mask = inst.vectorInfo.vectorField;
                     return fmt::format(
                         "{{ __m128 res = _mm_shuffle_ps(ctx->vu0_vf[{}], ctx->vu0_vf[{}], _MM_SHUFFLE(0,3,2,1)); "

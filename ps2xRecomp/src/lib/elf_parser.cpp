@@ -106,7 +106,7 @@ namespace
     {
         for (const auto &section : sections)
         {
-            if (address >= section.address && address < (section.address + section.size))
+            if (sectionContainsAddress(section, address))
             {
                 return &section;
             }
@@ -142,7 +142,7 @@ namespace
                 continue;
             }
 
-            if (address >= section.address && address < (section.address + section.size))
+            if (sectionContainsAddress(section, address))
             {
                 return &section;
             }
@@ -187,9 +187,7 @@ namespace
         }
 
         const uint64_t sectionEnd64 = static_cast<uint64_t>(section->address) + static_cast<uint64_t>(section->size);
-        const uint32_t sectionEnd = (sectionEnd64 > 0xFFFFFFFFull)
-                                        ? 0xFFFFFFFFu
-                                        : static_cast<uint32_t>(sectionEnd64);
+        const uint32_t sectionEnd = clampFunctionEnd(sectionEnd64);
 
         uint32_t end = requestedEnd;
         if (end == 0 || end > sectionEnd)
@@ -199,10 +197,11 @@ namespace
 
         if (end <= start)
         {
+            // Old code cast minimumEnd64 to uint32_t, so a start at 0xFFFFFFFC gave an end of 0.
             const uint64_t minimumEnd64 = static_cast<uint64_t>(start) + 4ull;
             if (minimumEnd64 <= sectionEnd64)
             {
-                end = static_cast<uint32_t>(minimumEnd64);
+                end = clampFunctionEnd(minimumEnd64);
             }
             else
             {
@@ -835,7 +834,7 @@ namespace
         const uint32_t targetAddress =
             ((instructionAddress + MIPS_INSTRUCTION_SIZE) & MIPS_JUMP_REGION_MASK) |
             (TARGET(raw) << MIPS_JUMP_TARGET_SHIFT);
-        if (targetAddress < section.address || targetAddress >= section.address + section.size)
+        if (!sectionContainsAddress(section, targetAddress))
         {
             return false;
         }
@@ -1194,7 +1193,7 @@ namespace
             std::vector<uint32_t> functionBoundaries;
             for (uint32_t start : starts)
             {
-                if (start >= section.address && start < section.address + section.size)
+                if (sectionContainsAddress(section, start))
                 {
                     functionBoundaries.push_back(start - section.address);
                 }
@@ -1669,7 +1668,7 @@ namespace
             const ps2recomp::Section *sec = FindCodeSectionByAddress(sections, *it);
             uint32_t previous = 0;
             const bool isDelaySlot =
-                sec && *it >= sec->address + MIPS_INSTRUCTION_SIZE &&
+                sec && static_cast<uint64_t>(*it) >= static_cast<uint64_t>(sec->address) + MIPS_INSTRUCTION_SIZE &&
                 ReadSectionWord(*sec, *it - sec->address - MIPS_INSTRUCTION_SIZE, previous) &&
                 IsControlTransfer(previous) &&
                 !(OPCODE(previous) == OPCODE_REGIMM && RT(previous) >= REGIMM_MTSAB); // MTSAB/MTSAH have no delay slot
@@ -1954,7 +1953,7 @@ namespace ps2recomp
             if (symbol.size > 0)
             {
                 const uint64_t end64 = static_cast<uint64_t>(symbol.address) + static_cast<uint64_t>(symbol.size);
-                func.end = (end64 > 0xFFFFFFFFull) ? 0xFFFFFFFFu : static_cast<uint32_t>(end64);
+                func.end = clampFunctionEnd(end64);
             }
             else
             {
@@ -1993,7 +1992,10 @@ namespace ps2recomp
             }
 
             const Section *section = FindFunctionSectionByAddress(m_sections, func.start);
-            uint32_t sectionEnd = section ? (section->address + section->size) : (func.start + 4);
+            // Clamp the 64-bit end to the 32-bit address space, as ClampFunctionEndToSection does;
+            // a wrapping uint32_t end would otherwise make this function end before it starts.
+            const uint64_t sectionEnd64 = section ? sectionEnd(*section) : (static_cast<uint64_t>(func.start) + 4u);
+            uint32_t sectionEnd = clampFunctionEnd(sectionEnd64);
 
             uint32_t nextStart = sectionEnd;
             if (index + 1 < functions.size())
@@ -2005,7 +2007,7 @@ namespace ps2recomp
                 }
             }
 
-            func.end = (nextStart > func.start) ? nextStart : (func.start + 4);
+            func.end = (nextStart > func.start) ? nextStart : clampFunctionEnd(static_cast<uint64_t>(func.start) + 4u);
         }
 
         return functions;
@@ -2035,7 +2037,7 @@ namespace ps2recomp
     {
         for (const auto &section : m_sections)
         {
-            if (address >= section.address && address < (section.address + section.size))
+            if (sectionContainsAddress(section, address))
             {
                 return true;
             }
@@ -2113,7 +2115,7 @@ namespace ps2recomp
     {
         for (const auto &section : m_sections)
         {
-            if (address < section.address || address >= (section.address + section.size))
+            if (!sectionContainsAddress(section, address))
             {
                 continue;
             }
@@ -2349,6 +2351,21 @@ namespace ps2recomp
             if (m_reporter)
             {
                 m_reporter->error("elf", "Not a MIPS ELF file");
+            }
+            return false;
+        }
+
+        // PS2 ELFs are 32-bit: every address, size and offset below is stored in a uint32_t.
+        // A 64-bit MIPS ELF would silently truncate those fields in loadSections/loadSymbols/
+        // loadRelocations (e.g. a section at 0x100000000 would appear at address 0 and overlap
+        // the real .text), so reject it here instead of letting truncated values drive code
+        // discovery. This is a validation rule, not a claim that 64-bit MIPS ELFs are invalid
+        // in general — they simply cannot be represented by this parser's 32-bit model.
+        if (m_elf->get_class() != ELFIO::ELFCLASS32)
+        {
+            if (m_reporter)
+            {
+                m_reporter->error("elf", "Not a 32-bit ELF file");
             }
             return false;
         }

@@ -1346,6 +1346,117 @@ void register_ps2_memory_tests()
             t.Equals(mem.vif1_regs.tops, 0x30u, "DBF=0 should restore TOPS to BASE");
         });
 
+        tc.Run("VIF0 OFFSET BASE MSCALF do not create VIF1 double-buffer state", [](TestCase &t)
+        {
+            // Phase 8b: ps2tek marks OFFSET (0x02), BASE (0x03) and
+            // MSCALF (0x15) VIF1, and its register map lists VIF1_BASE /
+            // VIF1_OFST / VIF1_TOPS / VIF1_TOP at VIF1-only addresses;
+            // ps2sdk annotates OFFSET, BASE and MSCALF "(VIF1)". The
+            // Phase 8 VIF0 branches that mirrored VIF1 here were wrong
+            // and are removed: on VIF0 these codes hit the generic
+            // unknown-code path, which aborts packet parsing. No
+            // invalid-command ERR/STAT semantics are established by the
+            // references, so none are asserted here either.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            struct Vu0Call
+            {
+                uint32_t startPC;
+                uint32_t top;
+                uint32_t itop;
+            };
+            std::vector<Vu0Call> mscalCalls;
+            mem.setVu0MscalCallback([&](uint32_t startPC, uint32_t top, uint32_t itop)
+            {
+                mscalCalls.push_back({startPC, top, itop});
+            });
+
+            const uint32_t offsetCmd = makeVifCmd(0x02u, 0u, 0x0020u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&offsetCmd), sizeof(offsetCmd));
+            t.Equals(mem.vif0_regs.ofst, 0u, "VIF0 OFFSET must not write OFST (VIF1-only register)");
+            t.Equals(mem.vif0_regs.base, 0u, "VIF0 OFFSET must not write BASE");
+            t.Equals(mem.vif0_regs.tops, 0u, "VIF0 OFFSET must not write TOPS");
+            t.IsTrue((mem.vif0_regs.stat & (1u << 7)) == 0u, "VIF0 OFFSET must not set STAT.DBF");
+
+            const uint32_t baseCmd = makeVifCmd(0x03u, 0u, 0x0030u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&baseCmd), sizeof(baseCmd));
+            t.Equals(mem.vif0_regs.base, 0u, "VIF0 BASE must not write BASE (VIF1-only register)");
+
+            // A VIF1-only code aborts parsing of its packet, so a MSCAL
+            // after it in the same packet is never reached.
+            const uint32_t abortedPacket[2] = {makeVifCmd(0x02u, 0u, 0x0020u), makeVifCmd(0x14u, 0u, 0x0003u)};
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(abortedPacket), sizeof(abortedPacket));
+            t.Equals(mscalCalls.size(), static_cast<size_t>(0u),
+                     "VIF0 OFFSET must abort its packet before a following MSCAL");
+
+            // MSCALF is VIF1-only: it must not start VU0.
+            const uint32_t mscalfCmd = makeVifCmd(0x15u, 0u, 0x0003u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&mscalfCmd), sizeof(mscalfCmd));
+            t.Equals(mscalCalls.size(), static_cast<size_t>(0u),
+                     "VIF0 MSCALF must not invoke the VU0 start callback (VIF1-only code)");
+            t.IsTrue((mem.vif0_regs.stat & (1u << 7)) == 0u, "VIF0 MSCALF must not toggle STAT.DBF");
+        });
+
+        tc.Run("VIF0 MSCAL MSCNT latch ITOP only and invoke VU0 callbacks", [](TestCase &t)
+        {
+            // Phase 8b: MSCAL (0x14) and MSCNT (0x17) are valid on both
+            // VIFs, but VIF0 has no TOP/TOPS/DBF. Only ITOP is latched
+            // from ITOPS (VIFn_ITOP is a shared register); the callback's
+            // top argument is always 0 on VIF0.
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            struct Vu0Call
+            {
+                uint32_t startPC;
+                uint32_t top;
+                uint32_t itop;
+            };
+            std::vector<Vu0Call> mscalCalls;
+            std::vector<Vu0Call> mscntCalls;
+            mem.setVu0MscalCallback([&](uint32_t startPC, uint32_t top, uint32_t itop)
+            {
+                mscalCalls.push_back({startPC, top, itop});
+            });
+            mem.setVu0MscntCallback([&](uint32_t top, uint32_t itop)
+            {
+                mscntCalls.push_back({0u, top, itop});
+            });
+
+            const uint32_t itopCmd = makeVifCmd(0x04u, 0u, 0x0044u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&itopCmd), sizeof(itopCmd));
+            t.Equals(mem.vif0_regs.itops, 0x44u, "VIF0 ITOP VIFcode should update pending ITOPS register");
+
+            const uint32_t mscalCmd = makeVifCmd(0x14u, 0u, 0x0003u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&mscalCmd), sizeof(mscalCmd));
+            t.Equals(mscalCalls.size(), static_cast<size_t>(1u), "VIF0 MSCAL should invoke the VU0 callback once");
+            // A failed assertion does not abort the test, so only index
+            // the call record when it exists (indexing an empty vector
+            // after a failed size check segfaulted under the MSCAL mutant).
+            if (mscalCalls.size() == 1u)
+            {
+                t.Equals(mscalCalls[0].startPC, 0x18u, "VIF0 MSCAL callback startPC should be IMMEDIATE*8");
+                t.Equals(mscalCalls[0].top, 0u, "VIF0 MSCAL callback top is always 0 (no VIF0 TOP register)");
+                t.Equals(mscalCalls[0].itop, 0x44u, "VIF0 MSCAL callback should receive pending ITOPS");
+            }
+            t.Equals(mem.vif0_regs.top, 0u, "VIF0 MSCAL must not latch a TOP (no such register on VIF0)");
+            t.Equals(mem.vif0_regs.itop, 0x44u, "VIF0 MSCAL should latch ITOP from ITOPS");
+            t.IsTrue((mem.vif0_regs.stat & (1u << 7)) == 0u, "VIF0 MSCAL must not toggle STAT.DBF");
+            t.Equals(mem.vif0_regs.tops, 0u, "VIF0 MSCAL must not write TOPS");
+
+            const uint32_t mscntCmd = makeVifCmd(0x17u, 0u, 0u);
+            mem.processVIF0Data(reinterpret_cast<const uint8_t *>(&mscntCmd), sizeof(mscntCmd));
+            t.Equals(mscntCalls.size(), static_cast<size_t>(1u), "VIF0 MSCNT should invoke the VU0 continue callback once");
+            if (mscntCalls.size() == 1u)
+            {
+                t.Equals(mscntCalls[0].top, 0u, "VIF0 MSCNT callback top is always 0 (no VIF0 TOP register)");
+                t.Equals(mscntCalls[0].itop, 0x44u, "VIF0 MSCNT callback should receive latched ITOP");
+            }
+            t.IsTrue((mem.vif0_regs.stat & (1u << 7)) == 0u, "VIF0 MSCNT must not toggle STAT.DBF");
+            t.Equals(mem.vif0_regs.tops, 0u, "VIF0 MSCNT must not write TOPS");
+        });
+
         tc.Run("VIF MSKPATH3 uses immediate bit15", [](TestCase &t)
         {
             PS2Memory mem;

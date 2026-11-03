@@ -2,6 +2,7 @@
 
 #include "ps2x/iop/iop_host.h"
 #include "ps2x/iop/iop_types.h"
+#include "ps2x/iop/sif0_fifo.h"
 
 #include <cstdint>
 #include <memory>
@@ -33,6 +34,15 @@ namespace ps2x::iop::detail
         [[nodiscard]] bool freeMemory(uint32_t address);
         [[nodiscard]] bool readMemory(uint32_t address, void *destination, size_t size) const;
         [[nodiscard]] bool writeMemory(uint32_t address, const void *source, size_t size);
+        // SIF0 DMA (Phase 4 slice): attach the shared transport and
+        // the explicit transport-ownership activation to the IOP
+        // engine, and read/write IOP hardware registers (including
+        // the channel-9 DMA registers) through the memory object.
+        // These are the integration/test surface for serviceSif0.
+        void setSif0Transport(ps2x::iop::Sif0Fifo *fifo);
+        void setTransportOwnsSif0(bool owned);
+        [[nodiscard]] uint32_t readIopRegister(uint32_t address) const;
+        void writeIopRegister(uint32_t address, uint32_t value);
         [[nodiscard]] bool zeroMemory(uint32_t address, size_t size);
         [[nodiscard]] bool isMemoryRange(uint32_t address, size_t size) const;
 

@@ -129,6 +129,8 @@ namespace ps2x::iop::detail
             nextModuleId = 1;
             moduleCursor = kModuleLoadBase;
             totalCycles = 0;
+            lastSpu2Cycle = 0;
+            lastSif0Cycle = 0;
             nextVblankCycle = kVblankPeriodCycles;
             totalInstructions = 0;
             eeCycleCarry = 0;
@@ -588,6 +590,51 @@ namespace ps2x::iop::detail
             }
         }
 
+        // SPU2 guest-time service: advance voices by the IOP cycles elapsed since the last
+        // service (768 cycles per 48 kHz sample, remainder carried by Spu2) and poll the IRQA
+        // interrupt. Called at scheduleStep boundaries, so voices lag guest time by at most
+        // one slice; runCpu slices inside a long guest call are not serviced until the
+        // scheduler regains control, the same boundary VBLANK already uses.
+        void serviceSpu2()
+        {
+            if (totalCycles > lastSpu2Cycle)
+            {
+                memory.advanceSpu2Cycles(totalCycles - lastSpu2Cycle);
+                lastSpu2Cycle = totalCycles;
+            }
+            else if (totalCycles < lastSpu2Cycle)
+            {
+                lastSpu2Cycle = totalCycles;
+            }
+        }
+
+        // SIF0 guest-time service (Phase 4 slice, mirroring
+        // serviceSpu2): drives the IOP channel-9 engine at
+        // scheduleStep boundaries. No SIF0-specific transfer
+        // rate/timing is sourced (design §12 UNKNOWN 6), so the
+        // slice does not invent a cycles-per-QW rate: each call
+        // pushes until FIFO full or chain EOT (progress is
+        // scheduler-step driven, not cycle-count driven), and
+        // lastSif0Cycle is kept for parity with serviceSpu2 and
+        // for future rate modelling, not for throttling. The
+        // nested-runCpu blind spot is inherited exactly: runCpu
+        // slices inside a long guest call are not serviced until
+        // the scheduler regains control, and no serviceSif0 call
+        // is added inside runCpu (that would change SPU2/VBLANK
+        // behaviour by analogy and needs its own justification).
+        void serviceSif0()
+        {
+            if (totalCycles > lastSif0Cycle)
+            {
+                memory.driveSif0();
+                lastSif0Cycle = totalCycles;
+            }
+            else if (totalCycles < lastSif0Cycle)
+            {
+                lastSif0Cycle = totalCycles;
+            }
+        }
+
         // One scheduling step at the current guest cycle: due interrupts and callbacks, then the highest-priority
         // ready thread for at most one slice, or, with nothing ready, a jump to the next event before `target`.
         void scheduleStep(uint64_t target)
@@ -605,7 +652,16 @@ namespace ps2x::iop::detail
                 if (!pendingGuestCallbacks.empty())
                     nextWake = std::min(nextWake, pendingGuestCallbacks.begin()->first);
                 nextWake = timrman.nextEventCycle(nextWake);
+                // SIF0 pending work must not be jumped past: an
+                // in-flight channel-9 transfer forces an immediate
+                // wake (design §9). When paused-on-full, the next
+                // EE drain schedules an immediate IOP wake through
+                // this same pending flag on the following step.
+                if (memory.sif0Pending())
+                    nextWake = totalCycles;
                 totalCycles = std::max(totalCycles + 1u, std::min(target, nextWake));
+                serviceSpu2();
+                serviceSif0();
                 return;
             }
             const uint64_t before = totalCycles;
@@ -613,6 +669,8 @@ namespace ps2x::iop::detail
             kernel.endTimeslice(*next, kThreadReturnSentinel);
             if (totalCycles == before)
                 ++totalCycles;
+            serviceSpu2();
+            serviceSif0();
         }
 
         void runCycles(uint64_t cycles) noexcept
@@ -767,6 +825,8 @@ namespace ps2x::iop::detail
         uint32_t nextModuleId = 1;
         uint32_t moduleCursor = kModuleLoadBase;
         uint64_t totalCycles = 0;
+        uint64_t lastSpu2Cycle = 0;
+        uint64_t lastSif0Cycle = 0;
         uint64_t nextVblankCycle = kVblankPeriodCycles;
         uint64_t totalInstructions = 0;
         uint64_t eeCycleCarry = 0;
@@ -845,6 +905,26 @@ namespace ps2x::iop::detail
     {
         return isMemoryRange(address, size) &&
                m_impl->memory.readRam(address, destination, size);
+    }
+
+    void IopEmulator::setSif0Transport(ps2x::iop::Sif0Fifo *fifo)
+    {
+        m_impl->memory.setSif0Transport(fifo);
+    }
+
+    void IopEmulator::setTransportOwnsSif0(bool owned)
+    {
+        m_impl->memory.setTransportOwnsSif0(owned);
+    }
+
+    uint32_t IopEmulator::readIopRegister(uint32_t address) const
+    {
+        return m_impl->memory.read32(address);
+    }
+
+    void IopEmulator::writeIopRegister(uint32_t address, uint32_t value)
+    {
+        m_impl->write32(address, value);
     }
 
     bool IopEmulator::writeMemory(uint32_t address, const void *source, size_t size)

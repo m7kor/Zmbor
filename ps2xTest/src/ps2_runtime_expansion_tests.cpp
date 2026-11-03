@@ -1856,6 +1856,149 @@ void register_ps2_runtime_expansion_tests()
                      "TPC should point at the first instruction not executed");
         });
 
+        tc.Run("VIF0 MSCAL starts a VU0 microprogram uploaded by MPG", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(runtime.syncCoreSubsystems(), "runtime core subsystems should bind");
+
+            uint8_t *const code = runtime.memory().getVU0Code();
+            std::memset(code, 0, PS2_VU0_CODE_SIZE);
+
+            constexpr uint32_t kVuUpperNop = 0x000002FFu;
+            constexpr uint32_t kVuUpperEndNop = 0x400002FFu;
+            // Packet: MPG uploads IADDIU vi1, vi0, 7 + E-bit NOP to VU0
+            // code 0, then MSCAL 0 starts VU0 there. Before this phase the
+            // VIF0 parser stopped at MSCAL and VU0 never ran.
+            std::vector<uint32_t> words;
+            words.push_back(makeVifCmd(0x4Au, 2u, 0u)); // MPG, 2 pairs, addr 0
+            words.push_back(makeVuIaddiu(1u, 0u, 7));
+            words.push_back(kVuUpperNop);
+            words.push_back(0u);
+            words.push_back(kVuUpperEndNop);
+            words.push_back(makeVifCmd(0x14u, 0u, 0u)); // MSCAL 0
+            runtime.memory().processVIF0Data(
+                reinterpret_cast<const uint8_t *>(words.data()),
+                static_cast<uint32_t>(words.size() * sizeof(uint32_t)));
+
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[1]), 7u,
+                     "VIF0 MSCAL should have run the uploaded VU0 program");
+        });
+
+        tc.Run("VIF0 XITOP reads VIF0 ITOP latched by MSCAL, 8-bit on VU0", [](TestCase &t)
+        {
+            // Phase 8b: XITOP is valid on VU0, but the VU User's Manual
+            // (XITOP Operation) says VU0 reads the lower 8 bits of
+            // VIF0_ITOP (4 KB data memory), VU1 the lower 10 bits of
+            // VIF1_ITOP. ITOP 0x123 must therefore read back as 0x23 on
+            // VU0, not 0x123. This replaces the Phase 8 XTOP test, which
+            // wrongly expected VU0 XTOP to read a VIF0 TOP register:
+            // XTOP "can be used only on VU1" (XTOP Remarks) and VIF0 has
+            // no TOP register at all.
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(runtime.syncCoreSubsystems(), "runtime core subsystems should bind");
+
+            uint8_t *const code = runtime.memory().getVU0Code();
+            std::memset(code, 0, PS2_VU0_CODE_SIZE);
+
+            constexpr uint32_t kVuUpperEndNop = 0x400002FFu;
+            std::vector<uint32_t> words;
+            words.push_back(makeVifCmd(0x4Au, 1u, 0u)); // MPG, 1 pair, addr 0
+            words.push_back(makeVuLowerSpecial(0x69u, 0u, 1u, 0u)); // XITOP vi1 (lower)
+            words.push_back(kVuUpperEndNop);
+            words.push_back(makeVifCmd(0x04u, 0u, 0x0123u)); // ITOP 0x123
+            words.push_back(makeVifCmd(0x14u, 0u, 0u));     // MSCAL 0
+            runtime.memory().processVIF0Data(
+                reinterpret_cast<const uint8_t *>(words.data()),
+                static_cast<uint32_t>(words.size() * sizeof(uint32_t)));
+
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[1]), 0x23u,
+                     "VU0 XITOP should read the lower 8 bits of VIF0 ITOP");
+        });
+
+        tc.Run("VU0 XTOP is reserved and stops the program at that pair", [](TestCase &t)
+        {
+            // Phase 8b: XTOP "can be used only on VU1" (VU User's
+            // Manual, XTOP Remarks). On VU0 the decode now gates lower
+            // special 0x68 reserved, like MFP and XGKICK already are, so
+            // the interpreter reports it and stops at that pair instead
+            // of executing it; the following instruction never runs.
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "PS2Memory initialize should succeed");
+
+            uint8_t *const code = runtime.memory().getVU0Code();
+            std::memset(code, 0, PS2_VU0_CODE_SIZE);
+
+            constexpr uint32_t kVuUpperNop = 0x000002FFu;
+            constexpr uint32_t kVuUpperEndNop = 0x400002FFu;
+            writeVuInstructionPair(
+                code, 0u, makeVuLowerSpecial(0x68u, 0u, 1u, 0u), // XTOP vi1 (lower)
+                kVuUpperNop);
+            writeVuInstructionPair(
+                code, 8u, makeVuIaddiu(2u, 0u, 9),
+                kVuUpperEndNop);
+
+            R5900Context ctx{};
+            runtime.executeVU0Microprogram(runtime.memory().getRDRAM(), &ctx, 0u);
+
+            t.Equals(static_cast<uint32_t>(ctx.vi[1]), 0u,
+                     "reserved VU0 XTOP must not write vi1");
+            t.Equals(static_cast<uint32_t>(ctx.vi[2]), 0u,
+                     "the instruction after a reserved VU0 XTOP must not run");
+            t.Equals(ctx.vu0_pc, 0u,
+                     "a reserved VU0 XTOP must stop the program at that pair");
+        });
+
+        tc.Run("VIF0 MSCNT continues a T-bit-stopped VU0 program at TPC", [](TestCase &t)
+        {
+            // Phase 8b MSCNT recheck: MSCNT resumes at ctx->vu0_tpc with
+            // the architectural state the stopped program left in the EE
+            // context (vi/vf/ACC/Q/P/flags/ITOP are copied back on stop
+            // and restored on entry; pipeline writes are flushed at the
+            // stop, so the scheduler reset on re-entry loses nothing
+            // architectural). The VU cycle counter restarts on VU0 entry
+            // (unlike VU1 resume), but no EE-visible state carries it,
+            // so that difference is documented, not rewritten here.
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(), "PS2Memory initialize should succeed");
+            t.IsTrue(runtime.syncCoreSubsystems(), "runtime core subsystems should bind");
+
+            uint8_t *const code = runtime.memory().getVU0Code();
+            std::memset(code, 0, PS2_VU0_CODE_SIZE);
+
+            constexpr uint32_t kVuUpperNop = 0x000002FFu;
+            constexpr uint32_t kVuUpperEndNop = 0x400002FFu;
+            runtime.cpu().vu0_fbrst = 1u << 3; // TE0: T-bit stops enabled
+
+            std::vector<uint32_t> words;
+            words.push_back(makeVifCmd(0x4Au, 2u, 0u)); // MPG, 2 pairs, addr 0
+            words.push_back(makeVuIaddiu(1u, 0u, 7));
+            words.push_back(kVuUpperNop | 0x08000000u); // T-bit pair
+            words.push_back(makeVuIaddiu(2u, 0u, 9));
+            words.push_back(kVuUpperEndNop);
+            words.push_back(makeVifCmd(0x14u, 0u, 0u)); // MSCAL 0
+            runtime.memory().processVIF0Data(
+                reinterpret_cast<const uint8_t *>(words.data()),
+                static_cast<uint32_t>(words.size() * sizeof(uint32_t)));
+
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[1]), 7u,
+                     "MSCAL should have run the program up to the T-bit pair");
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[2]), 0u,
+                     "TE0 should stop VU0 before the following instruction");
+            t.Equals(runtime.cpu().vu0_tpc, 8u,
+                     "TPC should point at the first instruction not executed");
+
+            const uint32_t mscntCmd = makeVifCmd(0x17u, 0u, 0u); // MSCNT
+            runtime.memory().processVIF0Data(
+                reinterpret_cast<const uint8_t *>(&mscntCmd), sizeof(mscntCmd));
+
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[1]), 7u,
+                     "MSCNT must preserve the registers the stopped program left");
+            t.Equals(static_cast<uint32_t>(runtime.cpu().vi[2]), 9u,
+                     "MSCNT should resume VU0 at TPC and run the rest");
+        });
+
         tc.Run("GS sprite draw applies XYOFFSET and fully-outside scissor should not render", [](TestCase &t)
         {
             std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);

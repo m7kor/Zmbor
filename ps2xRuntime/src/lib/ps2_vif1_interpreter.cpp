@@ -467,9 +467,55 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
             vif0_regs.cycle = imm;
             continue;
         }
+        // Phase 8b: there are deliberately NO OFFSET (0x02), BASE (0x03),
+        // MSKPATH3 (0x06), MSCALF (0x15) or DIRECT/DIRECTHL (0x50/0x51)
+        // branches here. ps2tek marks all of them VIF1 (its register map
+        // lists VIF1_BASE/VIF1_OFST/VIF1_TOPS/VIF1_TOP at VIF1-only
+        // addresses, with no VIF0 counterparts) and ps2sdk annotates
+        // OFFSET, BASE and MSCALF "(VIF1)". On VIF0 those codes fall
+        // through to the generic unknown-code `break` below, which aborts
+        // packet parsing — the interpreter's pre-existing VIF0 behaviour
+        // for unrecognised codes, retained unchanged. No invalid-command
+        // ERR/STAT semantics for a VIF1-only code on VIF0 are established
+        // by ps2tek, ps2sdk or the VU User's Manual, so none are modelled;
+        // that absence is a documented decision, not a hardware claim.
         else if (opcode == VIF_ITOP)
         {
             vif0_regs.itops = imm & 0x3FFu;
+            continue;
+        }
+        else if (opcode == VIF_MSCAL)
+        {
+            // MSCAL is valid on both VIFs (unannotated in ps2tek/ps2sdk),
+            // but VIF0 has no BASE/OFST/TOPS/TOP registers and no double
+            // buffering, so unlike the VIF1 branch this latches only ITOP
+            // from ITOPS (VIFn_ITOP is a shared register) and never touches
+            // TOP/TOPS or STAT.DBF. The callback's top argument is always 0
+            // on VIF0: there is no VIF0 TOP for a VU0 program to read (VU
+            // XTOP is VU1-only, see ps2_vu1_lower.cpp). The ITOPS->ITOP
+            // latch timing is retained from the VIF1 model; ps2tek does not
+            // describe it, so it is a documented model choice, not a
+            // hardware claim.
+            uint32_t startPC = (uint32_t)imm * 8u;
+
+            const uint32_t runItop = vif0_regs.itops & 0x3FFu;
+            vif0_regs.itop = runItop;
+
+            if (m_vu0MscalCallback)
+                m_vu0MscalCallback(startPC, 0u, runItop);
+            continue;
+        }
+        else if (opcode == VIF_MSCNT)
+        {
+            // MSCNT is valid on both VIFs (ps2tek: execution continues at
+            // the VU's TPC). As with MSCAL above: latch ITOP only, no
+            // TOP/DBF behaviour on VIF0. The runtime binding resumes VU0
+            // at ctx->vu0_tpc.
+            const uint32_t runItop = vif0_regs.itops & 0x3FFu;
+            vif0_regs.itop = runItop;
+
+            if (m_vu0MscntCallback)
+                m_vu0MscntCallback(0u, runItop);
             continue;
         }
         else if (opcode == VIF_STMOD)
@@ -485,6 +531,14 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
         }
         else if (opcode == VIF_FLUSHE || opcode == VIF_FLUSH || opcode == VIF_FLUSHA)
         {
+            // Phase 8b note: ps2tek marks FLUSH/FLUSHA VIF1 (their waits
+            // cover PATH1/PATH2/PATH3, which VIF0 does not have); FLUSHE is
+            // the shared wait-for-VU-end code. VU execution here is
+            // synchronous, so any such wait returns immediately, and the
+            // no-op is behaviourally identical to waiting. Retained as a
+            // documented decision; if asynchronous VU/GIF execution ever
+            // lands, FLUSH/FLUSHA on VIF0 must be revisited rather than
+            // assumed to wait.
             continue;
         }
         else if (opcode == VIF_STMASK)
@@ -551,6 +605,8 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
         else if ((opcode & 0x60u) == 0x60u)
         {
             // Same unpacker as VIF1 (formats, S replication, mask, STMOD, STCYCL), on VU0 data memory.
+            // UNPACK bit 15 (TOPS added to the destination) is VIF1-only in ps2tek and is already gated
+            // on vif != 0 inside unpackVif, so it never applies here.
             const uint32_t next = unpackVif(0u, opcode, num, imm, data, pos, sizeBytes);
             if (next > sizeBytes)
             {
@@ -562,6 +618,11 @@ void PS2Memory::processVIF0Data(const uint8_t *data, uint32_t sizeBytes)
         }
         else
         {
+            // Unknown or VIF1-only code on VIF0 (OFFSET, BASE, MSKPATH3,
+            // MSCALF, DIRECT, DIRECTHL): abort packet parsing. This is the
+            // interpreter's pre-existing generic VIF0 behaviour, not a
+            // modelled hardware error response (see the Phase 8b note
+            // above the ITOP branch).
             break;
         }
     }

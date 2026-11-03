@@ -11,6 +11,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VADD_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -22,6 +26,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VSUB_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -33,6 +41,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMUL_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -44,6 +56,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VADD(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -53,6 +69,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VSUB(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -62,6 +82,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMUL(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -106,7 +130,11 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMFIR(const Instruction &inst)
     {
         uint8_t dest_mask = inst.vectorInfo.vectorField;
-        return fmt::format("{{ uint32_t tmp = (uint32_t)(int32_t)(int16_t)ctx->vi[{}]; float val; std::memcpy(&val, &tmp, sizeof(val)); "
+                if (inst.rt == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
+return fmt::format("{{ uint32_t tmp = (uint32_t)(int32_t)(int16_t)ctx->vi[{}]; float val; std::memcpy(&val, &tmp, sizeof(val)); "
                            "__m128 res = _mm_set1_ps(val); "
                            "__m128i mask = _mm_set_epi32({}, {}, {}, {}); "
                            "ctx->vu0_vf[{}] = _mm_blendv_ps(ctx->vu0_vf[{}], res, _mm_castsi128_ps(mask)); }}",
@@ -233,6 +261,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMADD_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -254,6 +286,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMSUB_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -274,6 +310,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMINI_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -293,6 +333,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMAX_Field(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -312,6 +356,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMADD(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -328,6 +376,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMADDq(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 mul_res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_q)); "
@@ -343,6 +395,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMADDi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 mul_res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -358,6 +414,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMAX(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -373,6 +433,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMAXi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = _mm_max_ps(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -387,6 +451,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMINIi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = _mm_min_ps(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -401,6 +469,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMULi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -415,6 +487,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMULq(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_q)); "
@@ -429,6 +505,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VOPMSUB(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -447,6 +527,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VADDq(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VADD(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_q)); "
@@ -461,6 +545,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VADDi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VADD(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -475,6 +563,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMSUB(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -491,6 +583,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMINI(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t vft = inst.rt;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
@@ -506,6 +602,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VSUBi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VSUB(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -520,6 +620,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VSUBq(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 res = PS2_VSUB(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_q)); "
@@ -534,6 +638,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMSUBq(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 mul_res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_q)); "
@@ -549,6 +657,10 @@ namespace ps2recomp
     std::string CodeGenerator::translateVU_VMSUBi(const Instruction &inst)
     {
         uint8_t vfd = inst.sa;
+        if (vfd == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
         uint8_t vfs = inst.rd;
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         return fmt::format("{{ __m128 mul_res = PS2_VMUL(ctx->vu0_vf[{}], _mm_set1_ps(ctx->vu0_i)); "
@@ -771,7 +883,11 @@ namespace ps2recomp
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         float scale = (shift == 0) ? 1.0f : (1.0f / static_cast<float>(1 << shift));
 
-        return fmt::format("{{ __m128i src = _mm_castps_si128(ctx->vu0_vf[{}]); "
+                if (inst.rt == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
+return fmt::format("{{ __m128i src = _mm_castps_si128(ctx->vu0_vf[{}]); "
                            "__m128 res = _mm_cvtepi32_ps(src); "
                            "res = _mm_mul_ps(res, _mm_set1_ps({})); "
                            "__m128i mask = _mm_set_epi32({}, {}, {}, {}); "
@@ -788,7 +904,11 @@ namespace ps2recomp
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         float scale = (shift == 0) ? 1.0f : static_cast<float>(1 << shift);
 
-        return fmt::format("{{ __m128 src = ctx->vu0_vf[{}]; "
+                if (inst.rt == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
+return fmt::format("{{ __m128 src = ctx->vu0_vf[{}]; "
                            "src = _mm_mul_ps(src, _mm_set1_ps({})); "
                            "__m128i res_i = _mm_cvttps_epi32(src); "
                            "__m128 res = _mm_castsi128_ps(res_i); "
@@ -875,7 +995,11 @@ namespace ps2recomp
     {
         uint8_t dest_mask = inst.vectorInfo.vectorField;
         uint8_t ft_reg = inst.rt;
-        return fmt::format("{{ __m128 res = ctx->vu0_r; __m128i mask = _mm_set_epi32({}, {}, {}, {}); ctx->vu0_vf[{}] = _mm_blendv_ps(ctx->vu0_vf[{}], res, _mm_castsi128_ps(mask)); }}", (dest_mask & 0x1) ? -1 : 0, (dest_mask & 0x2) ? -1 : 0, (dest_mask & 0x4) ? -1 : 0, (dest_mask & 0x8) ? -1 : 0, ft_reg, ft_reg);
+                if (inst.rt == 0u)
+        {
+            return "{ /* VF0 is hardwired to (0,0,0,1): a vector write to vf0 is discarded */ }";
+        }
+return fmt::format("{{ __m128 res = ctx->vu0_r; __m128i mask = _mm_set_epi32({}, {}, {}, {}); ctx->vu0_vf[{}] = _mm_blendv_ps(ctx->vu0_vf[{}], res, _mm_castsi128_ps(mask)); }}", (dest_mask & 0x1) ? -1 : 0, (dest_mask & 0x2) ? -1 : 0, (dest_mask & 0x4) ? -1 : 0, (dest_mask & 0x8) ? -1 : 0, ft_reg, ft_reg);
     }
 
     std::string CodeGenerator::translateVU_VRINIT(const Instruction &inst)

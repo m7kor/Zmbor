@@ -17,6 +17,7 @@ void register_ps2_gs_tests();
 void register_ps2_iop_tests();
 void register_ps2_sif_rpc_tests();
 void register_ps2_sif_dma_tests();
+void register_ps2_sif0_tests();
 void register_ps2_recompiler_tests();
 void register_ps2_runtime_expansion_tests();
 void register_ps2_float_semantics_tests();
@@ -42,6 +43,7 @@ int main()
     register_ps2_iop_tests();
     register_ps2_sif_rpc_tests();
     register_ps2_sif_dma_tests();
+    register_ps2_sif0_tests();
     register_ps2_recompiler_tests();
     register_ps2_runtime_expansion_tests();
     register_ps2_float_semantics_tests();

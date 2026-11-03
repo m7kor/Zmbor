@@ -40,6 +40,17 @@ namespace ps2x::iop::detail
             return true;
         case 7: // sceSifSetDma
         {
+            // HLE gating (design §7.3, Phase 4 slice): when the
+            // DMAC transport owns SIF0, the DMAC engine is the sole
+            // owner of IOP->EE transfers and this HLE copy path must
+            // not be used for a transfer the engine is running.
+            // The flag defaults false, so existing HLE behaviour is
+            // unchanged unless slice activation sets it explicitly.
+            if (m_memory.transportOwnsSif0())
+            {
+                setV0(0u);
+                return true;
+            }
             constexpr uint32_t kDescriptorSize = 16u;
             constexpr uint32_t kMaxDescriptors = 32u;
             const uint32_t descriptorAddress = cpu.gpr[4];
@@ -120,7 +131,17 @@ namespace ps2x::iop::detail
             return true;
         }
         case 8: // sceSifDmaStat
-            setV0(0xFFFFFFFFu);
+            // In-flight DmaStat model (design §8), under transport
+            // ownership only: 1 = complete, 0 = in-flight, -1 =
+            // unknown id (as a 32-bit register value, -1 reads as
+            // 0xFFFFFFFF — the same bits as the legacy return, so
+            // the int32 interpretation is what distinguishes the
+            // unknown case under ownership). Legacy 0xFFFFFFFF is
+            // preserved while the transport does not own SIF0.
+            if (m_memory.transportOwnsSif0())
+                setV0(static_cast<uint32_t>(m_memory.sif0DmaStat(cpu.gpr[4])));
+            else
+                setV0(0xFFFFFFFFu);
             return true;
         case 29: // sceSifCheckInit
             setV0(m_sifInitialized ? 1u : 0u);

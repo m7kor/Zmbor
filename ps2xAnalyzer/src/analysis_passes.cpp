@@ -79,9 +79,7 @@ namespace ps2recomp
             const uint32_t targetAddr = baseAddr + static_cast<int16_t>(inst.immediate);
             for (const auto &section : sections)
             {
-                if (section.isCode &&
-                    targetAddr >= section.address &&
-                    targetAddr < section.address + section.size)
+                if (section.isCode && sectionContainsAddress(section, targetAddr))
                 {
                     return true;
                 }

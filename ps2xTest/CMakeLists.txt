@@ -59,10 +59,24 @@ add_library(ps2_test_lib STATIC
     src/ps2_iop_tests.cpp
     src/ps2_sif_rpc_tests.cpp
     src/ps2_sif_dma_tests.cpp
+    src/ps2_sif0_tests.cpp
     src/ps2_recompiler_tests.cpp
     src/ps2_runtime_expansion_tests.cpp
     src/ps2_float_semantics_tests.cpp
     src/ps2_vu_fmac_tests.cpp
+)
+
+# The VU0-macro test reads ps2xRecomp/include/ps2recomp/instructions.h.
+# Give it the repository root as a build-time absolute path so it no longer
+# depends on the test binary's working directory (it previously only worked
+# from the repo root). The relative candidates in the test remain as fallback.
+get_filename_component(PS2X_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+# The generated-code vf0 regression compiles and runs its output at test
+# time, so it needs the build-time host compiler path as well as the repo
+# root. Both are compile definitions only; nothing is executed at build time.
+target_compile_definitions(ps2_test_lib PRIVATE
+    "PS2X_REPO_ROOT=\"${PS2X_REPO_ROOT}\""
+    "PS2X_HOST_CXX=\"${CMAKE_CXX_COMPILER}\""
 )
 
 target_include_directories(ps2_test_lib PRIVATE
@@ -71,6 +85,9 @@ target_include_directories(ps2_test_lib PRIVATE
     ${CMAKE_SOURCE_DIR}/ps2xAnalyzer/include
     ${CMAKE_SOURCE_DIR}/ps2xRuntime/include
     ${CMAKE_SOURCE_DIR}/ps2xRuntime/src/lib
+    # The SIF0 both-ends tests drive IopMemory directly, mirroring
+    # the ps2_iop_import_tests target's src include path.
+    ${CMAKE_SOURCE_DIR}/ps2xIOP/src
 )
 
 target_link_libraries(ps2_test_lib PRIVATE

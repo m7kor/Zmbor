@@ -561,6 +561,19 @@ if(NOT MSVC)
     target_compile_options(ps2_runtime PUBLIC -ffp-contract=off)
 endif()
 
+# ps2_runtime.h explicitly includes smmintrin.h and uses SSE4.1 intrinsics (_mm_extract_epi32/64,
+# _mm_blendv_ps/epi8) in inline helpers and in ps2_runtime_macros.h, so every translation unit that
+# includes those headers needs SSE4.1 enabled. GCC/Clang do not enable it by default (x86-64 baseline
+# is SSE2), and GCC rejects the always_inline SSE4.1 intrinsics with "target specific option
+# mismatch" without it — which made ps2_runtime unbuildable with GCC on Linux. MSVC needs no flag
+# for these intrinsics (Release already passes /arch:AVX2), and ARM builds use sse2neon instead, so
+# this is x86 GCC/Clang only. PUBLIC for the same reason as -ffp-contract=off: consumers include
+# the headers and call the inline helpers. This adds no new CPU requirement: the code already
+# executes SSE4.1 instructions, so SSE4.1 was already the runtime minimum.
+if(NOT MSVC AND NOT PS2X_IS_ARM_TARGET AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|i[3-6]86")
+    target_compile_options(ps2_runtime PUBLIC -msse4.1)
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     EnableFastReleaseMode(ps2_runtime)
     EnableFastReleaseMode(ps2EntryRunner)

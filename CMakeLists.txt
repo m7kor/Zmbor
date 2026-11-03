@@ -19,6 +19,14 @@ endif()
 
 project(PS2RetroX)
 
+# Testing at the top level: ps2xTest includes CTest, but that only enables
+# testing in its own subtree, so a top-level `ctest` previously reported 0
+# tests. Enabling here makes the root CTestTestfile include the suites
+# registered under ps2xTest; it changes no test's behaviour. (ps2xIOP's
+# tests stay behind PS2X_IOP_BUILD_TESTS, which defaults to OFF, and are
+# run as a separate standalone suite, not via the top-level build.)
+enable_testing()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(PS2X_BUILD_RECOMP "Build ps2xRecomp" ON)

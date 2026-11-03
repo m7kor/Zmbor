@@ -724,16 +724,24 @@ void VU1Interpreter::execLower(uint32_t instr, uint8_t *vuData, uint32_t dataSiz
                 applyDest(m_state.vf[vfT], result, dest);
                 return;
             }
-            case 0x68: // XTOP - move current VIF1 TOP into VI register
+            case 0x68: // XTOP - VU1-only (VU User's Manual); on VU0 the
+                       // decode gates this reserved, so execLower is never
+                       // reached for it there. Kept for VU1, where it reads
+                       // VIF1 TOP (10 bits).
             {
                 if (viT != 0)
                     m_state.vi[viT] = (int32_t)(m_state.top & 0x3FFu);
                 return;
             }
-            case 0x69: // XITOP - move current VIF1 ITOP into VI register
+            case 0x69: // XITOP - move current VIF ITOP into VI register.
+                       // Phase 8b: VU User's Manual, XITOP Operation: VU0
+                       // reads the lower 8 bits of VIF0_ITOP (its data
+                       // memory is 4 KB), VU1 the lower 10 bits of
+                       // VIF1_ITOP. The previous code used 10 bits for
+                       // both, which could expose bits 8-9 on VU0.
             {
                 if (viT != 0)
-                    m_state.vi[viT] = (int32_t)(m_state.itop & 0x3FFu);
+                    m_state.vi[viT] = (int32_t)(m_state.itop & (m_unit == Unit::VU0 ? 0xFFu : 0x3FFu));
                 return;
             }
             case 0x6C: // XGKICK - send GIF packet from VU1 data memory

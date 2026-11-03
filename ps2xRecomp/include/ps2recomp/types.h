@@ -125,6 +125,32 @@ namespace ps2recomp
         uint8_t *data;
     };
 
+    // Section end in 64 bits. A section near the top of the 32-bit address space wraps if its end is
+    // computed in uint32_t (e.g. base 0xFFFFFFF0 + size 0x20 -> 0x10), which made every range check that
+    // used `address + size` miss the section's own addresses. Use this helper for all section range
+    // checks; the plain uint32_t end does not exist, on purpose.
+    inline uint64_t sectionEnd(const Section &section) noexcept
+    {
+        return static_cast<uint64_t>(section.address) + static_cast<uint64_t>(section.size);
+    }
+
+    inline bool sectionContainsAddress(const Section &section, uint32_t address) noexcept
+    {
+        return static_cast<uint64_t>(address) >= static_cast<uint64_t>(section.address) &&
+               static_cast<uint64_t>(address) < sectionEnd(section);
+    }
+
+    // Clamp a 64-bit exclusive end to a uint32_t function end. This is a lossy representation,
+    // used only where a function end must stay uint32_t: an end past 0xFFFFFFFF becomes 0xFFFFFFFF.
+    // That still contains every 4-aligned instruction start in the section (the last one is
+    // 0xFFFFFFFC < 0xFFFFFFFF), and it is never a wrapped small value that would make the function
+    // end before it starts. The single byte at 0xFFFFFFFF itself is not an instruction start and is
+    // still covered by the unclamped sectionContainsAddress() for data ranges.
+    inline uint32_t clampFunctionEnd(uint64_t end64) noexcept
+    {
+        return (end64 > 0xFFFFFFFFull) ? 0xFFFFFFFFu : static_cast<uint32_t>(end64);
+    }
+
     // Relocation information
     struct Relocation
     {

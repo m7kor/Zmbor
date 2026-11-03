@@ -174,7 +174,7 @@ namespace ps2recomp
             symbol.isExported = true;
             m_context.symbols.push_back(std::move(symbol));
 
-            const uint32_t discoveredEnd = match.address + match.size;
+            const uint32_t discoveredEnd = clampFunctionEnd(static_cast<uint64_t>(match.address) + match.size);
             if (Function *func = m_context.findFunction(match.address))
             {
                 if (func->name != match.name)
@@ -410,7 +410,7 @@ namespace ps2recomp
                                 for (const auto &sym : m_context.symbols)
                                 {
                                     if (!sym.isFunction && targetAddr >= sym.address &&
-                                        targetAddr < sym.address + sym.size)
+                                        static_cast<uint64_t>(targetAddr) < static_cast<uint64_t>(sym.address) + sym.size)
                                     {
                                         std::cout << "Function " << func.name << " accesses data within symbol "
                                                   << sym.name << " at offset 0x" << std::hex << (targetAddr - sym.address)
@@ -440,12 +440,12 @@ namespace ps2recomp
 
                         for (const auto &section : m_context.sections)
                         {
-                            if (targetAddr >= section.address && targetAddr < section.address + section.size)
+                            if (sectionContainsAddress(section, targetAddr))
                             {
                                 auto symIt = std::find_if(m_context.symbols.begin(), m_context.symbols.end(),
                                                           [targetAddr](const Symbol &s)
                                                           { return !s.isFunction && s.address <= targetAddr &&
-                                                                   s.address + s.size > targetAddr; });
+                                                                   static_cast<uint64_t>(s.address) + s.size > targetAddr; });
 
                                 if (symIt != m_context.symbols.end())
                                 {
@@ -1591,8 +1591,12 @@ namespace ps2recomp
     {
         std::vector<Instruction> instructions;
 
-        for (uint32_t addr = function.start; addr < function.end; addr += 4)
+        // Iterate in 64 bits: with a uint32_t loop variable, a function ending at the top of the
+        // address space wraps addr back to 0 and the loop never reaches its end (tryReadWord only
+        // continues on failure). With a 64-bit address the loop stops after the last word.
+        for (uint64_t addr64 = function.start; addr64 < function.end; addr64 += 4)
         {
+            const uint32_t addr = static_cast<uint32_t>(addr64);
             uint32_t rawInstruction = 0;
             if (!tryReadWord(m_elfParser.get(), addr, rawInstruction))
             {

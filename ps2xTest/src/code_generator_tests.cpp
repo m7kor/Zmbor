@@ -3,6 +3,8 @@
 #include "ps2recomp/instructions.h"
 #include "ps2recomp/ps2_recompiler.h"
 #include "ps2recomp/types.h"
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -427,6 +429,207 @@ void register_code_generator_tests()
         viaddi.rd = 1;
         viaddi.sa = 3;
         t.IsTrue(gen.translateVU_VIADDI(viaddi).find("ctx->vi[0] =") == std::string::npos, "VIADDI must not write vi0");
+    });
+
+    tc.Run("VU0 macro vector ops discard writes to vf0", [](TestCase &t) {
+        // VF0 is hardwired to (0,0,0,1): a macro vector write to it must not
+        // emit a vf0 assignment, exactly as QMTC2, VLQI and the integer ops
+        // already discard their vf0/vi0 writes.
+        CodeGenerator gen({}, {});
+        Instruction vadd{};
+        vadd.sa = 0; // vd
+        vadd.rd = 1;
+        vadd.rt = 2;
+        vadd.vectorInfo.vectorField = 0xF;
+        t.IsTrue(gen.translateVU_VADD(vadd).find("ctx->vu0_vf[0] =") == std::string::npos, "VADD must not write vf0");
+        vadd.sa = 3;
+        t.IsTrue(gen.translateVU_VADD(vadd).find("ctx->vu0_vf[3] =") != std::string::npos,
+                 "VADD still writes other registers");
+        Instruction vmfir{};
+        vmfir.rt = 0;
+        t.IsTrue(gen.translateVU_VMFIR(vmfir).find("ctx->vu0_vf[0] =") == std::string::npos, "VMFIR must not write vf0");
+        Instruction vitof{};
+        vitof.rt = 0;
+        t.IsTrue(gen.translateVU_VITOF(vitof, 0).find("ctx->vu0_vf[0] =") == std::string::npos, "VITOF must not write vf0");
+        Instruction vrget{};
+        vrget.rt = 0;
+        t.IsTrue(gen.translateVU_VRGET(vrget).find("ctx->vu0_vf[0] =") == std::string::npos, "VRGET must not write vf0");
+        // VABS/VMOVE/VMR32 live in the S2 dispatch, not in the helpers:
+        // format COP2_CO, function >= 0x3C, and the S2 opcode encoded in
+        // raw as (((raw >> 6) & 0x1F) << 2) | (raw & 0x3).
+        Instruction move{};
+        move.opcode = OPCODE_COP2;
+        move.rs = COP2_CO | 0xF;
+        move.function = 0x3C;
+        move.raw = 0x300; // VU0_S2_VMOVE = 0x30
+        move.rt = 0;
+        move.rd = 1;
+        move.vectorInfo.vectorField = 0xF;
+        t.IsTrue(gen.translateInstruction(move).find("ctx->vu0_vf[0] =") == std::string::npos, "VMOVE must not write vf0");
+        move.rt = 4;
+        t.IsTrue(gen.translateInstruction(move).find("ctx->vu0_vf[4] =") != std::string::npos,
+                 "VMOVE still writes other registers");
+        Instruction abs{};
+        abs.opcode = OPCODE_COP2;
+        abs.rs = COP2_CO | 0xF;
+        abs.function = 0x3C;
+        abs.raw = 0x1C1; // VU0_S2_VABS = 0x1D
+        abs.rt = 0;
+        abs.rd = 1;
+        abs.vectorInfo.vectorField = 0xF;
+        t.IsTrue(gen.translateInstruction(abs).find("ctx->vu0_vf[0] =") == std::string::npos, "VABS must not write vf0");
+        abs.rt = 5;
+        t.IsTrue(gen.translateInstruction(abs).find("ctx->vu0_vf[5] =") != std::string::npos,
+                 "VABS still writes other registers");
+        Instruction mr32{};
+        mr32.opcode = OPCODE_COP2;
+        mr32.rs = COP2_CO | 0xF;
+        mr32.function = 0x3C;
+        mr32.raw = 0x301; // VU0_S2_VMR32 = 0x31
+        mr32.rt = 0;
+        mr32.rd = 1;
+        mr32.vectorInfo.vectorField = 0xF;
+        t.IsTrue(gen.translateInstruction(mr32).find("ctx->vu0_vf[0] =") == std::string::npos, "VMR32 must not write vf0");
+        mr32.rt = 6;
+        t.IsTrue(gen.translateInstruction(mr32).find("ctx->vu0_vf[6] =") != std::string::npos,
+                 "VMR32 still writes other registers");
+    });
+
+    tc.Run("generated macro code keeps vf0 hardwired and neighbouring effects intact", [](TestCase &t)
+    {
+        // Phase 8b: the per-instruction vf0 tests above assert on the
+        // translator's output strings. This test goes end to end: it
+        // generates a whole function, then compiles and runs it, so a
+        // vf0 write that survived code generation would actually corrupt
+        // vf0 at runtime, and a guard that swallowed a neighbouring
+        // instruction would show up as a missing side effect.
+        auto makeVadd = [](uint32_t address, uint8_t dest, uint8_t src1, uint8_t src2)
+        {
+            Instruction vadd{};
+            vadd.address = address;
+            vadd.opcode = OPCODE_COP2;
+            vadd.rs = COP2_CO | 0xF;
+            vadd.function = 0x28; // VU0_S1_VADD
+            vadd.sa = dest;
+            vadd.rd = src1;
+            vadd.rt = src2;
+            vadd.vectorInfo.vectorField = 0xF;
+            return vadd;
+        };
+
+        Function func;
+        func.name = "";
+        func.start = 0x1000;
+        func.end = 0x1018;
+        func.isRecompiled = true;
+        std::vector<Instruction> instructions;
+        instructions.push_back(makeVadd(0x1000, 0, 1, 2)); // discarded vf0 write
+        instructions.push_back(makeAddiu(0x1004, 8, 0, 7)); // neighbour side effect
+        instructions.push_back(makeVadd(0x1008, 3, 0, 1)); // reads hardwired vf0
+        instructions.push_back(makeVadd(0x100C, 4, 1, 2)); // neighbour write
+        instructions.push_back(makeVadd(0x1010, 0, 1, 2)); // discarded vf0 write again
+        instructions.push_back(makeVadd(0x1014, 5, 0, 2)); // reads hardwired vf0
+
+        CodeGenerator gen({}, {});
+        const std::string generated = gen.generateFunction(func, instructions, true);
+
+        t.IsTrue(generated.find("ctx->vu0_vf[0] =") == std::string::npos,
+                 "generated function must not assign vf0");
+        const size_t vf3Pos = generated.find("ctx->vu0_vf[3] =");
+        const size_t vf4Pos = generated.find("ctx->vu0_vf[4] =");
+        const size_t vf5Pos = generated.find("ctx->vu0_vf[5] =");
+        t.IsTrue(vf3Pos != std::string::npos, "generated function must still write vf3");
+        t.IsTrue(vf4Pos != std::string::npos, "generated function must still write vf4");
+        t.IsTrue(vf5Pos != std::string::npos, "generated function must still write vf5");
+        t.IsTrue(vf3Pos < vf4Pos && vf4Pos < vf5Pos,
+                 "generated function must keep the instructions in order");
+        t.IsTrue(generated.find("Errorfunc_1000") != std::string::npos,
+                 "unnamed generated function should be emitted as Errorfunc_1000");
+
+#if defined(PS2X_HOST_CXX) && defined(PS2X_REPO_ROOT)
+        namespace fs = std::filesystem;
+        const std::string compiler = PS2X_HOST_CXX;
+        if (!fs::exists(compiler))
+        {
+            std::printf("SKIP: generated-code execution needs the build-time host compiler at %s\n",
+                        compiler.c_str());
+            return;
+        }
+        const fs::path dir = fs::temp_directory_path() / "zmbor_vf0_gen";
+        std::error_code ec;
+        fs::remove_all(dir, ec);
+        fs::create_directories(dir, ec);
+        {
+            std::ofstream stub(dir / "ps2_recompiled_functions.h");
+            stub << "#pragma once\n";
+        }
+        {
+            std::ofstream stub(dir / "ps2_recompiled_stubs.h");
+            stub << "#pragma once\n";
+        }
+        {
+            std::ofstream harness(dir / "harness.cpp");
+            harness << "#include <cstdio>\n#include <cstdint>\n#include <immintrin.h>\n";
+            harness << generated;
+            harness << R"HARNESS(
+int main()
+{
+    R5900Context ctx{};
+    ctx.vu0_vf[0] = _mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f); // (x, y, z, w) = (0, 0, 0, 1)
+    ctx.vu0_vf[1] = _mm_set_ps(1.0f, 1.0f, 1.0f, 1.0f);
+    ctx.vu0_vf[2] = _mm_set_ps(2.0f, 2.0f, 2.0f, 2.0f);
+    Errorfunc_1000(nullptr, &ctx, nullptr);
+    float out[4];
+    _mm_storeu_ps(out, ctx.vu0_vf[0]);
+    std::printf("vf0 %g %g %g %g\n", out[0], out[1], out[2], out[3]);
+    _mm_storeu_ps(out, ctx.vu0_vf[3]);
+    std::printf("vf3 %g %g %g %g\n", out[0], out[1], out[2], out[3]);
+    _mm_storeu_ps(out, ctx.vu0_vf[4]);
+    std::printf("vf4 %g %g %g %g\n", out[0], out[1], out[2], out[3]);
+    _mm_storeu_ps(out, ctx.vu0_vf[5]);
+    std::printf("vf5 %g %g %g %g\n", out[0], out[1], out[2], out[3]);
+    alignas(16) uint8_t gpr[16];
+    _mm_store_si128(reinterpret_cast<__m128i*>(gpr), ctx.r[8]);
+    std::printf("gpr8 %u\n", static_cast<unsigned>(gpr[0] | (gpr[1] << 8) |
+                                                   (gpr[2] << 16) | (gpr[3] << 24)));
+    return 0;
+}
+)HARNESS";
+        }
+        // ps2_runtime.h pulls in IOP types (ps2xIOP/include) and the
+        // kernel stub headers (ps2xRuntime/src/lib/Kernel) via
+        // ps2_stubs.h; both roots are needed for a standalone compile.
+        const std::string compileCmd = "\"" + compiler + "\" -std=c++20 -msse4.1 -I\"" +
+                                       std::string(PS2X_REPO_ROOT) + "/ps2xRuntime/include\" -I\"" +
+                                       std::string(PS2X_REPO_ROOT) + "/ps2xIOP/include\" -I\"" +
+                                       std::string(PS2X_REPO_ROOT) + "/ps2xRuntime/src/lib/Kernel\" -I\"" +
+                                       dir.string() + "\" \"" + (dir / "harness.cpp").string() +
+                                       "\" -o \"" + (dir / "harness").string() + "\"";
+        const int compileResult = std::system(compileCmd.c_str());
+        t.IsTrue(compileResult == 0, "generated-code harness must compile: " + compileCmd);
+        if (compileResult != 0)
+            return;
+        const std::string runCmd = "\"" + (dir / "harness").string() + "\" > \"" +
+                                   (dir / "output.txt").string() + "\"";
+        const int runResult = std::system(runCmd.c_str());
+        t.IsTrue(runResult == 0, "generated-code harness must run");
+        std::ifstream output(dir / "output.txt");
+        const std::string outputText((std::istreambuf_iterator<char>(output)),
+                                     std::istreambuf_iterator<char>());
+        t.IsTrue(outputText.find("vf0 0 0 0 1") != std::string::npos,
+                 "executed generated code must keep vf0 hardwired: " + outputText);
+        t.IsTrue(outputText.find("vf3 1 1 1 2") != std::string::npos,
+                 "executed generated code must read hardwired vf0 into vf3: " + outputText);
+        t.IsTrue(outputText.find("vf4 3 3 3 3") != std::string::npos,
+                 "executed generated code must still write vf4: " + outputText);
+        t.IsTrue(outputText.find("vf5 2 2 2 3") != std::string::npos,
+                 "executed generated code must read hardwired vf0 into vf5: " + outputText);
+        t.IsTrue(outputText.find("gpr8 7") != std::string::npos,
+                 "executed generated code must not skip the neighbouring ADDIU: " + outputText);
+        fs::remove_all(dir, ec);
+#else
+        std::printf("SKIP: generated-code execution needs PS2X_HOST_CXX and PS2X_REPO_ROOT (CMake build)\n");
+#endif
     });
 
     tc.Run("SYSCALL publishes its continuation before entering the runtime", [](TestCase &t) {
@@ -1493,7 +1696,13 @@ void register_code_generator_tests()
         });
 
         tc.Run("VU0 macro mappings cover all S1/S2 enums", [](TestCase &t) {
+            // Build-time absolute path first, so this test no longer depends
+            // on the working directory; the relative candidates below are
+            // kept only as a fallback for builds without the definition.
             const std::vector<std::string> candidates = {
+#ifdef PS2X_REPO_ROOT
+                std::string(PS2X_REPO_ROOT) + "/ps2xRecomp/include/ps2recomp/instructions.h",
+#endif
                 "ps2xRecomp/include/ps2recomp/instructions.h",
                 "../ps2xRecomp/include/ps2recomp/instructions.h",
                 "../../ps2xRecomp/include/ps2recomp/instructions.h"

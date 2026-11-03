@@ -38,7 +38,7 @@ namespace ps2recomp
                 {
                     continue;
                 }
-                if (address >= section.address && address < (section.address + section.size))
+                if (sectionContainsAddress(section, address))
                 {
                     return true;
                 }
@@ -372,7 +372,7 @@ namespace ps2recomp
                                 const Section *rodata = nullptr;
                                 for (const auto &sec : m_sections)
                                 {
-                                    if (tableAddress >= sec.address && tableAddress < sec.address + sec.size)
+                                    if (sectionContainsAddress(sec, tableAddress))
                                     {
                                         rodata = &sec;
                                         break;
@@ -387,7 +387,8 @@ namespace ps2recomp
                                     for (uint32_t i = 0; i < numCases; ++i)
                                     {
                                         uint32_t addr = tableAddress + i * 4;
-                                        if (addr >= rodata->address && addr + 4 <= rodata->address + rodata->size)
+                                        if (addr >= rodata->address &&
+                                            static_cast<uint64_t>(addr) + 4u <= sectionEnd(*rodata))
                                         {
                                             uint32_t target = 0;
                                             std::memcpy(&target, rodata->data + (addr - rodata->address), 4);

@@ -724,6 +724,20 @@ bool PS2Runtime::syncCoreSubsystems()
                                  {
                                      R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
                                      runVu1Microprogram(cpuContext ? cpuContext : &m_cpuContext, startPC, top, itop); });
+    m_memory.setVu0MscalCallback([this](uint32_t startPC, uint32_t top, uint32_t itop)
+                                 {
+                                     (void)top;
+                                     (void)itop;
+                                     R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
+                                     executeVU0Microprogram(m_memory.getRDRAM(), cpuContext ? cpuContext : &m_cpuContext, startPC); });
+    m_memory.setVu0MscntCallback([this](uint32_t top, uint32_t itop)
+                                 {
+                                     (void)top;
+                                     (void)itop;
+                                     R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
+                                     if (!cpuContext)
+                                         cpuContext = &m_cpuContext;
+                                     executeVU0Microprogram(m_memory.getRDRAM(), cpuContext, cpuContext->vu0_tpc); });
     m_memory.setVu1MscntCallback([this](uint32_t top, uint32_t itop)
                                  {
                                      R5900Context *cpuContext = m_eeScheduler ? m_eeScheduler->currentContext() : nullptr;
@@ -1514,7 +1528,10 @@ void PS2Runtime::executeVU0Microprogram(uint8_t *rdram, R5900Context *ctx, uint3
 
     uint8_t *const vu0Code = m_memory.getVU0Code();
     uint8_t *const vu0Data = m_memory.getVU0Data();
-    const uint32_t startPC = address & ~0x7u;
+    // Wrap at the VU0 micro-memory size, as the interpreter's
+    // microAddressMask (0x0FFF) does: a VIF0 MSCAL immediate above the
+    // 512-pair range wraps instead of silently running nothing.
+    const uint32_t startPC = (address & ~0x7u) & (PS2_VU0_CODE_SIZE - 1u);
 
     if (!vu0Code || !vu0Data || startPC + 8u > PS2_VU0_CODE_SIZE)
     {
@@ -1524,10 +1541,18 @@ void PS2Runtime::executeVU0Microprogram(uint8_t *rdram, R5900Context *ctx, uint3
 
     m_vu0.reset();
     copyVu0ContextToState(ctx, m_vu0.state());
+    // Phase 8b: XITOP reads VIF0 ITOP (the interpreter latches itops into
+    // vif0_regs.itop on MSCAL/MSCNT), and VIF0's own registers are the
+    // source for VCALLMS-started programs too. XTOP is VU1-only (VU
+    // User's Manual) and is decode-gated reserved on VU0, so the TOP
+    // argument below is unobservable on VU0; it is always 0 on the VIF0
+    // path because VIF0 has no TOP register (previously TOP was always 0
+    // and ITOP came from a context field nothing fed from VIF0).
+    const VIFRegisters &vif0 = m_memory.vifRegs(0u);
     m_vu0.execute(vu0Code, PS2_VU0_CODE_SIZE,
                   vu0Data, PS2_VU0_DATA_SIZE,
                   m_gs, &m_memory,
-                  startPC, 0u, ctx->vu0_itop, 4096);
+                  startPC, vif0.top, vif0.itop, 4096);
     copyVu0StateToContext(m_vu0.state(), ctx);
 }
 

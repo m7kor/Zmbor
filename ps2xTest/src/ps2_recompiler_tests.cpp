@@ -121,6 +121,46 @@ static bool writeMinimalMipsElfWithCodeAndDataFunctionSymbols(const std::filesys
     return writer.save(elfPath.string());
 }
 
+// A 64-bit MIPS ELF whose .text sits above the 32-bit address space. Before the ELFCLASS32
+// check in ElfParser::parse, this parsed and its section/symbol addresses truncated to 0,
+// overlapping the real low sections; after the check, parse() must reject it outright.
+static bool writeMinimalMipsElf64WithHighText(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS64, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x100000000ull);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x100000000ull);
+    const char textBytes[] = {0x08, 0x00, static_cast<char>(0xE0), 0x03, 0x00, 0x00, 0x00, 0x00};
+    text->set_data(textBytes, sizeof(textBytes));
+
+    ELFIO::section *strtab = writer.sections.add(".strtab");
+    strtab->set_type(ELFIO::SHT_STRTAB);
+    strtab->set_addr_align(1);
+
+    ELFIO::section *symtab = writer.sections.add(".symtab");
+    symtab->set_type(ELFIO::SHT_SYMTAB);
+    symtab->set_info(1);
+    symtab->set_link(strtab->get_index());
+    symtab->set_addr_align(8);
+    symtab->set_entry_size(writer.get_default_entry_size(ELFIO::SHT_SYMTAB));
+
+    ELFIO::symbol_section_accessor symbols(writer, symtab);
+    ELFIO::string_section_accessor strings(strtab);
+    symbols.add_symbol(strings, "", 0, 0, ELFIO::STB_LOCAL, ELFIO::STT_NOTYPE, 0, ELFIO::SHN_UNDEF);
+    symbols.add_symbol(strings, "high_func", text->get_address(), text->get_size(),
+                       ELFIO::STB_GLOBAL, ELFIO::STT_FUNC, 0, text->get_index());
+
+    return writer.save(elfPath.string());
+}
+
 static bool writeMinimalMipsElfWithJalFallbackTarget(const std::filesystem::path &elfPath)
 {
     ELFIO::elfio writer;
@@ -2063,6 +2103,52 @@ void register_ps2_recompiler_tests()
 
             std::error_code removeError;
             std::filesystem::remove_all(tempRoot, removeError);
+        });
+
+        tc.Run("section range checks do not wrap at the top of the address space", [](TestCase &t) {
+            Section top{};
+            top.address = 0xFFFFFFF0u;
+            top.size = 0x20u;
+            top.isCode = true;
+            // Old code computed the end in uint32_t (0xFFFFFFF0 + 0x20 -> 0x10) and missed every
+            // address in this section, including its own start.
+            t.IsTrue(sectionContainsAddress(top, 0xFFFFFFF0u), "a section contains its own start");
+            t.IsTrue(sectionContainsAddress(top, 0xFFFFFFFCu), "a section contains its last word");
+            t.IsTrue(sectionEnd(top) == 0x100000010ull, "the section end is computed in 64 bits");
+            t.IsFalse(sectionContainsAddress(top, 0x00000010u),
+                      "the wrapped uint32_t end must not make low addresses look inside");
+            t.IsFalse(sectionContainsAddress(top, 0xFFFFFFEFu), "an address below the section is outside");
+            t.IsTrue(sectionContainsAddress(top, 0xFFFFFFFFu),
+                     "the 64-bit range check covers the byte at 0xFFFFFFFF, which a clamped function end cannot name");
+            t.Equals(clampFunctionEnd(0x100000000ull), 0xFFFFFFFFu,
+                     "a function end past the address space clamps to 0xFFFFFFFF, not to a wrapped 0");
+            t.Equals(clampFunctionEnd(0x00100100ull), 0x00100100u,
+                     "a normal function end is unchanged by clamping");
+            Section normal{};
+            normal.address = 0x00100000u;
+            normal.size = 0x100u;
+            t.IsTrue(sectionContainsAddress(normal, 0x001000FCu), "a normal section still contains its tail");
+            t.IsFalse(sectionContainsAddress(normal, 0x00100100u), "a normal section ends at address + size");
+        });
+
+        tc.Run("elf parser rejects a 64-bit MIPS ELF instead of truncating its addresses", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-parser64-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writeMinimalMipsElf64WithHighText(elfPath);
+            t.IsTrue(writeOk, "temporary 64-bit ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            t.IsFalse(parser.parse(),
+                      "a 64-bit ELF must be rejected, not parsed with its 0x100000000 addresses truncated to 0");
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
         });
 
         tc.Run("respect max length for .cpp filenames", [](TestCase& t) {

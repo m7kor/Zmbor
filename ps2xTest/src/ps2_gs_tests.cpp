@@ -4,6 +4,7 @@
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
 #include "runtime/gs/gs_frontend.h"
+#include "runtime/gs/gs_cpu_backend.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/gs/ps2_gs_memory.h"
 #include "runtime/gs/ps2_gs_psmct32.h"
@@ -19,6 +20,7 @@
 #include <initializer_list>
 #include <utility>
 #include <cstring>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -446,6 +448,95 @@ namespace
         }
         uint32_t frame(uint32_t x, uint32_t y) { return gs.ReadVram(GS_PSM_CT32, 0u, 1u, x, y); }
         uint32_t depth(uint32_t x, uint32_t y) { return gs.ReadVram(GS_PSM_Z32, 32u, 1u, x, y); }
+    };
+
+    // Stage 0 (GS raw-GIF seam) test backends. NullRawGifBackend accepts the
+    // raw seam, records every raw packet with its path, and draws nothing:
+    // it proves what the seam forwards and what it suppresses. It is NOT a
+    // renderer and must never be mistaken for one.
+    class NullRawGifBackend final : public GSRasterBackend
+    {
+    public:
+        void Initialize(uint8_t *, uint32_t) override {}
+        void Reset() override { ++resetCount; }
+        void Submit(const GSPrimitiveBatch &) override { ++submitCount; }
+        void LoadClut(const GSTex0Reg &, const GSTexClutReg &) override { ++loadClutCount; }
+        void BeginTransfer(const GSTransferCommand &) override { ++beginTransferCount; }
+        void UploadImage(const uint8_t *, uint32_t) override { ++uploadCount; }
+        void Flush() override {}
+        void TextureFlush() override { ++textureFlushCount; }
+        void Sync(GSSyncReason) override {}
+        PresentationFrame Present(const GSPresentationRequest &) override { return PresentationFrame{}; }
+        bool ClearFramebuffer(const GSContext &, uint32_t) override { return false; }
+        uint32_t ConsumeLocalToHostBytes(uint8_t *, uint32_t) override { return 0u; }
+        uint32_t ReadVram(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) const override { return 0u; }
+        void WriteVram(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) override {}
+        void SnapshotVram(std::vector<uint8_t> &out) const override { out.clear(); }
+        GSTransferSnapshot GetTransferSnapshot() const override { return GSTransferSnapshot{}; }
+
+        bool WantsRawGif() const override { return true; }
+        void RawGif(uint32_t path, const uint8_t *data, uint32_t sizeBytes) override
+        {
+            rawPaths.push_back(path);
+            rawPackets.emplace_back(data, data + sizeBytes);
+        }
+        void VSync(const GSPrivRegsSnapshot &privRegs, uint32_t field) override
+        {
+            vsyncSnapshots.push_back(privRegs);
+            vsyncFields.push_back(field);
+        }
+        void GsReset() override { ++gsResetCount; }
+
+        uint32_t submitCount = 0;
+        uint32_t loadClutCount = 0;
+        uint32_t beginTransferCount = 0;
+        uint32_t uploadCount = 0;
+        uint32_t textureFlushCount = 0;
+        uint32_t resetCount = 0;
+        uint32_t gsResetCount = 0;
+        std::vector<uint32_t> rawPaths;
+        std::vector<std::vector<uint8_t>> rawPackets;
+        std::vector<GSPrivRegsSnapshot> vsyncSnapshots;
+        std::vector<uint32_t> vsyncFields;
+    };
+
+    // Forwards everything to an owned CPU backend except Submit, which also
+    // records a failure — proving the LastError() channel is observable
+    // through the frontend instead of silent.
+    class ErrorRecordingBackend final : public GSRasterBackend
+    {
+    public:
+        void Initialize(uint8_t *vram, uint32_t vramSize) override { m_cpu.Initialize(vram, vramSize); }
+        void Reset() override { m_cpu.Reset(); }
+        void Submit(const GSPrimitiveBatch &batch) override
+        {
+            m_error = "injected submit failure";
+            m_cpu.Submit(batch);
+        }
+        void LoadClut(const GSTex0Reg &tex0, const GSTexClutReg &texclut) override { m_cpu.LoadClut(tex0, texclut); }
+        void BeginTransfer(const GSTransferCommand &command) override { m_cpu.BeginTransfer(command); }
+        void UploadImage(const uint8_t *data, uint32_t sizeBytes) override { m_cpu.UploadImage(data, sizeBytes); }
+        void Flush() override { m_cpu.Flush(); }
+        void TextureFlush() override { m_cpu.TextureFlush(); }
+        void Sync(GSSyncReason reason) override { m_cpu.Sync(reason); }
+        PresentationFrame Present(const GSPresentationRequest &request) override { return m_cpu.Present(request); }
+        bool ClearFramebuffer(const GSContext &context, uint32_t rgba) override { return m_cpu.ClearFramebuffer(context, rgba); }
+        uint32_t ConsumeLocalToHostBytes(uint8_t *dst, uint32_t maxBytes) override { return m_cpu.ConsumeLocalToHostBytes(dst, maxBytes); }
+        uint32_t ReadVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y) const override
+        {
+            return m_cpu.ReadVram(psm, base, bw, x, y);
+        }
+        void WriteVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y, uint32_t value) override
+        {
+            m_cpu.WriteVram(psm, base, bw, x, y, value);
+        }
+        void SnapshotVram(std::vector<uint8_t> &out) const override { m_cpu.SnapshotVram(out); }
+        GSTransferSnapshot GetTransferSnapshot() const override { return m_cpu.GetTransferSnapshot(); }
+        const char *LastError() const override { return m_error.empty() ? nullptr : m_error.c_str(); }
+
+    private:
+        GSCpuBackend m_cpu;
+        std::string m_error;
     };
 }
 
@@ -3182,6 +3273,398 @@ void register_ps2_gs_tests()
 
             t.Equals(gs.ReadVram(GS_PSM_CT32, 64u, 1u, 3u, 2u), kColor,
                      "switching raster backends must retain the logical 4 MiB GS local memory");
+        });
+
+        tc.Run("GS raw-GIF seam forwards packets with paths and suppresses decoded delivery", [](TestCase &t)
+        {
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regs{};
+            regs.csr.store(0u);
+            regs.vsyncTick.store(0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), &regs);
+            t.IsTrue(!gs.wantsRawGif(), "raw mode must be off by default (CPU backend)");
+
+            auto raw = std::make_unique<NullRawGifBackend>();
+            NullRawGifBackend *rawPtr = raw.get();
+            gs.setRasterBackend(std::move(raw));
+            t.IsTrue(gs.wantsRawGif(), "attaching a raw backend must enable raw mode");
+
+            // PACKED A+D priv-reg write on PATH2: the frontend must still
+            // apply it even though decoded delivery is suppressed.
+            std::vector<uint8_t> adPacket;
+            appendU64(adPacket, makeGifTag(1u, GIF_FMT_PACKED, 1u, true));
+            appendU64(adPacket, 0x0Eull); // REGS[0] = A+D
+            const uint64_t dispfb1 = 0x0123456789ABCDEFull;
+            appendU64(adPacket, dispfb1);
+            appendU64(adPacket, 0x59ull); // DISPFB1
+            gs.processGIFPacket(GifPathId::Path2, adPacket.data(), static_cast<uint32_t>(adPacket.size()));
+
+            t.Equals(rawPtr->rawPackets.size(), static_cast<size_t>(1u), "raw backend must receive exactly the forwarded packet");
+            t.IsTrue(rawPtr->rawPackets[0] == adPacket, "forwarded packet bytes must be identical");
+            t.Equals(rawPtr->rawPaths.size(), static_cast<size_t>(1u), "one path must be recorded");
+            t.Equals(rawPtr->rawPaths[0], 2u, "PATH2 packet must carry path 2");
+            t.Equals(regs.dispfb1, dispfb1, "frontend must still apply priv-reg writes in raw mode");
+
+            // TEX0 + TEXFLUSH in raw mode must not reach the backend either.
+            gs.writeRegister(GS_REG_TEX0_1,
+                             (64ull << 0) | (1ull << 14) | (static_cast<uint64_t>(GS_PSM_T8) << 20) |
+                                 (128ull << 37) | (static_cast<uint64_t>(GS_PSM_CT32) << 51) | (1ull << 55) | (1ull << 61));
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            t.Equals(rawPtr->loadClutCount, 0u, "no CLUT load may be delivered in raw mode");
+            t.Equals(rawPtr->textureFlushCount, 0u, "no texture flush may be delivered in raw mode");
+
+            // Flat sprite draw via registers in raw mode: nothing delivered.
+            auto drawFlatSprite = [](GS &g)
+            {
+                g.writeRegister(GS_REG_FRAME_1, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+                g.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+                g.writeRegister(GS_REG_SCISSOR_1, (0ull << 0) | (63ull << 16) | (0ull << 32) | (63ull << 48));
+                g.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+                g.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                g.writeRegister(GS_REG_ALPHA_1, 0ull);
+                g.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_SPRITE));
+                g.writeRegister(GS_REG_RGBAQ, 0xFF102030ull);
+                g.writeRegister(GS_REG_XYZ2, 0ull);
+                g.writeRegister(GS_REG_XYZ2, (32ull << 0) | (32ull << 16));
+            };
+            drawFlatSprite(gs);
+            t.Equals(rawPtr->submitCount, 0u, "sprite draw must not reach Submit in raw mode");
+            uint32_t pixel = 0u;
+            std::memcpy(&pixel, vram.data(), sizeof(pixel));
+            t.Equals(pixel, 0u, "sprite draw must not touch VRAM in raw mode");
+
+            // Same draw on a CPU backend must land (proves the sequence).
+            std::vector<uint8_t> vramCpu(PS2_GS_VRAM_SIZE, 0u);
+            GS gsCpu;
+            gsCpu.init(vramCpu.data(), static_cast<uint32_t>(vramCpu.size()), nullptr);
+            drawFlatSprite(gsCpu);
+            std::memcpy(&pixel, vramCpu.data(), sizeof(pixel));
+            t.Equals(pixel, 0xFF102030u, "same draw must land on the CPU backend (sequence validity)");
+
+            // IMAGE upload via packet in raw mode: setup registers still
+            // update (guest-visible state) but no transfer is delivered.
+            gs.writeRegister(GS_REG_BITBLTBUF, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+            gs.writeRegister(GS_REG_TRXPOS, 0ull);
+            gs.writeRegister(GS_REG_TRXREG, (4ull << 0) | (4ull << 32));
+            gs.writeRegister(GS_REG_TRXDIR, 0ull);
+            std::vector<uint8_t> imagePacket;
+            appendU64(imagePacket, makeGifTag(4u, GIF_FMT_IMAGE, 0u, true));
+            appendU64(imagePacket, 0ull);
+            for (uint32_t i = 0; i < 64u; ++i)
+                imagePacket.push_back(0xABu);
+            gs.processGIFPacket(GifPathId::Path3, imagePacket.data(), static_cast<uint32_t>(imagePacket.size()));
+            t.Equals(rawPtr->beginTransferCount, 0u, "TRXDIR must not reach BeginTransfer in raw mode");
+            t.Equals(rawPtr->uploadCount, 0u, "IMAGE upload must not reach UploadImage in raw mode");
+            t.Equals(rawPtr->rawPackets.size(), static_cast<size_t>(2u), "IMAGE packet must also be forwarded raw");
+            t.Equals(rawPtr->rawPaths[1], 3u, "IMAGE packet must carry path 3");
+        });
+
+        tc.Run("GS backend swap re-issues the last CLUT load", [](TestCase &t)
+        {
+            // Same textured setup as the TEX2 CLUT test: texel index 8 must
+            // resolve through the CLUT at the TEX2-overridden base.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kWrongClutCbp = 128u;
+            constexpr uint32_t kExpectedClutCbp = 192u;
+            constexpr uint64_t kFrameReg =
+                (0ull << 0) |
+                (1ull << 16) |
+                (static_cast<uint64_t>(GS_PSM_CT32) << 24);
+            constexpr uint64_t kZbuf = (1ull << 32);
+            constexpr uint64_t kTex0 =
+                (static_cast<uint64_t>(kTexTbp) << 0) |
+                (1ull << 14) |
+                (static_cast<uint64_t>(GS_PSM_T8) << 20) |
+                (0ull << 26) |
+                (0ull << 30) |
+                (1ull << 34) |
+                (1ull << 35) |
+                (static_cast<uint64_t>(kWrongClutCbp) << 37) |
+                (static_cast<uint64_t>(GS_PSM_CT32) << 51) |
+                (1ull << 55) |
+                (1ull << 61);
+            constexpr uint64_t kTex2 =
+                (static_cast<uint64_t>(GS_PSM_T8) << 20) |
+                (static_cast<uint64_t>(kExpectedClutCbp) << 37) |
+                (static_cast<uint64_t>(GS_PSM_CT32) << 51) |
+                (1ull << 55) |
+                (1ull << 61);
+            constexpr uint64_t kPrim =
+                static_cast<uint64_t>(GS_PRIM_SPRITE) |
+                (1ull << 4) |
+                (1ull << 8);
+            constexpr uint32_t kWrongColor = 0xFF00FF00u;
+            constexpr uint32_t kExpectedColor = 0xFF0000FFu;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            const uint32_t texOff = GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u);
+            vram[texOff] = 8u;
+            const uint32_t wrongClutOff = GSPSMCT32::addrPSMCT32(kWrongClutCbp, 1u, 8u, 0u);
+            const uint32_t expectedClutOff = GSPSMCT32::addrPSMCT32(kExpectedClutCbp, 1u, 8u, 0u);
+            std::memcpy(vram.data() + wrongClutOff, &kWrongColor, sizeof(kWrongColor));
+            std::memcpy(vram.data() + expectedClutOff, &kExpectedColor, sizeof(kExpectedColor));
+
+            auto drawTextured = [&](GS &g)
+            {
+                g.writeRegister(GS_REG_FRAME_1, kFrameReg);
+                g.writeRegister(GS_REG_ZBUF_1, kZbuf);
+                g.writeRegister(GS_REG_SCISSOR_1, 0ull);
+                g.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+                g.writeRegister(GS_REG_TEST_1, 0x30000ull);
+                g.writeRegister(GS_REG_ALPHA_1, 0ull);
+                g.writeRegister(GS_REG_PRIM, kPrim);
+                g.writeRegister(GS_REG_RGBAQ, 0x80808080ull);
+                g.writeRegister(GS_REG_UV, 0ull);
+                g.writeRegister(GS_REG_XYZ2, 0ull);
+                g.writeRegister(GS_REG_UV, 0ull);
+                g.writeRegister(GS_REG_XYZ2, (16ull << 0) | (16ull << 16));
+            };
+
+            gs.writeRegister(GS_REG_TEX0_1, kTex0);
+            gs.writeRegister(GS_REG_TEX2_1, kTex2);
+            drawTextured(gs);
+            uint32_t pixel = 0u;
+            std::memcpy(&pixel, vram.data(), sizeof(pixel));
+            t.Equals(pixel, kExpectedColor, "textured draw must resolve through the TEX2 CLUT before the swap");
+
+            // Swap to a fresh CPU backend, then redraw WITHOUT re-writing
+            // TEX0/TEX2: the frontend still holds the texture state, so only
+            // the swap's CLUT re-issue can make the redraw resolve correctly.
+            gs.setRasterBackend(nullptr);
+            gs.WriteVram(GS_PSM_CT32, 0u, 1u, 0u, 0u, 0xDEADBEEFu);
+            drawTextured(gs);
+            std::memcpy(&pixel, vram.data(), sizeof(pixel));
+            t.Equals(pixel, kExpectedColor,
+                     "redraw after a backend swap must still resolve through the CLUT (swap must re-issue LoadClut)");
+        });
+
+        tc.Run("GS ordering contract: FINISH makes prior draws visible to reads", [](TestCase &t)
+        {
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            gs.writeRegister(GS_REG_FRAME_1, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+            gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+            gs.writeRegister(GS_REG_SCISSOR_1, (0ull << 0) | (63ull << 16) | (0ull << 32) | (63ull << 48));
+            gs.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+            gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+            gs.writeRegister(GS_REG_ALPHA_1, 0ull);
+            gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_SPRITE));
+            gs.writeRegister(GS_REG_RGBAQ, 0xFF102030ull);
+            gs.writeRegister(GS_REG_XYZ2, 0ull);
+            gs.writeRegister(GS_REG_XYZ2, (32ull << 0) | (32ull << 16));
+            // FINISH performs Flush + Sync(Finish) in the frontend.
+            gs.writeRegister(GS_REG_FINISH, 0ull);
+
+            t.Equals(gs.ReadVram(GS_PSM_CT32, 0u, 1u, 0u, 0u), 0xFF102030u,
+                     "after FINISH, a prior Submit must be visible to ReadVram");
+
+            // Debug-readback path: refreshDisplaySnapshot performs
+            // Sync(DebugReadback) before SnapshotVram, so the snapshot must
+            // contain the draw.
+            gs.refreshDisplaySnapshot();
+            uint32_t snapSize = 0u;
+            const uint8_t *snap = gs.lockDisplaySnapshot(snapSize);
+            t.IsTrue(snap != nullptr, "display snapshot must exist after snapshotVRAM");
+            t.Equals(snapSize, static_cast<uint32_t>(PS2_GS_VRAM_SIZE), "display snapshot must cover the full VRAM");
+            uint32_t snapPixel = 0u;
+            if (snap != nullptr && snapSize >= 4u)
+                std::memcpy(&snapPixel, snap, sizeof(snapPixel));
+            gs.unlockDisplaySnapshot();
+            t.Equals(snapPixel, 0xFF102030u, "after DebugReadback sync, the snapshot must contain the draw");
+        });
+
+        tc.Run("GS error channel observes an injected backend failure", [](TestCase &t)
+        {
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            t.IsTrue(gs.lastBackendError() == nullptr, "CPU backend must report no error");
+
+            auto err = std::make_unique<ErrorRecordingBackend>();
+            gs.setRasterBackend(std::move(err));
+            t.IsTrue(gs.lastBackendError() == nullptr, "fresh error backend must report no error before any Submit");
+
+            gs.writeRegister(GS_REG_FRAME_1, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+            gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+            gs.writeRegister(GS_REG_SCISSOR_1, (0ull << 0) | (63ull << 16) | (0ull << 32) | (63ull << 48));
+            gs.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+            gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+            gs.writeRegister(GS_REG_ALPHA_1, 0ull);
+            gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_SPRITE));
+            gs.writeRegister(GS_REG_RGBAQ, 0xFF102030ull);
+            gs.writeRegister(GS_REG_XYZ2, 0ull);
+            gs.writeRegister(GS_REG_XYZ2, (32ull << 0) | (32ull << 16));
+
+            t.IsTrue(gs.lastBackendError() != nullptr, "backend failure must be observable through the frontend");
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected submit failure",
+                     "error channel must carry the backend's failure string");
+        });
+
+        tc.Run("GS raw-GIF VSync snapshot, GsReset, and default-off mode", [](TestCase &t)
+        {
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            t.IsTrue(!gs.wantsRawGif(), "raw mode must be off by default");
+
+            auto raw = std::make_unique<NullRawGifBackend>();
+            NullRawGifBackend *rawPtr = raw.get();
+            gs.setRasterBackend(std::move(raw));
+            t.IsTrue(gs.wantsRawGif(), "attaching a raw backend must enable raw mode");
+
+            // No priv-reg block: the snapshot must be all zeros, not a crash.
+            gs.onVSync(0u);
+            t.Equals(rawPtr->vsyncSnapshots.size(), static_cast<size_t>(1u), "VSync must reach the raw backend");
+            t.Equals(rawPtr->vsyncFields[0], 0u, "VSync field must be forwarded");
+            t.Equals(rawPtr->vsyncSnapshots[0].pmode, 0u, "null priv-reg block must snapshot as zeros");
+
+            // With a priv-reg block: the snapshot must match the live values.
+            std::vector<uint8_t> vram2(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regs{};
+            regs.csr.store(0u);
+            regs.vsyncTick.store(0u);
+            regs.pmode = 0xFF25ull;
+            regs.dispfb1 = 0x0123456789ABCDEFull;
+            regs.display1 = 0x1111222233334444ull;
+            regs.bgcolor = 0x00A0B0C0ull;
+            regs.csr.store(0x2ull);
+            regs.vsyncTick.store(7u);
+            regs.siglblid = 0xAABBCCDD11223344ull;
+            GS gs2;
+            gs2.init(vram2.data(), static_cast<uint32_t>(vram2.size()), &regs);
+            auto raw2 = std::make_unique<NullRawGifBackend>();
+            NullRawGifBackend *raw2Ptr = raw2.get();
+            gs2.setRasterBackend(std::move(raw2));
+            gs2.onVSync(1u);
+            t.Equals(raw2Ptr->vsyncSnapshots.size(), static_cast<size_t>(1u), "VSync must reach the second raw backend");
+            t.Equals(raw2Ptr->vsyncFields[0], 1u, "VSync field 1 must be forwarded");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].pmode, 0xFF25ull, "snapshot must capture pmode");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].dispfb1, 0x0123456789ABCDEFull, "snapshot must capture dispfb1");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].display1, 0x1111222233334444ull, "snapshot must capture display1");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].bgcolor, 0x00A0B0C0ull, "snapshot must capture bgcolor");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].csr, 0x2ull, "snapshot must capture csr");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].vsyncTick, 7u, "snapshot must capture vsyncTick");
+            t.Equals(raw2Ptr->vsyncSnapshots[0].siglblid, 0xAABBCCDD11223344ull, "snapshot must capture siglblid");
+
+            // reset() must call Reset() first (existing contract) and then
+            // GsReset() for a raw backend.
+            gs2.reset();
+            t.Equals(raw2Ptr->resetCount, 1u, "reset must still call Reset on a raw backend");
+            t.Equals(raw2Ptr->gsResetCount, 1u, "reset must additionally call GsReset on a raw backend");
+
+            // Decoded mode: onVSync must be a silent no-op.
+            std::vector<uint8_t> vram3(PS2_GS_VRAM_SIZE, 0u);
+            GS gs3;
+            gs3.init(vram3.data(), static_cast<uint32_t>(vram3.size()), &regs);
+            gs3.onVSync(1u);
+            t.IsTrue(!gs3.wantsRawGif(), "onVSync must not enable raw mode on a decoded backend");
+        });
+
+        tc.Run("GS raw-GIF recorded stream replays to identical VRAM", [](TestCase &t)
+        {
+            // Stream: A+D setup, one REGLIST sprite draw, A+D SIGNAL+FINISH.
+            // (This is gate (b) in replay form: a null backend draws nothing
+            // by design, so literal same-instance golden output is impossible;
+            // what is proven instead is that the recorded stream replays to
+            // byte-identical VRAM and identical guest-visible state.)
+            constexpr uint64_t kFrame =
+                (0ull << 0) |
+                (1ull << 16) |
+                (static_cast<uint64_t>(GS_PSM_CT32) << 24);
+            constexpr uint64_t kScissor =
+                (0ull << 0) | (63ull << 16) | (0ull << 32) | (63ull << 48);
+            std::vector<uint8_t> setupPacket;
+            appendU64(setupPacket, makeGifTag(4u, GIF_FMT_PACKED, 1u, true));
+            appendU64(setupPacket, 0x0Eull); // REGS[0] = A+D
+            appendU64(setupPacket, kFrame);
+            appendU64(setupPacket, GS_REG_FRAME_1);
+            // ZMSK set: without it the depth write (ZBP 0, same block as the
+            // framebuffer) would overwrite the drawn colour with z = 0.
+            appendU64(setupPacket, (1ull << 32));
+            appendU64(setupPacket, GS_REG_ZBUF_1);
+            appendU64(setupPacket, kScissor);
+            appendU64(setupPacket, GS_REG_SCISSOR_1);
+            appendU64(setupPacket, 0x30000ull);
+            appendU64(setupPacket, GS_REG_TEST_1);
+
+            std::vector<uint8_t> drawPacket;
+            appendU64(drawPacket, makeGifTag(1u, GIF_FMT_REGLIST, 4u, true));
+            appendU64(drawPacket, 0x00ull | (0x01ull << 4) | (0x05ull << 8) | (0x05ull << 12));
+            appendU64(drawPacket, static_cast<uint64_t>(GS_PRIM_SPRITE));
+            appendU64(drawPacket, 0xFF102030ull);
+            appendU64(drawPacket, 0ull);
+            appendU64(drawPacket, (32ull << 0) | (32ull << 16));
+
+            std::vector<uint8_t> finPacket;
+            appendU64(finPacket, makeGifTag(2u, GIF_FMT_PACKED, 1u, true));
+            appendU64(finPacket, 0x0Eull); // REGS[0] = A+D
+            // SIGNAL value: low 32 bits = id, high 32 bits = mask. A full
+            // mask is required for the id to actually land in siglblid.
+            appendU64(finPacket, 0xFFFFFFFFAABBCCDDull);
+            appendU64(finPacket, GS_REG_SIGNAL);
+            appendU64(finPacket, 0ull);
+            appendU64(finPacket, GS_REG_FINISH);
+
+            const std::vector<std::vector<uint8_t>> stream = {setupPacket, drawPacket, finPacket};
+
+            // Null-backend run (raw mode): record only, draw nothing.
+            std::vector<uint8_t> vramNull(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regsNull{};
+            regsNull.csr.store(0u);
+            regsNull.vsyncTick.store(0u);
+            GS gsNull;
+            gsNull.init(vramNull.data(), static_cast<uint32_t>(vramNull.size()), &regsNull);
+            auto raw = std::make_unique<NullRawGifBackend>();
+            NullRawGifBackend *rawPtr = raw.get();
+            gsNull.setRasterBackend(std::move(raw));
+            for (const auto &packet : stream)
+                gsNull.processGIFPacket(GifPathId::Path3, packet.data(), static_cast<uint32_t>(packet.size()));
+
+            t.Equals(rawPtr->rawPackets.size(), stream.size(), "raw backend must record every packet");
+            bool packetsIdentical = rawPtr->rawPackets.size() == stream.size();
+            bool pathsIdentical = true;
+            for (size_t i = 0; i < stream.size() && packetsIdentical; ++i)
+            {
+                packetsIdentical = rawPtr->rawPackets[i] == stream[i];
+                pathsIdentical = pathsIdentical && rawPtr->rawPaths[i] == 3u;
+            }
+            t.IsTrue(packetsIdentical, "recorded packets must be byte-identical to the input stream");
+            t.IsTrue(pathsIdentical, "recorded packets must all carry path 3");
+            t.Equals(regsNull.csr.load() & 0x3ull, 0x3ull, "SIGNAL+FINISH must set CSR bits in raw mode");
+            t.Equals(regsNull.siglblid & 0xFFFFFFFFull, 0xAABBCCDDull, "SIGNAL must set siglblid in raw mode");
+
+            // Direct CPU run.
+            std::vector<uint8_t> vramDirect(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regsDirect{};
+            regsDirect.csr.store(0u);
+            regsDirect.vsyncTick.store(0u);
+            GS gsDirect;
+            gsDirect.init(vramDirect.data(), static_cast<uint32_t>(vramDirect.size()), &regsDirect);
+            for (const auto &packet : stream)
+                gsDirect.processGIFPacket(packet.data(), static_cast<uint32_t>(packet.size()));
+
+            // Replay run: recorded packets through a fresh CPU backend.
+            std::vector<uint8_t> vramReplay(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regsReplay{};
+            regsReplay.csr.store(0u);
+            regsReplay.vsyncTick.store(0u);
+            GS gsReplay;
+            gsReplay.init(vramReplay.data(), static_cast<uint32_t>(vramReplay.size()), &regsReplay);
+            for (const auto &packet : rawPtr->rawPackets)
+                gsReplay.processGIFPacket(GifPathId::Path3, packet.data(), static_cast<uint32_t>(packet.size()));
+
+            t.IsTrue(vramReplay == vramDirect, "replayed recorded stream must reproduce identical VRAM");
+            uint32_t pixel = 0u;
+            std::memcpy(&pixel, vramDirect.data(), sizeof(pixel));
+            t.Equals(pixel, 0xFF102030u, "draw packet must actually land in the direct run (non-vacuous replay)");
+            t.Equals(regsReplay.csr.load(), regsDirect.csr.load(), "replay must reproduce CSR");
+            t.Equals(regsReplay.siglblid, regsDirect.siglblid, "replay must reproduce siglblid");
         });
 
         tc.Run("GS TEX2 updates CLUT state independently from TEX0", [](TestCase &t)

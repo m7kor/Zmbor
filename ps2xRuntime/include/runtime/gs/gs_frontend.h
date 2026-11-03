@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "runtime/gs/gs_backend.h"
+#include "runtime/gs/ps2_gif_arbiter.h"
 
 struct GSDebugSnapshot
 {
@@ -107,6 +108,24 @@ public:
     void setRasterBackend(std::unique_ptr<GSRasterBackend> backend);
 
     void processGIFPacket(const uint8_t *data, uint32_t sizeBytes);
+    // Pathed entry: production paths (GIF arbiter, VU1 XGKICK) must use this
+    // so a raw backend receives the PATH index with each packet. The unpathed
+    // entry above is retained for tests and direct injection and reports
+    // path 3 (GIF DMA).
+    void processGIFPacket(GifPathId path, const uint8_t *data, uint32_t sizeBytes);
+    // Vsync notification for the raw-GIF seam: captures the stream-order
+    // priv-reg snapshot and forwards it to a raw backend. No-op unless a raw
+    // backend is attached. Called by the EE scheduler at each VBlankStart;
+    // field alternates with the vsync tick (0/1, a model choice for the
+    // interlaced field index).
+    void onVSync(uint32_t field);
+    // True while the attached backend reports WantsRawGif(). Raw mode is off
+    // by default (the CPU backend reports false) and unreachable by guest
+    // code: only an explicitly attached backend enables it.
+    bool wantsRawGif() const;
+    // Frontend passthrough for the backend error channel (GSRasterBackend
+    // contract): nullptr when healthy or when no backend is attached.
+    const char *lastBackendError() const;
     bool processNativePackedGIFPacket(const uint8_t *data, uint32_t sizeBytes);
     void uploadImageNative(uint64_t bitbltbuf,
                            uint64_t trxpos,
@@ -168,6 +187,15 @@ private:
     void recordTransferDebugEventUnlocked();
     void recordPresentDebugEventUnlocked(uint32_t displayFbp, uint32_t sourceFbp, uint32_t width, uint32_t height, bool usedPreferred);
 
+    // True while the attached backend reports WantsRawGif(). Callers must
+    // hold m_stateMutex (or use the locking wantsRawGif() accessor).
+    bool rawGifMode() const;
+    // Delivers a CLUT load to the backend unless raw mode suppresses decoded
+    // delivery, and records it as the last delivered CLUT load so a backend
+    // swap can re-issue it (Stage 0 swap contract). Callers must hold
+    // m_stateMutex.
+    void issueLoadClutUnlocked(const GSTex0Reg &tex0, const GSTexClutReg &texclut);
+
     void processImageData(const uint8_t *data, uint32_t sizeBytes);
     bool tryProcessNativeImageUploadPacket(const uint8_t *data, uint32_t sizeBytes);
     GSPrimitiveBatch buildDrawBatch(int vertexCount) const;
@@ -204,6 +232,12 @@ private:
     uint64_t m_colclamp = 0;
     GSTexaReg m_texa{0u, false, 0u};
     GSTexClutReg m_texclut{0u, 0u, 0u};
+
+    // Last CLUT load actually delivered to a backend (Stage 0 swap contract).
+    // Cleared by reset(); never recorded while raw mode suppresses delivery.
+    GSTex0Reg m_lastLoadClutTex0{};
+    GSTexClutReg m_lastLoadClutTexclut{0u, 0u, 0u};
+    bool m_hasLastLoadClut = false;
 
     GSBitBltBuf m_bitbltbuf{};
     GSTrxPos m_trxpos{};

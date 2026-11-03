@@ -2015,6 +2015,13 @@ void EeScheduler::processEvent(const EeEvent &event)
         {
             m_runtime.memory().gs().csr.fetch_and(~0x2000ull, std::memory_order_acq_rel);
         }
+        // Stage 0 GS raw-GIF seam: notify the frontend of vsync so a raw
+        // backend receives its stream-order priv-reg snapshot. No-op unless
+        // a raw backend is attached (decoded mode returns before any backend
+        // call), so existing vsync behaviour is unchanged. Field alternates
+        // with the vsync tick (0/1, a model choice for the interlaced field
+        // index).
+        m_runtime.gs().onVSync(m_vsyncTick & 1u);
         writeGuestU32(m_vsyncFlagAddress, 1u);
         if (m_vsyncTickAddress != 0u)
         {

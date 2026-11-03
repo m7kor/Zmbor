@@ -40,7 +40,8 @@ namespace ps2recomp
 
         using AnalysisResult = ControlFlowAnalysisResult;
 
-        std::string generateFunction(const Function &function, const std::vector<Instruction> &instructions, const bool &useHeaders);
+        std::string generateFunction(const Function &function, const std::vector<Instruction> &instructions,
+                                     const bool &useHeaders, const std::vector<Function> *allFunctions = nullptr);
         std::string generateFunctionRegistration(const std::vector<Function> &functions, const std::map<uint32_t, std::string> &stubs);
         std::string handleBranchDelaySlots(const Instruction &branchInst, const Instruction &delaySlot,
                                            const Function &function, const AnalysisResult &analysisResult);
@@ -52,6 +53,15 @@ namespace ps2recomp
         void setBootstrapInfo(const BootstrapInfo &info);
         void setRelocationCallNames(const std::unordered_map<uint32_t, std::string> &callNames);
         void setConfiguredJumpTables(const std::vector<JumpTable> &jumpTables);
+        // Phase 12 — merge parser-discovered jump tables into the same map
+        // the CFA consults for configured tables, so discovered tables are
+        // accepted with IDENTICAL validation (in-function targets become
+        // entry points, external targets become external entry points, and
+        // a resolved JR never triggers indirect-fallback promotion). A
+        // configured table at the same address wins: its targets replace
+        // the discovered ones rather than merging, so explicit user config
+        // is never diluted by discovery.
+        void setDiscoveredJumpTables(const std::vector<JumpTable> &jumpTables);
         void setResumeEntryTargets(const std::unordered_map<uint32_t, std::vector<uint32_t>> &resumeTargetsByOwner);
         void setEmitInstructionComments(bool emitInstructionComments);
         void setReporter(RecompilerReporter *reporter);

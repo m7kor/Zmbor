@@ -53,7 +53,8 @@ namespace ps2recomp
     std::string FunctionEmitter::emit(
         const Function &function,
         const std::vector<Instruction> &instructions,
-        bool useHeaders)
+        bool useHeaders,
+        const std::vector<Function> *allFunctions)
     {
         CodeGenerator &cg = m_codeGenerator;
         std::stringstream ss;
@@ -79,7 +80,8 @@ namespace ps2recomp
             ss << "#endif\n\n";
         }
 
-        CodeGenerator::AnalysisResult analysisResult = cg.collectInternalBranchTargets(function, instructions);
+        CodeGenerator::AnalysisResult analysisResult =
+            cg.collectInternalBranchTargets(function, instructions, allFunctions);
         std::vector<uint32_t> resumeTargets(analysisResult.resumeEntryPoints.begin(),
                                             analysisResult.resumeEntryPoints.end());
         auto resumeIt = cg.m_resumeEntryTargetsByOwner.find(function.start);

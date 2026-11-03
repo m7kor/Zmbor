@@ -140,6 +140,24 @@ namespace ps2recomp
         }
     }
 
+    void CodeGenerator::setDiscoveredJumpTables(const std::vector<JumpTable> &jumpTables)
+    {
+        for (const auto &table : jumpTables)
+        {
+            if (m_configJumpTableTargetsByAddress.contains(table.address))
+            {
+                continue;
+            }
+            auto &targets = m_configJumpTableTargetsByAddress[table.address];
+            for (const auto &entry : table.entries)
+            {
+                targets.push_back(entry.target);
+            }
+            std::sort(targets.begin(), targets.end());
+            targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+        }
+    }
+
     void CodeGenerator::setResumeEntryTargets(const std::unordered_map<uint32_t, std::vector<uint32_t>> &resumeTargetsByOwner)
     {
         m_resumeEntryTargetsByOwner = resumeTargetsByOwner;
@@ -273,10 +291,11 @@ namespace ps2recomp
     std::string ps2recomp::CodeGenerator::generateFunction(
         const Function &function,
         const std::vector<Instruction> &instructions,
-        const bool &useHeaders)
+        const bool &useHeaders,
+        const std::vector<Function> *allFunctions)
     {
         FunctionEmitter emitter(*this);
-        return emitter.emit(function, instructions, useHeaders);
+        return emitter.emit(function, instructions, useHeaders, allFunctions);
     }
 
     std::string CodeGenerator::emitUnhandledInstruction(const Instruction &inst, const std::string &message)

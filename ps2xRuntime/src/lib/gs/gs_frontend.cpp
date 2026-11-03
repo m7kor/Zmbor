@@ -150,6 +150,7 @@ void GS::reset()
     m_colclamp = 0u;
     m_texa = {0u, false, 0u};
     m_texclut = {0u, 0u, 0u};
+    m_hasLastLoadClut = false;
     m_bitbltbuf = {};
     m_trxpos = {};
     m_trxreg = {};
@@ -164,6 +165,10 @@ void GS::reset()
         m_backend->Flush();
         m_backend->Sync(GSSyncReason::Reset);
         m_backend->Reset();
+        // Raw-mode reset pairing (Stage 0 seam): Reset() first (existing
+        // contract), then GsReset() for raw backends only.
+        if (rawGifMode())
+            m_backend->GsReset();
     }
     {
         std::lock_guard<std::mutex> presentationLock(m_presentationMutex);
@@ -640,11 +645,31 @@ bool GS::copyLatchedHostPresentationFrame(std::vector<uint8_t> &outPixels,
 
 void GS::processGIFPacket(const uint8_t *data, uint32_t sizeBytes)
 {
+    // Legacy unpathed entry: production paths carry the path explicitly.
+    processGIFPacket(GifPathId::Path3, data, sizeBytes);
+}
+
+void GS::processGIFPacket(GifPathId path, const uint8_t *data, uint32_t sizeBytes)
+{
     std::lock_guard<std::recursive_mutex> lock(m_stateMutex);
     if (!data || sizeBytes < 16 || !m_backend)
         return;
 
-    if (tryProcessNativeImageUploadPacket(data, sizeBytes))
+    const bool raw = rawGifMode();
+    if (raw)
+    {
+        // Raw-GIF seam (Stage 0): the packet goes to the raw backend whole,
+        // in stream order. The frontend still parses it below (with decoded
+        // delivery suppressed) so guest-visible state — priv-reg writes,
+        // SIGNAL/FINISH/LABEL/CSR — stays in the frontend.
+        m_backend->RawGif(static_cast<uint32_t>(path), data, sizeBytes);
+    }
+
+    // The native image-upload fast path consumes the packet without
+    // forwarding raw bytes, so it must not run in raw mode: the generic loop
+    // below parses the same packet (registers decode, image delivery is
+    // suppressed by the raw-mode gates) and the raw backend already has it.
+    if (!raw && tryProcessNativeImageUploadPacket(data, sizeBytes))
         return;
 
     PS2_IF_AGRESSIVE_LOGS({
@@ -1240,7 +1265,7 @@ void GS::writeRegisterUnlocked(uint8_t regAddr, uint64_t value)
         t.csm = static_cast<uint8_t>((value >> 55) & 0x1);
         t.csa = static_cast<uint8_t>((value >> 56) & 0x1F);
         t.cld = static_cast<uint8_t>((value >> 61) & 0x7);
-        m_backend->LoadClut(t, m_texclut);
+        issueLoadClutUnlocked(t, m_texclut);
         break;
     }
     case GS_REG_CLAMP_1:
@@ -1271,7 +1296,7 @@ void GS::writeRegisterUnlocked(uint8_t regAddr, uint64_t value)
         t.csm = static_cast<uint8_t>((value >> 55) & 0x1);
         t.csa = static_cast<uint8_t>((value >> 56) & 0x1F);
         t.cld = static_cast<uint8_t>((value >> 61) & 0x7);
-        m_backend->LoadClut(t, m_texclut);
+        issueLoadClutUnlocked(t, m_texclut);
         break;
     }
     case GS_REG_XYOFFSET_1:
@@ -1385,7 +1410,10 @@ void GS::writeRegisterUnlocked(uint8_t regAddr, uint64_t value)
     {
         m_trxdir = static_cast<uint32_t>(value & 0x3);
 
-        if (m_backend)
+        // Raw mode suppresses decoded transfer delivery (the raw backend
+        // already received the packet whole); frontend transfer registers
+        // above still update, since they are guest-visible state.
+        if (m_backend && !rawGifMode())
         {
             GSTransferCommand command{};
             command.bitbltbuf = m_bitbltbuf;
@@ -1413,7 +1441,7 @@ void GS::writeRegisterUnlocked(uint8_t regAddr, uint64_t value)
         m_fogB = static_cast<uint8_t>((value >> 16) & 0xFFu);
         break;
     case GS_REG_TEXFLUSH:
-        if (m_backend)
+        if (m_backend && !rawGifMode())
             m_backend->TextureFlush();
         break;
     case GS_REG_SCANMSK:
@@ -1577,7 +1605,10 @@ void GS::vertexKick(bool drawing)
     {
         GSPrimitiveBatch batch = buildDrawBatch(needed);
         updatePreferredDisplaySourceForDraw(batch);
-        m_backend->Submit(batch);
+        // Raw mode suppresses decoded primitive delivery; the frontend draw
+        // state and debug history above still update.
+        if (!rawGifMode())
+            m_backend->Submit(batch);
         recordDrawDebugEventUnlocked(needed);
     }
 
@@ -1610,7 +1641,9 @@ void GS::vertexKick(bool drawing)
 
 void GS::processImageData(const uint8_t *data, uint32_t sizeBytes)
 {
-    if (m_backend)
+    // Raw mode suppresses decoded image delivery (IMAGE packets, HWREG, and
+    // the native image-upload path all funnel through here).
+    if (m_backend && !rawGifMode())
         m_backend->UploadImage(data, sizeBytes);
 }
 
@@ -1660,6 +1693,78 @@ void GS::setRasterBackend(std::unique_ptr<GSRasterBackend> backend)
 
     m_backend = std::move(backend);
     m_backend->Initialize(m_localMemoryStorage, m_localMemorySize);
+
+    // Stage 0 swap contract: VRAM bytes were transferred above. Re-issue the
+    // last delivered CLUT load so the new backend does not render textured
+    // draws with an empty CLUT. The texture-page cache needs no transfer: it
+    // is a VRAM mirror refilled on demand from the transferred bytes.
+    // Transfer state is NOT preserved — swaps require transfer-idle state
+    // (see the GSRasterBackend contract); issueLoadClutUnlocked also skips
+    // delivery when the new backend is a raw backend.
+    if (m_hasLastLoadClut)
+        issueLoadClutUnlocked(m_lastLoadClutTex0, m_lastLoadClutTexclut);
+}
+
+bool GS::rawGifMode() const
+{
+    return m_backend && m_backend->WantsRawGif();
+}
+
+void GS::issueLoadClutUnlocked(const GSTex0Reg &tex0, const GSTexClutReg &texclut)
+{
+    if (rawGifMode())
+        return;
+    m_lastLoadClutTex0 = tex0;
+    m_lastLoadClutTexclut = texclut;
+    m_hasLastLoadClut = true;
+    if (m_backend)
+        m_backend->LoadClut(tex0, texclut);
+}
+
+bool GS::wantsRawGif() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_stateMutex);
+    return rawGifMode();
+}
+
+const char *GS::lastBackendError() const
+{
+    std::lock_guard<std::recursive_mutex> lock(m_stateMutex);
+    return m_backend ? m_backend->LastError() : nullptr;
+}
+
+void GS::onVSync(uint32_t field)
+{
+    std::lock_guard<std::recursive_mutex> lock(m_stateMutex);
+    if (!rawGifMode() || !m_backend)
+        return;
+    // Stream-order snapshot: copy the live priv-reg block now, never hand a
+    // raw backend the live pointer (post-vsync values would mismatch flips).
+    GSPrivRegsSnapshot snapshot{};
+    if (m_privRegs)
+    {
+        snapshot.pmode = m_privRegs->pmode;
+        snapshot.smode1 = m_privRegs->smode1;
+        snapshot.smode2 = m_privRegs->smode2;
+        snapshot.srfsh = m_privRegs->srfsh;
+        snapshot.synch1 = m_privRegs->synch1;
+        snapshot.synch2 = m_privRegs->synch2;
+        snapshot.syncv = m_privRegs->syncv;
+        snapshot.dispfb1 = m_privRegs->dispfb1;
+        snapshot.display1 = m_privRegs->display1;
+        snapshot.dispfb2 = m_privRegs->dispfb2;
+        snapshot.display2 = m_privRegs->display2;
+        snapshot.extbuf = m_privRegs->extbuf;
+        snapshot.extdata = m_privRegs->extdata;
+        snapshot.extwrite = m_privRegs->extwrite;
+        snapshot.bgcolor = m_privRegs->bgcolor;
+        snapshot.csr = m_privRegs->csr.load(std::memory_order_acquire);
+        snapshot.vsyncTick = m_privRegs->vsyncTick.load(std::memory_order_acquire);
+        snapshot.imr = m_privRegs->imr;
+        snapshot.busdir = m_privRegs->busdir;
+        snapshot.siglblid = m_privRegs->siglblid;
+    }
+    m_backend->VSync(snapshot, field);
 }
 
 uint32_t GS::ReadVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y) const

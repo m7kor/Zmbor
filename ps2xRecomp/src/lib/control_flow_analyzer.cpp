@@ -314,8 +314,30 @@ namespace ps2recomp
                             const auto configuredTableIt = m_configJumpTableTargetsByAddress.find(tableAddress);
                             if (configuredTableIt != m_configJumpTableTargetsByAddress.end())
                             {
+                                // Phase 12 — a map hit resolves the JR when
+                                // every target is accounted for, not only
+                                // when at least one target is in-function.
+                                // The old gate (!jrTargets.empty()) treated
+                                // a switch whose cases were split into
+                                // separate functions (the fallback scan
+                                // creates one function per case, so the
+                                // switch's own range ends at case0) as
+                                // unresolved even though every target is a
+                                // known function entry — producing spurious
+                                // fallback promotion and an "unresolved JR"
+                                // warning for a proven table. A target is
+                                // accounted for when it is in-function, or
+                                // when it is contained in a known function
+                                // (queueExternalEntryTarget already queues
+                                // mid-function targets and skips function
+                                // starts, which are entries already). A
+                                // target contained in NO known function is
+                                // unaccounted, so a table with bogus targets
+                                // still falls back instead of silently
+                                // dropping edges.
                                 std::vector<uint32_t> jrTargets;
                                 jrTargets.reserve(configuredTableIt->second.size());
+                                bool allTargetsAccounted = !configuredTableIt->second.empty();
                                 for (uint32_t target : configuredTableIt->second)
                                 {
                                     if (target >= function.start && target < function.end &&
@@ -326,6 +348,10 @@ namespace ps2recomp
                                     else
                                     {
                                         queueExternalEntryTarget(target);
+                                        if (!findContainingExternalFunction(target))
+                                        {
+                                            allTargetsAccounted = false;
+                                        }
                                     }
                                 }
 
@@ -338,6 +364,16 @@ namespace ps2recomp
                                     {
                                         result.entryPoints.insert(target);
                                     }
+                                    foundTable = true;
+                                }
+                                else if (allTargetsAccounted)
+                                {
+                                    // No in-function targets to record for
+                                    // the emitter's local dispatch (it falls
+                                    // back to generic dispatch, which
+                                    // reaches the separate case functions),
+                                    // but the JR is resolved: no fallback
+                                    // promotion for a proven table.
                                     foundTable = true;
                                 }
                             }
@@ -383,6 +419,7 @@ namespace ps2recomp
                                 {
                                     std::vector<uint32_t> jrTargets;
                                     bool validJumpTable = true;
+                                    bool allTargetsAccounted = numCases > 0;
                                     std::unordered_set<uint32_t> uniqueTargets;
                                     for (uint32_t i = 0; i < numCases; ++i)
                                     {
@@ -403,6 +440,10 @@ namespace ps2recomp
                                             else
                                             {
                                                 queueExternalEntryTarget(target);
+                                                if (!findContainingExternalFunction(target))
+                                                {
+                                                    allTargetsAccounted = false;
+                                                }
                                             }
                                         }
                                         else
@@ -418,6 +459,15 @@ namespace ps2recomp
                                         {
                                             result.entryPoints.insert(t);
                                         }
+                                        foundTable = true;
+                                    }
+                                    else if (validJumpTable && allTargetsAccounted)
+                                    {
+                                        // Same Phase 12 rule as the
+                                        // configured-table branch above:
+                                        // every target is a known function
+                                        // entry, so the JR is resolved even
+                                        // though no target is in-function.
                                         foundTable = true;
                                     }
                                 }

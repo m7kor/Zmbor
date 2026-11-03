@@ -1,0 +1,6 @@
+[general]
+input = "/home/hatch/workspace/zmbor-research/poc1/fixtures/vu_macro.elf"
+output = "/home/hatch/workspace/zmbor-research/poc1/fixtures/vu_macro_generated"
+single_file_output = true
+stubs = ["puts", "exit"]
+skip = []

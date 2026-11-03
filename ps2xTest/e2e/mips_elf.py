@@ -129,7 +129,10 @@ class Assembler:
         self.text.append(lambda a=self, o=opcode, d=target: (o << 26) | ((a.addr(d) >> 2) & 0x03FFFFFF))
 
     # ------------------------------------------------------------------ ELF
-    def elf(self, entry='_start'):
+    def elf(self, entry='_start', strip=False):
+        # strip=True emits a genuinely stripped ELF: no .symtab/.strtab
+        # sections at all (not just an empty table), so the recompiler must
+        # rely on entry-point discovery rather than symbols.
         self.end_functions()
         text = b''.join(struct.pack('<I', (w(self) if callable(w) else w) & 0xFFFFFFFF) for w in self.text)
         data_base = self.data_base()
@@ -153,24 +156,37 @@ class Assembler:
             shstr.extend(n.encode() + b'\0')
             return o
 
-        names = [sname(n) for n in ('.text', '.data', '.symtab', '.strtab', '.shstrtab')]
         image_off = 0x1000
         text_size = data_base - self.text_base
-        off_symtab = image_off + len(image)
-        off_strtab = off_symtab + len(symtab)
-        off_shstr = off_strtab + len(strtab)
-        off_sh = (off_shstr + len(shstr) + 3) & ~3
-        shdrs = [bytes(40),
-                 struct.pack('<10I', names[0], 1, 0x6, self.text_base, image_off, len(text), 0, 0, 16, 0),
-                 struct.pack('<10I', names[1], 1, 0x3, data_base, image_off + text_size, len(self.data), 0, 0, 16, 0),
-                 struct.pack('<10I', names[2], 2, 0, 0, off_symtab, len(symtab), 4, 1, 4, 16),
-                 struct.pack('<10I', names[3], 3, 0, 0, off_strtab, len(strtab), 0, 0, 1, 0),
-                 struct.pack('<10I', names[4], 3, 0, 0, off_shstr, len(shstr), 0, 0, 1, 0)]
+        if strip:
+            names = [sname(n) for n in ('.text', '.data', '.shstrtab')]
+            off_shstr = image_off + len(image)
+            off_sh = (off_shstr + len(shstr) + 3) & ~3
+            shdrs = [bytes(40),
+                     struct.pack('<10I', names[0], 1, 0x6, self.text_base, image_off, len(text), 0, 0, 16, 0),
+                     struct.pack('<10I', names[1], 1, 0x3, data_base, image_off + text_size, len(self.data), 0, 0, 16, 0),
+                     struct.pack('<10I', names[2], 3, 0, 0, off_shstr, len(shstr), 0, 0, 1, 0)]
+            shstr_index = 3
+            tail = shstr
+        else:
+            names = [sname(n) for n in ('.text', '.data', '.symtab', '.strtab', '.shstrtab')]
+            off_symtab = image_off + len(image)
+            off_strtab = off_symtab + len(symtab)
+            off_shstr = off_strtab + len(strtab)
+            off_sh = (off_shstr + len(shstr) + 3) & ~3
+            shdrs = [bytes(40),
+                     struct.pack('<10I', names[0], 1, 0x6, self.text_base, image_off, len(text), 0, 0, 16, 0),
+                     struct.pack('<10I', names[1], 1, 0x3, data_base, image_off + text_size, len(self.data), 0, 0, 16, 0),
+                     struct.pack('<10I', names[2], 2, 0, 0, off_symtab, len(symtab), 4, 1, 4, 16),
+                     struct.pack('<10I', names[3], 3, 0, 0, off_strtab, len(strtab), 0, 0, 1, 0),
+                     struct.pack('<10I', names[4], 3, 0, 0, off_shstr, len(shstr), 0, 0, 1, 0)]
+            shstr_index = 5
+            tail = symtab + strtab + shstr
         ehdr = (b'\x7fELF' + bytes([1, 1, 1, 0]) + bytes(8) +
-                struct.pack('<HHIIIIIHHHHHH', 2, 8, 1, self.addr(entry), 52, off_sh, 0, 52, 32, 1, 40, len(shdrs), 5))
+                struct.pack('<HHIIIIIHHHHHH', 2, 8, 1, self.addr(entry), 52, off_sh, 0, 52, 32, 1, 40, len(shdrs), shstr_index))
         phdr = struct.pack('<8I', 1, image_off, self.text_base, self.text_base, len(image), len(image), 7, 0x1000)
         out = bytearray(ehdr + phdr)
-        out += bytes(image_off - len(out)) + image + symtab + strtab + shstr
+        out += bytes(image_off - len(out)) + image + tail
         out += bytes(off_sh - len(out))
         for sh in shdrs:
             out += sh

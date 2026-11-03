@@ -318,6 +318,44 @@ void register_ps2_memory_tests()
             t.Equals(mem.translateAddress(PS2_SCRATCHPAD_ALIAS_BASE + 0x123u), 0x123u, "0xF000 scratchpad alias should translate to local offset");
         });
 
+        tc.Run("Phase15 KSEG2 TLB hit translates, miss throws Ps2TlbMissError", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
+
+            t.IsTrue(mem.tlbWrite(0u, 0xC0001000u, 1u, 0u, true),
+                     "TLB entry install should succeed");
+            t.Equals(mem.translateAddress(0xC0001000u), 0x1000u,
+                     "KSEG2 TLB hit must translate to the mapped physical page");
+            t.Equals(mem.translateAddress(0xC0001004u), 0x1004u,
+                     "TLB hit must preserve the page offset");
+
+            bool threw = false;
+            try
+            {
+                (void)mem.translateAddress(0xC0002000u);
+            }
+            catch (const Ps2TlbMissError &e)
+            {
+                threw = true;
+                t.Equals(e.vaddr, 0xC0002000u, "TLB miss must carry the faulting address");
+            }
+            t.IsTrue(threw, "KSEG2 address with no TLB entry must miss");
+
+            // The miss type stays a std::runtime_error, so DMA/loader paths
+            // that catch std::exception keep behaving as before.
+            threw = false;
+            try
+            {
+                (void)mem.translateAddress(0xC0002000u);
+            }
+            catch (const std::runtime_error &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "TLB miss must still be catchable as std::runtime_error");
+        });
+
         tc.Run("EE timer0 count advances from scheduler cycles and can be reset", [](TestCase &t)
         {
             PS2Memory mem;
@@ -1569,10 +1607,14 @@ void register_ps2_memory_tests()
         tc.Run("GIF arbiter prioritizes PATH1 then PATH2 then PATH3", [](TestCase &t)
         {
             std::vector<uint8_t> order;
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            std::vector<GifPathId> paths;
+            GifArbiter arbiter([&](GifPathId path, const uint8_t *data, uint32_t sizeBytes)
             {
                 if (data && sizeBytes > 0u)
+                {
                     order.push_back(data[0]);
+                    paths.push_back(path);
+                }
             });
 
             const std::vector<uint8_t> p1(16u, 0x11u);
@@ -1588,6 +1630,12 @@ void register_ps2_memory_tests()
             t.Equals(order[0], static_cast<uint8_t>(0x11u), "PATH1 should be drained first");
             t.Equals(order[1], static_cast<uint8_t>(0x22u), "PATH2 should be drained second");
             t.Equals(order[2], static_cast<uint8_t>(0x33u), "PATH3 should be drained third");
+            // Stage 0 raw-GIF seam: drain must preserve the PATH index, not
+            // just the packet order, so a raw backend can tell paths apart.
+            t.Equals(paths.size(), static_cast<size_t>(3u), "all drained packets should carry a path");
+            t.IsTrue(paths[0] == GifPathId::Path1, "first drained packet should carry PATH1");
+            t.IsTrue(paths[1] == GifPathId::Path2, "second drained packet should carry PATH2");
+            t.IsTrue(paths[2] == GifPathId::Path3, "third drained packet should carry PATH3");
         });
 
         tc.Run("VIF DIRECTHL stalls behind queued PATH3 IMAGE packets", [](TestCase &t)
@@ -1596,7 +1644,7 @@ void register_ps2_memory_tests()
             t.IsTrue(mem.initialize(), "PS2Memory initialize should succeed");
 
             std::vector<uint8_t> firstBytes;
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 if (data && sizeBytes > 0u)
                     firstBytes.push_back(data[0]);
@@ -3616,7 +3664,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3685,7 +3733,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3743,7 +3791,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });
@@ -3800,7 +3848,7 @@ void register_ps2_memory_tests()
 
             GS gs;
             gs.init(mem.getGSVRAM(), static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &mem.gs());
-            GifArbiter arbiter([&](const uint8_t *data, uint32_t sizeBytes)
+            GifArbiter arbiter([&](GifPathId, const uint8_t *data, uint32_t sizeBytes)
             {
                 gs.processGIFPacket(data, sizeBytes);
             });

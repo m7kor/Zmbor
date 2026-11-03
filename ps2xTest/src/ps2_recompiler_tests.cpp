@@ -1,8 +1,10 @@
 #include "MiniTest.h"
 #include "ps2recomp/ps2_recompiler.h"
 #include "ps2recomp/config_manager.h"
+#include "ps2recomp/control_flow_analyzer.h"
 #include "ps2recomp/elf_parser.h"
 #include "ps2recomp/instructions.h"
+#include "ps2recomp/r5900_decoder.h"
 #include "ps2recomp/types.h"
 #include "ps2_runtime_calls.h"
 #include <elfio/elfio.hpp>
@@ -12,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -192,6 +195,349 @@ static bool writeMinimalMipsElfWithJalFallbackTarget(const std::filesystem::path
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
     textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+// Phase 12 — stripped synthetic ELF with an exactly known function set.
+// .text at 0x00100000 (42 words, 0xA8 bytes):
+//   entry [0x100000,0x100020): jal f1, jal f2, jal switch_fn, jr $ra
+//   f1    [0x100020,0x100028): jr $ra
+//   f2    [0x100028,0x100034): addiu v0, 7; jr $ra
+//   switch[0x100034,0x100088): addiu a0, 1; andi t1, a0, 3; lui t2, 0x10;
+//                              ori t2, t2, 0x200; sll t1, t1, 2;
+//                              addu t3, t2, t1; lw t4, 0(t3); jr t4;
+//                              cases 10/11/12/13 at 0x100058/64/70/7C
+//                              (each: addiu v0, N; jr $ra)
+//   dead_caller [0x100088,0x1000A0): jal f2, jal dead_func, jr $ra —
+//                              UNREACHABLE from entry (no edge leads here)
+//   dead_func   [0x1000A0,0x1000A8): jr $ra — called only by dead_caller
+// .data at 0x00100200: the 4-entry switch table (case addresses).
+// Deliberately NO SLTIU anywhere: the switch bound is an ANDI mask, so the
+// CFA's unconfigured SLTIU recovery cannot resolve the JR — only a
+// discovered table can. cutEntryJalF2 replaces entry's `jal f2` with nop
+// (the call-edge-deletion mutant); withMergedSymbol adds a sized symbol
+// "merged_fn" covering [f1, f2) to test merge order.
+static const std::array<uint32_t, 42> kPhase12TextWords = {
+    0x0C040008u, // jal f1 (0x100020)
+    0x00000000u, // nop
+    0x0C04000Au, // jal f2 (0x100028)
+    0x00000000u, // nop
+    0x0C04000Du, // jal switch_fn (0x100034)
+    0x00000000u, // nop
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x03E00008u, // f1: jr $ra
+    0x00000000u, // nop
+    0x24020007u, // f2: addiu v0, zero, 7
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x24040001u, // switch: addiu a0, zero, 1
+    0x30890003u, // andi t1, a0, 3
+    0x3C0A0010u, // lui t2, 0x10
+    0x354A0200u, // ori t2, t2, 0x200
+    0x00094880u, // sll t1, t1, 2
+    0x01495821u, // addu t3, t2, t1
+    0x8D6C0000u, // lw t4, 0(t3)
+    0x01800008u, // jr t4
+    0x00000000u, // nop
+    0x2402000Au, // case0: addiu v0, zero, 10
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x2402000Bu, // case1: addiu v0, zero, 11
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x2402000Cu, // case2: addiu v0, zero, 12
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x2402000Du, // case3: addiu v0, zero, 13
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x0C04000Au, // dead_caller: jal f2
+    0x00000000u, // nop
+    0x0C040028u, // dead_caller: jal dead_func (0x1000A0)
+    0x00000000u, // nop
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x03E00008u, // dead_func: jr $ra
+    0x00000000u, // nop
+};
+
+static bool writePhase12DiscoveryElf(const std::filesystem::path &elfPath, bool cutEntryJalF2,
+                                     bool withMergedSymbol)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    std::array<uint32_t, 42> textWords = kPhase12TextWords;
+    if (cutEntryJalF2)
+    {
+        textWords[2] = 0x00000000u; // entry's `jal f2` becomes nop
+    }
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::section *data = writer.sections.add(".data");
+    data->set_type(ELFIO::SHT_PROGBITS);
+    data->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_WRITE);
+    data->set_addr_align(4);
+    data->set_address(0x00100200u);
+    const std::array<uint32_t, 4> tableWords = {0x00100058u, 0x00100064u, 0x00100070u, 0x0010007Cu};
+    data->set_data(reinterpret_cast<const char *>(tableWords.data()),
+                   static_cast<ELFIO::Elf_Word>(tableWords.size() * sizeof(uint32_t)));
+
+    if (withMergedSymbol)
+    {
+        ELFIO::section *strtab = writer.sections.add(".strtab");
+        strtab->set_type(ELFIO::SHT_STRTAB);
+        strtab->set_addr_align(1);
+
+        ELFIO::section *symtab = writer.sections.add(".symtab");
+        symtab->set_type(ELFIO::SHT_SYMTAB);
+        symtab->set_info(1);
+        symtab->set_link(strtab->get_index());
+        symtab->set_addr_align(4);
+        symtab->set_entry_size(writer.get_default_entry_size(ELFIO::SHT_SYMTAB));
+
+        ELFIO::symbol_section_accessor symbols(writer, symtab);
+        ELFIO::string_section_accessor strings(strtab);
+        symbols.add_symbol(strings, "", 0, 0, ELFIO::STB_LOCAL, ELFIO::STT_NOTYPE, 0, ELFIO::SHN_UNDEF);
+        symbols.add_symbol(strings, "merged_fn", 0x00100020u, 0x14u, ELFIO::STB_GLOBAL, ELFIO::STT_FUNC,
+                           0, text->get_index());
+    }
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    ELFIO::segment *dataSegment = writer.segments.add();
+    dataSegment->set_type(ELFIO::PT_LOAD);
+    dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
+    dataSegment->set_align(0x1000);
+    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+// Phase 14 — JALR / JR-constant synthetic ELF (no .data section).
+// .text at 0x00100000 (50 words):
+//   entry [0x100000,0x100040): lui $t9,0x10; addiu $t9,$t9,0x40;
+//                              jalr $t9 (funcA); lui $t9,0x10;
+//                              ori $t9,$t9,0x60; jalr $t9 (funcB);
+//                              jalr $t8 (never defined: unknown target);
+//                              lui $t0,0x10; addiu $t0,$t0,0xA0;
+//                              jr $t0 (computed jump to jrBlock); jr $ra
+//   funcA [0x100040,0x10004C): addiu $v0, 41; jr $ra
+//   funcB [0x100060,0x10006C): addiu $v0, 42; jr $ra
+//   jrBlock [0x1000A0,0x1000B0): jal funcD; jr $ra — reached ONLY
+//                              through the entry's constant jr $t0, so it
+//                              is an entry block, NOT a function start
+//   funcD [0x1000C0,0x1000C8): jr $ra — reached ONLY through jrBlock's
+//                              jal, so it is discovered ONLY if the
+//                              constant-jr edge is followed.
+// cutFirstAddiu replaces entry's first `addiu $t9,$t9,0x40` with nop, so
+// the first jalr targets the bare LUI value 0x100000 (entry itself) and
+// funcA must drop out. clobberDelay replaces the first jalr's delay-slot
+// nop with `addiu $t9,$zero,0x99`, so the target register is rewritten
+// in the delay slot (architecturally unpredictable) and funcA must NOT
+// be recovered from that jalr.
+static const std::array<uint32_t, 50> kPhase14JalrTextWords = {
+    0x3C190010u, // entry: lui $t9, 0x10
+    0x27390040u, // addiu $t9, $t9, 0x40 -> 0x100040
+    0x0320F809u, // jalr $t9 (funcA)
+    0x00000000u, // nop (delay)
+    0x3C190010u, // lui $t9, 0x10
+    0x37390060u, // ori $t9, $t9, 0x60 -> 0x100060
+    0x0320F809u, // jalr $t9 (funcB)
+    0x00000000u, // nop (delay)
+    0x0300F809u, // jalr $t8 (unknown: $t8 never defined)
+    0x00000000u, // nop (delay)
+    0x3C080010u, // lui $t0, 0x10
+    0x210800A0u, // addiu $t0, $t0, 0xA0 -> 0x1000A0
+    0x01000008u, // jr $t0 (computed jump to jrBlock)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra (unreached fallthrough words)
+    0x00000000u, // nop
+    0x24020029u, // funcA: addiu $v0, zero, 41
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x2402002Au, // funcB: addiu $v0, zero, 42
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x0C040030u, // jrBlock: jal funcD (0x1000C0)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x03E00008u, // funcD: jr $ra
+    0x00000000u, // nop
+};
+
+static bool writePhase14JalrElf(const std::filesystem::path &elfPath, bool cutFirstAddiu,
+                                bool clobberDelay)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    std::array<uint32_t, 50> textWords = kPhase14JalrTextWords;
+    if (cutFirstAddiu)
+    {
+        textWords[1] = 0x00000000u; // entry's first `addiu $t9,$t9,0x40` becomes nop
+    }
+    if (clobberDelay)
+    {
+        textWords[3] = 0x24190099u; // first jalr's delay slot: addiu $t9, $zero, 0x99
+    }
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+// Phase 14 — singleton data-pointer synthetic ELF.
+// .text at 0x00100000 (26 words):
+//   entry [0x100000,0x100010): jal plainFunc; jr $ra
+//   plainFunc [0x100020,0x10002C): addiu $v0, 51; jr $ra
+//   dataptrFunc [0x100040,0x100054): addiu $v0, 52; jal dataptrCallee;
+//                                    jr $ra — reachable ONLY through the
+//                                    .data pointer below
+//   dataptrCallee [0x100060,0x100068): jr $ra — reachable ONLY through
+//                                    dataptrFunc's jal, so it is discovered
+//                                    ONLY if dataptrFunc is descended into.
+// .data at 0x00100200 (14 words): a SINGLETON pointer to dataptrFunc at
+// offset 0 (no conservative neighbour within 32 bytes, so the fallback
+// scan's clustering rule must miss it), 9 junk words, a decoy pointer to
+// plainFunc's jr $ra (mid-function, offset 0x28 = 40 bytes away, so it
+// clusters with nothing either), junk, a self pointer, and an unaligned
+// code address. zeroDataPointer replaces the singleton word with 0, so
+// dataptrFunc (and hence dataptrCallee) must drop out of discovery.
+static const std::array<uint32_t, 26> kPhase14DataTextWords = {
+    0x0C040008u, // entry: jal plainFunc (0x100020)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x24020033u, // plainFunc: addiu $v0, zero, 51
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x24020034u, // dataptrFunc: addiu $v0, zero, 52
+    0x0C040018u, // jal dataptrCallee (0x100060)
+    0x00000000u, // nop (delay)
+    0x03E00008u, // jr $ra
+    0x00000000u, // nop
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x00000000u, // pad
+    0x03E00008u, // dataptrCallee: jr $ra
+    0x00000000u, // nop
+};
+
+static bool writePhase14DataElf(const std::filesystem::path &elfPath, bool zeroDataPointer)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+    text->set_data(reinterpret_cast<const char *>(kPhase14DataTextWords.data()),
+                   static_cast<ELFIO::Elf_Word>(kPhase14DataTextWords.size() * sizeof(uint32_t)));
+
+    ELFIO::section *data = writer.sections.add(".data");
+    data->set_type(ELFIO::SHT_PROGBITS);
+    data->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_WRITE);
+    data->set_addr_align(4);
+    data->set_address(0x00100200u);
+    std::array<uint32_t, 14> dataWords = {
+        0x00100040u, // singleton pointer to dataptrFunc
+        0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu,
+        0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu, 0xDEADBEEFu,
+        0x00100024u, // decoy: plainFunc's jr $ra (mid-function)
+        0xDEADBEEFu,
+        0x00100200u, // self pointer (data, not code)
+        0x00100042u, // unaligned code address
+    };
+    if (zeroDataPointer)
+    {
+        dataWords[0] = 0x00000000u;
+    }
+    data->set_data(reinterpret_cast<const char *>(dataWords.data()),
+                   static_cast<ELFIO::Elf_Word>(dataWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    ELFIO::segment *dataSegment = writer.segments.add();
+    dataSegment->set_type(ELFIO::PT_LOAD);
+    dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
+    dataSegment->set_align(0x1000);
+    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
 
     return writer.save(elfPath.string());
 }
@@ -1855,6 +2201,548 @@ void register_ps2_recompiler_tests()
             std::error_code removeError;
             std::filesystem::remove(elfPath, removeError);
             std::filesystem::remove(mapPath, removeError);
+        });
+
+        tc.Run("Phase 12 discovery finds exactly the reachable set and switch table", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase12-base-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase12DiscoveryElf(elfPath, false, false);
+            t.IsTrue(writeOk, "temporary stripped ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            // The discovery pass itself: proven reachable set, nothing more.
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(4), "discovery should find exactly 4 reachable functions");
+            for (const uint32_t expected :
+                 {0x00100000u, 0x00100020u, 0x00100028u, 0x00100034u})
+            {
+                t.IsTrue(starts.count(expected) == 1, "reachable function should be discovered");
+            }
+            t.IsFalse(starts.count(0x00100088u) == 1,
+                      "dead_caller is unreachable and must not be discovered");
+            t.IsFalse(starts.count(0x001000A0u) == 1,
+                      "dead_func is called only by dead code and must not be discovered");
+
+            t.Equals(discovery.jumpTables.size(), static_cast<size_t>(1),
+                     "exactly one switch table should be recovered");
+            if (discovery.jumpTables.size() == 1)
+            {
+                const auto &table = discovery.jumpTables[0];
+                t.Equals(table.address, 0x00100200u, "switch table address should be the .data table");
+                t.Equals(table.entries.size(), static_cast<size_t>(4), "switch table should have 4 entries");
+                const std::array<uint32_t, 4> cases = {0x00100058u, 0x00100064u, 0x00100070u, 0x0010007Cu};
+                for (size_t i = 0; i < 4 && i < table.entries.size(); ++i)
+                {
+                    t.Equals(table.entries[i].target, cases[i], "switch table entry should match its case");
+                }
+            }
+
+            // The merged output still carries the fallback-scan extras, so
+            // it is a SUPERSET of discovery: the case targets appear as
+            // functions (the scan proposes materialized code addresses from
+            // the .data table words) and dead_func appears (its JAL word
+            // sits in dead code, which the scan cannot distinguish), while
+            // dead_caller appears in neither (nothing takes its address).
+            // Discovery, by contrast, treats the cases as intra-function
+            // blocks of the switch function — the 4-function set above.
+            // Ends are inferred from the next merged start / section end,
+            // so the merged switch end is case0, not the switch's own
+            // decoded extent.
+            const auto functions = parser.extractFunctions();
+            const auto findFn = [&functions](uint32_t start) {
+                return std::find_if(functions.begin(), functions.end(),
+                                    [start](const Function &fn) { return fn.start == start; });
+            };
+            const auto entryIt = findFn(0x00100000u);
+            t.IsTrue(entryIt != functions.end(), "merged entry should exist");
+            if (entryIt != functions.end())
+            {
+                t.Equals(entryIt->end, 0x00100020u, "merged entry end should be f1 start");
+            }
+            const auto f1It = findFn(0x00100020u);
+            t.IsTrue(f1It != functions.end(), "merged f1 should exist");
+            if (f1It != functions.end())
+            {
+                t.Equals(f1It->end, 0x00100028u, "merged f1 end should be f2 start");
+            }
+            const auto f2It = findFn(0x00100028u);
+            t.IsTrue(f2It != functions.end(), "merged f2 should exist");
+            if (f2It != functions.end())
+            {
+                t.Equals(f2It->end, 0x00100034u, "merged f2 end should be switch start");
+            }
+            const auto switchIt = findFn(0x00100034u);
+            t.IsTrue(switchIt != functions.end(), "merged switch should exist");
+            if (switchIt != functions.end())
+            {
+                t.Equals(switchIt->end, 0x00100058u,
+                         "merged switch end should be the next merged start (case0, via the scan)");
+            }
+            t.IsTrue(findFn(0x00100058u) != functions.end(),
+                     "merged output contains case0 via the fallback scan (not via discovery)");
+            t.IsTrue(findFn(0x001000A0u) != functions.end(),
+                     "merged output still contains dead_func via the fallback scan");
+            t.IsTrue(findFn(0x00100088u) == functions.end(),
+                     "dead_caller appears in neither discovery nor merged output");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 12 merge order keeps sized symbol ranges over discovery", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase12-merge-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase12DiscoveryElf(elfPath, false, true);
+            t.IsTrue(writeOk, "temporary ELF with sized symbol should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            // Discovery itself is symbol-blind: it still finds f1 and f2
+            // from code alone. The merge, not discovery, enforces priority.
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.IsTrue(starts.count(0x00100020u) == 1, "discovery still finds f1 from code");
+            t.IsTrue(starts.count(0x00100028u) == 1, "discovery still finds f2 from code");
+
+            const auto functions = parser.extractFunctions();
+            const auto findFn = [&functions](uint32_t start) {
+                return std::find_if(functions.begin(), functions.end(),
+                                    [start](const Function &fn) { return fn.start == start; });
+            };
+            const auto mergedIt = findFn(0x00100020u);
+            t.IsTrue(mergedIt != functions.end(), "symbol range should survive the merge");
+            if (mergedIt != functions.end())
+            {
+                t.Equals(mergedIt->name, std::string("merged_fn"), "symbol name should win over auto name");
+                t.Equals(mergedIt->end, 0x00100034u,
+                         "symbol end should be exactly start + size, not extended by discovery");
+            }
+            t.IsTrue(findFn(0x00100028u) == functions.end(),
+                     "f2 must not appear as a separate function inside the symbol range");
+            const auto entryIt = findFn(0x00100000u);
+            t.IsTrue(entryIt != functions.end(), "merged entry should exist");
+            if (entryIt != functions.end())
+            {
+                t.Equals(entryIt->end, 0x00100020u, "merged entry end should be the symbol start");
+            }
+            t.IsTrue(findFn(0x00100034u) != functions.end(), "switch should survive the merge");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 12 call-edge deletion removes only the orphaned callee", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase12-mutant-" + uniqueSuffix + ".elf");
+
+            // Entry's `jal f2` replaced by nop; dead_caller still contains
+            // `jal f2`, so a scan-based pass would still report f2.
+            const bool writeOk = writePhase12DiscoveryElf(elfPath, true, false);
+            t.IsTrue(writeOk, "temporary mutant ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(3),
+                     "deleting the only live call edge should leave exactly 3 functions");
+            t.IsTrue(starts.count(0x00100000u) == 1, "entry should remain discovered");
+            t.IsTrue(starts.count(0x00100020u) == 1, "f1 should remain discovered");
+            t.IsTrue(starts.count(0x00100034u) == 1, "switch should remain discovered");
+            t.IsFalse(starts.count(0x00100028u) == 1,
+                      "f2 must drop out of discovery once its only live caller is cut");
+            t.Equals(discovery.jumpTables.size(), static_cast<size_t>(1),
+                     "the switch table should still be recovered in the mutant");
+
+            // Contrast: the merged output DOES still contain f2, because
+            // the fallback scan sees dead_caller's `jal f2` word. This is
+            // what makes the test non-vacuous — it measures descent, not
+            // scanning.
+            const auto functions = parser.extractFunctions();
+            t.IsTrue(std::any_of(functions.begin(), functions.end(),
+                                 [](const Function &fn) { return fn.start == 0x00100028u; }),
+                     "merged output still contains f2 via the fallback scan");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 12 discovered tables resolve JR switches without fallback promotion", [](TestCase &t) {
+            // Decode the switch function's own words (indices 13..33 of the
+            // Phase 12 text) with the real decoder, so the CFA sees exactly
+            // what the recompiler would feed it.
+            R5900Decoder decoder;
+            std::vector<Instruction> instructions;
+            for (size_t i = 13; i < 34; ++i)
+            {
+                instructions.push_back(
+                    decoder.decodeInstruction(0x00100000u + static_cast<uint32_t>(i * 4), kPhase12TextWords[i]));
+            }
+            t.Equals(instructions.size(), static_cast<size_t>(21), "switch function should decode to 21 instructions");
+
+            Section textSec{};
+            textSec.name = ".text";
+            textSec.address = 0x00100000u;
+            textSec.size = 0xA8u;
+            textSec.isCode = true;
+            Section dataSec{};
+            dataSec.name = ".data";
+            dataSec.address = 0x00100200u;
+            dataSec.size = 16u;
+            dataSec.isData = true;
+            const std::vector<Section> sections{textSec, dataSec};
+
+            Function switchFn{};
+            switchFn.name = "switch_fn";
+            switchFn.start = 0x00100034u;
+            switchFn.end = 0x00100088u;
+            switchFn.isRecompiled = true;
+            const std::vector<Function> allFunctions{switchFn};
+
+            const std::unordered_map<uint32_t, std::vector<uint32_t>> discoveredMap{
+                {0x00100200u, {0x00100058u, 0x00100064u, 0x00100070u, 0x0010007Cu}}};
+            ControlFlowAnalyzer withTable(sections, discoveredMap, nullptr);
+            const auto result = withTable.analyze(switchFn, instructions, &allFunctions);
+            const auto jrIt = result.jumpTableTargets.find(0x00100050u);
+            t.IsTrue(jrIt != result.jumpTableTargets.end(),
+                     "JR should resolve through the discovered table");
+            if (jrIt != result.jumpTableTargets.end())
+            {
+                t.Equals(jrIt->second.size(), static_cast<size_t>(4),
+                         "JR should resolve to all 4 case targets");
+                for (const uint32_t target : {0x00100058u, 0x00100064u, 0x00100070u, 0x0010007Cu})
+                {
+                    t.IsTrue(std::find(jrIt->second.begin(), jrIt->second.end(), target) != jrIt->second.end(),
+                             "each case target should be a proven CFG edge");
+                }
+            }
+            t.IsTrue(result.indirectFallbackEntryPoints.empty(),
+                     "a resolved JR must not trigger indirect-fallback promotion");
+
+            // Negative control: the same function with NO discovered table
+            // must fall back (the switch bound is an ANDI mask, not SLTIU,
+            // so unconfigured recovery cannot save it).
+            const std::unordered_map<uint32_t, std::vector<uint32_t>> emptyMap;
+            ControlFlowAnalyzer withoutTable(sections, emptyMap, nullptr);
+            const auto fallbackResult = withoutTable.analyze(switchFn, instructions, &allFunctions);
+            t.IsFalse(fallbackResult.indirectFallbackEntryPoints.empty(),
+                      "without the discovered table the JR must fall back to promotion");
+            t.IsTrue(fallbackResult.jumpTableTargets.find(0x00100050u) ==
+                         fallbackResult.jumpTableTargets.end(),
+                     "without the discovered table the JR should have no proven targets");
+
+            std::error_code removeError;
+            (void)removeError;
+        });
+
+        tc.Run("Phase 12 CFA resolves tables whose cases are separate functions", [](TestCase &t) {
+            // The real-pipeline shape: the fallback scan turns each case
+            // into its own function, so the merged switch range ends at
+            // case0 and the CFA sees only the 8-word prologue. Every case
+            // target is then "external" — but each is a known function
+            // entry, so the JR must resolve without fallback promotion.
+            R5900Decoder decoder;
+            std::vector<Instruction> instructions;
+            for (size_t i = 13; i < 21; ++i)
+            {
+                instructions.push_back(
+                    decoder.decodeInstruction(0x00100000u + static_cast<uint32_t>(i * 4), kPhase12TextWords[i]));
+            }
+            t.Equals(instructions.size(), static_cast<size_t>(8), "prologue should decode to 8 instructions");
+
+            Section textSec{};
+            textSec.name = ".text";
+            textSec.address = 0x00100000u;
+            textSec.size = 0xA8u;
+            textSec.isCode = true;
+            Section dataSec{};
+            dataSec.name = ".data";
+            dataSec.address = 0x00100200u;
+            dataSec.size = 16u;
+            dataSec.isData = true;
+            const std::vector<Section> sections{textSec, dataSec};
+
+            Function switchFn{};
+            switchFn.name = "switch_fn";
+            switchFn.start = 0x00100034u;
+            switchFn.end = 0x00100058u; // ends at case0, as the scan-split merged output does
+            switchFn.isRecompiled = true;
+            std::vector<Function> allFunctions{switchFn};
+            for (size_t c = 0; c < 4; ++c)
+            {
+                Function caseFn{};
+                caseFn.name = "case_fn";
+                caseFn.start = 0x00100058u + static_cast<uint32_t>(c * 12);
+                caseFn.end = caseFn.start + 12u;
+                caseFn.isRecompiled = true;
+                allFunctions.push_back(caseFn);
+            }
+
+            const std::unordered_map<uint32_t, std::vector<uint32_t>> discoveredMap{
+                {0x00100200u, {0x00100058u, 0x00100064u, 0x00100070u, 0x0010007Cu}}};
+            ControlFlowAnalyzer withTable(sections, discoveredMap, nullptr);
+            const auto result = withTable.analyze(switchFn, instructions, &allFunctions);
+            t.IsTrue(result.indirectFallbackEntryPoints.empty(),
+                     "all-external but known case targets must not trigger fallback promotion");
+
+            // Guard: a table with a target contained in NO known function
+            // must still fall back — the accounting rule must not blindly
+            // suppress promotion for bogus tables.
+            const std::unordered_map<uint32_t, std::vector<uint32_t>> bogusMap{
+                {0x00100200u, {0x00100058u, 0x00100064u, 0x00100070u, 0x00200000u}}};
+            ControlFlowAnalyzer withBogus(sections, bogusMap, nullptr);
+            const auto bogusResult = withBogus.analyze(switchFn, instructions, &allFunctions);
+            t.IsFalse(bogusResult.indirectFallbackEntryPoints.empty(),
+                      "a table with an unaccounted target must still fall back");
+        });
+
+        tc.Run("Phase 14 JALR constant targets are proven discovery edges", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-jalr-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14JalrElf(elfPath, false, false);
+            t.IsTrue(writeOk, "temporary JALR ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            // Discovery is the proven set: both constant JALR targets and
+            // the function reached only through the constant JR edge.
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(4),
+                     "discovery should find exactly entry, funcA, funcB, funcD");
+            for (const uint32_t expected :
+                 {0x00100000u, 0x00100040u, 0x00100060u, 0x001000C0u})
+            {
+                t.IsTrue(starts.count(expected) == 1, "JALR/JR-constant reachable function should be discovered");
+            }
+            t.IsFalse(starts.count(0x001000A0u) == 1,
+                      "jrBlock is an entry block reached by a constant jump, not a function start");
+            t.IsTrue(discovery.jumpTables.empty(), "no switch table should be recovered from this ELF");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 14 JALR mutants drop only the affected callee", [](TestCase &t) {
+            for (const auto &[name, cutAddiu, clobber] :
+                 {std::tuple{"cut-addiu", true, false}, std::tuple{"clobber-delay", false, true}})
+            {
+                const auto uniqueSuffix = std::to_string(static_cast<unsigned long long>(
+                    std::chrono::steady_clock::now().time_since_epoch().count()));
+                const std::filesystem::path elfPath = std::filesystem::temp_directory_path() /
+                                                      ("ps2recomp-phase14-jalr-mutant-" + uniqueSuffix + ".elf");
+
+                const bool writeOk = writePhase14JalrElf(elfPath, cutAddiu, clobber);
+                t.IsTrue(writeOk, "temporary JALR mutant ELF should be generated");
+                if (!writeOk)
+                {
+                    continue;
+                }
+
+                ElfParser parser(elfPath.string());
+                const bool parseOk = parser.parse();
+                t.IsTrue(parseOk, "generated mutant ELF should parse");
+                if (!parseOk)
+                {
+                    std::error_code removeError;
+                    std::filesystem::remove(elfPath, removeError);
+                    continue;
+                }
+
+                const auto discovery = parser.discoverFromEntryPoint();
+                std::set<uint32_t> starts;
+                for (const auto &fn : discovery.functions)
+                {
+                    starts.insert(fn.start);
+                }
+                t.Equals(starts.size(), static_cast<size_t>(3),
+                         "mutant discovery should find exactly entry, funcB, funcD");
+                t.IsFalse(starts.count(0x00100040u) == 1,
+                          "funcA must drop out of discovery once its JALR edge is cut or clobbered");
+                t.IsTrue(starts.count(0x00100060u) == 1, "funcB should remain discovered in the mutant");
+                t.IsTrue(starts.count(0x001000C0u) == 1, "funcD should remain discovered in the mutant");
+
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                (void)name;
+            }
+        });
+
+        tc.Run("Phase 14 singleton data pointer discovers its function, decoy excluded", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-data-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14DataElf(elfPath, false);
+            t.IsTrue(writeOk, "temporary data-pointer ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(4),
+                     "discovery should find exactly entry, plainFunc, dataptrFunc, dataptrCallee");
+            for (const uint32_t expected :
+                 {0x00100000u, 0x00100020u, 0x00100040u, 0x00100060u})
+            {
+                t.IsTrue(starts.count(expected) == 1, "data-pointer reachable function should be discovered");
+            }
+            t.IsFalse(starts.count(0x00100024u) == 1,
+                      "decoy pointer to plainFunc's jr $ra is mid-function and must not be discovered");
+
+            // The merged output must carry dataptrFunc through the
+            // discovery merge: the fallback scan's clustering rule misses
+            // a singleton pointer with no conservative neighbour.
+            const auto functions = parser.extractFunctions();
+            t.IsTrue(std::any_of(functions.begin(), functions.end(),
+                                 [](const Function &fn) { return fn.start == 0x00100040u; }),
+                     "merged output should contain dataptrFunc via discovery");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("Phase 14 data-pointer deletion removes the function and its callee", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-phase14-data-mutant-" + uniqueSuffix + ".elf");
+
+            const bool writeOk = writePhase14DataElf(elfPath, true);
+            t.IsTrue(writeOk, "temporary data-pointer mutant ELF should be generated");
+            if (!writeOk)
+            {
+                return;
+            }
+
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (!parseOk)
+            {
+                std::error_code removeError;
+                std::filesystem::remove(elfPath, removeError);
+                return;
+            }
+
+            const auto discovery = parser.discoverFromEntryPoint();
+            std::set<uint32_t> starts;
+            for (const auto &fn : discovery.functions)
+            {
+                starts.insert(fn.start);
+            }
+            t.Equals(starts.size(), static_cast<size_t>(2),
+                     "deleting the data pointer should leave exactly entry and plainFunc");
+            t.IsFalse(starts.count(0x00100040u) == 1,
+                      "dataptrFunc must drop out of discovery once its data pointer is zeroed");
+            t.IsFalse(starts.count(0x00100060u) == 1,
+                      "dataptrCallee must drop out too: its only caller was dataptrFunc");
+
+            // Contrast: the merged output DOES still contain dataptrCallee,
+            // because the fallback scan sees dataptrFunc's `jal` word in
+            // dead code. This is what makes the test non-vacuous — it
+            // measures descent from the data pointer, not scanning.
+            const auto functions = parser.extractFunctions();
+            t.IsTrue(std::any_of(functions.begin(), functions.end(),
+                                 [](const Function &fn) { return fn.start == 0x00100060u; }),
+                     "merged output still contains dataptrCallee via the fallback scan");
+
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
         });
 
         tc.Run("elf parser discovers address-taken callbacks in stripped ELFs", [](TestCase &t) {

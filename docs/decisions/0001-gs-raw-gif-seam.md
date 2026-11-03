@@ -1,6 +1,13 @@
 # ADR 0001: one raw-GIF seam for whole-GS renderers
 
-Status: proposed (design only; nothing in this ADR is implemented yet).
+Status: partially implemented (Stage 0, 2026-11-03): items 1–4 are implemented
+against the CPU backend only — defaulted `WantsRawGif`/`RawGif`/`VSync`/
+`GsReset` virtuals on `GSRasterBackend`, the PATH-carrying arbiter callback,
+stream-order priv-reg snapshots at vsync, and the written ordering contract
+in `gs_backend.h` — with the seam present-but-disabled proven byte-identical
+on the gs_sprite golden frame and a null raw-GIF backend proving packet
+fidelity by replay. Item 5 (VERIFY comparison mode) is NOT implemented yet;
+it belongs to Stage 1 (harness + fixtures). No GPU adapter exists yet.
 
 ## Context
 

@@ -76,6 +76,7 @@ ps2x_add_e2e_program(basic)
 ps2x_add_e2e_program(gs_sprite FRAME)
 ps2x_add_e2e_program(branchdelay)
 ps2x_add_e2e_program(vu_macro)
+ps2x_add_e2e_program(stripped)
 
 # Hardware result tests: ELFs recompiled by tools/hwtest/hwtest.py prepare (for example ps2autotests, whose
 # .expected files were printed by a real PS2). Configure with -DPS2X_HWTEST_GENERATED=<prepared dir>.

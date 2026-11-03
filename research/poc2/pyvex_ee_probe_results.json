@@ -1,0 +1,51 @@
+{
+  "0x48a90800": {
+    "note": "COP2 word from vu_macro .text",
+    "size": 0,
+    "n_statements": 0,
+    "jumpkind": "Ijk_NoDecode",
+    "statements": []
+  },
+  "0x4be20928": {
+    "note": "COP2 word from vu_macro .text",
+    "size": 0,
+    "n_statements": 0,
+    "jumpkind": "Ijk_NoDecode",
+    "statements": []
+  },
+  "0x7ba80000": {
+    "note": "LQ opcode 0x1E",
+    "size": 0,
+    "n_statements": 0,
+    "jumpkind": "Ijk_NoDecode",
+    "statements": []
+  },
+  "0x7d0a0020": {
+    "note": "SQ opcode 0x1F (word from vu_macro .text)",
+    "size": 4,
+    "n_statements": 1,
+    "jumpkind": "Ijk_SigILL",
+    "statements": [
+      "------ IMark(0x100000, 4, 0) ------"
+    ]
+  },
+  "0x70000121": {
+    "note": "MMI opcode 0x1C",
+    "size": 4,
+    "n_statements": 1,
+    "jumpkind": "Ijk_Boring",
+    "statements": [
+      "------ IMark(0x100000, 4, 0) ------"
+    ]
+  },
+  "0x2408002a": {
+    "note": "addiu control",
+    "size": 4,
+    "n_statements": 2,
+    "jumpkind": "Ijk_Boring",
+    "statements": [
+      "------ IMark(0x100000, 4, 0) ------",
+      "PUT(offset=40) = 0x0000002a"
+    ]
+  }
+}

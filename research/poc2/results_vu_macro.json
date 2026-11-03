@@ -1,0 +1,37 @@
+{
+  "tool": "angr CFGFast",
+  "angr_version": "10.0.5",
+  "elf": "fixtures/vu_macro.elf",
+  "arch": "<Arch MIPS32 (LE)>",
+  "entry": "0x100000",
+  "reported": 9,
+  "reported_addrs": [
+    "0x100000",
+    "0x10000c",
+    "0x10001c",
+    "0x100094",
+    "0x1002d4",
+    "0x100310",
+    "0x100334",
+    "0x10037c",
+    "0x100384"
+  ],
+  "promotable_tp": [],
+  "false_positive": [],
+  "candidate_only": [
+    "0x100000",
+    "0x10000c",
+    "0x10001c",
+    "0x100094",
+    "0x1002d4",
+    "0x100310",
+    "0x100334",
+    "0x10037c",
+    "0x100384"
+  ],
+  "missed": [],
+  "unresolved_indirect": [],
+  "blocks_empty_or_nodecode_vex": 0,
+  "wall_seconds": 10.33,
+  "peak_rss_mb": 132.9
+}

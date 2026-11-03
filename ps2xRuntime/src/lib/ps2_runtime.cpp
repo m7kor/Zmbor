@@ -717,8 +717,8 @@ bool PS2Runtime::syncCoreSubsystems()
     }
 
     m_gs.init(gsVram, static_cast<uint32_t>(PS2_GS_VRAM_SIZE), &m_memory.gs());
-    m_gifArbiter.setProcessPacketFn([this](const uint8_t *data, uint32_t size)
-                                    { m_gs.processGIFPacket(data, size); });
+    m_gifArbiter.setProcessPacketFn([this](GifPathId path, const uint8_t *data, uint32_t size)
+                                    { m_gs.processGIFPacket(path, data, size); });
     m_memory.setGifArbiter(&m_gifArbiter);
     m_memory.setVu1MscalCallback([this](uint32_t startPC, uint32_t top, uint32_t itop)
                                  {
@@ -1612,6 +1612,33 @@ void PS2Runtime::handleSyscall(uint8_t *rdram, R5900Context *ctx, uint32_t encod
 void PS2Runtime::handleBreak(uint8_t *rdram, R5900Context *ctx)
 {
     raiseCop0Exception(ctx, EXCEPTION_BREAKPOINT);
+    // Phase 15: raising the exception only sets EPC/cause/PC. Without the
+    // transfer, the rest of the generated block would keep executing and its
+    // terminal branch would overwrite the vector PC, silently losing the
+    // exception. Abort the block so the scheduler redispatches at the vector.
+    throw EeDispatcherTransfer{};
+}
+
+// Phase 15: CACHE has no modelled cache state to act on, so every valid
+// I/D-cache op is a no-op — exactly, not approximately: guest stores write
+// straight to host RAM, so there are never dirty lines to write back, and
+// generated code executes from RAM contents, so there is no cache to
+// invalidate. The one thing the model cannot honour is a cache field that
+// names no cache (2/3 are reserved on the R5900): that raises a reserved
+// instruction exception instead of being silently ignored, as before.
+// I-cache coherence for self-modifying code is a separate gap: PS2Memory
+// records code modifications (markModified) but no production consumer
+// currently revalidates recompiled code from it, so a CACHE invalidate
+// after a code store does not by itself make new code execute.
+void PS2Runtime::handleCacheOp(uint8_t *rdram, R5900Context *ctx, uint32_t op, uint32_t addr)
+{
+    (void)rdram;
+    (void)addr;
+    if ((op & 3u) > 1u)
+    {
+        raiseCop0Exception(ctx, EXCEPTION_RESERVED_INSTRUCTION);
+        throw EeDispatcherTransfer{};
+    }
 }
 
 void PS2Runtime::drainCompletedDmacHandlers(uint8_t *rdram)
@@ -1625,6 +1652,9 @@ void PS2Runtime::drainCompletedDmacHandlers(uint8_t *rdram)
 void PS2Runtime::handleTrap(uint8_t *rdram, R5900Context *ctx)
 {
     raiseCop0Exception(ctx, EXCEPTION_TRAP);
+    // Phase 15: same block-abort rule as handleBreak — the exception must
+    // reach the scheduler, not fall through to the rest of the block.
+    throw EeDispatcherTransfer{};
 }
 
 void PS2Runtime::handleTLBR(uint8_t *rdram, R5900Context *ctx)
@@ -2317,10 +2347,17 @@ uint8_t PS2Runtime::Load8(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
     {
         return m_memory.read8(vaddr);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_LOAD);
-        return 0;
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2330,10 +2367,17 @@ uint16_t PS2Runtime::Load16(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
     {
         return m_memory.read16(vaddr);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_LOAD);
-        return 0;
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2343,10 +2387,17 @@ uint32_t PS2Runtime::Load32(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
     {
         return m_memory.read32(vaddr);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_LOAD);
-        return 0;
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2356,10 +2407,17 @@ uint64_t PS2Runtime::Load64(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
     {
         return m_memory.read64(vaddr);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_LOAD);
-        return 0;
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2370,10 +2428,17 @@ __m128i PS2Runtime::Load128(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr)
     {
         return m_memory.read128(vaddr);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_LOAD);
-        return _mm_setzero_si128();
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2384,9 +2449,17 @@ void PS2Runtime::Store8(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint8
     {
         m_memory.write8(vaddr, value);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_STORE);
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2397,9 +2470,17 @@ void PS2Runtime::Store16(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
     {
         m_memory.write16(vaddr, value);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_STORE);
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2411,9 +2492,17 @@ void PS2Runtime::Store32(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
         m_memory.write32(vaddr, value);
         drainCompletedDmacHandlers(rdram);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_STORE);
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2424,9 +2513,17 @@ void PS2Runtime::Store64(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
     {
         m_memory.write64(vaddr, value);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_STORE);
+        throw EeDispatcherTransfer{};
     }
 }
 
@@ -2440,9 +2537,17 @@ void PS2Runtime::Store128(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, __m
     {
         m_memory.write128(vaddr, value);
     }
+    catch (const Ps2TlbMissError &miss)
+    {
+        ctx->cop0_badvaddr = miss.vaddr;
+        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        throw EeDispatcherTransfer{};
+    }
     catch (const std::exception &)
     {
+        ctx->cop0_badvaddr = vaddr;
         SignalException(ctx, EXCEPTION_ADDRESS_ERROR_STORE);
+        throw EeDispatcherTransfer{};
     }
 }
 

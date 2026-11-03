@@ -1,0 +1,133 @@
+{
+  "capstone_version": "5.0.7",
+  "probe_words": [
+    {
+      "word": "0x2408002a",
+      "mnemonic": "addiu",
+      "op_str": "$t0, $zero, 0x2a",
+      "note": "addiu $t0,$zero,42 (plain MIPS III, control)"
+    },
+    {
+      "word": "0x0c100000",
+      "mnemonic": "jal",
+      "op_str": "0x400000",
+      "note": "jal 0x100000 (plain MIPS, control)"
+    },
+    {
+      "word": "0x03e00008",
+      "mnemonic": "jr",
+      "op_str": "$ra",
+      "note": "jr $ra (plain MIPS, control)"
+    },
+    {
+      "word": "0x7ba80000",
+      "mnemonic": "xori.b",
+      "op_str": "$w0, $w0, 0xa8",
+      "note": "LQ opcode 0x1E: lq $t0,0($sp) (EE, 128-bit load)"
+    },
+    {
+      "word": "0x7fa80000",
+      "mnemonic": "ext",
+      "op_str": "$t0, $sp, 0, 1",
+      "note": "SQ opcode 0x1F: sq $t0,0($sp) (EE, 128-bit store)"
+    },
+    {
+      "word": "0x70000000",
+      "mnemonic": "madd",
+      "op_str": "$zero, $zero",
+      "note": "MMI opcode 0x1C, all other fields zero"
+    },
+    {
+      "word": "0x70000121",
+      "mnemonic": null,
+      "op_str": "NO DECODE",
+      "note": "MMI opcode 0x1C, funct-like field 0x21 (cf. PADDUW family)"
+    },
+    {
+      "word": "0x48000000",
+      "mnemonic": "mfc2",
+      "op_str": "$zero, $zero, 0",
+      "note": "COP2 opcode 0x12, all other fields zero"
+    },
+    {
+      "word": "0x4a000000",
+      "mnemonic": null,
+      "op_str": "NO DECODE",
+      "note": "COP2 opcode 0x12 with VU-macro-ish upper bits (unverified)"
+    }
+  ],
+  "vu_macro": {
+    "elf": "fixtures/vu_macro.elf",
+    "text_addr": "0x100000",
+    "text_words": 227,
+    "linear_decoded": 13,
+    "per_word_failed": 13,
+    "failed_words": [
+      {
+        "word": "0x48a90800",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x48a91000",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x48a91800",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x4be20928",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x4be2096c",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x4be209aa",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x4be20abe",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x4be219e9",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x482a2000",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x482a2800",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x482a3000",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x7d0a0020",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      },
+      {
+        "word": "0x482a3800",
+        "mnemonic": null,
+        "op_str": "NO DECODE"
+      }
+    ]
+  }
+}

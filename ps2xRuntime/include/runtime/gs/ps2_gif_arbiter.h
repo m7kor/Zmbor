@@ -23,7 +23,11 @@ struct GifArbiterPacket
 class GifArbiter
 {
 public:
-    using ProcessPacketFn = std::function<void(const uint8_t *, uint32_t)>;
+    // Stage 0 (ADR 0001): the callback carries the PATH index so the frontend
+    // can forward it to a raw backend. The old path-less signature is gone:
+    // every callback site was updated, and the frontend keeps its unpathed
+    // entry (path 3) only for tests and direct injection.
+    using ProcessPacketFn = std::function<void(GifPathId, const uint8_t *, uint32_t)>;
 
     GifArbiter() = default;
     explicit GifArbiter(ProcessPacketFn processFn);

@@ -274,6 +274,36 @@ struct GSTransferSnapshot
     size_t localToHostPendingBytes = 0;
 };
 
+// Stage 0 (GS raw-GIF seam, ADR 0001): a stream-order snapshot of the
+// privileged GS register block, captured by the frontend at each vsync and
+// handed to a raw backend. Plain uint64_t fields on purpose: the live
+// GSRegisters block holds csr/vsyncTick as atomics, and a raw backend must
+// never read the live block later (post-vsync values would mismatch flips).
+// A null priv-reg block snapshots as all zeros.
+struct GSPrivRegsSnapshot
+{
+    uint64_t pmode = 0;
+    uint64_t smode1 = 0;
+    uint64_t smode2 = 0;
+    uint64_t srfsh = 0;
+    uint64_t synch1 = 0;
+    uint64_t synch2 = 0;
+    uint64_t syncv = 0;
+    uint64_t dispfb1 = 0;
+    uint64_t display1 = 0;
+    uint64_t dispfb2 = 0;
+    uint64_t display2 = 0;
+    uint64_t extbuf = 0;
+    uint64_t extdata = 0;
+    uint64_t extwrite = 0;
+    uint64_t bgcolor = 0;
+    uint64_t csr = 0;
+    uint64_t vsyncTick = 0;
+    uint64_t imr = 0;
+    uint64_t busdir = 0;
+    uint64_t siglblid = 0;
+};
+
 struct GSPresentationRequest
 {
     uint64_t pmode = 0;

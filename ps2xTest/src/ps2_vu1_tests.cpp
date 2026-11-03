@@ -252,6 +252,40 @@ void register_ps2_vu1_tests()
             t.Equals(vu1.state().vf[3][3], -4.0f, "ADD.xz should preserve w");
         });
 
+        tc.Run("upper write to vf0 is not visible to the lower instruction of the same pair", [](TestCase &t)
+        {
+            Vu1Fixture fx;
+            t.IsTrue(fx.initialize(), "VU1 fixture should initialize");
+
+            // Pair 0: upper ADD.xyzw vf0, vf1, vf2 (result discarded) and
+            // lower MOVE.xyzw vf3, vf0. Hardware vf0 is (0,0,0,1), so vf3
+            // must read that, not the discarded sum (11,22,33,44).
+            writeVuInstructionPair(fx.code, 0u,
+                                   makeVuLowerSpecial(0x30u, 0u, 3u, 0u, 0xFu),
+                                   makeVuUpper(0x28u, 0xFu, 2u, 1u, 0u));
+            // Pair 1: E-bit NOP ends the program.
+            writeVuInstructionPair(fx.code, 8u, 0u, kVuUpperNop | 0x40000000u);
+
+            VU1Interpreter vu1;
+            vu1.state().vf[1][0] = 1.0f;
+            vu1.state().vf[1][1] = 2.0f;
+            vu1.state().vf[1][2] = 3.0f;
+            vu1.state().vf[1][3] = 4.0f;
+            vu1.state().vf[2][0] = 10.0f;
+            vu1.state().vf[2][1] = 20.0f;
+            vu1.state().vf[2][2] = 30.0f;
+            vu1.state().vf[2][3] = 40.0f;
+
+            vu1.execute(fx.code, PS2_VU1_CODE_SIZE, fx.data, PS2_VU1_DATA_SIZE, fx.gs, &fx.mem, 0u, 0u, 0u, 64u);
+
+            t.Equals(vu1.state().vf[3][0], 0.0f, "MOVE from vf0 should read x = 0");
+            t.Equals(vu1.state().vf[3][1], 0.0f, "MOVE from vf0 should read y = 0");
+            t.Equals(vu1.state().vf[3][2], 0.0f, "MOVE from vf0 should read z = 0");
+            t.Equals(vu1.state().vf[3][3], 1.0f, "MOVE from vf0 should read w = 1");
+            t.Equals(vu1.state().vf[0][0], 0.0f, "vf0 should stay (0,0,0,1) after the pair");
+            t.Equals(vu1.state().vf[0][3], 1.0f, "vf0 w should stay 1 after the pair");
+        });
+
         tc.Run("LOI commits the lower immediate after the upper instruction", [](TestCase &t)
         {
             Vu1Fixture fx;

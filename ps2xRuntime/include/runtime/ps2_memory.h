@@ -13,6 +13,16 @@
 
 #include "gs/ps2_gif_arbiter.h"
 #include "runtime/ps2_ipu.h"
+
+// Forward declaration only: ps2_memory.h is included by targets
+// (e.g. ps2_recomp_lib) that do not carry ps2xIOP/include on their
+// include path, and the header only stores a Sif0Fifo pointer.
+// The real header is included by ps2_memory.cpp, which does have
+// the path (ps2_runtime links ps2_iop).
+namespace ps2x::iop
+{
+class Sif0Fifo;
+}
 #include <deque>
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -230,11 +240,17 @@ struct VIFRegisters
     uint32_t mask;   // Data mask
     uint32_t code;   // VIFcode
     uint32_t itops;  // ITOP save
-    uint32_t base;   // Base address
-    uint32_t ofst;   // Offset
-    uint32_t tops;   // TOPS
+    // Phase 8b: base/ofst/tops/top are VIF1-only registers (ps2tek lists
+    // VIF1_BASE/VIF1_OFST/VIF1_TOPS/VIF1_TOP at VIF1-only addresses).
+    // They are retained in this shared struct, but the VIF0 path never
+    // writes them, so they read back 0 on VIF0; that is a consequence of
+    // the shared struct, not a modelled claim about unmapped-register
+    // reads on hardware.
+    uint32_t base;   // Base address (VIF1 only)
+    uint32_t ofst;   // Offset (VIF1 only)
+    uint32_t tops;   // TOPS (VIF1 only)
     uint32_t itop;   // ITOP
-    uint32_t top;    // TOP
+    uint32_t top;    // TOP (VIF1 only)
     uint32_t row[4]; // Transfer row data
     uint32_t col[4]; // Transfer column data
 };
@@ -337,6 +353,17 @@ public:
     void setVu1MscalCallback(Vu1MscalCallback cb) { m_vu1MscalCallback = std::move(cb); }
     using Vu1MscntCallback = std::function<void(uint32_t top, uint32_t itop)>;
     void setVu1MscntCallback(Vu1MscntCallback cb) { m_vu1MscntCallback = std::move(cb); }
+    // VIF0 counterparts of the VU1 callbacks: MSCAL starts VU0, MSCNT
+    // continues it at its TPC. Phase 8b: MSCALF is VIF1-only (ps2tek,
+    // ps2sdk) and does NOT start VU0, and VIF0 has no TOP/TOPS/DBF, so
+    // the top argument of both callbacks is always 0 on VIF0 while itop
+    // carries the latched VIF0 ITOP. Previously processVIF0Data had no
+    // such branches, so a VIF0 MSCAL aborted packet parsing and VU0
+    // never ran.
+    using Vu0MscalCallback = std::function<void(uint32_t startPC, uint32_t top, uint32_t itop)>;
+    void setVu0MscalCallback(Vu0MscalCallback cb) { m_vu0MscalCallback = std::move(cb); }
+    using Vu0MscntCallback = std::function<void(uint32_t top, uint32_t itop)>;
+    void setVu0MscntCallback(Vu0MscntCallback cb) { m_vu0MscntCallback = std::move(cb); }
 
     uint8_t *getVU1Code() { return m_vu1Code; }
     const uint8_t *getVU1Code() const { return m_vu1Code; }
@@ -422,6 +449,8 @@ public:
     GifArbiter *m_gifArbiter = nullptr;
     Vu1MscalCallback m_vu1MscalCallback;
     Vu1MscntCallback m_vu1MscntCallback;
+    Vu0MscalCallback m_vu0MscalCallback;
+    Vu0MscntCallback m_vu0MscntCallback;
 
     uint8_t *m_vu0Code = nullptr;
     uint8_t *m_vu0Data = nullptr;
@@ -468,6 +497,25 @@ public:
     std::mutex m_completedDmacMutex;
     std::vector<uint32_t> m_completedDmacCauses;
 
+    // SIF0 channel-5 engine state (private to PS2Memory, design
+    // §3.1). Never written by the IOP side; the transport is the
+    // only shared object, accessed only through its push/pop API.
+    ps2x::iop::Sif0Fifo *m_sif0Fifo = nullptr;
+    bool m_transportOwnsSif0 = false;
+    bool m_sif0Active = false;
+    bool m_sif0HasTag = false;
+    bool m_sif0WaitingOnEmpty = false;
+    bool m_sif0Held = false;
+    bool m_sif0TagIrq = false;
+    bool m_sif0TagEnd = false;
+    bool m_sif0Tie = false;
+    uint32_t m_sif0QwcRemaining = 0u;
+    uint32_t m_sif0DestPhys = 0u;
+    uint32_t m_sif0DestGuest = 0u;
+    uint32_t m_sif0CurrentId = 0u;
+    uint32_t m_sif0NextId = 1u;
+    std::unordered_map<uint32_t, int32_t> m_sif0IdState;
+
     struct CodeRegion
     {
         uint32_t start;
@@ -498,6 +546,41 @@ public:
     void queueCompletedDmacCause(uint32_t cause);
     // Starts a VIF0/VIF1/GIF transfer for a CHCR with STR set (normal or source-chain mode).
     void startEeChannelTransfer(uint32_t channelBase, uint32_t chcr);
+    // SIF0 channel-5 start (see driveSif0 above for the engine).
+    void startSif0Transfer(uint32_t chcr);
+
+    // SIF0 DMA (EE side, channel 5 destination chain) — Phase 4
+    // vertical slice, labelled model per
+    // sif0-architecture-design.md §11.1. The transport object is
+    // owned by the caller (the host/runtime layer bridging the
+    // processors, design §3.4); PS2Memory only holds a pointer.
+    // transportOwnsSif0 is an explicit activation flag, default
+    // false, never inferred from CHCR STR: when false, channel-5
+    // STR writes are stored but the engine never starts, preserving
+    // today's observable behaviour for non-slice guests.
+    void setSif0Transport(ps2x::iop::Sif0Fifo *fifo) { m_sif0Fifo = fifo; }
+    void setTransportOwnsSif0(bool owned) { m_transportOwnsSif0 = owned; }
+    [[nodiscard]] bool transportOwnsSif0() const { return m_transportOwnsSif0; }
+    // Drive the channel-5 engine: pop headers/payload from the FIFO
+    // and write payload to EE RAM through the internal DMA write
+    // path (memcpy + markModified, never the writeGuest memcpy
+    // path). Called on the CHCR STR write that starts a transfer
+    // and on each transport push notification; tests call it
+    // directly to simulate those drive points.
+    void driveSif0();
+    [[nodiscard]] bool sif0Active() const { return m_sif0Active; }
+    [[nodiscard]] bool sif0WaitingOnEmpty() const { return m_sif0WaitingOnEmpty; }
+    [[nodiscard]] bool sif0Held() const { return m_sif0Held; }
+    // In-flight DmaStat model (design §8), under transport
+    // ownership only: 1 = that id's transfer completed, 0 =
+    // in-flight, -1 = unknown id. The HLE stub keeps its legacy
+    // return while transportOwnsSif0 is false.
+    [[nodiscard]] int32_t sif0DmaStat(uint32_t id) const
+    {
+        const auto it = m_sif0IdState.find(id);
+        return it != m_sif0IdState.end() ? it->second : -1;
+    }
+    [[nodiscard]] uint32_t sif0CurrentTransferId() const { return m_sif0CurrentId; }
 
     // MFIFO (D_CTRL.MFD = 2 VIF1, 3 GIF): fromSPR writes into the ring D_RBOR..D_RBOR+D_RBSR+16 and the drain
     // channel's source chain reads its tags (and data that follows them) from that ring, stalling with D_STAT.MEIS

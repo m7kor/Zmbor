@@ -298,6 +298,16 @@ namespace ps2_stubs
         // time: the next is written only after the SIF0 handler for the previous one has returned.
         void deliverIopPackets(uint8_t *rdram, PS2Runtime *runtime)
         {
+            // HLE gating (design §7.3, Phase 4 slice): when the
+            // DMAC transport owns SIF0, IOP->EE transfers go through
+            // the DMAC engine and its CIS5 completion only. The HLE
+            // packet path must not dispatch cause 5 for them, or
+            // delivery would double. Packets stay queued (nothing
+            // is popped here) while the transport owns SIF0; the
+            // flag defaults false, so existing HLE behaviour is
+            // unchanged unless slice activation sets it explicitly.
+            if (runtime && runtime->memory().transportOwnsSif0())
+                return;
             IopToEePacket next;
             uint32_t receiveBuffer = 0u;
             {
@@ -637,9 +647,18 @@ namespace ps2_stubs
     void sceSifDmaStat(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         (void)rdram;
+        const uint32_t trid = getRegU32(ctx, 4);
+        // In-flight DmaStat model (design §8), under transport
+        // ownership only: 1 = complete, 0 = in-flight, -1 =
+        // unknown id, from the DMAC engine's id table. While the
+        // transport does not own SIF0, the legacy return (-1) is
+        // preserved so existing HLE guests and tests are unaffected.
+        if (runtime && runtime->memory().transportOwnsSif0())
+        {
+            setReturnS32(ctx, runtime->memory().sif0DmaStat(trid));
+            return;
+        }
         (void)runtime;
-        (void)getRegU32(ctx, 4); // trid
-
         // Transfers are applied immediately by sceSifSetDma in this runtime.
         setReturnS32(ctx, -1);
     }
@@ -1095,7 +1114,13 @@ namespace ps2_stubs
         if (runtime)
             deliverIopPackets(rdram, runtime);
 
-        ps2_syscalls::dispatchDmacHandlersForCause(rdram, runtime, 5u);
+        // HLE gating (design §7.3): when the DMAC transport owns
+        // SIF0, this direct dispatch would double-deliver cause 5
+        // alongside the DMAC engine's completeDmacChannel(5), so it
+        // is skipped. With the flag false, behaviour is exactly as
+        // before (the HLE path is the sole owner).
+        if (!runtime || !runtime->memory().transportOwnsSif0())
+            ps2_syscalls::dispatchDmacHandlersForCause(rdram, runtime, 5u);
 
         setReturnS32(ctx, static_cast<int32_t>(allocateSifDmaTransferId()));
     }

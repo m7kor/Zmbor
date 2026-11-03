@@ -1483,7 +1483,13 @@ static inline __m128i ps2MmiHalfwordMultiply(R5900Context *ctx, __m128i rs, __m1
     for (int i = 0; i < 8; ++i)
     {
         const uint32_t product = static_cast<uint32_t>(static_cast<int32_t>(a[i]) * static_cast<int32_t>(b[i]));
-        uint32_t &word = ((i & 2) ? w.hi : w.lo)[((i >> 2) << 1) | (i & 1)];
+        // Select the array through a pointer first, as ps2MmiHorizontalMultiply does below.
+        // The equivalent one-liner ((i & 2) ? w.hi : w.lo)[...] is semantically identical (the
+        // index is provably 0..3), but GCC's UBSan instrumentation of a subscripted conditional
+        // array misreports it at -O2 with a nondeterministic, huge "index" that cannot come from
+        // i in 0..7, aborting the sanitizer run; the explicit pointer form instruments cleanly.
+        uint32_t *wordArray = (i & 2) ? w.hi : w.lo;
+        uint32_t &word = wordArray[((i >> 2) << 1) | (i & 1)];
         word = (mode == Ps2MmiAccumulate::Set) ? product : (mode == Ps2MmiAccumulate::Add) ? word + product : word - product;
     }
     ps2StoreHiLo(ctx, w);

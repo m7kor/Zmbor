@@ -1,4 +1,5 @@
 #include "runtime/ps2_memory.h"
+#include "ps2x/iop/sif0_fifo.h"
 #include "runtime/ps2_address.h"
 #include "runtime/gs/gs_frontend.h"
 #include "ps2_log.h"
@@ -1446,10 +1447,177 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
     return false;
 }
 
+// SIF0 channel-5 destination-chain engine (Phase 4 vertical slice,
+// labelled model per sif0-architecture-design.md §5.2). Started by a
+// CHCR STR write while transportOwnsSif0 is true; driven by
+// driveSif0() on that write and on transport push notifications
+// (tests call driveSif0() directly for those drive points).
+void PS2Memory::startSif0Transfer(uint32_t chcr)
+{
+    // A held transfer can be re-armed by a fresh STR write (MODEL
+    // CHOICE: the design leaves hold recovery unspecified; a stuck
+    // transfer that could never be re-armed would deadlock the
+    // channel, while re-arming only clears slice engine state).
+    if (m_sif0Active && !m_sif0Held)
+        return; // Already in-flight: a second STR write is ignored.
+    if (!m_transportOwnsSif0)
+        return; // Gated off: STR stays stored, engine never starts.
+    m_sif0Active = true;
+    m_sif0HasTag = false;
+    m_sif0WaitingOnEmpty = false;
+    m_sif0Held = false;
+    m_sif0TagIrq = false;
+    m_sif0TagEnd = false;
+    m_sif0Tie = false;
+    m_sif0QwcRemaining = 0u;
+    m_sif0DestPhys = 0u;
+    m_sif0DestGuest = 0u;
+    m_sif0CurrentId = m_sif0NextId++;
+    if (m_sif0NextId == 0u)
+        m_sif0NextId = 1u;
+    m_sif0IdState[m_sif0CurrentId] = 0;
+    // MOD != chain is out of slice scope (§5.3): hold, do not
+    // silently run as chain. driveSif0() returns immediately while
+    // held, so STR stays set and nothing is written or completed.
+    if (((chcr >> 2u) & 0x3u) != 1u)
+        m_sif0Held = true;
+}
+
+void PS2Memory::driveSif0()
+{
+    if (!m_sif0Active || m_sif0Fifo == nullptr || m_rdram == nullptr)
+        return;
+    if (m_sif0Held)
+        return;
+    static constexpr uint32_t kSif0Chcr = 0x1000C000u;
+    // Safety bound on units consumed per drive (headers + QWs), so
+    // one drive can never loop forever on a pathological chain;
+    // progress is preserved and resumes on the next drive.
+    for (uint32_t guard = 0u; guard < (1u << 20u); ++guard)
+    {
+        if (!m_sif0HasTag)
+        {
+            ps2x::iop::Sif0Fifo::Header header{};
+            if (!m_sif0Fifo->tryPopHeader(header))
+            {
+                // Wait-on-empty (sourced, design §6): a started EE
+                // transfer with an empty FIFO is running but
+                // waiting — STR stays set, no completion, no CIS5.
+                // A front payload QW is also not consumed here: a
+                // header pop never fabricates or misreads data.
+                m_sif0WaitingOnEmpty = true;
+                return;
+            }
+            m_sif0WaitingOnEmpty = false;
+            const uint32_t qwc = header.lo & 0xFFFFu;
+            const uint32_t tagId = (header.lo >> 28u) & 0x7u;
+            const bool tagIrq = (header.lo & (1u << 31u)) != 0u;
+            const uint32_t destGuest = header.hi & 0x7FFFFFF0u;
+            const bool scratch = (header.hi & (1u << 31u)) != 0u;
+            const uint32_t chcr = m_ioRegisters.count(kSif0Chcr) ? m_ioRegisters[kSif0Chcr] : 0u;
+            const bool tie = (chcr & (1u << 7u)) != 0u;
+            const bool tte = (chcr & (1u << 6u)) != 0u;
+            // Only cnt (0), cnts (1), end (7) are in slice scope
+            // (sourced destination-chain IDs, §5.2). Any other ID,
+            // TTE = 1, or a scratchpad destination holds the
+            // transfer (MODEL CHOICE for safety, §5.2 step 2):
+            // STR stays, no write, no completion.
+            if (tagId != 0u && tagId != 1u && tagId != 7u)
+            {
+                m_sif0Held = true;
+                return;
+            }
+            if (tte || scratch || isScratchpad(destGuest))
+            {
+                m_sif0Held = true;
+                return;
+            }
+            // Whole-tag bounds before any write (§10): ADDR +
+            // QWC*16 must not overflow and must lie in EE RAM.
+            // No partial write past the boundary on failure.
+            uint32_t destPhys = 0u;
+            try
+            {
+                destPhys = translateAddress(destGuest);
+            }
+            catch (const std::exception &)
+            {
+                m_sif0Held = true;
+                return;
+            }
+            const uint64_t tagBytes = static_cast<uint64_t>(qwc) * 16u;
+            if (tagBytes > static_cast<uint64_t>(PS2_RAM_SIZE) ||
+                static_cast<uint64_t>(destPhys) > static_cast<uint64_t>(PS2_RAM_SIZE) - tagBytes)
+            {
+                m_sif0Held = true;
+                return;
+            }
+            m_sif0TagIrq = tagIrq;
+            m_sif0TagEnd = tagId == 7u;
+            m_sif0Tie = tie;
+            m_sif0QwcRemaining = qwc;
+            m_sif0DestPhys = destPhys;
+            m_sif0DestGuest = destGuest;
+            m_sif0HasTag = true;
+            m_ioRegisters[kSif0Chcr + 0x10u] = destGuest;
+            m_ioRegisters[kSif0Chcr + 0x20u] = qwc;
+            continue;
+        }
+
+        if (m_sif0QwcRemaining == 0u)
+        {
+            // Tag done. An end tag completes; so does a tag with
+            // IRQ set when the channel's TIE bit is set ("the
+            // transfer ends after QWC has been transferred",
+            // sourced, §5.2 step 5). Completion goes through
+            // completeDmacChannel(5) only — never a direct
+            // dispatchDmacHandlersForCause (design §7.1).
+            const bool complete = m_sif0TagEnd || (m_sif0TagIrq && m_sif0Tie);
+            m_sif0HasTag = false;
+            if (!complete)
+                continue; // Next header (or wait-on-empty).
+            m_sif0Active = false;
+            m_sif0IdState[m_sif0CurrentId] = 1;
+            completeDmacChannel(kSif0Chcr, 5u);
+            return;
+        }
+
+        ps2x::iop::Sif0Fifo::Qword qw{};
+        if (!m_sif0Fifo->tryPopQw(qw))
+        {
+            // FIFO emptied mid-tag: preserve MADR and QWC
+            // remaining exactly, no partial-QW write (§5.2).
+            m_sif0WaitingOnEmpty = true;
+            return;
+        }
+        m_sif0WaitingOnEmpty = false;
+        // Internal EE DMA write path: memcpy + markModified, so
+        // freshly DMA'd code invalidates recompiled regions
+        // (§10). Never the writeGuest memcpy path.
+        std::memcpy(m_rdram + m_sif0DestPhys, qw.bytes.data(), qw.bytes.size());
+        markModified(m_sif0DestPhys, 16u);
+        m_sif0DestPhys += 16u;
+        m_sif0DestGuest += 16u;
+        --m_sif0QwcRemaining;
+        m_ioRegisters[kSif0Chcr + 0x10u] = m_sif0DestGuest;
+        m_ioRegisters[kSif0Chcr + 0x20u] = m_sif0QwcRemaining;
+    }
+}
+
 // Starts a VIF0/VIF1/GIF channel whose CHCR was written with STR set: normal mode queues MADR/QWC, source-chain mode
 // walks the tags (an MFIFO drain stops where fromSPR has not written yet and stays active).
 void PS2Memory::startEeChannelTransfer(uint32_t channelBase, uint32_t value)
 {
+    if (channelBase == 0x1000C000u)
+    {
+        startSif0Transfer(value);
+        // The EE engine is driven on the STR write that starts it
+        // (design §9a): with data already in the FIFO it drains
+        // immediately; with an empty FIFO it enters waiting-on-
+        // empty with STR held (design §6).
+        driveSif0();
+        return;
+    }
     if (channelBase == 0x1000C400u)
     {
         startSif1Transfer(value);
@@ -2975,6 +3143,15 @@ uint32_t PS2Memory::readIORegister(uint32_t address)
             {
                 // A VIF DMA held behind a VIF stall is still running until FBRST.STC releases it.
                 if ((address == 0x10008000u && m_vifDmaHeld[0]) || (address == 0x10009000u && m_vifDmaHeld[1]))
+                    return m_ioRegisters[address] | 0x100u;
+                // SIF0 channel 5 counts as held while its engine is
+                // active — in-flight, waiting-on-empty, or held —
+                // so a polling guest sees STR set until
+                // completeDmacChannel(5) clears it (design §6).
+                // Without this, the first CHCR read would clear STR
+                // although no transfer ran, and the stall protocol
+                // would be unobservable to guest code.
+                if (address == 0x1000C000u && m_sif0Active)
                     return m_ioRegisters[address] | 0x100u;
                 // So is a drain waiting at the empty MFIFO ring or at D_STADR.
                 if (isDrainChannelHeld(address))

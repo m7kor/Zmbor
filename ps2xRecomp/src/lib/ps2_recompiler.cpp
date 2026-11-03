@@ -1045,6 +1045,16 @@ namespace ps2recomp
             m_codeGenerator->setRelocationCallNames(relocationCallNames);
             m_codeGenerator->setBootstrapInfo(m_bootstrapInfo);
             m_codeGenerator->setConfiguredJumpTables(m_config.jumpTables);
+            // Phase 12 — discovered tables join the same CFA map (config
+            // wins on address collision, inside setDiscoveredJumpTables),
+            // so a recovered JR switch becomes proven CFG edges instead of
+            // indirect-fallback promotion. Discovery is recomputed here
+            // rather than cached from extractFunctions() because the
+            // recompiler needs the tables, not just the functions.
+            if (m_elfParser)
+            {
+                m_codeGenerator->setDiscoveredJumpTables(m_elfParser->discoverFromEntryPoint().jumpTables);
+            }
             m_codeGenerator->setEmitInstructionComments(true);
 
             fs::create_directories(m_config.outputPath);
@@ -1382,7 +1392,10 @@ namespace ps2recomp
                     }
 
                     const auto &instructions = decodedFunctions.at(function.start);
-                    return codeGenerator.generateFunction(function, instructions, useHeaders);
+                    // Phase 12 — pass the full function list so the
+                    // emitter's CFA run can verify external jump-table
+                    // targets (see FunctionEmitter::emit).
+                    return codeGenerator.generateFunction(function, instructions, useHeaders, &m_functions);
                 }
                 catch (const std::exception &e)
                 {

@@ -236,5 +236,108 @@ void register_elf_analyzer_tests()
                 std::vector<Instruction>{invalid, bne, filler, jtLui, jtAddiu, jtLoad, jtJump}, std::vector<Section>(),
                 readWord);
             t.Equals(invalidTables.size(), static_cast<size_t>(0),
-                     "bounds over guard limit should not produce a jump table"); }); });
+                     "bounds over guard limit should not produce a jump table"); });
+
+                       tc.Run("jump-table detection finds LUI/ADDU/SLL/JR pattern without SLTIU", [](TestCase &t)
+                              {
+            // Phase 12 — the standard MIPS switch bounded by an ANDI mask,
+            // not an SLTIU: addiu a0,1; andi t1,a0,3; lui t2,0x10;
+            // ori t2,t2,0x200; sll t1,t1,2; addu t3,t2,t1; lw t4,0(t3);
+            // jr t4. The first shape cannot fire here (no SLTIU/bne pair),
+            // so only the new shape may report the table.
+            Instruction addiu = makeInstruction(0x100034, OPCODE_ADDIU);
+            addiu.rs = 0;
+            addiu.rt = 4;
+            addiu.simmediate = 1;
+            Instruction andi = makeInstruction(0x100038, OPCODE_ANDI);
+            andi.rs = 4;
+            andi.rt = 9;
+            andi.immediate = 3;
+            Instruction lui = makeInstruction(0x10003C, OPCODE_LUI);
+            lui.rt = 10;
+            lui.immediate = 0x10;
+            Instruction ori = makeInstruction(0x100040, OPCODE_ORI);
+            ori.rs = 10;
+            ori.rt = 10;
+            ori.immediate = 0x200;
+            Instruction sll = makeInstruction(0x100044, OPCODE_SPECIAL);
+            sll.function = SPECIAL_SLL;
+            sll.rt = 9;
+            sll.rd = 9;
+            Instruction addu = makeInstruction(0x100048, OPCODE_SPECIAL);
+            addu.function = SPECIAL_ADDU;
+            addu.rs = 10;
+            addu.rt = 9;
+            addu.rd = 11;
+            Instruction lw = makeInstruction(0x10004C, OPCODE_LW);
+            lw.rs = 11;
+            lw.rt = 12;
+            Instruction jr = makeInstruction(0x100050, OPCODE_SPECIAL);
+            jr.function = SPECIAL_JR;
+            jr.rs = 12;
+
+            std::vector<Instruction> instructions{addiu, andi, lui, ori, sll, addu, lw, jr};
+
+            Section textSection{};
+            textSection.name = ".text";
+            textSection.address = 0x100000;
+            textSection.size = 0xA8;
+            textSection.isCode = true;
+            const std::vector<Section> sections{textSection};
+
+            std::unordered_map<uint32_t, uint32_t> tableMemory{
+                {0x100200, 0x100058},
+                {0x100204, 0x100064},
+                {0x100208, 0x100070},
+                {0x10020C, 0x10007C},
+            };
+            auto readWord = [&tableMemory](uint32_t address, uint32_t &outWord) -> bool
+            {
+                auto it = tableMemory.find(address);
+                if (it == tableMemory.end())
+                {
+                    return false;
+                }
+                outWord = it->second;
+                return true;
+            };
+
+            auto jumpTables = ElfAnalyzer::detectJumpTablesForHeuristics(instructions, sections, readWord);
+            t.Equals(jumpTables.size(), static_cast<size_t>(1), "one jump table should be detected");
+            if (!jumpTables.empty())
+            {
+                t.Equals(jumpTables[0].address, static_cast<uint32_t>(0x100200),
+                         "jump table base address should match LUI/ORI pattern");
+                t.Equals(jumpTables[0].baseRegister, static_cast<uint32_t>(11),
+                         "base register should match LW base");
+                t.Equals(jumpTables[0].entries.size(), static_cast<size_t>(4),
+                         "entry count should match the sequential code-target scan");
+                t.Equals(jumpTables[0].entries[0].target, static_cast<uint32_t>(0x100058),
+                         "entry 0 target should match case0");
+                t.Equals(jumpTables[0].entries[3].target, static_cast<uint32_t>(0x10007C),
+                         "entry 3 target should match case3");
+            }
+
+            // Negative control: entries pointing outside code are not a
+            // table (the sequential scan stops at the first non-code entry
+            // and the <2-entry result is rejected).
+            std::unordered_map<uint32_t, uint32_t> badMemory{
+                {0x100200, 0x200000},
+                {0x100204, 0x200004},
+                {0x100208, 0x200008},
+                {0x10020C, 0x20000C},
+            };
+            auto readBadWord = [&badMemory](uint32_t address, uint32_t &outWord) -> bool
+            {
+                auto it = badMemory.find(address);
+                if (it == badMemory.end())
+                {
+                    return false;
+                }
+                outWord = it->second;
+                return true;
+            };
+            auto badTables = ElfAnalyzer::detectJumpTablesForHeuristics(instructions, sections, readBadWord);
+            t.Equals(badTables.size(), static_cast<size_t>(0),
+                     "non-code table entries should not produce a jump table"); }); });
 }

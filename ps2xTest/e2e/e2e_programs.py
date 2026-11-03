@@ -531,8 +531,105 @@ FRAME_EXPECTATIONS = {
     },
 }
 
+def program_stripped():
+    # Phase 12 e2e: a genuinely stripped ELF (no .symtab/.strtab) whose
+    # functions are reachable only from the entry point. main calls a
+    # 4-case switch (LUI/ORI/SLL/ADDU/LW/JR, masked by ANDI — no SLTIU, so
+    # the CFA's unconfigured recovery cannot resolve it alone) and a
+    # helper, then prints via the shared string helpers and address-bound
+    # puts/exit stubs (the Python side knows the labels' addresses even
+    # though the ELF carries no symbol table).
+    import struct
+    a = Assembler()
+
+    a.function('_start')
+    a.i('lui', 'sp', 'zero', 0x01F0)
+    a.jump('jal', 'main')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.r('or', rd='a0', rs='zero', rt='zero')
+    a.label('hang')
+    a.branch('beq', 'zero', 'zero', 'hang')
+    a.nop()
+
+    a.function('main')
+    a.i('addiu', 'sp', 'sp', -32)
+    for off, r in ((28, 'ra'), (24, 's0'), (20, 's1'), (16, 's2')):
+        a.i('sw', r, 'sp', off)
+    a.li('a0', 1)
+    a.jump('jal', 'switch_fn')
+    a.nop()
+    a.r('or', rd='s0', rs='v0', rt='zero')
+    a.li('a0', 30)
+    a.li('a1', 12)
+    a.jump('jal', 'add_fn')
+    a.nop()
+    a.r('or', rd='s1', rs='v0', rt='zero')
+    a.la('s2', 'outbuf')
+    for lbl, reg in (('s_sw', 's0'), ('s_sum', 's1')):
+        a.r('or', rd='a0', rs='s2', rt='zero')
+        a.la('a1', lbl)
+        a.jump('jal', 'strcpy_end')
+        a.nop()
+        a.r('or', rd='a0', rs='v0', rt='zero')
+        a.r('or', rd='a1', rs=reg, rt='zero')
+        a.jump('jal', 'utoa')
+        a.nop()
+        a.r('or', rd='s2', rs='v0', rt='zero')
+    a.i('sb', 'zero', 's2', 0)
+    a.la('a0', 'outbuf')
+    a.jump('jal', 'puts')
+    a.nop()
+    for off, r in ((16, 's2'), (20, 's1'), (24, 's0'), (28, 'ra')):
+        a.i('lw', r, 'sp', off)
+    a.r('jr', rs='ra')
+    a.i('addiu', 'sp', 'sp', 32)
+
+    # switch_fn(a0 = index) -> 10 + (index & 3). The table lives in .data;
+    # the LUI/ORI pair is the low-adjustment shape discovery must recover.
+    a.function('switch_fn')
+    a.i('andi', 't1', 'a0', 3)
+    a.la('t2', 'sw_table')
+    a.r('sll', rd='t1', rt='t1', sa=2)
+    a.r('addu', rd='t3', rs='t2', rt='t1')
+    a.i('lw', 't4', 't3', 0)
+    a.r('jr', rs='t4')
+    a.nop()
+    for i in range(4):
+        a.label(f'case{i}')
+        a.li('v0', 10 + i)
+        a.r('jr', rs='ra')
+        a.nop()
+
+    a.function('add_fn')
+    a.r('addu', rd='v0', rs='a0', rt='a1')
+    a.r('jr', rs='ra')
+    a.nop()
+
+    emit_string_helpers(a)
+
+    a.function('puts')
+    a.r('jr', rs='ra')
+    a.nop()
+    a.function('exit')
+    a.r('jr', rs='ra')
+    a.nop()
+
+    a.data_block('outbuf', bytes(96), align=4)
+    a.data_block('s_sw', b'E2E stripped sw=\0', align=1)
+    a.data_block('s_sum', b' sum=\0', align=1)
+    a.data_block('sw_table', struct.pack('<4I', *(a.addr(f'case{i}') for i in range(4))), align=4)
+    stubs = [f"puts@{a.labels['puts']:#x}", f"exit@{a.labels['exit']:#x}"]
+    return a, stubs
+
+
+EXPECTED['stripped'] = 'E2E stripped sw=11 sum=42'
+
 PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay,
-            'vu_macro': program_vu_macro}
+            'vu_macro': program_vu_macro, 'stripped': program_stripped}
+
+# Programs whose ELF must be emitted stripped (no symbol table).
+STRIPPED_PROGRAMS = {'stripped'}
 
 
 def main():
@@ -540,7 +637,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     asm, stubs = PROGRAMS[name]()
     elf_path = out_dir / f'{name}.elf'
-    elf_path.write_bytes(asm.elf())
+    elf_path.write_bytes(asm.elf(strip=(name in STRIPPED_PROGRAMS)))
     gen_dir = out_dir / f'{name}_generated'
     stub_list = ', '.join(f'"{s}"' for s in stubs)
     (out_dir / f'{name}.toml').write_text(

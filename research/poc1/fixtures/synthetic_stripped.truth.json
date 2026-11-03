@@ -1,0 +1,31 @@
+{
+  "entry": "0x00100000",
+  "functions": {
+    "_start": "0x00100000",
+    "f_add": "0x00100028",
+    "f_switch": "0x00100044",
+    "f_jalr_caller": "0x001000b4",
+    "f_target": "0x001000dc",
+    "f_dataptr_user": "0x001000e8",
+    "f_callback": "0x00100114",
+    "dead_func": "0x00100120"
+  },
+  "intra_function_blocks": {
+    "sw_case0": "0x00100084",
+    "sw_case1": "0x00100090",
+    "sw_case2": "0x0010009c",
+    "sw_default": "0x001000a8"
+  },
+  "non_functions": {
+    "bare_leaf": "0x0010013c",
+    "decoy_data_word": "0x00100210"
+  },
+  "data": {
+    "jump_table": "0x00100200",
+    "callback_ptr": "0x0010020c",
+    "decoy_ptr": "0x00100210",
+    "data_base": "0x00100200"
+  },
+  "text_base": "0x00100000",
+  "text_size": "0x00000144"
+}

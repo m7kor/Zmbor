@@ -1,0 +1,6 @@
+[general]
+input = "/home/hatch/workspace/zmbor-research/poc1/fixtures/gs_sprite.elf"
+output = "/home/hatch/workspace/zmbor-research/poc1/fixtures/gs_sprite_generated"
+single_file_output = true
+stubs = ["puts", "exit"]
+skip = []

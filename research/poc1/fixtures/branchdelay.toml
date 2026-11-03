@@ -1,0 +1,6 @@
+[general]
+input = "/home/hatch/workspace/zmbor-research/poc1/fixtures/branchdelay.elf"
+output = "/home/hatch/workspace/zmbor-research/poc1/fixtures/branchdelay_generated"
+single_file_output = true
+stubs = ["puts", "exit"]
+skip = []

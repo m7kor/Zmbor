@@ -12,12 +12,35 @@
 
 Zmbor translates PlayStation 2 **Emotion Engine (R5900)** ELF code into native C++ and links it against a runtime modelling PS2 memory, vector processors, graphics, DMA, IOP services and sound hardware. It is an experimental **static recompiler and runtime framework**, not a turnkey PS2 emulator, BIOS replacement, game downloader or proven universal game porting solution.
 
-**Latest integrated work:** the [Phase 11 full-system integration (PR #9)](https://github.com/m7kor/Zmbor/pull/9), merged on **3 November 2026**, added the SPU2 audio execution milestones, VU/VIF corrections, a bounded SIF0 DMA model and additional reliability and test infrastructure. The more recent ADMA hardware-layout correction and guest-driven reverb-register integration are **not included** in this integration.
+**Latest code update (3 November 2026):** Phase 10b and Phases 12–16 extend the [Phase 11 integration](https://github.com/m7kor/Zmbor/pull/9) with guest-driven SPU2 reverb registers, stripped-ELF and indirect-control-flow discovery, loud failures for unsupported syscalls, COP0 exception fixes, and the first CPU-only raw-GIF GS backend seam. The **GPU adapter and differential GS harness are not yet implemented**. This update does not include a hardware-confirmed ADMA guest-enable address or a native SPU2 output sink.
 
 > [!IMPORTANT]
 > **Experimental / work in progress.** Passing unit tests, synthetic ELF tests or historical hardware-output comparisons does not mean a commercial PS2 game is playable. No complete commercial-game run has been verified by Zmbor's published acceptance gate. You must provide your own legally obtained game software; the repository includes neither BIOS images nor copyrighted game data.
 
 **Start here:** [architecture](#architecture) · [visual hardware dashboard](#status) · [implementation snapshot](#implementation-snapshot--phase-11) · [build](#build) · [testing](#testing-and-validation) · [roadmap](#roadmap) · [contributing](#contributing)
+
+## New development: recompilation and GS groundwork (November 2026)
+
+These are **incremental changes**, not evidence of automatic commercial-game conversion. Source-level checks and original-patch verification are separate from build/test results.
+
+| Workstream | What changed | Known limitations |
+|:--|:--|:--|
+| Phase 10b — SPU2 guest reverb | Guest P/R-block MMIO writes, R-pair packing, effect/volume gating and regression tests | Model behaviour, not physical-PS2 verified; no host audio sink |
+| Phase 12 — stripped ELF | Reachability-led discovery, selected jump-table recovery and synthetic stripped end-to-end test | Unknown indirect targets and data-only functions remain |
+| Phase 13 — syscall safety | Unsupported named and numeric calls fail loudly rather than silently returning a fake result | Unimplemented functions are **still unimplemented** |
+| Phase 14 — indirect control flow | Block-local constant JR/JALR discovery and guarded data-pointer function candidates | Cross-block values, dynamic pointers and some trivial leaves remain unresolved |
+| Phase 15 — COP0 faults | Alignment exceptions, TLB miss distinction, BadVAddr/exception block abort and bounded CACHE handling | KUSEG translation still modelled; CACHE microarchitecture not emulated |
+| Phase 16 / GS Stage 0 | Backend contracts, PATH-aware raw-GIF seam, VSYNC snapshots and CPU-only seam tests | **No GPU backend, no VERIFY harness, no measured improvement from a GPU** |
+
+The development team reports **647/647** passing `ps2x_tests` on the Phase 16 working tree (Release and ASan+UBSan) and **56 CTest cases** (55 passing, one intentionally skipped). Those results have **not been independently re-run on this GitHub integration branch**. The historical hardware-output ladder remains **53/55 programs, 8202/8250 lines**; it is not a game-compatibility percentage.
+
+New research and reproducible prototypes:
+
+- [Technology landscape](docs/research/OPEN_SOURCE_TECHNOLOGY_LANDSCAPE.md), [integration feasibility](docs/research/INTEGRATION_FEASIBILITY_MATRIX.md), [measured benchmarks](docs/research/TECHNOLOGY_BENCHMARKS.md), and [incremental next-generation design](docs/architecture/NEXT_GENERATION_RECOMPILER_DESIGN.md).
+- [Ghidra headless experiment](research/poc1/README.md) (fixture-level positive results, production CSV loader not yet verified), [angr/Capstone limitations](research/poc2/README.md), and [C++ compilation-speed research](research/poc3/README.md).
+- [Core-mission assessment](docs/research/RECOMPILER_MISSION_ASSESSMENT.md) and [GS backend assessment](docs/research/GS_BACKEND_ASSESSMENT.md).
+
+**Next gates:** establish CI parity on Linux and Windows, finish the GS differential fixture harness (Stage 1), and validate external analysis outputs before changing function discovery precedence. The formal [227-component status dashboard](docs/status/README.md) remains evidence-gated; it is **not** automatically upgraded by these phases.
 
 ## Overview
 

@@ -43,7 +43,15 @@ void VU1Interpreter::execUpper(uint32_t instr)
     uint8_t fd = FD(instr);
     uint8_t op = instr & 0x3F;
 
-    float *vd = m_state.vf[fd];
+    // VF0 is hardwired to (0,0,0,1): an upper write to it must not be visible
+    // to the lower instruction of the same pair. The run loop restores vf0
+    // after the pair, but without this scratch the lower instruction would
+    // read the discarded upper result (the vf0 shadow logic only tracks
+    // non-zero destination registers, and addVfWrite ignores reg 0). Flag
+    // updates from applyFmacDest are unchanged: they are computed from the
+    // result, not from the destination register.
+    float vf0Scratch[4]{};
+    float *vd = fd == 0u ? vf0Scratch : m_state.vf[fd];
     float normalizedVs[4];
     float normalizedVt[4];
     float normalizedAcc[4];
@@ -240,7 +248,7 @@ void VU1Interpreter::execUpper(uint32_t instr)
     case 0x3F:
     {
         const uint8_t specialOp = static_cast<uint8_t>((instr & 0x3u) | ((instr >> 4) & 0x7Cu));
-        float *vtDest = m_state.vf[ft];
+        float *vtDest = ft == 0u ? vf0Scratch : m_state.vf[ft];
 
         switch (specialOp)
         {

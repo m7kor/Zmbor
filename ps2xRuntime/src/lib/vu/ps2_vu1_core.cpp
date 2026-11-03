@@ -1536,7 +1536,24 @@ VU1Interpreter::InstructionUsage VU1Interpreter::decodeLowerUsage(uint32_t lower
         addVfWrite(usage, vfT, dest);
         break;
     case 0x68:
+        // Phase 8b: XTOP "can be used only on VU1" (VU User's Manual
+        // v6.0, XTOP Remarks). Gate it reserved on VU0 exactly like MFP
+        // (0x64) and XGKICK (0x6C) already are; the interpreter then
+        // reports it and stops at that pair instead of executing it.
+        if (m_unit == Unit::VU0)
+        {
+            usage.reserved = true;
+            break;
+        }
+        usage.pipeline = PipelineIalu;
+        usage.latency = 1u;
+        writeVi(viT);
+        break;
     case 0x69:
+        // XITOP is valid on both units (VU User's Manual, XITOP
+        // Operation: VU0 reads the lower 8 bits of VIF0_ITOP, VU1 the
+        // lower 10 bits of VIF1_ITOP; the width difference is applied in
+        // execLower).
         usage.pipeline = PipelineIalu;
         usage.latency = 1u;
         writeVi(viT);

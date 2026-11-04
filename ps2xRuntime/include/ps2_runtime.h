@@ -2,6 +2,7 @@
 #define PS2_RUNTIME_H
 
 #include <cstring>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 #include <string>
@@ -48,6 +49,7 @@ struct EeEvent;
 enum PS2Exception
 {
     EXCEPTION_TLB_REFILL = 0x02,          // TLB refill/load exception
+    EXCEPTION_TLB_STORE = 0x03,           // TLB refill/store exception (MIPS TLBS)
     EXCEPTION_ADDRESS_ERROR_LOAD = 0x04,  // Address error on load
     EXCEPTION_ADDRESS_ERROR_STORE = 0x05, // Address error on store
     EXCEPTION_SYSCALL = 0x08,             // SYSCALL instruction

@@ -8,29 +8,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(PS2X_ENABLE_RUNNER_UNITY_BUILD "Build ps2EntryRunner with CMake unity build" ON)
 set(PS2X_RUNNER_UNITY_BUILD_BATCH_SIZE 32 CACHE STRING "Unity build batch size for ps2EntryRunner")
 option(PS2X_ENABLE_RUNNER_PCH "Precompile the heavy runtime headers for ps2EntryRunner" ON)
-option(PS2X_ENABLE_SCCACHE "Use sccache as compiler launcher when available" ON)
-
 option(PS2X_ENABLE_RUNTIME_LOGS "Enable PS2 runtime logs" ON)
 option(PS2X_ENABLE_AGRESSIVE_LOGS "Enable very verbose/agressive PS2 runtime logs" ON)
 option(PS2X_ENABLE_IOP_RPC_TRACE "Log unhandled IOP/SIF RPC trace suggestions" ON)
 option(PS2X_STRICT_RETURN_DIAGNOSTICS "Route generated JR $ra returns through runtime branch diagnostics" OFF)
 option(PS2X_SHOW_WINDOWS_CONSOLE "Show a console window for ps2EntryRunner on Windows release builds" ON)
 option(PS2X_ENABLE_DEBUG_UI "Build the desktop runtime debug UI" ON)
-
-if(PS2X_ENABLE_SCCACHE)
-    find_program(PS2X_SCCACHE_PROGRAM sccache)
-
-    if(PS2X_SCCACHE_PROGRAM)
-        if(CMAKE_C_COMPILER)
-            set(CMAKE_C_COMPILER_LAUNCHER "${PS2X_SCCACHE_PROGRAM}")
-        endif()
-
-        set(CMAKE_CXX_COMPILER_LAUNCHER "${PS2X_SCCACHE_PROGRAM}")
-        message(STATUS "Using sccache: ${PS2X_SCCACHE_PROGRAM}")
-    else()
-        message(STATUS "sccache not found; continuing without compiler launcher")
-    endif()
-endif()
+option(PS2X_ENABLE_PARALLEL_GS "Build the paraLLEl-GS Vulkan GS backend adapter (requires Vulkan + Granite; separately built, never vendored)" OFF)
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ReleaseMode.cmake")
 
@@ -429,6 +413,61 @@ endif()
 target_compile_definitions(ps2_runtime PRIVATE
     PS2X_HAS_FFMPEG=$<BOOL:${PS2X_ENABLE_FFMPEG}>
 )
+
+# paraLLEl-GS adapter (GS Stage 2). The upstream library is NEVER vendored
+# into this tree: it is resolved from the existing dependency-cache pattern
+# (FETCHCONTENT_SOURCE_DIR_PARALLEL_GS pointing at an anonymous clone, with
+# the Granite submodule initialized at the pin recorded by parallel-gs) or,
+# when no cache override is given, cloned anonymously at the pinned commit
+# below with recursive submodules. Only Granite + the gs/ library are added
+# (never the upstream top-level file, so sandbox/analog/dump/tools targets
+# are not pulled into this build). A missing Vulkan/Granite setup is a
+# CONFIGURE failure with a clear message, never a silent fallback.
+if(PS2X_ENABLE_PARALLEL_GS)
+    include(FetchContent)
+    FetchContent_Declare(parallel_gs
+        GIT_REPOSITORY https://github.com/Arntzen-Software/parallel-gs.git
+        GIT_TAG cc6184af7e0c03da603045ca371ffa5dae9b0655
+        GIT_SUBMODULES_RECURSE ON)
+    FetchContent_GetProperties(parallel_gs)
+    if(NOT parallel_gs_POPULATED)
+        FetchContent_Populate(parallel_gs)
+    endif()
+    if(NOT EXISTS "${parallel_gs_SOURCE_DIR}/Granite/CMakeLists.txt")
+        message(FATAL_ERROR "PS2X_ENABLE_PARALLEL_GS=ON but Granite is not initialized under ${parallel_gs_SOURCE_DIR}/Granite. "
+            "With a cache override, initialize it first: git -C ${parallel_gs_SOURCE_DIR} submodule update --init Granite, "
+            "then Granite's standalone submodules (volk, third_party/khronos/vulkan-headers). "
+            "See parallel-gs/checkout_submodules.sh for the standalone set.")
+    endif()
+    if(NOT EXISTS "${parallel_gs_SOURCE_DIR}/gs/CMakeLists.txt")
+        message(FATAL_ERROR "PS2X_ENABLE_PARALLEL_GS=ON but ${parallel_gs_SOURCE_DIR}/gs/CMakeLists.txt is missing.")
+    endif()
+    # Standalone settings, identical to parallel-gs's own top-level CMake
+    # with PARALLEL_GS_STANDALONE=ON (headless, no runtime shader compiler,
+    # precompiled SPIR-V shaders only).
+    set(GRANITE_FAST_MATH OFF CACHE BOOL "" FORCE)
+    set(GRANITE_VULKAN_FOSSILIZE OFF CACHE BOOL "" FORCE)
+    set(GRANITE_RENDERER OFF CACHE BOOL "" FORCE)
+    set(GRANITE_VULKAN_SPIRV_CROSS OFF CACHE BOOL "" FORCE)
+    set(GRANITE_VULKAN_SHADER_MANAGER_RUNTIME_COMPILER OFF CACHE BOOL "" FORCE)
+    set(GRANITE_VULKAN_SYSTEM_HANDLES OFF CACHE BOOL "" FORCE)
+    set(GRANITE_SHADER_COMPILER_OPTIMIZE OFF CACHE BOOL "" FORCE)
+    set(GRANITE_SHIPPING ON CACHE BOOL "" FORCE)
+    set(GRANITE_PLATFORM "null" CACHE STRING "" FORCE)
+    set(GRANITE_TOOLS OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${parallel_gs_SOURCE_DIR}/Granite" "${CMAKE_CURRENT_BINARY_DIR}/parallel-gs-granite" EXCLUDE_FROM_ALL)
+    add_subdirectory("${parallel_gs_SOURCE_DIR}/gs" "${CMAKE_CURRENT_BINARY_DIR}/parallel-gs-lib")
+    if(NOT TARGET parallel-gs)
+        message(FATAL_ERROR "PS2X_ENABLE_PARALLEL_GS=ON but the parallel-gs target was not created.")
+    endif()
+    target_sources(ps2_runtime PRIVATE
+        src/lib/gs/gs_parallel_backend.cpp
+    )
+    target_link_libraries(ps2_runtime PUBLIC parallel-gs)
+    target_compile_definitions(ps2_runtime PUBLIC PS2X_HAS_PARALLEL_GS=1)
+else()
+    target_compile_definitions(ps2_runtime PUBLIC PS2X_HAS_PARALLEL_GS=0)
+endif()
 
 file(GLOB_RECURSE KERNEL_SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lib/Kernel/*.cpp"

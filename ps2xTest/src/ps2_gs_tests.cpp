@@ -7,6 +7,7 @@
 #include "runtime/gs/gs_cpu_backend.h"
 #include "runtime/ee_scheduler.h"
 #include "runtime/gs/ps2_gs_memory.h"
+#include "runtime/gs/ps2_gs_psmct16.h"
 #include "runtime/gs/ps2_gs_psmct32.h"
 #include "runtime/gs/ps2_gs_psmt4.h"
 #include "runtime/gs/ps2_gs_psmt8.h"
@@ -520,6 +521,107 @@ namespace
         void TextureFlush() override { m_cpu.TextureFlush(); }
         void Sync(GSSyncReason reason) override { m_cpu.Sync(reason); }
         PresentationFrame Present(const GSPresentationRequest &request) override { return m_cpu.Present(request); }
+        bool ClearFramebuffer(const GSContext &context, uint32_t rgba) override { return m_cpu.ClearFramebuffer(context, rgba); }
+        uint32_t ConsumeLocalToHostBytes(uint8_t *dst, uint32_t maxBytes) override { return m_cpu.ConsumeLocalToHostBytes(dst, maxBytes); }
+        uint32_t ReadVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y) const override
+        {
+            return m_cpu.ReadVram(psm, base, bw, x, y);
+        }
+        void WriteVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y, uint32_t value) override
+        {
+            m_cpu.WriteVram(psm, base, bw, x, y, value);
+        }
+        void SnapshotVram(std::vector<uint8_t> &out) const override { m_cpu.SnapshotVram(out); }
+        GSTransferSnapshot GetTransferSnapshot() const override { return m_cpu.GetTransferSnapshot(); }
+        const char *LastError() const override { return m_error.empty() ? nullptr : m_error.c_str(); }
+
+    private:
+        GSCpuBackend m_cpu;
+        std::string m_error;
+    };
+
+    // Gate E (S4) helpers: TEX0/TEX2 values for indexed-texture CLUT loads.
+    // Bit layout mirrors the frontend's TEX0 decode (tbp0 0-13, tbw 14-19,
+    // psm 20-25, tw 26-29, th 30-33, tcc 34, tfx 35-36, cbp 37-50,
+    // cpsm 51-54, csm 55, csa 56-60, cld 61-63). tcc=1/tfx=1 (DECAL) so a
+    // draw resolves to the palette colour directly.
+    uint64_t makeClutTex0(uint32_t tbp, uint32_t psm, uint32_t cbp, uint32_t cpsm,
+                          uint32_t csm, uint32_t csa, uint32_t cld)
+    {
+        return (static_cast<uint64_t>(tbp) << 0) |
+               (1ull << 14) |
+               (static_cast<uint64_t>(psm) << 20) |
+               (0ull << 26) |
+               (0ull << 30) |
+               (1ull << 34) |
+               (1ull << 35) |
+               (static_cast<uint64_t>(cbp) << 37) |
+               (static_cast<uint64_t>(cpsm) << 51) |
+               (static_cast<uint64_t>(csm) << 55) |
+               (static_cast<uint64_t>(csa) << 56) |
+               (static_cast<uint64_t>(cld) << 61);
+    }
+
+    // 1x1 textured sprite draw used by the Gate E swap tests: the sampled
+    // texel is texture (0,0), and the framebuffer pixel lands at (0,0).
+    // The draw deliberately does NOT touch TEX0/TEX2, so it resolves
+    // through whatever texture context is current.
+    void drawIndexedClutSprite(GS &g)
+    {
+        g.writeRegister(GS_REG_FRAME_1, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+        g.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+        g.writeRegister(GS_REG_SCISSOR_1, 0ull);
+        g.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+        g.writeRegister(GS_REG_TEST_1, 0x30000ull);
+        g.writeRegister(GS_REG_ALPHA_1, 0ull);
+        g.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_SPRITE) | (1ull << 4) | (1ull << 8));
+        g.writeRegister(GS_REG_RGBAQ, 0x80808080ull);
+        g.writeRegister(GS_REG_UV, 0ull);
+        g.writeRegister(GS_REG_XYZ2, 0ull);
+        g.writeRegister(GS_REG_UV, 0ull);
+        g.writeRegister(GS_REG_XYZ2, (16ull << 0) | (16ull << 16));
+    }
+
+    uint32_t readFramebufferPixel0(const std::vector<uint8_t> &vram)
+    {
+        uint32_t pixel = 0u;
+        std::memcpy(&pixel, vram.data(), sizeof(pixel));
+        return pixel;
+    }
+
+    // Gate E (§5.2) error backend: forwards everything to an owned CPU
+    // backend except Initialize (optionally records an init failure) and
+    // Present (optionally returns an empty frame with an error). Used to
+    // pin the LastError lifetime rule and the failed-Present latch rule.
+    class GateEFailingBackend final : public GSRasterBackend
+    {
+    public:
+        bool failInitialize = false;
+        bool failPresent = false;
+
+        void Initialize(uint8_t *vram, uint32_t vramSize) override
+        {
+            m_cpu.Initialize(vram, vramSize);
+            if (failInitialize)
+                m_error = "injected init failure";
+        }
+        void Reset() override { m_cpu.Reset(); }
+        void Submit(const GSPrimitiveBatch &batch) override { m_cpu.Submit(batch); }
+        void LoadClut(const GSTex0Reg &tex0, const GSTexClutReg &texclut) override { m_cpu.LoadClut(tex0, texclut); }
+        void BeginTransfer(const GSTransferCommand &command) override { m_cpu.BeginTransfer(command); }
+        void UploadImage(const uint8_t *data, uint32_t sizeBytes) override { m_cpu.UploadImage(data, sizeBytes); }
+        void Flush() override { m_cpu.Flush(); }
+        void TextureFlush() override { m_cpu.TextureFlush(); }
+        void Sync(GSSyncReason reason) override { m_cpu.Sync(reason); }
+        PresentationFrame Present(const GSPresentationRequest &request) override
+        {
+            if (failPresent)
+            {
+                m_error = "injected present failure";
+                return PresentationFrame{};
+            }
+            return m_cpu.Present(request);
+        }
         bool ClearFramebuffer(const GSContext &context, uint32_t rgba) override { return m_cpu.ClearFramebuffer(context, rgba); }
         uint32_t ConsumeLocalToHostBytes(uint8_t *dst, uint32_t maxBytes) override { return m_cpu.ConsumeLocalToHostBytes(dst, maxBytes); }
         uint32_t ReadVram(uint32_t psm, uint32_t base, uint32_t bw, uint32_t x, uint32_t y) const override
@@ -3440,6 +3542,430 @@ void register_ps2_gs_tests()
             std::memcpy(&pixel, vram.data(), sizeof(pixel));
             t.Equals(pixel, kExpectedColor,
                      "redraw after a backend swap must still resolve through the CLUT (swap must re-issue LoadClut)");
+        });
+
+        tc.Run("GS swap replays CLUT history past a trailing CLD=0 no-op (Gate E S4a)", [](TestCase &t)
+        {
+            // Gate A §6.3 sequence (a): CLD=1 load, then a CLD=0 TEX0 write
+            // (texture switch without reload). Last-load-only restore
+            // re-issues the no-op and the new backend's palette stays
+            // zeros; full-history replay restores the load.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kClutCbp = 192u;
+            constexpr uint32_t kExpectedColor = 0xFF0000FFu;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t clutOff = GSPSMCT32::addrPSMCT32(kClutCbp, 1u, 8u, 0u);
+            std::memcpy(vram.data() + clutOff, &kExpectedColor, sizeof(kExpectedColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, kClutCbp, GS_PSM_CT32, 1u, 0u, 1u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "CLD=1 load must resolve before the swap");
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, kClutCbp, GS_PSM_CT32, 1u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "trailing CLD=0 write must not clear the loaded palette");
+
+            gs.setRasterBackend(nullptr);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "redraw after swap must still resolve through the CLD=1 load, not the trailing no-op");
+        });
+
+        tc.Run("GS swap replays CLD slot history for a trailing CLD=4/CBP=0 load (Gate E S4b)", [](TestCase &t)
+        {
+            // Gate A §6.3 sequence (b): CLD=2 records CBP slot 0 = 128 and
+            // loads, then CLD=4 with CBP=0 loads (slot differs) and records
+            // slot 0 = 0. Last-load-only restore re-issues CLD=4/CBP=0
+            // into a fresh backend whose slot is already 0, so the
+            // conditional skips the load; replay reproduces the slot
+            // evolution and the load.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kWrongColor = 0xFF00FF00u;
+            constexpr uint32_t kExpectedColor = 0xFF0000FFu;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t wrongOff = GSPSMCT32::addrPSMCT32(128u, 1u, 8u, 0u);
+            const uint32_t expectedOff = GSPSMCT32::addrPSMCT32(0u, 1u, 8u, 0u);
+            std::memcpy(vram.data() + wrongOff, &kWrongColor, sizeof(kWrongColor));
+            std::memcpy(vram.data() + expectedOff, &kExpectedColor, sizeof(kExpectedColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 128u, GS_PSM_CT32, 1u, 0u, 2u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kWrongColor,
+                     "CLD=2 load must resolve through the recorded CBP before the swap");
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 0u, GS_PSM_CT32, 1u, 0u, 4u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "CLD=4/CBP=0 load must resolve once the slot differs");
+
+            gs.setRasterBackend(nullptr);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "redraw after swap must still resolve through the CLD=4/CBP=0 load");
+        });
+
+        tc.Run("GS swap replays multiple CBP/CSA slices, CSM1/CT16 8-bit (Gate E S4c)", [](TestCase &t)
+        {
+            // Gate A §6.3 sequence (c): two full slices at different CSA
+            // bases. CT16 gives a 512-entry destination space, so csa=0
+            // (entries 0-255) and csa=16 (entries 256-511) are disjoint.
+            // CSM1 source order is the bit-3/4 swizzle: entry 8 reads from
+            // source (0,1). Expected pixels are captured pre-swap so the
+            // test is independent of the 5551 conversion details; the
+            // slices must differ and both be nonzero pre-swap.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint16_t kSliceA = 0xFFFFu;
+            constexpr uint16_t kSliceB = 0x801Fu;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t sliceAOff = GSPSMCT16::addrPSMCT16(192u, 1u, 0u, 1u);
+            const uint32_t sliceBOff = GSPSMCT16::addrPSMCT16(256u, 1u, 0u, 1u);
+            std::memcpy(vram.data() + sliceAOff, &kSliceA, sizeof(kSliceA));
+            std::memcpy(vram.data() + sliceBOff, &kSliceB, sizeof(kSliceB));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT16, 0u, 0u, 1u));
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 256u, GS_PSM_CT16, 0u, 16u, 1u));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT16, 0u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            const uint32_t preSwapA = readFramebufferPixel0(vram);
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 256u, GS_PSM_CT16, 0u, 16u, 0u));
+            drawIndexedClutSprite(gs);
+            const uint32_t preSwapB = readFramebufferPixel0(vram);
+            t.IsTrue(preSwapA != 0u && preSwapB != 0u, "both slices must resolve to nonzero colours pre-swap");
+            t.IsTrue(preSwapA != preSwapB, "the two slices must resolve to different colours pre-swap");
+
+            gs.setRasterBackend(nullptr);
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT16, 0u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), preSwapA,
+                     "first slice must survive the swap, not just the last load");
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 256u, GS_PSM_CT16, 0u, 16u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), preSwapB,
+                     "last slice must survive the swap");
+        });
+
+        tc.Run("GS swap replays CSM1-suffix partial loads (Gate E S4d)", [](TestCase &t)
+        {
+            // CSM1 + CT32 + 8-bit loads only the suffix: csa=0 loads all
+            // entries, csa=1 loads entries [16,256). Entry 8 therefore
+            // comes only from the first load; last-load-only restore
+            // leaves entries [0,16) zeros. Entry 200 comes from the
+            // second load either way (guard). CSM1 sources are swizzled:
+            // entry 8 reads (0,1), entry 200 reads (0,13).
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kFirstColor = 0xFF0000FFu;
+            constexpr uint32_t kSuffixColor = 0xFF00FF00u;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            const uint32_t texOff = GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u);
+            const uint32_t firstOff = GSPSMCT32::addrPSMCT32(192u, 1u, 0u, 1u);
+            const uint32_t suffixOff = GSPSMCT32::addrPSMCT32(256u, 1u, 0u, 13u);
+            std::memcpy(vram.data() + firstOff, &kFirstColor, sizeof(kFirstColor));
+            std::memcpy(vram.data() + suffixOff, &kSuffixColor, sizeof(kSuffixColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT32, 0u, 0u, 1u));
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 256u, GS_PSM_CT32, 0u, 1u, 1u));
+
+            vram[texOff] = 8u;
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT32, 0u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kFirstColor,
+                     "entry 8 must resolve through the first load pre-swap");
+            // The texture page cache holds the texel-8 page: rewriting
+            // the texel byte directly needs a TEXFLUSH before the next
+            // draw, or the draw keeps sampling the cached byte. TEXFLUSH
+            // invalidates the page cache only; it never touches m_clut.
+            vram[texOff] = 200u;
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSuffixColor,
+                     "entry 200 must resolve through the suffix load pre-swap");
+
+            gs.setRasterBackend(nullptr);
+            vram[texOff] = 8u;
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT32, 0u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kFirstColor,
+                     "entry 8 must survive the swap even though the last load did not cover it");
+            vram[texOff] = 200u;
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSuffixColor,
+                     "entry 200 must survive the swap");
+        });
+
+        tc.Run("GS swap replays CSM2 multi-slice loads, 4-bit (Gate E CSM2)", [](TestCase &t)
+        {
+            // Stage 1 covered CSM1 only; this is the CSM2 fixture gap.
+            // CSM2 4-bit loads cover 16 entries each, so csa=0 (entries
+            // 0-15) and csa=1 (entries 16-31) are disjoint slices.
+            // addrPSMT4 returns a NIBBLE address, so the texel is placed
+            // with the existing writePSMT4Texel helper, not a raw byte
+            // write. CSM2 sources are direct: entry 5 reads (5,0) in
+            // its block.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kSliceA = 0xFF0000FFu;
+            constexpr uint32_t kSliceB = 0xFF00FF00u;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            writePSMT4Texel(vram, kTexTbp, 1u, 0u, 0u, 5u);
+            const uint32_t sliceAOff = GSPSMCT32::addrPSMCT32(192u, 1u, 5u, 0u);
+            const uint32_t sliceBOff = GSPSMCT32::addrPSMCT32(256u, 1u, 5u, 0u);
+            std::memcpy(vram.data() + sliceAOff, &kSliceA, sizeof(kSliceA));
+            std::memcpy(vram.data() + sliceBOff, &kSliceB, sizeof(kSliceB));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 192u, GS_PSM_CT32, 1u, 0u, 1u));
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 256u, GS_PSM_CT32, 1u, 1u, 1u));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 192u, GS_PSM_CT32, 1u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSliceA,
+                     "first CSM2 slice must resolve pre-swap");
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 256u, GS_PSM_CT32, 1u, 1u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSliceB,
+                     "second CSM2 slice must resolve pre-swap");
+
+            gs.setRasterBackend(nullptr);
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 192u, GS_PSM_CT32, 1u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSliceA,
+                     "first CSM2 slice must survive the swap, not just the last load");
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T4, 256u, GS_PSM_CT32, 1u, 1u, 0u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kSliceB,
+                     "second CSM2 slice must survive the swap");
+        });
+
+        tc.Run("GS swap after TEXFLUSH re-reads current VRAM (Gate E guard)", [](TestCase &t)
+        {
+            // Gate A §6.3 last row: TEXFLUSH does NOT restore CLUT (the
+            // palette stays the load-time snapshot), but a swap's
+            // re-issue reads current VRAM. A fix that snapshotted palette
+            // bytes at load time would fail the post-swap assertion.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kClutCbp = 192u;
+            constexpr uint32_t kOldColor = 0xFF0000FFu;
+            constexpr uint32_t kNewColor = 0xFF00FF00u;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t clutOff = GSPSMCT32::addrPSMCT32(kClutCbp, 1u, 8u, 0u);
+            std::memcpy(vram.data() + clutOff, &kOldColor, sizeof(kOldColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, kClutCbp, GS_PSM_CT32, 1u, 0u, 1u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kOldColor,
+                     "load-time palette must resolve before the VRAM rewrite");
+
+            std::memcpy(vram.data() + clutOff, &kNewColor, sizeof(kNewColor));
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kOldColor,
+                     "TEXFLUSH must not change the loaded palette snapshot");
+
+            gs.setRasterBackend(nullptr);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kNewColor,
+                     "swap re-issue must read the current VRAM palette");
+        });
+
+        tc.Run("GS reset clears CLUT history (Gate E reset rule)", [](TestCase &t)
+        {
+            // reset() clears the backend palette and the frontend's
+            // last-load record; history must clear with it, or a
+            // post-reset swap would resurrect the pre-reset palette.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kClutCbp = 192u;
+            constexpr uint32_t kExpectedColor = 0xFF0000FFu;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t clutOff = GSPSMCT32::addrPSMCT32(kClutCbp, 1u, 8u, 0u);
+            std::memcpy(vram.data() + clutOff, &kExpectedColor, sizeof(kExpectedColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, kClutCbp, GS_PSM_CT32, 1u, 0u, 1u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kExpectedColor,
+                     "load must resolve before reset");
+
+            gs.reset();
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, kClutCbp, GS_PSM_CT32, 1u, 0u, 0u));
+            drawIndexedClutSprite(gs);
+            t.IsTrue(readFramebufferPixel0(vram) != kExpectedColor,
+                     "reset must clear the backend palette before any swap");
+
+            gs.setRasterBackend(nullptr);
+            drawIndexedClutSprite(gs);
+            t.IsTrue(readFramebufferPixel0(vram) != kExpectedColor,
+                     "post-reset swap must not resurrect the pre-reset palette");
+        });
+
+        tc.Run("GS raw-mode TEX0 writes are not recorded in CLUT history (Gate E parity)", [](TestCase &t)
+        {
+            // Raw mode suppresses decoded delivery, so raw-mode TEX0
+            // writes must not enter the replay history either (parity
+            // with the last-load record, which raw mode also skips).
+            // The draw after swapping back resolves through the
+            // pre-raw palette: cbp affects loads only, not lookups.
+            constexpr uint32_t kTexTbp = 64u;
+            constexpr uint32_t kPreRawColor = 0xFF0000FFu;
+            constexpr uint32_t kRawColor = 0xFF00FF00u;
+
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            vram[GSPSMT8::addrPSMT8(kTexTbp, 1u, 0u, 0u)] = 8u;
+            const uint32_t preRawOff = GSPSMCT32::addrPSMCT32(192u, 1u, 8u, 0u);
+            const uint32_t rawOff = GSPSMCT32::addrPSMCT32(256u, 1u, 8u, 0u);
+            std::memcpy(vram.data() + preRawOff, &kPreRawColor, sizeof(kPreRawColor));
+            std::memcpy(vram.data() + rawOff, &kRawColor, sizeof(kRawColor));
+
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 192u, GS_PSM_CT32, 1u, 0u, 1u));
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kPreRawColor,
+                     "pre-raw palette must resolve before attaching the raw backend");
+
+            auto raw = std::make_unique<NullRawGifBackend>();
+            NullRawGifBackend *rawPtr = raw.get();
+            gs.setRasterBackend(std::move(raw));
+            gs.writeRegister(GS_REG_TEX0_1, makeClutTex0(kTexTbp, GS_PSM_T8, 256u, GS_PSM_CT32, 1u, 0u, 1u));
+            t.Equals(rawPtr->loadClutCount, 0u, "no CLUT load may be delivered in raw mode");
+
+            gs.setRasterBackend(nullptr);
+            drawIndexedClutSprite(gs);
+            t.Equals(readFramebufferPixel0(vram), kPreRawColor,
+                     "swap back from raw mode must restore only the pre-raw palette");
+        });
+
+        tc.Run("GS LastError is sticky across successful calls (Gate E 5.2 pin)", [](TestCase &t)
+        {
+            // The contract's lifetime rule, pinned: a recorded failure
+            // survives subsequent successful calls; only a backend
+            // re-Initialize (or a newer failure) replaces it. Without
+            // this rule a Flush/Sync between the failure and the
+            // frontend's read could silently clear the diagnostic.
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+            t.IsTrue(gs.lastBackendError() == nullptr, "CPU backend must report no error");
+
+            auto err = std::make_unique<ErrorRecordingBackend>();
+            gs.setRasterBackend(std::move(err));
+            t.IsTrue(gs.lastBackendError() == nullptr, "fresh error backend must report no error before any Submit");
+
+            gs.writeRegister(GS_REG_FRAME_1, (0ull << 0) | (1ull << 16) | (static_cast<uint64_t>(GS_PSM_CT32) << 24));
+            gs.writeRegister(GS_REG_ZBUF_1, (1ull << 32));
+            gs.writeRegister(GS_REG_SCISSOR_1, (0ull << 0) | (63ull << 16) | (0ull << 32) | (63ull << 48));
+            gs.writeRegister(GS_REG_XYOFFSET_1, 0ull);
+            gs.writeRegister(GS_REG_TEST_1, 0x30000ull);
+            gs.writeRegister(GS_REG_ALPHA_1, 0ull);
+            gs.writeRegister(GS_REG_PRIM, static_cast<uint64_t>(GS_PRIM_SPRITE));
+            gs.writeRegister(GS_REG_RGBAQ, 0xFF102030ull);
+            gs.writeRegister(GS_REG_XYZ2, 0ull);
+            gs.writeRegister(GS_REG_XYZ2, (32ull << 0) | (32ull << 16));
+            t.IsTrue(gs.lastBackendError() != nullptr, "Submit failure must be observable");
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected submit failure",
+                     "error channel must carry the backend's failure string");
+
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected submit failure",
+                     "a successful TextureFlush must not clear a recorded failure");
+            (void)gs.ReadVram(GS_PSM_CT32, 0u, 1u, 0u, 0u);
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected submit failure",
+                     "a successful ReadVram must not clear a recorded failure");
+            gs.refreshDisplaySnapshot();
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected submit failure",
+                     "a successful Sync must not clear a recorded failure");
+        });
+
+        tc.Run("GS failed Present clears the latched frame, never serves stale pixels (Gate E 5.2 pin)", [](TestCase &t)
+        {
+            // Latch a good frame, swap to a backend whose Present fails,
+            // latch again: the copy must report no frame, not the stale
+            // good one. The failure string stays observable through the
+            // frontend channel.
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GSRegisters regs{};
+            regs.pmode = 1ull;
+            regs.dispfb1 = 150ull | (1ull << 9) | (static_cast<uint64_t>(GS_PSM_CT32) << 15);
+            regs.display1 = (63ull << 32) | (63ull << 44);
+
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), &regs);
+
+            constexpr uint32_t kTopLeft = 0xFF332211u;
+            writeReferenceFramePSMCT32Pixel(vram, 150u, 1u, 0u, 0u, kTopLeft);
+            gs.latchHostPresentationFrame();
+            std::vector<uint8_t> goodFrame;
+            uint32_t goodWidth = 0u, goodHeight = 0u;
+            t.IsTrue(gs.copyLatchedHostPresentationFrame(goodFrame, goodWidth, goodHeight),
+                     "good latch must produce a readable frame");
+            uint32_t goodPixel = 0u;
+            std::memcpy(&goodPixel, goodFrame.data(), sizeof(goodPixel));
+            t.Equals(goodPixel, kTopLeft, "good latch must carry the framebuffer pixel");
+
+            auto failing = std::make_unique<GateEFailingBackend>();
+            failing->failPresent = true;
+            gs.setRasterBackend(std::move(failing));
+            gs.latchHostPresentationFrame();
+            std::vector<uint8_t> staleFrame;
+            uint32_t staleWidth = 0u, staleHeight = 0u;
+            t.IsTrue(!gs.copyLatchedHostPresentationFrame(staleFrame, staleWidth, staleHeight),
+                     "failed Present must clear the latch, not serve the stale frame");
+            t.IsTrue(staleFrame.empty(), "failed Present must leave no latched pixels");
+            t.IsTrue(gs.lastBackendError() != nullptr, "failed Present must be observable");
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected present failure",
+                     "failed Present must carry the backend's failure string");
+        });
+
+        tc.Run("GS init failure is observable through lastBackendError after attach (Gate E 5.2 pin)", [](TestCase &t)
+        {
+            // The attach-time diagnostic is the LastError channel itself:
+            // a backend whose Initialize fails must report through it
+            // immediately, and a later successful no-op must not clear it.
+            std::vector<uint8_t> vram(PS2_GS_VRAM_SIZE, 0u);
+            GS gs;
+            gs.init(vram.data(), static_cast<uint32_t>(vram.size()), nullptr);
+
+            auto failing = std::make_unique<GateEFailingBackend>();
+            failing->failInitialize = true;
+            gs.setRasterBackend(std::move(failing));
+            t.IsTrue(gs.lastBackendError() != nullptr, "init failure must be observable right after attach");
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected init failure",
+                     "init failure must carry the backend's failure string");
+            gs.writeRegister(GS_REG_TEXFLUSH, 0ull);
+            t.IsTrue(std::string(gs.lastBackendError()) == "injected init failure",
+                     "a successful TextureFlush must not clear a recorded init failure");
         });
 
         tc.Run("GS ordering contract: FINISH makes prior draws visible to reads", [](TestCase &t)

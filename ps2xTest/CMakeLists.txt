@@ -64,6 +64,7 @@ add_library(ps2_test_lib STATIC
     src/ps2_runtime_expansion_tests.cpp
     src/ps2_float_semantics_tests.cpp
     src/ps2_vu_fmac_tests.cpp
+    src/gs_parallel_backend_tests.cpp
 )
 
 # The VU0-macro test reads ps2xRecomp/include/ps2recomp/instructions.h.

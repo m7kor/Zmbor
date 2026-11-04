@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <functional>
+#include <cstddef>
 #include <cstdint>
 
 namespace ps2recomp

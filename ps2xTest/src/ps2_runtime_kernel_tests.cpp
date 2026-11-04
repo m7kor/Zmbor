@@ -1606,6 +1606,42 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(env.ctx.pc, 0x80000000u, "TLB refill must vector to 0x80000000");
         });
 
+        tc.Run("GateC S14 store TLB miss raises TLBS, not TLBL", [](TestCase &t)
+        {
+            // MIPS ExcCode table: 2 = TLBL (load/fetch), 3 = TLBS (store).
+            // A store to a KSEG2 address with no TLB entry must report TLBS
+            // and still take the shared TLB-refill vector.
+            TestEnv env;
+            t.IsTrue(env.runtime.memory().initialize(), "runtime memory initialize should succeed");
+            env.runtime.memory().write32(0x1000u, 0xDEADBEEFu);
+            t.IsTrue(env.runtime.memory().tlbWrite(0u, 0xC0001000u, 1u, 0u, true),
+                     "TLB entry install should succeed");
+
+            uint8_t *rdram = env.runtime.memory().getRDRAM();
+            env.ctx.pc = 0x80001000u;
+            env.runtime.Store32(rdram, &env.ctx, 0xC0001000u, 0x11223344u);
+            t.Equals(env.runtime.memory().read32(0x1000u), 0x11223344u,
+                     "KSEG2 TLB hit store must translate to RAM");
+
+            env.ctx.pc = 0x80001000u;
+            env.ctx.cop0_cause = 0u;
+            env.ctx.cop0_status = 0u;
+            bool threw = false;
+            try
+            {
+                env.runtime.Store32(rdram, &env.ctx, 0xC0002000u, 0x55667788u);
+            }
+            catch (const EeDispatcherTransfer &)
+            {
+                threw = true;
+            }
+            t.IsTrue(threw, "KSEG2 TLB miss store must abort via dispatcher transfer");
+            t.Equals((env.ctx.cop0_cause >> 2) & 0x1Fu, 3u,
+                     "KSEG2 TLB miss store must raise TLBS, not TLBL");
+            t.Equals(env.ctx.cop0_badvaddr, 0xC0002000u, "TLB miss store must record BadVAddr");
+            t.Equals(env.ctx.pc, 0x80000000u, "TLB miss store must vector to 0x80000000");
+        });
+
         tc.Run("Phase15 CACHE valid ops are no-ops, invalid cache field raises RI", [](TestCase &t)
         {
             TestEnv env;

@@ -400,6 +400,109 @@ namespace
     }
 }
 
+// Gate C (S5) — scheduler transfer adversarial tests. The guest functions below
+// are file-scope (not lambdas) because registerFunction takes plain function
+// pointers, and the test bodies run on the scheduler's thread.
+//
+// NOTE on observability: the exception vector 0x80000080 is a KSEG0 address and
+// CANNOT be registered (registerFunction writes only the generated dense table
+// [0x0, 0x2000000)). After an abort the scheduler dispatches at the vector, finds
+// no function, and the thread goes dormant — the designed missing-function path.
+// The tests therefore assert on the dormant thread's context (and, for the
+// interrupt case, on the faulting invocation's context), which is exactly the
+// guest-visible exception state the abort must preserve.
+constexpr uint32_t kGateCMainPc = 0x00180000u;
+constexpr uint32_t kGateCChildPc = 0x00180010u;
+constexpr uint32_t kGateCIrqHandlerPc = 0x00180020u;
+constexpr uint32_t kGateCIrqResumePc = 0x00180030u;
+constexpr uint32_t kGateCBranchTargetPc = 0x00180040u;
+constexpr uint32_t kGateCVectorPc = 0x80000080u;
+constexpr uint32_t kGateCFaultAddress = 0x1002u;
+
+std::atomic<bool> gGateCDtorRan{false};
+std::atomic<uint32_t> gGateCIrqResumeRuns{0u};
+std::atomic<uint32_t> gGateCBranchTargetRuns{0u};
+std::atomic<bool> gGateCWaitStarted{false};
+
+struct GateCDtorGuard
+{
+    ~GateCDtorGuard() { gGateCDtorRan.store(true, std::memory_order_release); }
+};
+
+void gatecFaultMain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+{
+    GateCDtorGuard guard;
+    (void)runtime->Load32(rdram, ctx, kGateCFaultAddress); // misaligned -> AdEL + transfer
+    ctx->pc = 0xDEADBEEFu; // unreachable: the abort must stop the block here
+}
+
+void gatecChild(uint8_t *, R5900Context *ctx, PS2Runtime *)
+{
+    ctx->pc = 0u;
+}
+
+void gatecOnCompleteMain(uint8_t *rdram, R5900Context *, PS2Runtime *runtime)
+{
+    GuestInvocation inv{};
+    inv.kind = GuestInvocationKind::HleCall;
+    inv.context.pc = kGateCChildPc;
+    inv.onComplete = [rdram, runtime](const R5900Context &, R5900Context &parent)
+    {
+        // Nested abort: raised on the LIVE parent context, inside the
+        // completion callback that site 262 swallows. The loop must
+        // re-derive control flow from the parent's (vector) pc.
+        runtime->handleBreak(rdram, &parent);
+    };
+    runtime->eeScheduler().invokeCurrent(std::move(inv)); // noreturn
+}
+
+void gatecWaitMain(uint8_t *rdram, R5900Context *, PS2Runtime *runtime)
+{
+    gGateCWaitStarted.store(true, std::memory_order_release);
+    runtime->eeScheduler().waitExternal(EeWaitReason::External, 0x5Au, 0xA5u,
+                                        [rdram, runtime](R5900Context &context)
+                                        {
+        // Nested abort: raised on the LIVE active context, inside the
+        // resume-completion callback that site 222 swallows.
+        runtime->handleBreak(rdram, &context);
+    });
+}
+
+void gatecIrqHandler(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+{
+    (void)runtime->Load32(rdram, ctx, kGateCFaultAddress); // misaligned -> AdEL + transfer
+    ctx->pc = 0xDEADBEEFu; // unreachable
+}
+
+void gatecBranchFaultMain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+{
+    (void)runtime->Load32(rdram, ctx, kGateCFaultAddress); // misaligned -> AdEL + transfer
+    // Terminal branch of the faulting block: must NOT run after the abort.
+    ctx->pc = kGateCBranchTargetPc;
+}
+
+void gatecBranchTarget(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+{
+    gGateCBranchTargetRuns.fetch_add(1u, std::memory_order_acq_rel);
+    ctx->pc = 0u;
+    runtime->requestStop();
+}
+
+void gatecIrqResume(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+{
+    gGateCIrqResumeRuns.fetch_add(1u, std::memory_order_acq_rel);
+    ctx->pc = 0u;
+    runtime->requestStop();
+}
+
+void gatecIrqMain(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+{
+    EeScheduler &ee = runtime->eeScheduler();
+    ee.addIrqHandler(false, 2u, kGateCIrqHandlerPc, true, 0u, 0u, 0u);
+    (void)ee.dispatchIrq(false, 2u);
+    ctx->pc = kGateCIrqResumePc;
+}
+
 void register_ps2_runtime_expansion_tests()
 {
     MiniTest::Case("PS2RuntimeExpansion", [](TestCase &tc)
@@ -1326,6 +1429,160 @@ void register_ps2_runtime_expansion_tests()
             executor.join();
             t.IsTrue(ended, "run() must return when no thread can run again");
             t.Equals(gAllDormantMainRuns.load(std::memory_order_acquire), 1u, "main ran once before exiting");
+        });
+
+        tc.Run("GateC S5 exception through guest frame runs destructors and keeps vector state", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            runtime.memory().initialize();
+            uint8_t *rdram = runtime.memory().getRDRAM();
+            runtime.registerFunction(kGateCMainPc, gatecFaultMain);
+            gGateCDtorRan.store(false, std::memory_order_release);
+            R5900Context mainContext{};
+            mainContext.pc = kGateCMainPc;
+            EeScheduler &ee = runtime.eeScheduler();
+            ee.reset(rdram, mainContext);
+            ee.run();
+            t.IsTrue(gGateCDtorRan.load(std::memory_order_acquire),
+                     "live local's destructor must run while the transfer unwinds");
+            const GuestThread *thread = ee.thread(EeScheduler::kMainThreadId);
+            t.IsTrue(thread != nullptr, "main thread still exists after the abort");
+            if (thread == nullptr)
+                return;
+            t.Equals(thread->context.pc, kGateCVectorPc,
+                     "faulted block stops at the exception vector, not the fall-through");
+            t.Equals(thread->context.cop0_epc, kGateCMainPc, "EPC is the fault pc");
+            t.Equals((thread->context.cop0_cause >> 2) & 0x1Fu, 4u, "cause is AdEL");
+            t.Equals(thread->context.cop0_badvaddr, kGateCFaultAddress, "BadVAddr set");
+            t.IsTrue((thread->context.cop0_status & 0x2u) != 0u, "EXL set");
+            t.IsTrue(thread->status == EeThreadStatus::Dormant, "thread dormant after unhandled abort");
+        });
+
+        tc.Run("GateC S5 exception from completion callback survives the swallow site", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            runtime.memory().initialize();
+            uint8_t *rdram = runtime.memory().getRDRAM();
+            runtime.registerFunction(kGateCMainPc, gatecOnCompleteMain);
+            runtime.registerFunction(kGateCChildPc, gatecChild);
+            R5900Context mainContext{};
+            mainContext.pc = kGateCMainPc;
+            EeScheduler &ee = runtime.eeScheduler();
+            ee.reset(rdram, mainContext);
+            ee.run();
+            const GuestThread *thread = ee.thread(EeScheduler::kMainThreadId);
+            t.IsTrue(thread != nullptr, "main thread still exists after the abort");
+            if (thread == nullptr)
+                return;
+            t.Equals(thread->context.pc, kGateCVectorPc,
+                     "parent dispatched at the vector after the swallowed completion abort");
+            t.Equals(thread->context.cop0_epc, kGateCMainPc, "EPC is the parent pc");
+            t.Equals((thread->context.cop0_cause >> 2) & 0x1Fu, 9u, "cause is BREAKPOINT");
+            t.IsTrue((thread->context.cop0_status & 0x2u) != 0u, "EXL set");
+        });
+
+        tc.Run("GateC S5 exception from resume completion survives the swallow site", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            runtime.memory().initialize();
+            uint8_t *rdram = runtime.memory().getRDRAM();
+            runtime.registerFunction(kGateCMainPc, gatecWaitMain);
+            gGateCWaitStarted.store(false, std::memory_order_release);
+            std::atomic<bool> finished{false};
+            std::thread executor([&]()
+                                 {
+                R5900Context mainContext{};
+                mainContext.pc = kGateCMainPc;
+                EeScheduler &ee = runtime.eeScheduler();
+                ee.reset(rdram, mainContext);
+                ee.run();
+                finished.store(true, std::memory_order_release); });
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (!gGateCWaitStarted.load(std::memory_order_acquire) &&
+                   std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            t.IsTrue(gGateCWaitStarted.load(std::memory_order_acquire), "main reached the external wait");
+            runtime.postEeEvent(EeEvent{EeEventType::ExternalWake, 0x5Au, 0xA5u});
+            while (!finished.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            const bool ended = finished.load(std::memory_order_acquire);
+            if (!ended)
+                runtime.requestStop();
+            executor.join();
+            t.IsTrue(ended, "run() must return after the swallowed resume abort");
+            const GuestThread *thread = runtime.eeScheduler().thread(EeScheduler::kMainThreadId);
+            t.IsTrue(thread != nullptr, "main thread still exists after the abort");
+            if (thread == nullptr)
+                return;
+            t.Equals(thread->context.pc, kGateCVectorPc,
+                     "waiter dispatched at the vector after the swallowed resume abort");
+            t.Equals(thread->context.cop0_epc, kGateCMainPc, "EPC is the waiter pc");
+            t.Equals((thread->context.cop0_cause >> 2) & 0x1Fu, 9u, "cause is BREAKPOINT");
+        });
+
+        tc.Run("GateC S5 exception from interrupt handler abandons invocation, thread resumes", [](TestCase &t)
+        {
+            // True interrupt path (dispatchIrq): the handler faults, its
+            // context goes to the vector, no vector function exists, so the
+            // missing-function fallback forces the invocation pc to 0, pops
+            // it, and the interrupted thread's continuation runs. The
+            // handler's cop0 fields are set by the same raiseCop0Exception
+            // path proven directly in the S5 guest-frame test; they leave
+            // with the popped invocation (designed missing-vector fallback,
+            // not a swallow-site loss: the thread context itself is never
+            // overwritten by the handler fault). What this test proves: no
+            // hang, no crash, no stuck invocation, and the continuation
+            // runs exactly once at its own pc.
+            PS2Runtime runtime;
+            runtime.memory().initialize();
+            uint8_t *rdram = runtime.memory().getRDRAM();
+            runtime.registerFunction(kGateCMainPc, gatecIrqMain);
+            runtime.registerFunction(kGateCIrqHandlerPc, gatecIrqHandler);
+            runtime.registerFunction(kGateCIrqResumePc, gatecIrqResume);
+            gGateCIrqResumeRuns.store(0u, std::memory_order_release);
+            R5900Context mainContext{};
+            mainContext.pc = kGateCMainPc;
+            EeScheduler &ee = runtime.eeScheduler();
+            ee.reset(rdram, mainContext);
+            ee.run();
+            t.Equals(gGateCIrqResumeRuns.load(std::memory_order_acquire), 1u,
+                     "thread continuation resumed exactly once after the handler abort");
+            const GuestThread *thread = ee.thread(EeScheduler::kMainThreadId);
+            t.IsTrue(thread != nullptr, "main thread still exists after the abort");
+            if (thread == nullptr)
+                return;
+            t.Equals(thread->invocations.size(), size_t{0},
+                     "aborted handler invocation popped, not stuck on the stack");
+            t.Equals(thread->context.pc, 0u, "thread ended at the resume function, not past the fault");
+        });
+
+        tc.Run("GateC S14 terminal branch cannot overwrite the exception destination", [](TestCase &t)
+        {
+            // Phase 15 class: a faulting block's terminal branch must not
+            // overwrite the exception vector pc. The fault aborts the block,
+            // so the branch target function never runs and the dormant thread
+            // context still points at the vector.
+            PS2Runtime runtime;
+            runtime.memory().initialize();
+            uint8_t *rdram = runtime.memory().getRDRAM();
+            runtime.registerFunction(kGateCMainPc, gatecBranchFaultMain);
+            runtime.registerFunction(kGateCBranchTargetPc, gatecBranchTarget);
+            gGateCBranchTargetRuns.store(0u, std::memory_order_release);
+            R5900Context mainContext{};
+            mainContext.pc = kGateCMainPc;
+            EeScheduler &ee = runtime.eeScheduler();
+            ee.reset(rdram, mainContext);
+            ee.run();
+            t.Equals(gGateCBranchTargetRuns.load(std::memory_order_acquire), 0u,
+                     "terminal branch target must not run after the fault abort");
+            const GuestThread *thread = ee.thread(EeScheduler::kMainThreadId);
+            t.IsTrue(thread != nullptr, "main thread still exists after the abort");
+            if (thread == nullptr)
+                return;
+            t.Equals(thread->context.pc, kGateCVectorPc,
+                     "exception destination is the vector, not the branch target");
+            t.Equals(thread->context.cop0_epc, kGateCMainPc, "EPC is the fault pc");
+            t.Equals((thread->context.cop0_cause >> 2) & 0x1Fu, 4u, "cause is AdEL");
         });
 
         tc.Run("sceMpegGetPicture blocks as a typed scheduler wait and resumes on EOF", [](TestCase &t)

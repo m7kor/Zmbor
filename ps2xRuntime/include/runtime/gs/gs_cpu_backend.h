@@ -4,6 +4,7 @@
 #include "runtime/gs/gs_texture_page_cache.h"
 
 #include <array>
+#include <cstddef>
 #include <mutex>
 #include <vector>
 

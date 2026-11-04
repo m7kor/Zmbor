@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <memory>
 #include <map>
+#include <cstddef>
 
 namespace ps2recomp
 {

@@ -15,12 +15,22 @@
 // allocation itself. The backend only BORROWS the VRAM pointer handed to
 // Initialize() and must never free it. Reset() re-initialises backend state
 // (CLUT, texture cache, transfer state) but never the VRAM allocation.
-// Backend swaps (GS::setRasterBackend) transfer VRAM bytes and re-issue the
-// frontend's last LoadClut; the texture-page cache self-heals because it is
-// a VRAM mirror refilled on demand. Transfer state is NOT preserved across a
-// swap: swaps require transfer-idle state (no transfer in flight). A swap
-// during an active transfer is out of contract — adapters select at startup
-// only, so mid-stream swap is a debug/test operation, not a production path.
+// Backend swaps (GS::setRasterBackend) transfer VRAM bytes and replay the
+// frontend's full ordered LoadClut history into the fresh backend (Gate E;
+// the old last-load-only re-issue lost cumulative, CLD-conditional palette
+// state — Gate A S4). History is every decoded LoadClut delivery in order,
+// including no-ops, since the last reset; it is never recorded while raw
+// mode suppresses delivery, and replay is skipped for raw backends. Replay
+// runs the fresh backend's own LoadClut against current VRAM, so palette
+// bytes changed after a load without a reload are NOT snapshotted — the
+// same VRAM semantics the old re-issue had. Cross-backend snapshot copying
+// (reading one backend's palette state into another) is forbidden: replay
+// is the only restore mechanism. The texture-page cache self-heals because
+// it is a VRAM mirror refilled on demand. Transfer state is NOT preserved
+// across a swap: swaps require transfer-idle state (no transfer in
+// flight). A swap during an active transfer is out of contract — adapters
+// select at startup only, so mid-stream swap is a debug/test operation,
+// not a production path.
 //
 // ORDERING. Single producer (the frontend). After Sync() returns for Finish,
 // LocalToHost, Presentation, DebugReadback, or Reset, every prior Submit,
@@ -48,6 +58,14 @@
 // ERRORS. Backends report failures through LastError(), never by throwing
 // across the GIF path and never silently: the frontend surfaces the string
 // through its existing debug/error path. The default (no error) is nullptr.
+// Lifetime rule (Gate E §5.2, pinned by test): a recorded failure is
+// sticky — a subsequent successful call never clears it; only a backend
+// re-Initialize (or a newer failure) replaces it. The frontend latch
+// clears (rather than serving a stale frame) when Present returns empty
+// after a failure, and the failure string stays readable through
+// GS::lastBackendError(). No production code currently polls that channel
+// outside tests and tooling; that is an integration gap, not a channel
+// defect — the channel itself reports init, submit, and present failures.
 class GSRasterBackend
 {
 public:

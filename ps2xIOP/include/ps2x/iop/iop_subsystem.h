@@ -3,6 +3,7 @@
 #include "ps2x/iop/iop_host.h"
 #include "ps2x/iop/iop_types.h"
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>

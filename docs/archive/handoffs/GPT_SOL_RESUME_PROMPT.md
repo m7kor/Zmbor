@@ -1,3 +1,8 @@
+> [!WARNING]
+> Archived historical session document (original path: `GPT_SOL_RESUME_PROMPT.md`).
+> References to local processes, paths, Git branches and test results are historical.
+> For current status see [the README](../../../README.md).
+
 # Resume prompt for GPT-Sol — Zmbor / Crash Twinsanity
 
 Paste everything below the line into a new session opened at `D:\Project\Testing`.

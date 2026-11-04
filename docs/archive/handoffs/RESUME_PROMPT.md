@@ -1,3 +1,8 @@
+> [!WARNING]
+> Archived historical session document (original path: `RESUME_PROMPT.md`).
+> References to local processes, paths, Git branches and test results are historical.
+> For current status see [the README](../../../README.md).
+
 # Resume prompt for the next session
 
 Paste the text below into a new Claude Code session opened at `D:\Project\Zmbor\wt-phase6`.

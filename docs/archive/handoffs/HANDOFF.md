@@ -1,3 +1,8 @@
+> [!WARNING]
+> Archived historical session document (original path: `HANDOFF.md`).
+> References to local processes, paths, Git branches and test results are historical.
+> For current status see [the README](../../../README.md).
+
 # Zmbor — handoff (updated 2026-10-25, Phase 6)
 
 Official repository: **https://github.com/m7kor/Zmbor**. Zmbor is the continuation of the "PS2Recomp Ultimate" work,

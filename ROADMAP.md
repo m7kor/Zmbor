@@ -1,6 +1,6 @@
 # Zmbor roadmap
 
-Order is by priority. `HANDOFF.md` has the details and the current measured state.
+Order is by priority and subject to the evidence-based [component status](docs/status/README.md) and [acceptance gates](docs/architecture/acceptance-gate.md). Historical handoffs live under [docs/archive/handoffs](docs/archive/handoffs/README.md) and must not be treated as the current worktree state.
 
 1. **Remaining PS2 hardware accuracy.** Two hardware programs still mismatch: FPU RSQRT.S rounding
    (`cpu_ee_fpu_sqrt`) and the last bits of the EFU series (`vu_lower_efu`). Both need new hardware measurements;

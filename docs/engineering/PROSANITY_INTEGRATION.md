@@ -6,7 +6,10 @@ This integration imports **67 game-independent files** from `m7kor/prosanity` at
 [`798d80701a977cc0dcecef373d39d145a84f9525`](https://github.com/m7kor/prosanity/commit/798d80701a977cc0dcecef373d39d145a84f9525)
 onto Zmbor's base `0ec3f4eb63df37e6b0b2bbf67420bc8e432e186a`.
 
-Every imported file's Git blob SHA was independently compared against the source tree: **67/67 identical**.
+At the initial snapshot import, all 67 transferred Git blobs matched the Prosanity source.
+The subsequent independent review includes Zmbor-specific hardening (RPC whole-range
+validation with a RAM-boundary regression test) and standalone documentation repairs;
+these reviewed files therefore no longer have byte-identical source blobs.
 Zmbor remains the canonical, game-independent recompilation framework. Existing GPL-3.0
 and upstream attributions remain intact.
 
@@ -48,3 +51,11 @@ https://github.com/m7kor/prosanity/actions/runs/41843554878 .
 This is source CI evidence, **not** a substitute for testing the Zmbor import.
 
 Only this integration branch is modified until its own checks are reviewed.
+
+## Independent review fixes
+
+- EE RPC server descriptors must fit completely inside guest EE memory; an individual mapped first or last byte is not proof of a valid structure.
+- IOP-to-EE RPC send buffers are validated as one contiguous RAM/scratchpad span **before** any bulk host `memcpy`; near-end RAM and KSEG1 alias behavior have a new regression test.
+- EE RPC replies stop at the real mapped memory boundary rather than wrapping a guest address back into low RAM.
+- Generic PAD playback, profiler documentation and tracing references no longer rely on excluded local Crash Twinsanity scripts/reports.
+- Re-run the Zmbor CI on the reviewed commit. This validation does not replace EE/IOP hardware corpus or full-game RE4/Crash regression measurements.

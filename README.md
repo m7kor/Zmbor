@@ -1,15 +1,20 @@
 # Zmbor
 
-Zmbor is an experimental PlayStation 2 static recompiler and native runtime. This branch integrates the
-[Prosanity engineering continuation](https://github.com/m7kor/prosanity/commit/798d80701a977cc0dcecef373d39d145a84f9525)
-while preserving Zmbor's core mission, GPL-3.0 licensing, PS2Recomp upstream attribution and build-compatible
-module names. See [integration notes](docs/engineering/PROSANITY_INTEGRATION.md).
+**Prosanity integration (4 November 2026):** [PR #13](https://github.com/m7kor/Zmbor/pull/13)
+incorporated Prosanity's runtime, recompiler, tests and compatibility engineering into Zmbor while
+preserving the Zmbor identity, GPL-3.0 license, [PS2Recomp](https://github.com/ran-j/PS2Recomp)
+attribution and compatible module names. See the [integration record](docs/engineering/PROSANITY_INTEGRATION.md)
+and [independent post-merge review](docs/engineering/PROSANITY_POSTMERGE_REVIEW.md).
 
-**Current checkpoint (4 November 2026):** native Crash Twinsanity startup and both introductory videos have been
-observed; **interactive gameplay is not verified**. The latest unit suite passes 697/697, and IOP hardware-output
-comparisons match 23/23 programs (1306/1306 lines). See the [engineering continuation report](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
-for exact configurations, regression limits, measured early-boot performance, and unresolved issues.
-Game files, BIOS, generated commercial-game code, private diagnostics, and screenshots are not included.
+**Verified integration scope:** Zmbor's imported code passed six GitHub CI jobs on PR #13,
+including MSVC, GCC, Clang, sanitizers, fuzz smoke and dashboard checks. The Prosanity source reports
+697/697 local unit tests and 23/23 IOP hardware-output comparisons (1306/1306 lines).
+Native Crash Twinsanity startup and two introductory videos were observed in the source development
+sessions; **interactive gameplay is not verified**. These results must not be interpreted as
+universal PS2 compatibility or fresh physical-hardware verification. See the
+[Crash Twinsanity continuation report](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
+for configurations, limits and remaining validation work. No game files, BIOS, generated
+commercial-game code, private diagnostic captures or screenshots are included.
 
 <p align="center"><strong>PlayStation 2 static recompilation • hardware-aware native runtime • evidence-first engineering</strong></p>
 

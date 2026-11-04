@@ -28,14 +28,58 @@ commercial-game code, private diagnostic captures or screenshots are included.
 
 Zmbor translates PlayStation 2 **Emotion Engine (R5900)** ELF code into native C++ and links it against a runtime modelling PS2 memory, vector processors, graphics, DMA, IOP services and sound hardware. It is an experimental **static recompiler and runtime framework**, not a turnkey PS2 emulator, BIOS replacement, game downloader or proven universal game porting solution.
 
-**Latest code update (3 November 2026):** Phase 10b and Phases 12–16 extend the [Phase 11 integration](https://github.com/m7kor/Zmbor/pull/9) with guest-driven SPU2 reverb registers, stripped-ELF and indirect-control-flow discovery, loud failures for unsupported syscalls, COP0 exception fixes, and the first CPU-only raw-GIF GS backend seam. The **GPU adapter and differential GS harness are not yet implemented**. This update does not include a hardware-confirmed ADMA guest-enable address or a native SPU2 output sink.
+**Previous milestone (3 November 2026, before the Prosanity merge):** Phase 10b and Phases 12–16 extend the [Phase 11 integration](https://github.com/m7kor/Zmbor/pull/9) with guest-driven SPU2 reverb registers, stripped-ELF and indirect-control-flow discovery, loud failures for unsupported syscalls, COP0 exception fixes, and the first CPU-only raw-GIF GS backend seam. The **GPU adapter and differential GS harness are not yet implemented**. This update does not include a hardware-confirmed ADMA guest-enable address or a native SPU2 output sink.
 
 > [!IMPORTANT]
 > **Experimental / work in progress.** Passing unit tests, synthetic ELF tests or historical hardware-output comparisons does not mean a commercial PS2 game is playable. No complete commercial-game run has been verified by Zmbor's published acceptance gate. You must provide your own legally obtained game software; the repository includes neither BIOS images nor copyrighted game data.
 
-**Start here:** [architecture](#architecture) · [visual hardware dashboard](#status) · [implementation snapshot](#implementation-snapshot--phase-11) · [build](#build) · [testing](#testing-and-validation) · [roadmap](#roadmap) · [contributing](#contributing)
+**Start here:** [latest integration](#november-2026-prosanity-integration-and-review) · [architecture](#architecture) · [visual hardware dashboard](#status) · [implementation snapshot](#implementation-snapshot--phase-11) · [build](#build) · [testing](#testing-and-validation) · [roadmap](#roadmap) · [contributing](#contributing)
 
-## New development: recompilation and GS groundwork (November 2026)
+## November 2026: Prosanity integration and review
+
+Zmbor is the **canonical PS2 static-recompilation framework**. Experimental game pipelines should be
+separate compatibility consumers; reusable improvements should return to Zmbor with regression tests.
+The [Prosanity engineering continuation](https://github.com/m7kor/prosanity) was integrated in
+[PR #13](https://github.com/m7kor/Zmbor/pull/13), merge commit
+[`6c624951`](https://github.com/m7kor/Zmbor/commit/6c6249519badcb16d1da2e46cfcba0a790736fcd)
+on **4 November 2026**. The imported change set covered **77 paths**, including portable code, test
+infrastructure, and Crash Twinsanity development reports. The original Prosanity commit history remains
+available in that repository; the Zmbor merge imported a source-tree snapshot, not the source's 21
+original commit objects.
+
+| Area | Integrated engineering | Boundary of evidence |
+|:--|:--|:--|
+| **IOP / SIF RPC / CDVD** | IOP client calls into EE RPC servers, bind/call completion, virtual disc diagnostics and additional IRX tests | Partial models and HLE, not a complete cycle-accurate SIF/CDVD implementation |
+| **ELF and recompiler** | Additional conservative stripped-ELF and vtable leaf-method discovery, generated-code diagnostics and tested analysis helpers | Game-dependent unresolved functions, control flow and SDK bindings remain |
+| **MPEG / IPU / FFmpeg** | MPEG demux/decoder callback sequencing, input span checks, DMA-fed IPU handling and FFmpeg parser input padding | Commercial-game movie end-of-stream and interactive transitions still need real-run verification |
+| **Runtime and GS** | Guest termination reporting, opt-in HLE/syscall/I/O/GS tracing, frame-series captures and bounded harness runs | Diagnostic output is not proof of hardware fidelity or full graphical accuracy |
+| **Input / profiling** | Scripted two-port PAD replay and opt-in Windows stack sampler | Replay requires guest pad polling; wall-time stack samples are not CPU-time attribution |
+| **Build and tests** | Out-of-tree generated-game CMake target, pinned Windows FFmpeg archive hash, synthetic E2E and subsystem regressions | Compiling a generated executable does not prove that a retail title works |
+
+### Verification ledger (4 November 2026)
+
+| Checkpoint | Evidence | Interpretation |
+|:--|:--|:--|
+| **Merged `main` / PR #13** | [Six GitHub CI jobs passed](https://github.com/m7kor/Zmbor/actions/runs/41856422558): Windows MSVC, Linux GCC, Linux Clang, ASan/UBSan, fuzz smoke and dashboard | The exact merged import built and passed its hosted checks |
+| **Prosanity source** | Source team reported **697/697** local unit tests and **23/23** IOP reference programs (**1,306/1,306** output lines) | Source-side historical results; not newly reproduced on a physical PS2 by this merge |
+| **EE real-hardware reference corpus** | Last recorded **53/55** exact programs, **8,202/8,250** output lines | Historical baseline; never describe this as a percentage of all PS2 compatibility |
+| **Post-merge audit / PR #16** | [RPC memory-boundary fix and regression](https://github.com/m7kor/Zmbor/pull/16); the first review version failed to compile because a test header was missing; [the header fix](https://github.com/m7kor/Zmbor/commit/597b54e07e98b742da8b42c51e915c2137dbb4bc) was pushed | **Review patch is not in `main`**; current-head CI must pass before merge |
+| **Game acceptance** | Crash Twinsanity native startup and introductory movies reported; RE4 has earlier separate project-level evidence | **Neither complete gameplay nor a whole-game Zmbor acceptance pass is established** |
+
+The review found that a new IOP→EE RPC path checked the first and last mapped bytes before
+`memcpy` without proving the *whole destination span* was contiguous. [PR #16](https://github.com/m7kor/Zmbor/pull/16)
+adds a complete EE-guest-range check, bounds reply reads, and tests RAM-boundary and KSEG1-alias
+cases. It also cleans documentation inherited from machine-specific test pipelines. **Do not count
+these review fixes as merged until #16 is actually merged.** See the
+[post-merge audit](docs/engineering/PROSANITY_POSTMERGE_REVIEW.md) and
+[full integration record](docs/engineering/PROSANITY_INTEGRATION.md).
+
+**Still required for stronger compatibility claims:** pass CI on the final audit commit, rerun
+EE and IOP hardware-reference corpora with unchanged `.expected` fixtures, check RE4 and Crash
+input/scene transitions using legally obtained assets, and measure performance with comparable
+logging and workload settings. The [227-component dashboard](#status) stays evidence-gated.
+
+## Earlier November development: recompilation and GS groundwork (Phases 10b–16)
 
 These are **incremental changes**, not evidence of automatic commercial-game conversion. Source-level checks and original-patch verification are separate from build/test results.
 
@@ -48,7 +92,7 @@ These are **incremental changes**, not evidence of automatic commercial-game con
 | Phase 15 — COP0 faults | Alignment exceptions, TLB miss distinction, BadVAddr/exception block abort and bounded CACHE handling | KUSEG translation still modelled; CACHE microarchitecture not emulated |
 | Phase 16 / GS Stage 0 | Backend contracts, PATH-aware raw-GIF seam, VSYNC snapshots and CPU-only seam tests | **No GPU backend, no VERIFY harness, no measured improvement from a GPU** |
 
-The development team reports **647/647** passing `ps2x_tests` on the Phase 16 working tree (Release and ASan+UBSan) and **56 CTest cases** (55 passing, one intentionally skipped). Those results have **not been independently re-run on this GitHub integration branch**. The historical hardware-output ladder remains **53/55 programs, 8202/8250 lines**; it is not a game-compatibility percentage.
+**Historical Phase 16 evidence:** the development team reported **647/647** `ps2x_tests` passing in Release and ASan+UBSan and **56 CTest cases** (55 passing, one intentionally skipped) on that earlier working tree. These are **not current test totals** after Prosanity. The later source branch reported 697/697 local tests, while merged Zmbor PR #13 passed its six CI jobs. The historical EE reference ladder remains **53/55 programs, 8,202/8,250 lines**; none of these numbers measures universal game compatibility.
 
 New research and reproducible prototypes:
 
@@ -56,7 +100,7 @@ New research and reproducible prototypes:
 - [Ghidra headless experiment](research/poc1/README.md) (fixture-level positive results, production CSV loader not yet verified), [angr/Capstone limitations](research/poc2/README.md), and [C++ compilation-speed research](research/poc3/README.md).
 - [Core-mission assessment](docs/research/RECOMPILER_MISSION_ASSESSMENT.md) and [GS backend assessment](docs/research/GS_BACKEND_ASSESSMENT.md).
 
-**Next gates:** establish CI parity on Linux and Windows, finish the GS differential fixture harness (Stage 1), and validate external analysis outputs before changing function discovery precedence. The formal [227-component status dashboard](docs/status/README.md) remains evidence-gated; it is **not** automatically upgraded by these phases.
+**Next architecture gates:** finish the GS differential fixture harness (Stage 1), validate external function-analysis outputs and close missing hardware/timing gaps. Windows and Linux CI did pass on the 4 November Prosanity merge; post-merge audit changes have their own required CI gate. The formal [227-component status dashboard](docs/status/README.md) remains evidence-gated.
 
 ## Overview
 
@@ -184,7 +228,7 @@ The following table describes **implemented code and verified regression scope a
 
 ### What was actually exercised
 
-The latest **contributor-reported** integrated regression run for the Phase 11 tree recorded:
+The **historical contributor-reported** regression run for the earlier Phase 11 tree recorded:
 
 | Gate | Reported result | Scope |
 |:--|:--|:--|
@@ -326,7 +370,11 @@ ctest --test-dir build-iop --output-on-failure
 | `PS2X_BUILD_TEST` | Main test suite |
 | `PS2X_BUILD_STUDIO` | Optional experimental developer GUI |
 | `PS2X_IOP_BUILD_TESTS` | Standalone IOP test executables |
-| `PS2X_ENABLE_FFMPEG` | Optional FFmpeg-backed functionality |
+| `PS2X_ENABLE_FFMPEG` | Optional FFmpeg-backed MPEG functionality; the Windows archive is integrity-pinned |
+| `PS2X_FFMPEG_ARCHIVE` | Optional local copy of the pinned Windows FFmpeg archive, useful for offline builds |
+| `PS2X_GAME_GENERATED_DIR` | Path to inspected, out-of-tree recompiled C++ output; enables the `ps2x_game` target |
+| `PS2X_GAME_OPTIMIZE` | Enable generated-game source optimization (longer build time); default OFF |
+| `PS2X_ENABLE_AGRESSIVE_LOGS` | Expensive entry/exit logs; default OFF; enable only for targeted diagnostics |
 | `PS2X_SANITIZE=address,undefined` | ASan + UBSan on supported GCC/Clang builds |
 | `PS2X_BUILD_FUZZERS=ON` | Fuzzer harnesses (requires supported sanitizer/compiler configuration) |
 
@@ -358,6 +406,37 @@ For stripped retail ELFs, the recommended workflow is Ghidra-assisted function d
 
 **Configuration notes:** `general.stubs` supports address-specific bindings such as `sceCdRead@0x00123456`; `ret0`, `ret1` and `reta0` are temporary diagnostic handlers, not substitutes for implemented services. Addresses vary by game, version and region. See [ps2xAnalyzer documentation](ps2xAnalyzer/Readme.md), [TESTING.md](TESTING.md), and the archived upstream configuration reference below.
 
+### Build generated code out of tree
+
+Pass an **existing** directory containing the recompiler-generated `*.cpp` files and
+`ps2_recompiled_functions.h`. Keep proprietary game content and generated source trees outside
+the framework repository. Example (paths are illustrative):
+
+```bash
+cmake -S . -B build-game -DPS2X_BUILD_STUDIO=OFF \
+  -DPS2X_GAME_GENERATED_DIR=/absolute/path/to/generated-code
+cmake --build build-game --target ps2x_game --parallel
+```
+
+This target is supported on desktop hosts; configuration can fail if generated headers or the
+required runtime dependencies are missing. The native runtime still needs compatible per-game
+configuration, function coverage and services. Passing compilation **does not** prove gameplay.
+
+### Reusable diagnostics and input playback
+
+| Feature | Opt-in setting / tool | Notes |
+|:--|:--|:--|
+| Scripted controller input | `ZMBOR_PAD_SCRIPT=path/to/script.txt` | [PAD script format](tools/game_pipeline/PAD_PLAYBACK.md); frame or millisecond timelines |
+| HLE, syscall, file I/O and GS tracing | `ZMBOR_TRACE_HLE=1`, `ZMBOR_TRACE_SYSCALL=1`, `ZMBOR_TRACE_IO=1`, `ZMBOR_TRACE_GS=1` | `ZMBOR_TRACE_ALL=1` enables all; potentially expensive |
+| Save summary | `ZMBOR_SUMMARY_FILE=path/to/summary.txt` | Trace counters and end-of-run diagnostics |
+| Bounded harness run | `ZMBOR_RUN_SECONDS=N` | Stops after N **host** seconds; a timeout is not guest success |
+| Frame captures over time | `ZMBOR_FRAME_SERIES=directory` | PPM samples; optionally set `ZMBOR_FRAME_SERIES_MS` (default 2000 ms) |
+| External Windows profiler | [`tools/profiling/`](tools/profiling/README.md) | Wall-clock stack snapshots; benchmark without sampler for performance claims |
+
+Keep verbose logging off for comparative performance work; record commit, build mode, workload,
+frame/input script and capture conditions. Generic fixes belong in Zmbor, while RE4/Crash-specific
+data and scripts remain separate compatibility projects.
+
 ### Using the runtime in an application
 
 Zmbor is a **framework for developers**. The native runtime handles guest memory and machine-like components and still relies on HLE for several platform APIs. It is not yet a one-click executable that launches arbitrary PS2 discs or ISOs.
@@ -382,7 +461,7 @@ The project uses multiple **non-interchangeable evidence layers**. Report the ex
 
 **Last recorded hardware-output baselines:** EE **53/55 programs, 8,202/8,250 lines**; IOP **23/23 programs, 1,306/1,306 lines**. Those measurements are from the archived hardware reference gate and must **not** be represented as newly re-measured on the Phase 11 merge without a new run. The outstanding EE mismatches are `cpu_ee_fpu_sqrt` and `vu_lower_efu`.
 
-**Latest contributor-reported Phase 11 regression:** 620/620 main tests, 4/4 IOP executables, main CTest 54 passed / 1 skipped. A newly published commit requires its own CI confirmation. [Browse GitHub Actions](https://github.com/m7kor/Zmbor/actions).
+**Historical Phase 11 regression:** 620/620 main tests, 4/4 IOP executables, main CTest 54 passed / 1 skipped. These predate Prosanity. **Latest merged CI evidence:** six jobs passed for PR #13; the follow-up RPC review in PR #16 requires its own checks. [Browse GitHub Actions](https://github.com/m7kor/Zmbor/actions).
 
 See [TESTING.md](TESTING.md) for hardware fixture preparation, reference-data policy, and Ghidra/e2e workflows. Never adjust expected outputs just to turn a regression green.
 
@@ -439,7 +518,9 @@ Contributors should cite the target commit and describe exactly which tests pass
 | [Changelog](CHANGELOG.md) | Original Zmbor / PS2Recomp Ultimate fork phases; historical entries |
 | [Roadmap](ROADMAP.md) | Longer-term project direction |
 | [Handoff](HANDOFF.md) / [resume state](docs/engineering/AUTONOMOUS_EXECUTION_STATE.md) | **Historical snapshots**; check dates and commit references |
-| [Phase 11 integration](https://github.com/m7kor/Zmbor/pull/9) | Published cumulative changes across 36 files |
+| [Phase 11 integration](https://github.com/m7kor/Zmbor/pull/9) | Historical cumulative changes across 36 files |
+| [Prosanity integration PR #13](https://github.com/m7kor/Zmbor/pull/13) / [source provenance](docs/engineering/PROSANITY_INTEGRATION.md) | Merged 4 November 2026; code, tooling, test and game-research material |
+| [Post-merge RPC review PR #16](https://github.com/m7kor/Zmbor/pull/16) / [audit report](docs/engineering/PROSANITY_POSTMERGE_REVIEW.md) | Review fix, boundary regression and documented outstanding gates; not yet merged |
 | [GitHub Actions](.github/workflows/build.yml) | CI build, sanitizers, dashboard consistency and fuzzing jobs |
 | [Upstream PS2Recomp](https://github.com/ran-j/PS2Recomp) | Original project, upstream docs and contributions |
 

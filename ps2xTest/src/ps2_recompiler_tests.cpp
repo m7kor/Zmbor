@@ -3,7 +3,10 @@
 #include "ps2recomp/config_manager.h"
 #include "ps2recomp/control_flow_analyzer.h"
 #include "ps2recomp/elf_parser.h"
+#include "ps2recomp/recompiler_reporter.h"
 #include "ps2recomp/instructions.h"
+#include "ps2recomp/code_generator.h"
+#include "ps2recomp/Translators/cop0_translator.h"
 #include "ps2recomp/r5900_decoder.h"
 #include "ps2recomp/types.h"
 #include "ps2_runtime_calls.h"
@@ -15,6 +18,7 @@
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -1270,6 +1274,1100 @@ static bool writeRecompilerTestConfig(const std::filesystem::path &configPath,
     return static_cast<bool>(config);
 }
 
+// Phase 19 — Ghidra oracle completion. Minimal ELF for the oracle tests:
+// .text at 0x00100000 (82 words, 0x148 bytes, covering the POC 1 synthetic
+// fixture's 0x144-byte text span) plus a non-executable .data at 0x00100200
+// (8 words).
+// .text word 0 is jal 0x00100028 so pre-map discovery finds a second start,
+// exactly like the existing ghidra-merge test's fallback pattern; the rest
+// is jr $ra / nop pairs (no further edges).
+static bool writeGhidraOracleElf(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    std::array<uint32_t, 82> textWords{};
+    textWords[0] = (0x03u << 26) | ((0x00100028u >> 2) & 0x03FFFFFFu); // jal 0x00100028
+    textWords[1] = 0x00000000u;                                     // nop (delay slot)
+    for (size_t i = 2; i < textWords.size(); i += 2)
+    {
+        textWords[i] = 0x03E00008u;     // jr $ra
+        textWords[i + 1] = 0x00000000u; // nop
+    }
+    // Gate D — the tile layout models real function boundaries: every
+    // oracle row start follows a non-branch word, so no row starts in
+    // a delay slot. The POC 1 row starts sit at indices 0, 10, 17, 45,
+    // 55, 58, 69, 72; their predecessors are indices 9, 16, 44, 54, 57,
+    // 68, 71. Indices 16, 44, 54, 68 would be jr $ra under the plain
+    // tiling, which would make those rows delay-slot starts; they are
+    // nop instead, matching real code where a function starts after
+    // the previous function's delay slot, not in it. Span decoding is
+    // unaffected (nop decodes).
+    textWords[16] = 0x00000000u; // nop, not jr: predecessor of FUN_00100044
+    textWords[44] = 0x00000000u; // nop, not jr: predecessor of FUN_001000b4
+    textWords[54] = 0x00000000u; // nop, not jr: predecessor of FUN_001000dc
+    textWords[68] = 0x00000000u; // nop, not jr: predecessor of FUN_00100114
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::section *data = writer.sections.add(".data");
+    data->set_type(ELFIO::SHT_PROGBITS);
+    data->set_flags(ELFIO::SHF_ALLOC);
+    data->set_addr_align(4);
+    data->set_address(0x00100200u);
+    const std::array<uint32_t, 8> dataWords = {0x00100084u, 0x00100000u, 0u, 0u, 0u, 0u, 0u, 0u};
+    data->set_data(reinterpret_cast<const char *>(dataWords.data()),
+                   static_cast<ELFIO::Elf_Word>(dataWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    ELFIO::segment *dataSegment = writer.segments.add();
+    dataSegment->set_type(ELFIO::PT_LOAD);
+    dataSegment->set_flags(ELFIO::PF_R);
+    dataSegment->set_align(0x1000);
+    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+static const Function *findFunctionByStart(const std::vector<Function> &functions, uint32_t start)
+{
+    const auto it = std::find_if(functions.begin(), functions.end(),
+                                 [start](const Function &fn) { return fn.start == start; });
+    return it == functions.end() ? nullptr : &*it;
+}
+
+static bool writeGhidraOracleCsv(const std::filesystem::path &mapPath, const char *rows)
+{
+    std::ofstream mapFile(mapPath);
+    if (!mapFile)
+    {
+        return false;
+    }
+    mapFile << "Name,Start,End,Size\n";
+    mapFile << rows;
+    mapFile.close();
+    return static_cast<bool>(mapFile);
+}
+
+static void cleanupGhidraOracleFiles(const std::filesystem::path &elfPath,
+                                     const std::filesystem::path &mapPath)
+{
+    std::error_code removeError;
+    std::filesystem::remove(elfPath, removeError);
+    std::filesystem::remove(mapPath, removeError);
+}
+
+static bool loadGhidraOracleElf(ElfParser &parser, const std::filesystem::path &elfPath, TestCase &t)
+{
+    const bool parseOk = parser.parse();
+    t.IsTrue(parseOk, "generated ELF should parse");
+    return parseOk;
+}
+
+static bool loadGhidraOracleMap(ElfParser &parser, const std::filesystem::path &mapPath, TestCase &t)
+{
+    const bool mapLoaded = parser.loadGhidraFunctionMap(mapPath.string());
+    t.IsTrue(mapLoaded, "ghidra map should load");
+    return mapLoaded;
+}
+
+static std::filesystem::path ghidraOracleTempPath(const std::string &stem, const std::string &suffix)
+{
+    const auto uniqueSuffix = std::to_string(
+        static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+    return std::filesystem::temp_directory_path() / (stem + "-" + uniqueSuffix + suffix);
+}
+
+// Phase 19 — LOAD: a real POC 1 result CSV flows through the real loader.
+// The 8 rows below are copied VERBATIM from the POC 1 stored results
+// (research/poc1/results/synthetic_stripped.ghidra.csv), produced by
+// Ghidra 12.1.4 + EE extension headless analysis of the synthetic
+// stripped fixture and re-verified byte-identical on a fresh 2026-11-03
+// re-run. Ends are Ghidra body-max+1; the Size column is the body
+// address count, NOT a byte size (f_switch spans 112 bytes but reports
+// 76 — its body excludes the jump-table cases), and the loader ignores
+// it. This test proves CSV -> map load -> merge -> function list with
+// the expected ranges, with no re-implementation or mock in between.
+static void runGhidraOracleLoadTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "entry,0x00100000,0x00100028,40\n"
+                                  "FUN_00100028,0x00100028,0x00100044,28\n"
+                                  "FUN_00100044,0x00100044,0x001000B4,76\n"
+                                  "FUN_001000b4,0x001000B4,0x001000DC,40\n"
+                                  "FUN_001000dc,0x001000DC,0x001000E8,12\n"
+                                  "FUN_001000e8,0x001000E8,0x00100114,44\n"
+                                  "FUN_00100114,0x00100114,0x00100120,12\n"
+                                  "FUN_00100120,0x00100120,0x0010013C,28\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.Equals(functions.size(), static_cast<size_t>(8),
+             "oracle CSV should yield exactly the 8 exported functions");
+
+    const std::array<std::tuple<const char *, uint32_t, uint32_t>, 8> expected = {{
+        {"entry", 0x00100000u, 0x00100028u},
+        {"FUN_00100028", 0x00100028u, 0x00100044u},
+        {"FUN_00100044", 0x00100044u, 0x001000B4u},
+        {"FUN_001000b4", 0x001000B4u, 0x001000DCu},
+        {"FUN_001000dc", 0x001000DCu, 0x001000E8u},
+        {"FUN_001000e8", 0x001000E8u, 0x00100114u},
+        {"FUN_00100114", 0x00100114u, 0x00100120u},
+        {"FUN_00100120", 0x00100120u, 0x0010013Cu},
+    }};
+    for (const auto &[name, start, end] : expected)
+    {
+        const Function *fn = findFunctionByStart(functions, start);
+        t.IsTrue(fn != nullptr, std::string("oracle function should exist at ") + name);
+        if (fn != nullptr)
+        {
+            t.Equals(fn->name, std::string(name), "oracle function name should match the CSV row");
+            t.Equals(fn->end, end, "uncontested oracle end should survive the merge");
+        }
+    }
+    const auto &loadStats = parser.ghidraMapLoadStats();
+    t.Equals(loadStats.loaded, 8, "oracle load keeps eight rows");
+    t.Equals(loadStats.skippedNonExecutable, 0, "oracle load skips nothing non-executable");
+    t.Equals(loadStats.skippedInvalidRange, 0, "oracle load skips nothing invalid-range");
+    t.Equals(loadStats.skippedMisaligned, 0, "oracle load skips nothing misaligned");
+    t.Equals(loadStats.skippedUnalignedEnd, 0, "oracle load skips nothing unaligned-end");
+    t.Equals(loadStats.skippedOverlapping, 0, "oracle load skips nothing overlapping");
+    t.Equals(loadStats.skippedUndecodable, 0, "oracle load skips nothing undecodable");
+    t.Equals(loadStats.skippedDelaySlot, 0, "oracle load skips nothing delay-slot");
+    t.Equals(loadStats.skippedMalformed, 0, "oracle load skips nothing malformed");
+    t.IsTrue(loadStats.headerSeen, "oracle load sees the exporter header");
+    t.IsFalse(loadStats.rowLimitExceeded, "oracle load does not hit the row cap");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Phase 19 — MUTANT: CSV entries failing Zmbor's validation must NOT
+// become functions. Non-executable-section and out-of-range rows were
+// already skipped by the loader; misaligned rows were NOT (no alignment
+// check existed anywhere in the loader or addOrMerge path) until the
+// Phase 19 loader fix — this test pins all three.
+static void runGhidraOracleMutantTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle-mutant", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle-mutant", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "entry,0x00100000,0x00100028,40\n"
+                                  "FUN_00100028,0x00100028,0x00100044,28\n"
+                                  "FUN_00100044,0x00100044,0x001000B4,76\n"
+                                  "BAD_MISALIGNED,0x00100002,0x00100010,0x0E\n"
+                                  "BAD_DATA,0x00100200,0x00100210,0x10\n"
+                                  "BAD_FAR,0x00200000,0x00200010,0x10\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.Equals(functions.size(), static_cast<size_t>(3),
+             "only the valid oracle rows should become functions");
+    t.IsTrue(findFunctionByStart(functions, 0x00100000u) != nullptr,
+             "valid entry row should survive");
+    t.IsTrue(findFunctionByStart(functions, 0x00100002u) == nullptr,
+             "misaligned CSV row must NOT become a function");
+    t.IsTrue(findFunctionByStart(functions, 0x00100200u) == nullptr,
+             "non-executable-section CSV row must NOT become a function");
+    t.IsTrue(findFunctionByStart(functions, 0x00200000u) == nullptr,
+             "out-of-range CSV row must NOT become a function");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Phase 19 — LABEL PROMOTION (documented hazard, not a feature), as
+// redesigned by Gate D: the label-collection port emits rows in the
+// SAME Name,Start,End,Size format with entry_* names, and entry_ is
+// NOT an auto-generated name per IsAutoGeneratedName — so the loader
+// promotes them as named extras with authoritative ends. Gate D's
+// overlap rule now rejects label rows that fall INSIDE an accepted
+// function row (both synthetic in-body labels below sit inside
+// FUN_00100044's [0x44, 0xB4) span), which is a behaviour improvement,
+// not a filter: the rule is name-blind, it rejects any overlapping
+// row. The hazard itself persists and is re-pinned by the gap label
+// at 0x140, which overlaps nothing and still promotes — that is
+// exactly why the label export must NOT be a pipeline input, only
+// the functions-only export.
+static void runGhidraOracleLabelPromotionTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle-label", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-ghidra-oracle-label", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "entry,0x00100000,0x00100028,40\n"
+                                  "FUN_00100028,0x00100028,0x00100044,28\n"
+                                  "FUN_00100044,0x00100044,0x001000B4,76\n"
+                                  "entry_00100084,0x00100084,0x001000A8,36\n"
+                                  "entry_001000a8,0x001000A8,0x001000B4,12\n"
+                                  "FUN_001000b4,0x001000B4,0x001000DC,40\n"
+                                  "FUN_001000dc,0x001000DC,0x001000E8,12\n"
+                                  "FUN_001000e8,0x001000E8,0x00100114,44\n"
+                                  "FUN_00100114,0x00100114,0x00100120,12\n"
+                                  "FUN_00100120,0x00100120,0x0010013C,28\n"
+                                  "entry_00100140,0x00100140,0x00100144,4\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.Equals(functions.size(), static_cast<size_t>(9),
+             "8 function rows plus the non-overlapping gap label should survive");
+    t.IsTrue(findFunctionByStart(functions, 0x00100084u) == nullptr,
+             "in-body switch-case label row must be rejected by the overlap rule");
+    t.IsTrue(findFunctionByStart(functions, 0x001000A8u) == nullptr,
+             "in-body switch-default label row must be rejected by the overlap rule");
+    const Function *gapLabel = findFunctionByStart(functions, 0x00100140u);
+    t.IsTrue(gapLabel != nullptr, "non-overlapping gap label row still promotes (hazard pinned)");
+    if (gapLabel != nullptr)
+    {
+        t.Equals(gapLabel->end, 0x00100144u, "gap label row end should survive the merge");
+    }
+    const auto &labelStats = parser.ghidraMapLoadStats();
+    t.Equals(labelStats.loaded, 9, "label load keeps nine rows");
+    t.Equals(labelStats.skippedOverlapping, 2, "exactly two in-body label rows counted overlapping");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+static void registerGhidraOracleTests(TestCase &tc)
+{
+    tc.Run("ghidra oracle CSV loads end to end with verbatim POC 1 synthetic rows",
+           [](TestCase &t) { runGhidraOracleLoadTest(t); });
+    tc.Run("ghidra map rejects misaligned, non-executable, and out-of-range rows",
+           [](TestCase &t) { runGhidraOracleMutantTest(t); });
+    tc.Run("ghidra label rows promote as functions (label-feed hazard pinned)",
+           [](TestCase &t) { runGhidraOracleLabelPromotionTest(t); });
+}
+
+// Gate D (S6) — Ghidra loader validation. All tests below reuse the
+// oracle ELF (0x00100000 tiles, Gate D nop layout) unless they build
+// their own ELF. Discovery from the oracle entry finds exactly
+// {0x00100000, 0x00100028} (entry jal + jr $ra), so any other start in
+// the merged output comes from the map under test, never discovery.
+// Fail-before note: every rejection test below fails against the
+// Phase 19 loader (the rejected row promotes there) and passes after
+// the Gate D loader fixes, except the symbol-precedence guard, which
+// passes in both (it pins downstream behaviour the loader must not
+// disturb).
+
+// Verbatim CSV writer: unlike writeGhidraOracleCsv it does NOT inject
+// a header line, so headerless-file tests control the first line.
+static bool writeGhidraOracleCsvRaw(const std::filesystem::path &mapPath, const std::string &content)
+{
+    std::ofstream mapFile(mapPath);
+    if (!mapFile)
+    {
+        return false;
+    }
+    mapFile << content;
+    mapFile.close();
+    return static_cast<bool>(mapFile);
+}
+
+// The 8 verbatim POC 1 rows, shared by the Gate D tests that need the
+// full accepted set (overlap and unaligned-end tests need the
+// neighbouring rows present for span claims).
+static const char *kGateDOracleRows =
+    "entry,0x00100000,0x00100028,40\n"
+    "FUN_00100028,0x00100028,0x00100044,28\n"
+    "FUN_00100044,0x00100044,0x001000B4,76\n"
+    "FUN_001000b4,0x001000B4,0x001000DC,40\n"
+    "FUN_001000dc,0x001000DC,0x001000E8,12\n"
+    "FUN_001000e8,0x001000E8,0x00100114,44\n"
+    "FUN_00100114,0x00100114,0x00100120,12\n"
+    "FUN_00100120,0x00100120,0x0010013C,28\n";
+
+// Gate D gap 1 — unaligned end. The 0x44 row's end is made unaligned
+// (0xB3); every other row is verbatim, so the only change is the end.
+static void runGateDUnalignedEndTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-end", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-end", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "entry,0x00100000,0x00100028,40\n"
+                                  "FUN_00100028,0x00100028,0x00100044,28\n"
+                                  "FUN_00100044,0x00100044,0x001000B3,76\n"
+                                  "FUN_001000b4,0x001000B4,0x001000DC,40\n"
+                                  "FUN_001000dc,0x001000DC,0x001000E8,12\n"
+                                  "FUN_001000e8,0x001000E8,0x00100114,44\n"
+                                  "FUN_00100114,0x00100114,0x00100120,12\n"
+                                  "FUN_00100120,0x00100120,0x0010013C,28\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) == nullptr,
+             "row with unaligned end must NOT become a function");
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) != nullptr,
+             "neighbouring valid row must still promote");
+    t.IsTrue(findFunctionByStart(functions, 0x00100000u) != nullptr,
+             "entry row must still promote");
+    const auto &endStats = parser.ghidraMapLoadStats();
+    t.Equals(endStats.loaded, 7, "unaligned-end load keeps seven rows");
+    t.Equals(endStats.skippedUnalignedEnd, 1, "exactly one unaligned-end row counted");
+    t.IsTrue(endStats.headerSeen, "exporter header recognized");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 2 — overlapping ranges. The full 8-row set plus one row
+// strictly inside FUN_00100044's span; adjacency (0xB4 touching 0x44's
+// end) is not overlap and must keep promoting.
+static void runGateDOverlapTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-overlap", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-overlap", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    std::string rows = kGateDOracleRows;
+    rows += "FUN_OVERLAP,0x00100084,0x001000A8,36\n";
+    t.IsTrue(writeGhidraOracleCsv(mapPath, rows.c_str()), "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.Equals(functions.size(), static_cast<size_t>(8),
+             "overlapping row must not add a ninth function");
+    t.IsTrue(findFunctionByStart(functions, 0x00100084u) == nullptr,
+             "overlapping row must NOT become a function");
+    const Function *covered = findFunctionByStart(functions, 0x00100044u);
+    t.IsTrue(covered != nullptr, "first-wins row must survive the overlap");
+    if (covered != nullptr)
+    {
+        t.Equals(covered->end, 0x001000B4u, "first-wins row keeps its end");
+    }
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) != nullptr,
+             "adjacent row touching the first-wins end must still promote");
+    const auto &overlapStats = parser.ghidraMapLoadStats();
+    t.Equals(overlapStats.loaded, 8, "overlap load keeps eight rows");
+    t.Equals(overlapStats.skippedOverlapping, 1, "exactly one overlapping row counted");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 3 — decode check, plus R5900-class coverage. .text at
+// 0x00100000, 12 words: entry jr/nop, then an INVALID word
+// (opcode 0x1D, unassigned — rabbitizer R5900 marks it
+// RABBITIZER_INSTR_ID_r5900_INVALID), then MMI/LQ/SQ/COP2 words that
+// must NOT be falsely rejected.
+static bool writeGateDUndecodableElf(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    const std::array<uint32_t, 12> textWords = {
+        0x03E00008u, // 0x100000: jr $ra (entry, no edges: discovery finds only this)
+        0x00000000u, // 0x100004: nop
+        0x03E00008u, // 0x100008: jr $ra
+        0x00000000u, // 0x10000C: nop
+        0x74000000u, // 0x100010: opcode 0x1D, unassigned -> INVALID
+        0x00000000u, // 0x100014: nop
+        0x70000008u, // 0x100018: paddw (MMI, must decode)
+        0x78000000u, // 0x10001C: lq (R5900, must decode)
+        0x7C000000u, // 0x100020: sq (R5900, must decode)
+        0x4A000000u, // 0x100024: vaddx (COP2, must decode)
+        0x03E00008u, // 0x100028: jr $ra
+        0x00000000u, // 0x10002C: nop
+    };
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+static void runGateDUndecodableTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-decode", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-decode", ".csv");
+
+    t.IsTrue(writeGateDUndecodableElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "GOOD,0x00100000,0x00100008,8\n"
+                                  "BAD,0x00100010,0x00100018,8\n"
+                                  "R5900ROW,0x00100018,0x00100028,16\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100000u) != nullptr,
+             "decodable entry row must promote");
+    t.IsTrue(findFunctionByStart(functions, 0x00100010u) == nullptr,
+             "row spanning an undecodable word must NOT become a function");
+    const Function *r5900 = findFunctionByStart(functions, 0x00100018u);
+    t.IsTrue(r5900 != nullptr, "row of valid MMI/LQ/SQ/COP2 words must promote");
+    if (r5900 != nullptr)
+    {
+        t.Equals(r5900->end, 0x00100028u, "R5900 row keeps its end");
+    }
+    const auto &decodeStats = parser.ghidraMapLoadStats();
+    t.Equals(decodeStats.loaded, 2, "decode load keeps two rows");
+    t.Equals(decodeStats.skippedUndecodable, 1, "exactly one undecodable row counted");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 4 — delay-slot start. .text at 0x00100000, 12 words:
+// entry jal to the branch function, then a beq at 0x100020 whose
+// delay slot is 0x100024. A row starting at the delay slot (with no
+// row covering the branch) must be rejected; the row after the delay
+// slot must promote.
+static bool writeGateDDelaySlotElf(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    const std::array<uint32_t, 12> textWords = {
+        0x0C040008u, // 0x100000: jal 0x100020
+        0x00000000u, // 0x100004: nop
+        0x03E00008u, // 0x100008: jr $ra
+        0x00000000u, // 0x10000C: nop
+        0x03E00008u, // 0x100010: jr $ra
+        0x00000000u, // 0x100014: nop
+        0x03E00008u, // 0x100018: jr $ra
+        0x00000000u, // 0x10001C: nop
+        0x10000001u, // 0x100020: beq $zero, $zero, 1 (target 0x100028)
+        0x00000000u, // 0x100024: nop (the beq delay slot)
+        0x03E00008u, // 0x100028: jr $ra
+        0x00000000u, // 0x10002C: nop
+    };
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+static void runGateDDelaySlotTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-delayslot", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-delayslot", ".csv");
+
+    t.IsTrue(writeGateDDelaySlotElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "DELAYSLOT,0x00100024,0x00100028,4\n"
+                                  "AFTER,0x00100028,0x00100030,8\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100024u) == nullptr,
+             "row starting in a branch delay slot must NOT become a function");
+    t.IsTrue(findFunctionByStart(functions, 0x00100028u) != nullptr,
+             "row starting after the delay slot must promote");
+    // Gate D correction: the branch function at 0x100020 is NOT a map
+    // row, so the loaded-map set rule (extractFunctions: a discovered
+    // start is admitted only if it is in m_ghidraMapStarts) drops it.
+    // That is pre-existing Phase 19 merge behavior, unchanged by
+    // Gate D — not a consequence of the delay-slot rejection. The
+    // original "discovery must survive" assertion contradicted the
+    // set rule and could never pass with any map loaded; asserting
+    // the set-rule outcome here instead. (The same rule explains the
+    // pre-fix row-cap anomaly: uncapped, the trailing TAIL row loaded
+    // and the set rule dropped the discovery entry; capped, the load
+    // fails and discovery survives.)
+    t.IsTrue(findFunctionByStart(functions, 0x00100020u) == nullptr,
+             "discovered branch function not listed in the map is dropped by the loaded-map set rule");
+    const auto &delayStats = parser.ghidraMapLoadStats();
+    t.Equals(delayStats.loaded, 1, "delay-slot load keeps one row");
+    t.Equals(delayStats.skippedDelaySlot, 1, "exactly one delay-slot row counted");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 5 — malformed-row accounting. Four malformed rows (short
+// row, non-numeric start, extra fifth field, empty start) plus two
+// valid rows. The valid rows must promote; the malformed rows must
+// produce a warning (observed via a capturing reporter), not silence.
+static void runGateDMalformedTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-malformed", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-malformed", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "entry,0x00100000,0x00100028,40\n"
+                                  "SHORT,0x00100044,0x001000B4\n"
+                                  "BADNUM,XYZ,0x001000B4,10\n"
+                                  "EXTRA,0x00100044,0x001000B4,76,EXTRA\n"
+                                  "EMPTYNUM,,0x001000B4,10\n"
+                                  "VALID,0x001000B4,0x001000DC,40\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    RecompilerReporter reporter;
+    parser.setReporter(&reporter);
+    if (!loadGhidraOracleElf(parser, elfPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+    t.IsTrue(parser.loadGhidraFunctionMap(mapPath.string()), "ghidra map should load");
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) != nullptr,
+             "valid row must promote despite malformed neighbours");
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) == nullptr,
+             "malformed rows must NOT become functions");
+    t.IsTrue(reporter.hasWarnings(),
+             "malformed rows must produce a warning, not silent skips");
+    const auto &malformedStats = parser.ghidraMapLoadStats();
+    t.Equals(malformedStats.loaded, 2, "malformed load keeps two valid rows");
+    t.Equals(malformedStats.skippedMalformed, 4, "exactly four malformed rows counted");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 6 — headerless file. The first line is a valid data row
+// with no header above it; the Phase 19 loader discarded it as the
+// assumed header. Both rows must promote now.
+static void runGateDHeaderTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-header", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-header", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsvRaw(mapPath,
+                                     "FUN_00100044,0x00100044,0x001000B4,76\n"
+                                     "FUN_001000B4,0x001000B4,0x001000DC,40\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    RecompilerReporter reporter;
+    parser.setReporter(&reporter);
+    if (!loadGhidraOracleElf(parser, elfPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+    t.IsTrue(parser.loadGhidraFunctionMap(mapPath.string()), "ghidra map should load");
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) != nullptr,
+             "first data row of a headerless file must promote, not be dropped");
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) != nullptr,
+             "second row must promote");
+    t.IsTrue(reporter.hasWarnings(),
+             "a headerless file must warn that its first line is not the known header");
+    const auto &headerStats = parser.ghidraMapLoadStats();
+    t.Equals(headerStats.loaded, 2, "headerless load keeps both data rows");
+    t.IsFalse(headerStats.headerSeen, "headerless file reports no header seen");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 7 — stoul base-0 octal parsing. .text at 0x00000040,
+// 64 jr/nop tile words, entry at 0x100 (a jr word: discovery finds
+// only the entry). The row start "0104" must parse as decimal 104
+// (0x68), not octal 68 (0x44); the hex row proves 0x-prefixed hex
+// still parses.
+static bool writeGateDOctalElf(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00000100u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00000040u);
+
+    std::array<uint32_t, 64> textWords{};
+    for (size_t i = 0; i < textWords.size(); i += 2)
+    {
+        textWords[i] = 0x03E00008u;     // jr $ra
+        textWords[i + 1] = 0x00000000u; // nop
+    }
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+static void runGateDOctalTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-octal", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-octal", ".csv");
+
+    t.IsTrue(writeGateDOctalElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "OCTAL,0104,0x80,28\n"
+                                  "HEXROW,0x90,0xA0,16\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00000068u) != nullptr,
+             "\"0104\" must parse as decimal 104 (0x68), not octal 68");
+    t.IsTrue(findFunctionByStart(functions, 0x00000044u) == nullptr,
+             "octal interpretation (0x44) must NOT appear");
+    t.IsTrue(findFunctionByStart(functions, 0x00000090u) != nullptr,
+             "0x-prefixed hex row must still promote");
+    const auto &octalStats = parser.ghidraMapLoadStats();
+    t.Equals(octalStats.loaded, 2, "octal test load keeps both rows");
+    t.Equals(octalStats.skippedMalformed, 0, "no malformed rows in the octal test");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 8 — row-count bound. 262144 non-executable filler rows
+// (the cap) plus one valid trailing row. The loader must stop at the
+// cap, so the trailing row is never read and never promotes.
+static void runGateDRowCapTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-rowcap", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-rowcap", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    {
+        std::ofstream mapFile(mapPath);
+        t.IsTrue(static_cast<bool>(mapFile), "ghidra map file should be writable");
+        if (!mapFile)
+        {
+            cleanupGhidraOracleFiles(elfPath, mapPath);
+            return;
+        }
+        mapFile << "Name,Start,End,Size\n";
+        for (int i = 0; i < 262144; ++i)
+        {
+            mapFile << "FILL,0x00200000,0x00200010,16\n";
+        }
+        mapFile << "TAIL,0x00100044,0x001000B4,76\n";
+        mapFile.close();
+        t.IsTrue(static_cast<bool>(mapFile), "ghidra map file should be writable");
+    }
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+    t.IsFalse(parser.loadGhidraFunctionMap(mapPath.string()),
+              "all-cap filler rows skipped and tail unread means no map loads");
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) == nullptr,
+             "trailing row past the row cap must NOT promote");
+    t.IsTrue(findFunctionByStart(functions, 0x00100000u) != nullptr,
+             "discovery entry must survive a capped map load");
+    const auto &rowCapStats = parser.ghidraMapLoadStats();
+    t.Equals(rowCapStats.loaded, 0, "capped load keeps no rows");
+    t.Equals(rowCapStats.skippedNonExecutable, 262144, "all cap filler rows counted non-executable");
+    t.IsTrue(rowCapStats.rowLimitExceeded, "row cap exceeded flag set");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D gap 8 (line-length bound). A row whose line exceeds the
+// 4096-character cap is malformed, however valid its addresses are.
+static void runGateDLineLengthTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-linelen", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-linelen", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    {
+        std::ofstream mapFile(mapPath);
+        t.IsTrue(static_cast<bool>(mapFile), "ghidra map file should be writable");
+        if (!mapFile)
+        {
+            cleanupGhidraOracleFiles(elfPath, mapPath);
+            return;
+        }
+        mapFile << "Name,Start,End,Size\n";
+        mapFile << std::string(5000, 'X') << ",0x00100044,0x001000B4,76\n";
+        mapFile << "VALID,0x001000B4,0x001000DC,40\n";
+        mapFile.close();
+        t.IsTrue(static_cast<bool>(mapFile), "ghidra map file should be writable");
+    }
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) == nullptr,
+             "over-long line must NOT become a function");
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) != nullptr,
+             "valid row after the over-long line must promote");
+    const auto &lineLengthStats = parser.ghidraMapLoadStats();
+    t.Equals(lineLengthStats.loaded, 1, "line-length load keeps one row");
+    t.Equals(lineLengthStats.skippedMalformed, 1, "exactly one over-long line counted malformed");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D independence — a fully rejected CSV must not poison the
+// function set: load returns false and only discovery survives. The
+// inverted-end row is the sharp edge: the Phase 19 clamp repaired it
+// to [start, start+4) and promoted it; the unaligned-end row likewise
+// promoted. Both must now be rejected.
+static void runGateDRejectedCsvTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-rejected", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-rejected", ".csv");
+
+    t.IsTrue(writeGhidraOracleElf(elfPath), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath,
+                                  "INV_END,0x00100044,0x00100040,0\n"
+                                  "UNAL_END,0x001000B4,0x001000DB,0\n"
+                                  "MISAL,0x00100002,0x00100010,0\n"
+                                  "NONEXEC,0x00100200,0x00100210,0\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+    t.IsFalse(parser.loadGhidraFunctionMap(mapPath.string()),
+              "a CSV with zero acceptable rows must not load");
+
+    const auto functions = parser.extractFunctions();
+    t.IsTrue(findFunctionByStart(functions, 0x00100000u) != nullptr,
+             "discovery entry must survive a rejected map");
+    t.IsTrue(findFunctionByStart(functions, 0x00100028u) != nullptr,
+             "discovery jal target must survive a rejected map");
+    t.IsTrue(findFunctionByStart(functions, 0x00100044u) == nullptr,
+             "repaired inverted-end row must NOT poison the set");
+    t.IsTrue(findFunctionByStart(functions, 0x001000B4u) == nullptr,
+             "unaligned-end row must NOT poison the set");
+    t.IsTrue(findFunctionByStart(functions, 0x00100002u) == nullptr,
+             "misaligned row must NOT poison the set");
+    t.IsTrue(findFunctionByStart(functions, 0x00100200u) == nullptr,
+             "non-executable row must NOT poison the set");
+    const auto &rejectedStats = parser.ghidraMapLoadStats();
+    t.Equals(rejectedStats.loaded, 0, "rejected load keeps no rows");
+    t.Equals(rejectedStats.skippedInvalidRange, 1, "exactly one invalid-range row counted");
+    t.Equals(rejectedStats.skippedUnalignedEnd, 1, "exactly one unaligned-end row counted");
+    t.Equals(rejectedStats.skippedMisaligned, 1, "exactly one misaligned row counted");
+    t.Equals(rejectedStats.skippedNonExecutable, 1, "exactly one non-executable row counted");
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+// Gate D independence — a bogus map row must never override a
+// verified ELF symbol (regression guard for merge precedence: the
+// loader changes must not disturb symbols > map). The Phase 12 ELF
+// carries sized symbol merged_fn [0x20, 0x34); the map row claims
+// the same start with a shorter end.
+static void runGateDSymbolPrecedenceTest(TestCase &t)
+{
+    const auto elfPath = ghidraOracleTempPath("ps2recomp-gated-symbol", ".elf");
+    const auto mapPath = ghidraOracleTempPath("ps2recomp-gated-symbol", ".csv");
+
+    t.IsTrue(writePhase12DiscoveryElf(elfPath, false, true), "temporary ELF should be generated");
+    t.IsTrue(writeGhidraOracleCsv(mapPath, "BOGUS,0x00100020,0x00100028,8\n"),
+             "ghidra map file should be writable");
+
+    ElfParser parser(elfPath.string());
+    if (!loadGhidraOracleElf(parser, elfPath, t) || !loadGhidraOracleMap(parser, mapPath, t))
+    {
+        cleanupGhidraOracleFiles(elfPath, mapPath);
+        return;
+    }
+
+    const auto functions = parser.extractFunctions();
+    const Function *fn = findFunctionByStart(functions, 0x00100020u);
+    t.IsTrue(fn != nullptr, "symbol address must yield a function");
+    if (fn != nullptr)
+    {
+        t.Equals(fn->name, std::string("merged_fn"), "verified symbol name must win over map row");
+        t.Equals(fn->end, 0x00100034u, "verified symbol end must win over map row end");
+    }
+
+    cleanupGhidraOracleFiles(elfPath, mapPath);
+}
+
+static void registerGateDTests(TestCase &tc)
+{
+    tc.Run("ghidra map rejects a row with an unaligned end",
+           [](TestCase &t) { runGateDUnalignedEndTest(t); });
+    tc.Run("ghidra map rejects overlapping rows first-wins",
+           [](TestCase &t) { runGateDOverlapTest(t); });
+    tc.Run("ghidra map rejects rows spanning undecodable words, keeps valid R5900 rows",
+           [](TestCase &t) { runGateDUndecodableTest(t); });
+    tc.Run("ghidra map rejects a row starting in a branch delay slot",
+           [](TestCase &t) { runGateDDelaySlotTest(t); });
+    tc.Run("ghidra map counts malformed rows with a warning",
+           [](TestCase &t) { runGateDMalformedTest(t); });
+    tc.Run("ghidra map treats a headerless first line as data",
+           [](TestCase &t) { runGateDHeaderTest(t); });
+    tc.Run("ghidra map parses leading-zero numbers as decimal, not octal",
+           [](TestCase &t) { runGateDOctalTest(t); });
+    tc.Run("ghidra map stops at the row cap and never reads past it",
+           [](TestCase &t) { runGateDRowCapTest(t); });
+    tc.Run("ghidra map rejects over-long lines as malformed",
+           [](TestCase &t) { runGateDLineLengthTest(t); });
+    tc.Run("ghidra map fully rejected CSV leaves discovery intact",
+           [](TestCase &t) { runGateDRejectedCsvTest(t); });
+    tc.Run("ghidra map row never overrides a verified symbol",
+           [](TestCase &t) { runGateDSymbolPrecedenceTest(t); });
+}
+
+// Gate C (S3) — SLTIU sign-extension synthetic ELF (no .data section).
+// .text at 0x00100000 (20 words). The entry materializes $s0, applies
+// SLTIU (or SLTI) against an immediate, scales the 0/1 result by 64,
+// adds it to 0x100000, and JALRs through the result:
+//   entry: <materialize $s0>; sltiu/slti $t0,$s0,imm; sll $t0,$t0,6;
+//          lui $t1,0x10; addu $t1,$t1,$t0; jalr $t1; nop; jr $ra; nop
+//   target [0x100040): addiu $v0, 7; jr $ra; nop — discovered ONLY if
+//          the comparison yields 1.
+// MIPS/R5900 SLTIU sign-extends the immediate FIRST, then compares
+// unsigned: with $s0 = 0x10000 and imm = -1, the correct result is 1
+// (0x10000 < 0xFFFFFFFF) while a zero-extended comparison gives 0
+// (0x10000 < 0xFFFF). The buggy code therefore resolves the JALR to
+// the entry itself (rejected as the current function start) and the
+// target drops out of discovery; the fixed code discovers it.
+enum class GateCSltiuVariant
+{
+    NegOne,
+    Neg32768,
+    Positive,
+    RsZero,
+    RsAllOnes,
+    Slti,
+    LoadVoid,
+    MmiVoid,
+};
+
+static bool writeGateCSltiuElf(const std::filesystem::path &elfPath, GateCSltiuVariant variant)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    // Word 0-1: materialize $s0 (two slots so every variant lines up).
+    uint32_t word0 = 0x3C100001u; // lui $s0, 0x1 -> 0x10000
+    uint32_t word1 = 0x00000000u; // nop
+    if (variant == GateCSltiuVariant::RsZero)
+    {
+        word0 = 0x34100000u; // ori $s0, $zero, 0 -> 0
+    }
+    else if (variant == GateCSltiuVariant::RsAllOnes)
+    {
+        word0 = 0x3C10FFFFu; // lui $s0, 0xFFFF
+        word1 = 0x3610FFFFu; // ori $s0, $s0, 0xFFFF -> 0xFFFFFFFF
+    }
+    else if (variant == GateCSltiuVariant::LoadVoid)
+    {
+        word1 = 0x8C100000u; // lw $s0, 0($zero): voids the $s0 proof
+    }
+    else if (variant == GateCSltiuVariant::MmiVoid)
+    {
+        word1 = 0x70000000u; // MMI opcode: unmodelled, voids all proofs
+    }
+
+    // Word 2: the comparison under test.
+    uint32_t compare = 0x2E08FFFFu; // sltiu $t0, $s0, -1
+    if (variant == GateCSltiuVariant::Neg32768)
+    {
+        compare = 0x2E088000u; // sltiu $t0, $s0, -32768
+    }
+    else if (variant == GateCSltiuVariant::Positive)
+    {
+        compare = 0x2E087FFFu; // sltiu $t0, $s0, 0x7FFF
+    }
+    else if (variant == GateCSltiuVariant::Slti)
+    {
+        compare = 0x2A08FFFFu; // slti $t0, $s0, -1 (signed: 0, unlike SLTIU)
+    }
+
+    const std::array<uint32_t, 20> textWords = {
+        word0,
+        word1,
+        compare,
+        0x00084180u, // sll $t0, $t0, 6
+        0x3C090010u, // lui $t1, 0x10
+        0x01284821u, // addu $t1, $t1, $t0
+        0x0120F809u, // jalr $t1
+        0x00000000u, // nop (delay)
+        0x03E00008u, // jr $ra
+        0x00000000u, // nop
+        0x00000000u, // pad
+        0x00000000u, // pad
+        0x00000000u, // pad
+        0x00000000u, // pad
+        0x00000000u, // pad
+        0x00000000u, // pad
+        0x24020007u, // target (0x100040): addiu $v0, zero, 7
+        0x03E00008u, // jr $ra
+        0x00000000u, // nop
+        0x00000000u, // pad
+    };
+    text->set_data(reinterpret_cast<const char *>(textWords.data()),
+                   static_cast<ELFIO::Elf_Word>(textWords.size() * sizeof(uint32_t)));
+
+    ELFIO::segment *textSegment = writer.segments.add();
+    textSegment->set_type(ELFIO::PT_LOAD);
+    textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    textSegment->set_align(0x1000);
+    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+
+    return writer.save(elfPath.string());
+}
+
+static bool gateCSltiuStarts(const std::filesystem::path &elfPath, GateCSltiuVariant variant,
+                   TestCase &t, std::set<uint32_t> &starts)
+{
+    const bool writeOk = writeGateCSltiuElf(elfPath, variant);
+    t.IsTrue(writeOk, "temporary SLTIU ELF should be generated");
+    if (!writeOk)
+    {
+        return false;
+    }
+    ElfParser parser(elfPath.string());
+    const bool parseOk = parser.parse();
+    t.IsTrue(parseOk, "generated SLTIU ELF should parse");
+    if (!parseOk)
+    {
+        std::error_code removeError;
+        std::filesystem::remove(elfPath, removeError);
+        return false;
+    }
+    const auto discovery = parser.discoverFromEntryPoint();
+    for (const auto &fn : discovery.functions)
+    {
+        starts.insert(fn.start);
+    }
+    std::error_code removeError;
+    std::filesystem::remove(elfPath, removeError);
+    return true;
+}
+
+static std::filesystem::path gateCSltiuPath()
+{
+    const auto uniqueSuffix = std::to_string(static_cast<unsigned long long>(
+        std::chrono::steady_clock::now().time_since_epoch().count()));
+    return std::filesystem::temp_directory_path() /
+           ("ps2recomp-gatec-sltiu-" + uniqueSuffix + ".elf");
+}
+
 void register_ps2_recompiler_tests()
 {
     MiniTest::Case("PS2Recompiler", [](TestCase &tc)
@@ -2203,6 +3301,10 @@ void register_ps2_recompiler_tests()
             std::filesystem::remove(mapPath, removeError);
         });
 
+        registerGhidraOracleTests(tc);
+        registerGateDTests(tc);
+
+
         tc.Run("Phase 12 discovery finds exactly the reachable set and switch table", [](TestCase &t) {
             const auto uniqueSuffix = std::to_string(
                 static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
@@ -2643,6 +3745,107 @@ void register_ps2_recompiler_tests()
                 std::filesystem::remove(elfPath, removeError);
                 (void)name;
             }
+        });
+
+        tc.Run("GateC SLTIU negative immediate proves the unsigned comparison", [](TestCase &t) {
+            // Discriminating cases: old code compares against the
+            // zero-extended field (0xFFFF / 0x8000) and resolves 0, so the
+            // JALR targets the entry itself and the target is lost. Fixed
+            // code sign-extends first (0xFFFFFFFF / 0x80000000) and resolves
+            // 1, so the target is discovered.
+            for (const auto variant : {GateCSltiuVariant::NegOne, GateCSltiuVariant::Neg32768})
+            {
+                std::set<uint32_t> starts;
+                if (!gateCSltiuStarts(gateCSltiuPath(), variant, t, starts))
+                {
+                    continue;
+                }
+                t.IsTrue(starts.count(0x00100000u) == 1, "entry should be discovered");
+                t.IsTrue(starts.count(0x00100040u) == 1,
+                         "SLTIU target must be discovered when the sign-extended comparison is 1");
+            }
+        });
+
+        tc.Run("GateC SLTIU agreement controls and SLTI divergence", [](TestCase &t) {
+            // Positive immediate: both old and new code resolve 0.
+            {
+                std::set<uint32_t> starts;
+                if (gateCSltiuStarts(gateCSltiuPath(), GateCSltiuVariant::Positive, t, starts))
+                {
+                    t.IsFalse(starts.count(0x00100040u) == 1,
+                              "positive-immediate SLTIU must resolve 0 in both old and new code");
+                }
+            }
+            // rs = 0 with imm = -1: 0 < 0xFFFFFFFF and 0 < 0xFFFF are both 1.
+            {
+                std::set<uint32_t> starts;
+                if (gateCSltiuStarts(gateCSltiuPath(), GateCSltiuVariant::RsZero, t, starts))
+                {
+                    t.IsTrue(starts.count(0x00100040u) == 1,
+                             "rs=0 SLTIU against -1 must resolve 1 in both old and new code");
+                }
+            }
+            // rs = 0xFFFFFFFF with imm = -1: both comparisons give 0.
+            {
+                std::set<uint32_t> starts;
+                if (gateCSltiuStarts(gateCSltiuPath(), GateCSltiuVariant::RsAllOnes, t, starts))
+                {
+                    t.IsFalse(starts.count(0x00100040u) == 1,
+                              "rs=0xFFFFFFFF SLTIU against -1 must resolve 0 in both old and new code");
+                }
+            }
+            // SLTI on the same operands as the NegOne case: signed
+            // 0x10000 < -1 is 0, while SLTIU gives 1. The two opcodes must
+            // differ exactly where the semantics say they must.
+            {
+                std::set<uint32_t> starts;
+                if (gateCSltiuStarts(gateCSltiuPath(), GateCSltiuVariant::Slti, t, starts))
+                {
+                    t.IsFalse(starts.count(0x00100040u) == 1,
+                              "SLTI with a negative immediate must resolve 0 where SLTIU resolves 1");
+                }
+            }
+        });
+
+        tc.Run("GateC SLTIU proof invalidated by load and unmodelled opcode", [](TestCase &t) {
+            // A load into $s0 voids its constant, and an unmodelled MMI
+            // opcode voids every proof: no JALR target may be proven from
+            // either block, before or after the fix.
+            for (const auto variant : {GateCSltiuVariant::LoadVoid, GateCSltiuVariant::MmiVoid})
+            {
+                std::set<uint32_t> starts;
+                if (!gateCSltiuStarts(gateCSltiuPath(), variant, t, starts))
+                {
+                    continue;
+                }
+                t.IsFalse(starts.count(0x00100040u) == 1,
+                          "a voided constant must never yield a proven JALR target");
+            }
+        });
+
+        tc.Run("GateC S14 ERET emitter restores from ErrorEPC or EPC", [](TestCase &t)
+        {
+            // ERET lives in the emitter (cop0_translator), not the runtime:
+            // ERL set -> pc = ErrorEPC and clear ERL; otherwise pc = EPC and
+            // clear EXL; the LL bit is cleared and the block stops. Neither
+            // ERL nor EXL set is undefined on hardware; the emitter uses EPC,
+            // which is the common behavior.
+            std::vector<Symbol> symbols;
+            std::vector<Section> sections;
+            CodeGenerator generator(symbols, sections);
+            Cop0Translator translator(generator);
+            R5900Decoder decoder;
+            const uint32_t raw = (OPCODE_COP0 << 26) | (COP0_CO << 21) | COP0_CO_ERET;
+            const Instruction inst = decoder.decodeInstruction(0x1000u, raw);
+            const std::string emitted = translator.translate(inst);
+            t.IsTrue(emitted.find("cop0_errorepc") != std::string::npos,
+                     "ERET must restore pc from ErrorEPC when ERL is set");
+            t.IsTrue(emitted.find("cop0_epc") != std::string::npos,
+                     "ERET must restore pc from EPC when ERL is clear");
+            t.IsTrue(emitted.find("~0x4") != std::string::npos, "ERET must clear ERL");
+            t.IsTrue(emitted.find("~0x2") != std::string::npos, "ERET must clear EXL");
+            t.IsTrue(emitted.find("clearLLBit") != std::string::npos, "ERET must clear the LL bit");
+            t.IsTrue(emitted.find("return;") != std::string::npos, "ERET must stop the block");
         });
 
         tc.Run("Phase 14 singleton data pointer discovers its function, decoy excluded", [](TestCase &t) {

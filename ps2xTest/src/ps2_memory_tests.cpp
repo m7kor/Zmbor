@@ -356,6 +356,28 @@ void register_ps2_memory_tests()
             t.IsTrue(threw, "TLB miss must still be catchable as std::runtime_error");
         });
 
+        tc.Run("GateB S7: Ps2TlbMissError message renders the address in hex", [](TestCase &t)
+        {
+            // Pre-fix the message rendered the address in decimal after a
+            // "0x" prefix (0x1F900000 printed as "0x529530880").
+            const Ps2TlbMissError e1(0x1F900000u);
+            t.IsTrue(std::string(e1.what()) ==
+                         "TLB miss for address: 0x1f900000",
+                     "message must contain the hex rendering, not decimal");
+            t.Equals(e1.vaddr, 0x1F900000u,
+                     "hex rendering must not change the carried address");
+
+            const Ps2TlbMissError e2(0xC0002000u);
+            t.IsTrue(std::string(e2.what()) ==
+                         "TLB miss for address: 0xc0002000",
+                     "second address must also render in hex");
+            // The exception type is unchanged: still a std::runtime_error.
+            const std::runtime_error *asBase = &e2;
+            t.IsTrue(std::string(asBase->what()) ==
+                         "TLB miss for address: 0xc0002000",
+                     "base-class what() must carry the same message");
+        });
+
         tc.Run("EE timer0 count advances from scheduler cycles and can be reset", [](TestCase &t)
         {
             PS2Memory mem;

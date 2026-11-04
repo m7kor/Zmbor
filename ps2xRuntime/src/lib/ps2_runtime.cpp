@@ -1519,7 +1519,7 @@ void PS2Runtime::SignalException(R5900Context *ctx, PS2Exception exception)
     }
 
     raiseCop0Exception(ctx, static_cast<uint32_t>(exception),
-                       exception == EXCEPTION_TLB_REFILL);
+                       exception == EXCEPTION_TLB_REFILL || exception == EXCEPTION_TLB_STORE);
 }
 
 void PS2Runtime::executeVU0Microprogram(uint8_t *rdram, R5900Context *ctx, uint32_t address)
@@ -2452,7 +2452,7 @@ void PS2Runtime::Store8(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint8
     catch (const Ps2TlbMissError &miss)
     {
         ctx->cop0_badvaddr = miss.vaddr;
-        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        SignalException(ctx, EXCEPTION_TLB_STORE);
         throw EeDispatcherTransfer{};
     }
     catch (const std::exception &)
@@ -2473,7 +2473,7 @@ void PS2Runtime::Store16(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
     catch (const Ps2TlbMissError &miss)
     {
         ctx->cop0_badvaddr = miss.vaddr;
-        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        SignalException(ctx, EXCEPTION_TLB_STORE);
         throw EeDispatcherTransfer{};
     }
     catch (const std::exception &)
@@ -2495,7 +2495,7 @@ void PS2Runtime::Store32(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
     catch (const Ps2TlbMissError &miss)
     {
         ctx->cop0_badvaddr = miss.vaddr;
-        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        SignalException(ctx, EXCEPTION_TLB_STORE);
         throw EeDispatcherTransfer{};
     }
     catch (const std::exception &)
@@ -2516,7 +2516,7 @@ void PS2Runtime::Store64(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, uint
     catch (const Ps2TlbMissError &miss)
     {
         ctx->cop0_badvaddr = miss.vaddr;
-        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        SignalException(ctx, EXCEPTION_TLB_STORE);
         throw EeDispatcherTransfer{};
     }
     catch (const std::exception &)
@@ -2540,7 +2540,7 @@ void PS2Runtime::Store128(uint8_t *rdram, R5900Context *ctx, uint32_t vaddr, __m
     catch (const Ps2TlbMissError &miss)
     {
         ctx->cop0_badvaddr = miss.vaddr;
-        SignalException(ctx, EXCEPTION_TLB_REFILL);
+        SignalException(ctx, EXCEPTION_TLB_STORE);
         throw EeDispatcherTransfer{};
     }
     catch (const std::exception &)

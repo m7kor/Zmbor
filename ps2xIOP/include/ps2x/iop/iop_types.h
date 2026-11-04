@@ -151,5 +151,7 @@ namespace ps2x::iop
         uint32_t emulatorRpcServers = 0;
         std::vector<DebugService> services;
         std::vector<std::string> diagnostics;
+        // Emulator bring-up counters: import calls by library:ordinal:disposition, RPC servers and calls.
+        std::vector<std::string> emulatorCounters;
     };
 }

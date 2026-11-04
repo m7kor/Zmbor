@@ -28,6 +28,29 @@ namespace ps2recomp
                 bool loadGhidraFunctionMap(const std::string &mapPath);
                 std::vector<Function> extractFunctions() const;
 
+                // Gate D — per-load validation statistics for the most
+                // recent loadGhidraFunctionMap call (reset at the start
+                // of every call, including early failures). The reporter
+                // warnings are the user-facing channel; this struct is
+                // the testable channel: a test can assert exactly which
+                // bucket rejected a row instead of inferring it from the
+                // merged function list.
+                struct GhidraMapLoadStats
+                {
+                    int loaded = 0;
+                    int skippedNonExecutable = 0;
+                    int skippedInvalidRange = 0;
+                    int skippedMisaligned = 0;
+                    int skippedUnalignedEnd = 0;
+                    int skippedOverlapping = 0;
+                    int skippedUndecodable = 0;
+                    int skippedDelaySlot = 0;
+                    int skippedMalformed = 0;
+                    bool headerSeen = false;
+                    bool rowLimitExceeded = false;
+                };
+                const GhidraMapLoadStats &ghidraMapLoadStats() const { return m_lastGhidraMapStats; }
+
                 // Phase 12 — recursive-descent function discovery (stripped-ELF front door).
                 //
                 // discoverFromEntryPoint() walks reachable code from the ELF entry point:
@@ -83,6 +106,7 @@ namespace ps2recomp
                 bool m_hasLoadedGhidraMap = false;
                 RecompilerReporter *m_reporter = nullptr;
                 std::unordered_set<uint32_t> m_ghidraMapStarts;
+                GhidraMapLoadStats m_lastGhidraMapStats;
 
                 void loadSections();
                 void loadSymbols();

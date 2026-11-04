@@ -44,7 +44,24 @@ jobs:
           ctest --test-dir build/ps2xTest -R "hwprobes_lab_selftest|compat_matrix_selftest" --output-on-failure
 
       - name: End-to-end (generated ELF -> ps2_recomp -> runtime)
-        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro)$" --output-on-failure
+        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite)$" --output-on-failure
+
+      # Gate F: every public header must compile standalone (Gate B S1/S2
+      # regression mechanism). Runs after configure, which populates
+      # build/_deps; the script accepts the FetchContent _deps layout
+      # (<name>-src) as well as the local cache layout (<name>). The
+      # compiler follows the matrix leg; the MSVC leg has no equivalent
+      # step yet (the script uses GCC/Clang-style -std=/-fsyntax-only, so
+      # MSVC needs a /std:c++20 + /Zs adaptation or clang-cl — see the
+      # Gate F ledger section for the unverified procedure).
+      - name: Public header self-containment check
+        run: |
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then
+            export CXX=g++
+          else
+            export CXX=clang++
+          fi
+          python3 tools/check_public_headers.py --repo . --deps build/_deps
 
       - name: VU1 workload correctness (output vs integer reference; timings informational)
         run: ./build/ps2xTest/bench/ps2x_bench_vu1 5 256 && ./build/ps2xTest/bench/ps2x_bench_vu1 5 200 xgkick
@@ -112,7 +129,13 @@ jobs:
         env:
           ASAN_OPTIONS: halt_on_error=1:detect_leaks=0
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro)$" --output-on-failure
+        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite)$" --output-on-failure
+
+      # Gate F: public header self-containment check (Gate B S1/S2
+      # regression mechanism); see the linux-gcc-clang job for the
+      # rationale and the MSVC-adaptation note. This job is clang-only.
+      - name: Public header self-containment check
+        run: CXX=clang++ python3 tools/check_public_headers.py --repo . --deps build/_deps
 
   # Bounded libFuzzer smoke run of every harness in tools/fuzz (60 s each; seeds from tools/fuzz/make_seeds.py plus the minimized regression inputs in tools/fuzz/regressions).
   # A crash or sanitizer report fails the job and leaves the reproducer as an artifact.

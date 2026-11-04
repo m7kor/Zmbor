@@ -1,6 +1,7 @@
 #ifndef PS2RECOMP_CONTROL_FLOW_UTILS_H
 #define PS2RECOMP_CONTROL_FLOW_UTILS_H
 
+#include "ps2recomp/types.h"
 #include "ps2recomp/instructions.h"
 
 #include <cstdint>

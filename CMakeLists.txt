@@ -19,6 +19,31 @@ endif()
 
 project(PS2RetroX)
 
+# sccache as compiler launcher (local cache only, no remote storage). This
+# block lives at the root so every subdirectory target inherits it: when it
+# lived in ps2xRuntime/CMakeLists.txt, only ps2xRuntime's own targets (plus
+# dependencies declared there) were wrapped, and ps2xRecomp, ps2xIOP,
+# ps2xAnalyzer, ps2xTest, and libdwarf/fmt stayed uncached. Set here before
+# any add_subdirectory() call, the directory-scoped variables propagate to
+# all targets. With sccache absent from PATH this is a status message only
+# and the build is unchanged; pass -DPS2X_ENABLE_SCCACHE=OFF to disable.
+option(PS2X_ENABLE_SCCACHE "Use sccache as compiler launcher when available" ON)
+
+if(PS2X_ENABLE_SCCACHE)
+    find_program(PS2X_SCCACHE_PROGRAM sccache)
+
+    if(PS2X_SCCACHE_PROGRAM)
+        if(CMAKE_C_COMPILER)
+            set(CMAKE_C_COMPILER_LAUNCHER "${PS2X_SCCACHE_PROGRAM}")
+        endif()
+
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${PS2X_SCCACHE_PROGRAM}")
+        message(STATUS "Using sccache: ${PS2X_SCCACHE_PROGRAM}")
+    else()
+        message(STATUS "sccache not found; continuing without compiler launcher")
+    endif()
+endif()
+
 # Testing at the top level: ps2xTest includes CTest, but that only enables
 # testing in its own subtree, so a top-level `ctest` previously reported 0
 # tests. Enabling here makes the root CTestTestfile include the suites

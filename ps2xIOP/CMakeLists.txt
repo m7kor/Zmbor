@@ -2,6 +2,18 @@ cmake_minimum_required(VERSION 3.21)
 
 project(ps2xIOP LANGUAGES CXX)
 
+# Gate F (S12): the C++ standard is declared explicitly, matching the
+# main-tree modules (ps2xRuntime/ps2xRecomp/ps2xTest all set
+# CMAKE_CXX_STANDARD 20 + REQUIRED ON). Previously this file set no
+# CMAKE_CXX_STANDARD and the effective -std=gnu++20 came only via
+# target_compile_features(ps2_iop PUBLIC cxx_std_20) below; the effective
+# flag is unchanged by this declaration (extensions stay enabled, so this
+# still yields -std=gnu++20), but the requirement is now stated in the
+# same form as every other module instead of depending on the
+# compile-features mechanism alone.
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 option(PS2X_IOP_BUILD_TESTS "Build ps2xIOP emulator smoke tests" OFF)
 
 add_library(ps2_iop STATIC

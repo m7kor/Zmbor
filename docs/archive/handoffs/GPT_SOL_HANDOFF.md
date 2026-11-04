@@ -1,3 +1,8 @@
+> [!WARNING]
+> Archived historical session document (original path: `GPT_SOL_HANDOFF.md`).
+> References to local processes, paths, Git branches and test results are historical.
+> For current status see [the README](../../../README.md).
+
 # Zmbor — engineering handoff to GPT-Sol
 
 Newest performance checkpoint: implementation HEAD `f02d674aede120b81383e6ee1a51298b96edd6e9`.

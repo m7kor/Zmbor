@@ -1,40 +1,39 @@
-# Game pipeline scripts (Windows, MSVC)
+# Crash Twinsanity compatibility pipeline — archived workstation example
 
-Copies of the scripts used for the Crash Twinsanity (SLUS_209.09) bring-up. The working copies live in the
-git-ignored `work/scripts/`, which is where the paths below point (`D:\Project\Testing` is the checkout). They hold
-no game data. See `GPT_SOL_HANDOFF.md` at the repository root for the full procedure.
+> [!WARNING]
+> **Not a portable Zmbor build workflow.** These scripts originated in a
+> particular Windows checkout, `D:\Project\Testing`, and depend on private,
+> git-ignored `work/` directories and game files. Use the
+> [main build and generated-game instructions](../../README.md#build-and-install)
+> for a fresh checkout instead. Keep private game assets out of Git.
 
-| script | purpose |
-|---|---|
-| `env.ps1` | loads `work/scripts/msvc.env` (a dump of `vcvars64.bat`'s PATH/INCLUDE/LIB; regenerate it, see the handoff) and `cd`s to the checkout |
-| `configure.ps1 -Dir <build> -Extra @(...)` | CMake + Ninja Release configure with pre-cloned dependencies from `work/deps` |
-| `crash_pipeline.ps1` | analyze -> recompile -> build `ps2x_game` -> bounded run; writes `work/crash_twinsanity/diagnostics/<Tag>.*` and `screenshots/<Tag>.*` |
-| `ppm2png.py` | frame dump -> PNG + statistics (standard library only) |
-| `contact_sheet.py` | frame series -> contact sheet + per-frame statistics (needs Pillow) |
+This directory preserves **historical game compatibility aids**, not required
+source files for Zmbor's general-purpose build:
 
-`crash_pipeline.ps1` parameters: `-RunSeconds N` (runtime stops itself, exit 124), `-SkipRecompile`, `-SkipBuild`,
-`-Tag name`, `-BuildDir build|build-o2|build-ff`, `-Trace hle,syscall,io,gs|all`, `-SeriesMs N` (frame every N ms),
-`-Disc <dir>`.
+| File | Status and role |
+|:--|:--|
+| [`PAD_PLAYBACK.md`](PAD_PLAYBACK.md) | General scripted controller playback format; reusable runtime feature |
+| [`bind_sdk_stub.py`](bind_sdk_stub.py) | Reusable SHA-1-validated ELF leaf binder; checks game/version-specific input before modifying a TOML |
+| [`ppm2png.py`](ppm2png.py) | Convert captured PPM frames to PNG and report image statistics |
+| [`contact_sheet.py`](contact_sheet.py) | Produce a time-series contact sheet (requires Pillow) |
+| [`crash_pipeline.ps1`](crash_pipeline.ps1) | Historical single-game launcher; **hardcoded local paths**: do not run unchanged on another checkout |
 
-Use a fresh tag for every run: the pipeline refuses existing evidence paths. Analyzer/recompiler logs and TOML
-are tagged, and the legacy `disc/ps2_log.txt` function trace is archived under diagnostics after the run (an older
-file is preserved as `<Tag>.previous-function-log.txt`). A failed analyzer stops the pipeline.
+Two redundant copies, `env.ps1` and `configure.ps1`, were dropped from
+the versioned tree because they did not configure Zmbor generically: both
+referenced a private `D:\Project\Testing\work` path. They are recoverable in
+the pre-cleanup Git history. The remaining example script itself imports
+an **untracked** `work/scripts/env.ps1`; use a real locally prepared
+environment and adapt paths before attempting a historical reproduction.
 
-Optional external profiling:
+The original [Crash engineering continuation](../../docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
+documents the observed stages, regression evidence and limitations. The
+[archived GPT-Sol handoff](../../docs/archive/handoffs/GPT_SOL_HANDOFF.md)
+contains older workstation instructions. Neither is a public acceptance
+gate for retail gameplay: introductory videos were observed, but interactive
+gameplay was not verified.
 
-```powershell
-& tools/game_pipeline/crash_pipeline.ps1 -SkipRecompile -SkipBuild -BuildDir build-ff `
-    -RunSeconds 150 -Tag NEW_PROFILE_TAG -Trace all -SeriesMs 3000 `
-    -Sampler work/profiling-build-z7/sample_process.exe -ProfileSeconds 60 -ProfileDelaySeconds 5
-```
-
-Build the sampler using [tools/profiling](../profiling/README.md), and use a game executable with a matching PDB.
-The JSON records its exit code. Its stack samples include waits; benchmark using separate runs without it.
-`PS2X_ENABLE_AGRESSIVE_LOGS=ON` also enables per-function tracing and can dominate file I/O; record this setting
-when comparing performance. Controller scripting is documented in [PAD_PLAYBACK.md](PAD_PLAYBACK.md).
-
-The Crash pipeline adds a reviewed `sceMpegGetPictureAbort` analysis binding using `bind_sdk_stub.py`.
-Its 16-byte SDK 3.x leaf is below the SCE scanner's 256-static-bit threshold. The helper checks the exact ELF
-function SHA-1 against the existing SDK signature before touching the config; a different game revision fails
-closed. The runtime API contains no title address or work-area offset hook. A wrong-signature negative control
-left the configuration hash unchanged; the positive binding regenerated the wrapper correctly.
+**Current policy:** add reusable fixes, tests and generic instrumentation to
+Zmbor's core. Keep title-specific paths, code patches, scripts and legally
+supplied game data in independent compatibility projects. Preserve hashes,
+compiler/build flags, timestamps and failure outcomes when publishing any
+new compatibility evidence.

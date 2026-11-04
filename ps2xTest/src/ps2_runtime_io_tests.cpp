@@ -10,6 +10,7 @@
 #include <vector>
 #include <cstring>
 #include <chrono>
+#include <algorithm>
 
 using namespace ps2_syscalls;
 
@@ -705,6 +706,97 @@ void register_ps2_runtime_io_tests()
                      "sceCdSearchFile should report the host file size");
             t.IsTrue(readGuestU32(test.rdram.data(), fileAddr + 0) >= 0x00100000u,
                      "sceCdSearchFile should assign a pseudo LSN for the resolved host file");
+        });
+
+        tc.Run("sceCdLayerSearchFile resolves layer 0 like sceCdSearchFile and misses layer 1", [](TestCase &t)
+        {
+            // Crash Twinsanity looks its movies up with sceCdLayerSearchFile; without an HLE handler the guest bound
+            // the IOP cdvdfsv RPC (sid 0x80000597), which nothing serves, and retried forever.
+            TestContext test;
+            std::filesystem::create_directories(test.paths.cdRoot / "FMV");
+            {
+                std::ofstream out(test.paths.cdRoot / "FMV" / "VIVENDI.PSS", std::ios::binary);
+                const std::string payload = "pss!";
+                out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+            }
+            constexpr uint32_t fileAddr = GUEST_BUFFER_AREA_START + 0x1C00;
+            constexpr uint32_t pathAddr = GUEST_STRING_AREA_START + 0xC00;
+            writeGuestString(test.rdram.data(), pathAddr, "\\FMV\\VIVENDI.PSS;1");
+
+            clearContext(test.ctx);
+            setRegU32(test.ctx, 4, fileAddr);
+            setRegU32(test.ctx, 5, pathAddr);
+            setRegU32(test.ctx, 6, 0u);
+            ps2_stubs::sceCdLayerSearchFile(test.rdram.data(), &test.ctx, nullptr);
+            t.Equals(getRegS32(&test.ctx, 2), 1, "layer 0 should resolve the file");
+            t.Equals(readGuestU32(test.rdram.data(), fileAddr + 4), 4u, "layer 0 should report the file size");
+
+            clearContext(test.ctx);
+            setRegU32(test.ctx, 4, fileAddr + 0x40u);
+            setRegU32(test.ctx, 5, pathAddr);
+            setRegU32(test.ctx, 6, 1u);
+            ps2_stubs::sceCdLayerSearchFile(test.rdram.data(), &test.ctx, nullptr);
+            t.Equals(getRegS32(&test.ctx, 2), 0, "a layer-1 search on a single-layer disc should report not found");
+        });
+
+        tc.Run("sceCdLayerSearchFile bounds the complete output in RAM and scratchpad", [](TestCase &t)
+        {
+            TestContext test;
+            { std::ofstream out(test.paths.cdRoot / "BOUNDS.BIN", std::ios::binary); out << "data"; }
+            constexpr uint32_t pathAddr = GUEST_STRING_AREA_START;
+            writeGuestString(test.rdram.data(), pathAddr, "\\BOUNDS.BIN;1");
+            // Extra storage makes a reverted out-of-bounds memcpy observable without
+            // corrupting the allocator, even when sanitizers are unavailable.
+            test.rdram.resize(PS2_RAM_SIZE + 32u, 0xA5u);
+            std::vector<uint8_t> scratch(PS2_SCRATCHPAD_SIZE + 32u, 0xA5u);
+            struct RestoreScratchpad
+            {
+                uint8_t *previous = ps2GetScratchpadHostPtr();
+                ~RestoreScratchpad() { ps2SetScratchpadHostPtr(previous); }
+            } restore;
+            ps2SetScratchpadHostPtr(scratch.data());
+            struct Region { uint32_t base; uint32_t size; uint8_t *bytes; };
+            const Region regions[] = {
+                {0u, PS2_RAM_SIZE, test.rdram.data()},
+                {0x20000000u, PS2_RAM_SIZE, test.rdram.data()},
+                {0x80000000u, PS2_RAM_SIZE, test.rdram.data()},
+                {0xA0000000u, PS2_RAM_SIZE, test.rdram.data()},
+                {PS2_SCRATCHPAD_BASE, PS2_SCRATCHPAD_SIZE, scratch.data()},
+                {PS2_SCRATCHPAD_BASE | 0x80000000u, PS2_SCRATCHPAD_SIZE, scratch.data()}
+            };
+            for (const Region &region : regions)
+            {
+                std::fill(region.bytes + region.size - 32u, region.bytes + region.size + 32u, 0xA5u);
+                clearContext(test.ctx);
+                setRegU32(test.ctx, 4, region.base + region.size - 16u);
+                setRegU32(test.ctx, 5, pathAddr);
+                setRegU32(test.ctx, 6, 0u);
+                ps2_stubs::sceCdLayerSearchFile(test.rdram.data(), &test.ctx, nullptr);
+                t.Equals(getRegS32(&test.ctx, 2), 0, "a result crossing its memory region must fail");
+                t.IsTrue(std::all_of(region.bytes + region.size - 32u, region.bytes + region.size + 32u,
+                                    [](uint8_t byte) { return byte == 0xA5u; }),
+                         "an invalid output span must not partially write or overrun host memory");
+
+                setRegU32(test.ctx, 4, region.base + region.size - 32u);
+                ps2_stubs::sceCdLayerSearchFile(test.rdram.data(), &test.ctx, nullptr);
+                t.Equals(getRegS32(&test.ctx, 2), 1, "an exactly fitting output span must succeed");
+                uint32_t size = 0;
+                std::memcpy(&size, region.bytes + region.size - 28u, sizeof(size));
+                t.Equals(size, 4u, "exactly fitting results must retain the file size");
+                t.IsTrue(std::all_of(region.bytes + region.size, region.bytes + region.size + 32u,
+                                    [](uint8_t byte) { return byte == 0xA5u; }),
+                         "a valid output span must leave the guard untouched");
+            }
+        });
+
+        tc.Run("sceCdLayerSearchFile handles an unmapped filename without crashing diagnostics", [](TestCase &t)
+        {
+            R5900Context ctx{};
+            setRegU32(ctx, 4, GUEST_BUFFER_AREA_START);
+            setRegU32(ctx, 5, GUEST_STRING_AREA_START);
+            setRegU32(ctx, 6, 0u);
+            ps2_stubs::sceCdLayerSearchFile(nullptr, &ctx, nullptr);
+            t.Equals(getRegS32(&ctx, 2), 0, "an unreadable filename must fail safely");
         });
 
         tc.Run("sceCdRead reads from explicit cdImage path", [](TestCase &t)

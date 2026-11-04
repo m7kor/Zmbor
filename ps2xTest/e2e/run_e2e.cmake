@@ -4,6 +4,13 @@
 # [-DFRAME_EXPECTED=<frame.json> -DPYTHON=<python> -DCHECK_FRAME=<check_frame.py> -DFRAME_FILE=<frame.ppm>]
 file(READ "${EXPECTED_FILE}" expected)
 string(STRIP "${expected}" expected)
+# <program>.exitcode next to the .expected file holds the required host exit code (default 0).
+string(REGEX REPLACE "\\.expected$" ".exitcode" exit_file "${EXPECTED_FILE}")
+set(expected_rc 0)
+if(EXISTS "${exit_file}")
+    file(READ "${exit_file}" expected_rc)
+    string(STRIP "${expected_rc}" expected_rc)
+endif()
 set(ENV{PS2X_HIDDEN_WINDOW} 1)
 if(FRAME_EXPECTED)
     file(REMOVE "${FRAME_FILE}")
@@ -16,8 +23,8 @@ execute_process(
     RESULT_VARIABLE rc
     TIMEOUT 60)
 string(FIND "${out}" "${expected}" found)
-if(NOT rc STREQUAL "0" OR found EQUAL -1)
-    message(FATAL_ERROR "end-to-end run failed\n  exit code: ${rc}\n  expected line: ${expected}\n"
+if(NOT rc STREQUAL "${expected_rc}" OR found EQUAL -1)
+    message(FATAL_ERROR "end-to-end run failed\n  exit code: ${rc} (expected ${expected_rc})\n  expected line: ${expected}\n"
                         "--- stdout ---\n${out}\n--- stderr (tail) ---\n${err}")
 endif()
 if(FRAME_EXPECTED)

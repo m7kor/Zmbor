@@ -1,9 +1,19 @@
-# Zmbor
+# Prosanity
+
+Prosanity publishes the ongoing **Zmbor** engineering continuation as an experimental PlayStation 2 static
+recompiler and native runtime. It retains Zmbor and [PS2Recomp](https://github.com/ran-j/PS2Recomp) history,
+attribution, and GPL-3.0 licensing. Existing module and executable names are retained for build compatibility.
+
+**Current checkpoint (4 November 2026):** native Crash Twinsanity startup and both introductory videos have been
+observed; **interactive gameplay is not verified**. The latest unit suite passes 697/697, and IOP hardware-output
+comparisons match 23/23 programs (1306/1306 lines). See the [engineering continuation report](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
+for exact configurations, regression limits, measured early-boot performance, and unresolved issues.
+Game files, BIOS, generated commercial-game code, private diagnostics, and screenshots are not included.
 
 <p align="center"><strong>PlayStation 2 static recompilation • hardware-aware native runtime • evidence-first engineering</strong></p>
 
 <p align="center">
-  <a href="https://github.com/m7kor/Zmbor/actions/workflows/build.yml"><img src="https://github.com/m7kor/Zmbor/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/m7kor/prosanity/actions/workflows/build.yml"><img src="https://github.com/m7kor/prosanity/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="GPL-3.0"></a>
   <img src="https://img.shields.io/badge/language-C%2B%2B20-00599C?logo=cplusplus" alt="C++20">
   <img src="https://img.shields.io/badge/platform-PS2%20%2B%20native%20host-6f42c1" alt="PS2 recompilation">

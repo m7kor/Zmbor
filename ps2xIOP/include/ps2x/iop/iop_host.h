@@ -5,8 +5,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace ps2x::iop
 {
@@ -117,6 +119,30 @@ namespace ps2x::iop
                                          uint32_t a2,
                                          uint32_t a3,
                                          uint32_t *resultAddress) = 0;
+
+        // IOP-as-client RPC to an EE server (the IOP side of sceSifBindRpc/sceSifCallRpc). findEeRpcServer reports
+        // the EE server descriptor and receive buffer registered for sid (EE sceSifRegisterRpc), or false while the
+        // EE has not registered it yet (the SDK's bind loop then retries). callEeRpc queues the EE server function
+        // (fno, send data copied to the EE server buffer, size) and later calls onComplete with the first
+        // receiveSize bytes at the address the server returned; it returns false if the call could not be queued.
+        // The defaults keep hosts without an EE side source-compatible.
+        virtual bool findEeRpcServer(uint32_t sid, uint32_t &serverAddress, uint32_t &bufferAddress)
+        {
+            (void)sid;
+            serverAddress = 0u;
+            bufferAddress = 0u;
+            return false;
+        }
+        virtual bool callEeRpc(uint32_t serverAddress, uint32_t function, std::vector<uint8_t> send,
+                               uint32_t receiveSize, std::function<void(const std::vector<uint8_t> &)> onComplete)
+        {
+            (void)serverAddress;
+            (void)function;
+            (void)send;
+            (void)receiveSize;
+            (void)onComplete;
+            return false;
+        }
 
         // Deliver an IOP -> EE SIF command packet. The default keeps hosts
         // which do not emulate the EE command dispatcher source-compatible.

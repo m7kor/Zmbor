@@ -6,6 +6,7 @@
 #include "runtime/ps2_memory.h"
 #include "Kernel/Stubs/MemoryCard.h"
 #include "Kernel/Syscalls/Common.h"
+#include "Kernel/Syscalls/RPC.h"
 
 #include <algorithm>
 #include <cstring>
@@ -515,6 +516,20 @@ bool PS2IopHostAdapter::sendSifCommand(uint32_t commandId,
                                          commandId,
                                          packet,
                                          packetSize);
+}
+
+bool PS2IopHostAdapter::findEeRpcServer(uint32_t sid, uint32_t &serverAddress, uint32_t &bufferAddress)
+{
+    uint8_t *const rdram = m_activeRdram ? m_activeRdram : m_runtime.memory().getRDRAM();
+    return ps2_syscalls::findEeRpcServerForIop(rdram, &m_runtime, sid, serverAddress, bufferAddress);
+}
+
+bool PS2IopHostAdapter::callEeRpc(uint32_t serverAddress, uint32_t function, std::vector<uint8_t> send,
+                                  uint32_t receiveSize, std::function<void(const std::vector<uint8_t> &)> onComplete)
+{
+    uint8_t *const rdram = m_activeRdram ? m_activeRdram : m_runtime.memory().getRDRAM();
+    return ps2_syscalls::queueEeRpcServerCallForIop(rdram, &m_runtime, serverAddress, function, std::move(send),
+                                                    receiveSize, std::move(onComplete));
 }
 
 void PS2IopHostAdapter::log(ps2x::iop::LogLevel level, std::string_view message)

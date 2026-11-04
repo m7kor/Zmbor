@@ -345,7 +345,7 @@ status: IMPLEMENTED_UNVERIFIED</title>
 <g><title>c.elf — ELF loading (stage 0)
 status: VERIFIED_PARTIAL
 implemented: 55/55 test programs
-missing: No game ELF
+missing: Crash Twinsanity ELF exercised; broader commercial-game compatibility unverified
 hardware programs: cpu_ee_alu</title>
 <rect x="23" y="635.7" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
 <text x="27" y="650.7" fill="#0d1117" font-size="11">ELF loading (stage 0)</text>
@@ -354,7 +354,7 @@ hardware programs: cpu_ee_alu</title>
 <g><title>c.native — Native executable generation (stages 1-2)
 status: VERIFIED_PARTIAL
 implemented: 55/55 test programs
-missing: No game ELF
+missing: Crash Twinsanity native executable built; broader commercial-game compatibility unverified
 hardware programs: cpu_ee_alu</title>
 <rect x="23" y="687.3" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
 <text x="27" y="702.3" fill="#0d1117" font-size="11">Native executable</text>
@@ -364,7 +364,7 @@ hardware programs: cpu_ee_alu</title>
 <g><title>c.init — Initialisation (stage 3)
 status: VERIFIED_PARTIAL
 implemented: 55/55 test programs produce output
-missing: No game
+missing: Crash Twinsanity initializes; broader game coverage unverified
 hardware programs: cpu_ee_alu</title>
 <rect x="182.3" y="635.7" width="157.3" height="49.7" fill="#d29922" stroke="#0d1117" stroke-width="1"/>
 <text x="186.3" y="650.7" fill="#0d1117" font-size="11">Initialisation (stage 3)</text>
@@ -382,49 +382,49 @@ hardware programs: cpu_ee_alu</title>
 </g>
 <g><title>c.mainloop — Main loop execution
 status: UNKNOWN
-missing: No game run</title>
+missing: Crash startup executes; interactive game main loop unverified</title>
 <rect x="341.7" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="345.7" y="650.7" fill="#c9d1d9" font-size="11">Main loop execution</text>
 <text x="495" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.render — Rendering
 status: UNKNOWN
-missing: Only a synthetic e2e frame is checked</title>
+missing: Synthetic e2e frame checked and Crash startup visually inspected; gameplay rendering and hardware accuracy unverified</title>
 <rect x="341.7" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="345.7" y="702.3" fill="#c9d1d9" font-size="11">Rendering</text>
 <text x="495" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.input — Controller input (stage 5)
 status: UNKNOWN
-missing: No scripted input runs</title>
+missing: Scripted EE HLE playback tested; interactive response in Crash and low-level SIO2 playback unverified</title>
 <rect x="501" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="505" y="650.7" fill="#c9d1d9" font-size="11">Controller input (stage 5)</text>
 <text x="654.3" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.sound — Sound
 status: UNKNOWN
-missing: No game run</title>
+missing: Crash startup runs; audible output unverified</title>
 <rect x="501" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="505" y="702.3" fill="#c9d1d9" font-size="11">Sound</text>
 <text x="654.3" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.scenes — Scene transitions (stage 6)
 status: UNKNOWN
-missing: No game run</title>
+missing: Crash startup runs; interactive scene transitions unverified</title>
 <rect x="660.3" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="664.3" y="650.7" fill="#c9d1d9" font-size="11">Scene transitions (stage 6)</text>
 <text x="813.7" y="681.3" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.save — Save and load (stage 8)
 status: UNKNOWN
-missing: No game run</title>
+missing: Crash startup probes memory card; saving and loading unverified</title>
 <rect x="660.3" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="664.3" y="702.3" fill="#c9d1d9" font-size="11">Save and load (stage 8)</text>
 <text x="813.7" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>
 </g>
 <g><title>c.extended — Extended execution (stage 7)
 status: UNKNOWN
-missing: No game run</title>
+missing: Bounded Crash startup runs; extended interactive execution unverified</title>
 <rect x="819.7" y="635.7" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="823.7" y="650.7" fill="#c9d1d9" font-size="11">Extended execution (stage</text>
 <text x="823.7" y="663.7" fill="#c9d1d9" font-size="11">7)</text>
@@ -432,7 +432,7 @@ missing: No game run</title>
 </g>
 <g><title>c.complete — Full completion (stage 9)
 status: UNKNOWN
-missing: No game run</title>
+missing: Crash startup runs; game completion unverified</title>
 <rect x="819.7" y="687.3" width="157.3" height="49.7" fill="#30363d" stroke="#0d1117" stroke-width="1" stroke-dasharray="3 2"/>
 <text x="823.7" y="702.3" fill="#c9d1d9" font-size="11">Full completion (stage 9)</text>
 <text x="973" y="733" fill="#c9d1d9" font-size="8" text-anchor="end" opacity="0.8">?</text>

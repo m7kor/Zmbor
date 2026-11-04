@@ -1,5 +1,7 @@
 #include "Common.h"
 #include "Pad.h"
+#include "runtime/pad_playback.h"
+#include <chrono>
 
 namespace ps2_stubs
 {
@@ -66,6 +68,68 @@ namespace ps2_stubs
         PadInputState g_padOverrideState{};
         PadPortState g_padPorts[kPadPortCount]{};
         int g_padReadLogCount = 0;
+        std::mutex g_playbackMutex;
+        PadPlayback g_playback;
+        bool g_playbackEnabled = false;
+        uint64_t g_playbackFrameOrigin = 0;
+        std::chrono::steady_clock::time_point g_playbackTimeOrigin;
+        const PadPlayback::Event *g_playbackLastEvent[kPadPortCount]{};
+
+        void resetPlayback(PS2Runtime *runtime)
+        {
+            std::lock_guard<std::mutex> lock(g_playbackMutex);
+            g_playback = PadPlayback{};
+            std::fill(std::begin(g_playbackLastEvent), std::end(g_playbackLastEvent), nullptr);
+            g_playbackTimeOrigin = std::chrono::steady_clock::now();
+            g_playbackFrameOrigin = runtime ? runtime->memory().gs().vsyncTick.load(std::memory_order_acquire) : 0;
+            const char *path = std::getenv("ZMBOR_PAD_SCRIPT");
+            g_playbackEnabled = path && *path;
+            if (!g_playbackEnabled)
+                return;
+            std::ifstream input(path);
+            std::string error;
+            if (!input || !g_playback.load(input, error))
+            {
+                // Keep scripted ports neutral on invalid input rather than mixing
+                // an incomplete test sequence with live controller input.
+                std::fprintf(stderr, "[pad:playback] error path=%s reason=%s; neutral input\n",
+                             path, input ? error.c_str() : "cannot open script");
+                return;
+            }
+            std::fprintf(stderr, "[pad:playback] loaded path=%s timeline=%s origin=pad-init\n",
+                         path, g_playback.usesFrames() ? "frames" : "milliseconds");
+        }
+
+        bool samplePlayback(int port, int slot, PS2Runtime *runtime, PadInputState &state)
+        {
+            std::lock_guard<std::mutex> lock(g_playbackMutex);
+            if (!g_playbackEnabled)
+                return false;
+            const uint64_t frame = runtime ? runtime->memory().gs().vsyncTick.load(std::memory_order_acquire) : 0;
+            const uint64_t relativeFrame = frame >= g_playbackFrameOrigin ? frame - g_playbackFrameOrigin : 0;
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - g_playbackTimeOrigin).count();
+            const uint64_t milliseconds = elapsed > 0 ? static_cast<uint64_t>(elapsed) : 0;
+            const PadPlayback::Event *event = nullptr;
+            const auto sampled = g_playback.sample(port, slot, relativeFrame, milliseconds, &event);
+            state.buttons = sampled.buttons;
+            state.lx = sampled.lx;
+            state.ly = sampled.ly;
+            state.rx = sampled.rx;
+            state.ry = sampled.ry;
+            if (port >= 0 && port < static_cast<int>(kPadPortCount) && event != g_playbackLastEvent[port])
+            {
+                g_playbackLastEvent[port] = event;
+                std::fprintf(stderr,
+                             "[pad:playback] port=%d slot=%d scheduled=%llu frame=%llu ms=%llu pressed=0x%04x lx=%u ly=%u rx=%u ry=%u\n",
+                             port, slot, static_cast<unsigned long long>(event ? event->tick : 0),
+                             static_cast<unsigned long long>(relativeFrame), static_cast<unsigned long long>(milliseconds),
+                             static_cast<unsigned>(static_cast<uint16_t>(~state.buttons)),
+                             static_cast<unsigned>(state.lx), static_cast<unsigned>(state.ly),
+                             static_cast<unsigned>(state.rx), static_cast<unsigned>(state.ry));
+            }
+            return true;
+        }
 
         uint8_t axisToByte(float axis)
         {
@@ -296,6 +360,8 @@ namespace ps2_stubs
             }
 
             bool usedBackend = false;
+            if (!useOverride)
+                useOverride = samplePlayback(port, slot, runtime, state);
             if (!useOverride)
             {
                 uint8_t backendData[32]{};
@@ -567,6 +633,7 @@ namespace ps2_stubs
             std::lock_guard<std::mutex> lock(g_padStateMutex);
             resetPadStateLocked();
         }
+        resetPlayback(runtime);
         setReturnS32(ctx, 1);
     }
 

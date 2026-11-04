@@ -228,6 +228,11 @@ namespace ps2x::iop::detail
                 return true;
 
             case 6: // sceCdRead
+                ++readCalls;
+                readSectorsTotal += a1;
+                if (debugLines.size() < kMaxDebugLines)
+                    debugLines.push_back("cd_read lsn=" + std::to_string(a0) + " sectors=" + std::to_string(a1) +
+                                         " file=" + describeSector(a0));
                 if (readSectors(a0, a1, a2))
                 {
                     signalCommandComplete();
@@ -242,7 +247,10 @@ namespace ps2x::iop::detail
                     cpu.gpr[2] = 1u;
                 }
                 else
+                {
                     cpu.gpr[2] = 0u;
+                    ++readFailures;
+                }
                 return true;
 
             case 7: // sceCdSeek
@@ -266,6 +274,15 @@ namespace ps2x::iop::detail
 
             case 10: // sceCdSearchFile
                 cpu.gpr[2] = searchFile(a0, a1) ? 1u : 0u;
+                if (debugLines.size() < kMaxDebugLines)
+                {
+                    uint32_t lsn = 0u, size = 0u;
+                    (void)memory.readRam(a0, &lsn, sizeof(lsn));
+                    (void)memory.readRam(a0 + 4u, &size, sizeof(size));
+                    debugLines.push_back("cd_search \"" + memory.readString(a1, 256u) + "\" -> " +
+                                         (cpu.gpr[2] ? "found lsn=" + std::to_string(lsn) + " size=" + std::to_string(size)
+                                                     : std::string("NOT FOUND")));
+                }
                 return true;
 
             case 11: // sceCdSync
@@ -346,6 +363,24 @@ namespace ps2x::iop::detail
             default:
                 return false;
             }
+        }
+
+        std::vector<std::string> debugCounters() const
+        {
+            std::vector<std::string> lines = debugLines;
+            lines.push_back("cd_reads calls=" + std::to_string(readCalls) + " sectors=" + std::to_string(readSectorsTotal) +
+                            " failures=" + std::to_string(readFailures) + " virtual_iso_files=" +
+                            std::to_string(std::count_if(nodes.begin(), nodes.end(), [](const IsoNode &n) { return !n.directory; })));
+            return lines;
+        }
+
+        std::string describeSector(uint32_t lsn)
+        {
+            if (!buildVirtualIso())
+                return "<no virtual iso>";
+            if (const IsoNode *node = fileForSector(lsn))
+                return node->hostPath.filename().string() + "+" + std::to_string(lsn - node->lsn);
+            return metadataSectors.count(lsn) ? "<metadata>" : "<unmapped>";
         }
 
         std::optional<CompletionCallback> takeCompletionCallback() noexcept
@@ -725,6 +760,11 @@ namespace ps2x::iop::detail
         uint32_t volumeSectors = 0u;
         std::vector<IsoNode> nodes;
         std::unordered_map<uint32_t, std::array<uint8_t, kSectorSize>> metadataSectors;
+        static constexpr size_t kMaxDebugLines = 64u;
+        std::vector<std::string> debugLines;
+        uint64_t readCalls = 0u;
+        uint64_t readSectorsTotal = 0u;
+        uint64_t readFailures = 0u;
     };
 
     IopCdvd::IopCdvd(IopHost &host, IopMemory &memory, IopKernel &kernel)
@@ -742,6 +782,11 @@ namespace ps2x::iop::detail
     bool IopCdvd::dispatchImport(uint16_t ordinal, IopCpuState &cpu)
     {
         return m_impl->dispatchImport(ordinal, cpu);
+    }
+
+    std::vector<std::string> IopCdvd::debugCounters() const
+    {
+        return m_impl->debugCounters();
     }
 
     std::optional<IopCdvd::CompletionCallback> IopCdvd::takeCompletionCallback() noexcept

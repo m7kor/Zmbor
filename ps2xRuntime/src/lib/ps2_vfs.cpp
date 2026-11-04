@@ -1,4 +1,5 @@
 #include "runtime/ps2_vfs.h"
+#include "runtime/zmbor_trace.h"
 
 #include "runtime/ps2_memory.h"
 #include "runtime/ps2_rom_device.h"
@@ -156,6 +157,14 @@ PS2Vfs::~PS2Vfs() = default;
 
 int32_t PS2Vfs::open(std::string_view path, uint32_t flags, const PS2VfsMounts &mounts, const PS2RomDevice &rom)
 {
+    const int32_t descriptor = openImpl(path, flags, mounts, rom);
+    if (descriptor < 0)
+        zmbor_trace::ioEvent("open", std::string(path), 0, 0, descriptor, 0u);
+    return descriptor;
+}
+
+int32_t PS2Vfs::openImpl(std::string_view path, uint32_t flags, const PS2VfsMounts &mounts, const PS2RomDevice &rom)
+{
     const ps2x::iop::ParsedPs2Path parsed = ps2x::iop::parsePs2Path(path);
     if (!parsed)
         return -1;
@@ -202,12 +211,19 @@ int32_t PS2Vfs::open(std::string_view path, uint32_t flags, const PS2VfsMounts &
         m_nextDescriptor = 3;
     const int32_t descriptor = m_nextDescriptor++;
     m_descriptors.emplace(descriptor, OpenDescriptor{std::move(file), parsed.deviceName, std::string(path)});
+    zmbor_trace::ioEvent("open", std::string(path), 0, 0, descriptor, 0u);
     return descriptor;
 }
 
 int32_t PS2Vfs::close(int32_t descriptor)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (zmbor_trace::enabled(zmbor_trace::kIo))
+    {
+        const auto found = m_descriptors.find(descriptor);
+        zmbor_trace::ioEvent("close", found == m_descriptors.end() ? std::string("<bad fd>") : found->second.path,
+                             0, 0, found == m_descriptors.end() ? -1 : 0, 0u);
+    }
     return m_descriptors.erase(descriptor) == 1u ? 0 : -1;
 }
 
@@ -215,7 +231,17 @@ int64_t PS2Vfs::read(int32_t descriptor, void *destination, size_t size)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     const auto found = m_descriptors.find(descriptor);
-    return found == m_descriptors.end() ? -1 : found->second.file->read(destination, size);
+    if (found == m_descriptors.end())
+    {
+        zmbor_trace::ioEvent("read", "<bad fd>", -1, static_cast<int64_t>(size), -1, 0u);
+        return -1;
+    }
+    const bool trace = zmbor_trace::enabled(zmbor_trace::kIo);
+    const int64_t offset = trace ? found->second.file->seek(0, SEEK_CUR) : -1;
+    const int64_t result = found->second.file->read(destination, size);
+    if (trace)
+        zmbor_trace::ioEvent("read", found->second.path, offset, static_cast<int64_t>(size), result, 0u);
+    return result;
 }
 
 int64_t PS2Vfs::write(int32_t descriptor, const void *source, size_t size)
@@ -229,7 +255,11 @@ int64_t PS2Vfs::seek(int32_t descriptor, int64_t offset, int whence)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     const auto found = m_descriptors.find(descriptor);
-    return found == m_descriptors.end() ? -1 : found->second.file->seek(offset, whence);
+    const int64_t result = found == m_descriptors.end() ? -1 : found->second.file->seek(offset, whence);
+    zmbor_trace::ioEvent(whence == SEEK_SET ? "seek_set" : (whence == SEEK_CUR ? "seek_cur" : "seek_end"),
+                         found == m_descriptors.end() ? std::string("<bad fd>") : found->second.path, offset, 0,
+                         result, 0u);
+    return result;
 }
 
 bool PS2Vfs::stat(std::string_view path, const PS2VfsMounts &mounts, const PS2RomDevice &rom, PS2VfsStat &result) const

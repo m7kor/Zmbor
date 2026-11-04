@@ -110,6 +110,7 @@ namespace ps2x::iop::detail
               imports(memory),
               loadcore(memory, imports)
         {
+            rpc.setExecutor(this);
             reset();
         }
 
@@ -405,6 +406,13 @@ namespace ps2x::iop::detail
                     cpu.pendingLoad = false;
                 }
                 const ImportDisposition disposition = dispatchImport(*import, cpu);
+                {
+                    std::string key = import->library;
+                    key += ':' + std::to_string(import->ordinal);
+                    key += disposition == ImportDisposition::Missing ? ":missing"
+                           : disposition == ImportDisposition::JumpToGuest ? ":guest" : ":hle";
+                    ++importCallCounts[key];
+                }
                 ++totalInstructions;
                 ++totalCycles;
                 if (disposition == ImportDisposition::JumpToGuest)
@@ -820,6 +828,8 @@ namespace ps2x::iop::detail
         IopImportRegistry imports;
         IopLoadcore loadcore;
         std::map<int, Module> modules;
+        // Bring-up diagnostics: calls per "library:ordinal:disposition" (bounded by the import table size).
+        std::map<std::string, uint64_t> importCallCounts;
         std::map<int, uint64_t> pendingDmaInterrupts;
         std::multimap<uint64_t, ScheduledGuestCallback> pendingGuestCallbacks;
         uint32_t nextModuleId = 1;
@@ -973,6 +983,20 @@ namespace ps2x::iop::detail
     uint32_t IopEmulator::rpcServerCount() const noexcept
     {
         return static_cast<uint32_t>(m_impl->rpc.serverCount());
+    }
+
+    std::vector<std::string> IopEmulator::debugCounters() const
+    {
+        std::vector<std::string> lines;
+        for (const auto &[key, count] : m_impl->importCallCounts)
+            lines.push_back("import " + key + " " + std::to_string(count));
+        for (const auto &line : m_impl->rpc.debugLines())
+            lines.push_back(line);
+        for (const auto &line : m_impl->cdvd.debugCounters())
+            lines.push_back(line);
+        for (const auto &[id, module] : m_impl->modules)
+            lines.push_back("module id=" + std::to_string(id) + " " + module.name);
+        return lines;
     }
 
 }

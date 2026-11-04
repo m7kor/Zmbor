@@ -625,8 +625,51 @@ def program_stripped():
 
 EXPECTED['stripped'] = 'E2E stripped sw=11 sum=42'
 
+
+def program_missing_target():
+    # Fatal-error propagation: the guest prints a line, then calls through JALR into .data, where no recompiled
+    # function exists (the shape of the Crash Twinsanity 0x25a4e0 failure). The runtime must report unresolved
+    # control flow and the host process must exit non-zero (it used to exit 0). run_e2e.cmake checks the code.
+    a = Assembler()
+    a.function('_start')
+    a.i('lui', 'sp', 'zero', 0x01F0)
+    a.jump('jal', 'main')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.r('or', rd='a0', rs='zero', rt='zero')
+    a.label('hang')
+    a.branch('beq', 'zero', 'zero', 'hang')
+    a.nop()
+
+    a.function('main')
+    a.i('addiu', 'sp', 'sp', -16)
+    a.i('sw', 'ra', 'sp', 12)
+    a.la('a0', 's_msg')
+    a.jump('jal', 'puts')
+    a.nop()
+    a.la('t9', 'not_code')
+    a.r('jalr', rd='ra', rs='t9')
+    a.nop()
+    a.i('lw', 'ra', 'sp', 12)
+    a.r('jr', rs='ra')
+    a.i('addiu', 'sp', 'sp', 16)
+
+    for name in ('puts', 'exit'):
+        a.function(name)
+        a.r('jr', rs='ra')
+        a.nop()
+    a.data_block('not_code', bytes(64), align=16)
+    a.data_block('s_msg', b'E2E before missing target\0', align=4)
+    return a, ['puts', 'exit']
+
+
+EXPECTED['missing_target'] = 'E2E before missing target'
+# Host exit code each program must end with (default 0). 3 = unresolved guest control flow
+# (PS2Runtime::GuestTermination::UnresolvedControlFlow).
+EXPECTED_EXIT = {'missing_target': 3}
+
 PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay,
-            'vu_macro': program_vu_macro, 'stripped': program_stripped}
+            'vu_macro': program_vu_macro, 'stripped': program_stripped, 'missing_target': program_missing_target}
 
 # Programs whose ELF must be emitted stripped (no symbol table).
 STRIPPED_PROGRAMS = {'stripped'}
@@ -648,6 +691,7 @@ def main():
         f'stubs = [{stub_list}]\n'
         'skip = []\n', encoding='utf-8')
     (out_dir / f'{name}.expected').write_text(EXPECTED[name] + '\n', encoding='utf-8')
+    (out_dir / f'{name}.exitcode').write_text(f'{EXPECTED_EXIT.get(name, 0)}\n', encoding='utf-8')
     if name in FRAME_EXPECTATIONS:
         import json
         (out_dir / f'{name}.frame.json').write_text(json.dumps(FRAME_EXPECTATIONS[name]), encoding='utf-8')

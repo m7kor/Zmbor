@@ -301,6 +301,7 @@ namespace ps2_syscalls
     {
         // Syscall 4 leaves the program (the kernel returns to the OSD); here that ends the run. ps2sdk's crt0 calls it
         // once main returns.
+        runtime->noteGuestTermination(PS2Runtime::GuestTermination::GuestExit, "Exit syscall");
         runtime->requestStop();
         ExitThread(rdram, ctx, runtime);
     }

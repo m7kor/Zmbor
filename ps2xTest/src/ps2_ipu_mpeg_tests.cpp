@@ -357,6 +357,122 @@ void register_ps2_ipu_mpeg_tests()
 {
     MiniTest::Case("PS2IpuMpeg", [](TestCase &tc)
     {
+        tc.Run("HLE IPU consumption rejects running hardware commands and partial qwords", [](TestCase &t)
+        {
+            PS2Ipu ipu;
+            Qword input{}, result{};
+            for (size_t i = 0; i < input.size(); ++i)
+                input[i] = static_cast<uint8_t>(i + 1u);
+            result.fill(0xEEu);
+            t.IsTrue(ipu.canConsumeInputForHle() && !ipu.popInputForHle(result), "an idle empty FIFO has nothing to consume");
+            ipu.pushInput(input);
+            ipu.writeCommand(kFdec | 8u); // completes after skipping a byte, leaving BP = 8 in the first qword
+            const uint32_t bp = ipu.readBitPointer();
+            const uint64_t top = ipu.readTop();
+            t.IsTrue(!ipu.busy() && (bp & 0x7Fu) == 8u, "FDEC leaves an idle but partially consumed qword");
+            t.IsTrue(!ipu.canConsumeInputForHle() && !ipu.popInputForHle(result), "a byte-aligned partial qword cannot be stolen by HLE");
+            t.IsTrue(ipu.readBitPointer() == bp && ipu.readTop() == top && result.front() == 0xEEu,
+                     "rejection preserves the bitstream and destination");
+            t.IsTrue(ipu.takeCompletion(), "HLE rejection does not clear the hardware completion latch");
+
+            ipu.reset();
+            ipu.writeCommand(kSetiq); // waits for four qwords
+            ipu.pushInput(input);
+            t.IsTrue(ipu.busy() && !ipu.popInputForHle(result), "HLE cannot consume a running command's input");
+            t.Equals(ipu.inputQwords(), size_t{1}, "running command input stays in the FIFO");
+            ipu.run();
+            t.IsTrue(ipu.busy() && ipu.inputQwords() == 0u && ipu.intraQuantizer(0) == 1u,
+                     "the hardware command retains normal ownership and consumes its own bytes");
+
+            ipu.reset();
+            ipu.pushInput(input);
+            t.IsTrue(ipu.popInputForHle(result) && result == input && ipu.inputQwords() == 0u,
+                     "an explicit idle HLE read returns exactly the FIFO front");
+            t.IsTrue(!ipu.takeCompletion(), "HLE input consumption does not fabricate IPU command completion");
+
+            ipu.reset();
+            ipu.writeCommand((7u << 28) | 1u); // one hardware CSC macroblock
+            for (size_t q = 0; q < 24u; ++q)
+            {
+                ipu.pushInput(input);
+                ipu.run();
+            }
+            for (size_t q = 0; q < 56u; ++q)
+                ipu.popOutput(result);
+            ipu.run();
+            ipu.pushInput(input);
+            t.IsTrue(!ipu.busy() && ipu.outputQwords() == 8u, "hardware command is idle with undrained output");
+            t.IsTrue(!ipu.canConsumeInputForHle() && !ipu.popInputForHle(result) && ipu.inputQwords() == 1u,
+                     "HLE cannot mix a new input stream with undrained hardware output");
+        });
+
+        tc.Run("HLE IPU drain bounds authoritative DMA input and completes channel 4 normally", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initializes");
+            constexpr uint32_t source = 0x00500000u, qwords = 512u;
+            std::vector<uint8_t> expected(qwords * 16u);
+            for (size_t i = 0; i < expected.size(); ++i)
+                expected[i] = static_cast<uint8_t>((i * 37u + i / 16u) & 0xFFu);
+            std::memcpy(mem.getRDRAM() + source, expected.data(), expected.size());
+            mem.writeIORegister(0x1000B410u, source);
+            mem.writeIORegister(0x1000B420u, qwords);
+            mem.writeIORegister(0x1000B400u, 0x101u);
+            std::vector<uint8_t> output{0xCAu, 0xFEu};
+            const size_t capacity = output.capacity();
+            const uint32_t status = mem.readIORegister(0x1000E010u);
+            t.Equals(mem.ipu().inputQwords(), PS2Ipu::kFifoQwords, "ordinary DMA fills only the hardware FIFO");
+            t.IsTrue((mem.readIORegister(0x1000B400u) & 0x100u) != 0u && (status & (1u << 4)) == 0u,
+                     "without explicit HLE consumption the remaining DMA is held, without CIS4");
+            t.Equals(mem.drainIpuInputForHle(0u, output), size_t{0}, "zero bound consumes nothing");
+            t.IsTrue(output.size() == 2u && output.capacity() == capacity && mem.readIORegister(0x1000E010u) == status &&
+                         mem.ipu().inputQwords() == PS2Ipu::kFifoQwords,
+                     "zero bound does not alter destination, FIFO or interrupt state");
+            t.Equals(mem.drainIpuInputForHle(7u, output), size_t{7}, "the caller's first seven-qword bound is honored");
+            t.Equals(output.size(), size_t{2u + 7u * 16u}, "only bounded bytes append after the preserved prefix");
+            t.IsTrue(output[0] == 0xCAu && output[1] == 0xFEu &&
+                         std::equal(output.begin() + 2, output.end(), expected.begin()),
+                     "input bytes arrive in original DMA order");
+            // The DMA completes once its last eight qwords enter the FIFO, before the decoder consumes them.
+            t.Equals(mem.drainIpuInputForHle(496u, output), size_t{496}, "503 qwords consumed in two bounded calls");
+            t.IsTrue((mem.readIORegister(0x1000B400u) & 0x100u) != 0u &&
+                         (mem.readIORegister(0x1000E010u) & (1u << 4)) == 0u,
+                     "one pending qword still holds DMA without a completion interrupt");
+            t.Equals(mem.drainIpuInputForHle(1u, output), size_t{1}, "consuming one more qword frees the final DMA slot");
+            t.IsTrue((mem.readIORegister(0x1000B400u) & 0x100u) == 0u &&
+                         (mem.readIORegister(0x1000E010u) & (1u << 4)) != 0u,
+                     "normal service clears STR and raises CIS4 after all DMA bytes enter the FIFO");
+            t.Equals(mem.readIORegister(0x1000B410u), source + qwords * 16u, "MADR reaches the ordinary transfer end");
+            t.Equals(mem.readIORegister(0x1000B420u), 0u, "completed DMA has QWC zero");
+            t.Equals(mem.ipu().inputQwords(), size_t{8}, "DMA completion preserves the last eight FIFO qwords");
+            t.Equals(mem.drainIpuInputForHle(size_t(-1), output), size_t{8}, "a large bound consumes only remaining input");
+            t.IsTrue(output.size() == expected.size() + 2u && std::equal(output.begin() + 2, output.end(), expected.begin()),
+                     "all 512 qwords are delivered exactly once in order");
+            t.IsTrue(mem.ipu().inputQwords() == 0u && !mem.takePendingIpuInterrupt(),
+                     "input drain empties the FIFO without fabricating a decoded frame or IPU interrupt");
+            t.Equals(mem.drainIpuInputForHle(512u, output), size_t{0}, "completed input is not replayed");
+        });
+
+        tc.Run("HLE memory IPU drain does not service unsafe hardware state", [](TestCase &t)
+        {
+            PS2Memory mem;
+            t.IsTrue(mem.initialize(), "PS2Memory initializes");
+            std::vector<uint8_t> output{0xABu};
+            Qword input{}; input.fill(0x42u);
+            mem.ipu().writeCommand(kSetiq);
+            mem.ipu().pushInput(input);
+            t.Equals(mem.drainIpuInputForHle(512u, output), size_t{0}, "a running hardware command rejects HLE drain");
+            t.IsTrue(mem.ipu().busy() && mem.ipu().inputQwords() == 1u && output.size() == 1u,
+                     "rejected memory drain does not run or consume the hardware command");
+            mem.ipu().reset();
+            mem.ipu().pushInput(input);
+            mem.ipu().writeCommand(kFdec | 1u);
+            const uint32_t bp = mem.ipu().readBitPointer();
+            t.Equals(mem.drainIpuInputForHle(512u, output), size_t{0}, "a partial bitstream rejects HLE drain");
+            t.IsTrue(mem.ipu().readBitPointer() == bp && output.size() == 1u,
+                     "partial hardware state and destination remain unchanged");
+        });
+
         // IEEE 1180-1990 bounds for an inverse DCT against the exact one: peak error 1, overall mean square error
         // 0.02. The reference decoder's IDCT is itself approximate, so the bounds apply to the pair.
         tc.Run("BDEC driven by VDEC/FDEC decodes ffmpeg-encoded MPEG-1/MPEG-2 intra pictures within IEEE 1180 bounds", [](TestCase &t)

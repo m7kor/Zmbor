@@ -231,9 +231,11 @@ int main(int argc, char *argv[])
 #ifdef _DEBUG
         ps2_log::print_saved_location();
 #endif
+        // A guest that died (unresolved control flow, host exception, ...) must not look like a success.
+        const int exitCode = runtime.processExitCode();
         std::cout.flush();
         std::cerr.flush();
-        std::_Exit(0);
+        std::_Exit(exitCode);
     }
     catch (const std::exception &e)
     {

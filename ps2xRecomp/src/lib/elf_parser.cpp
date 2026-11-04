@@ -1,8 +1,10 @@
 #include "ps2recomp/elf_parser.h"
 #include "ps2recomp/instructions.h"
 #include "ps2recomp/r5900_decoder.h"
+#include "rabbitizer.h"
 #include "ps2recomp/recompiler_reporter.h"
 #include "ps2recomp/types.h"
+#include <charconv>
 #include <iostream>
 #include <optional>
 #include <stdexcept>
@@ -495,6 +497,128 @@ namespace
             }
         }
         return false;
+    }
+
+    // Gate D — CSV number parsing: the exporter writes 0x-prefixed
+    // hex, bare fields are decimal. Base-0 parsing is forbidden
+    // here because a leading zero would silently mean octal
+    // ("010" -> 8). A field that is not a clean number in either
+    // form fails; the caller counts it malformed.
+    bool ParseGhidraNumber(const std::string &field, uint32_t &out)
+    {
+        size_t begin = 0;
+        size_t end = field.size();
+        while (begin < end && (field[begin] == ' ' || field[begin] == '\t' || field[begin] == '\r'))
+        {
+            ++begin;
+        }
+        while (end > begin && (field[end - 1] == ' ' || field[end - 1] == '\t' || field[end - 1] == '\r'))
+        {
+            --end;
+        }
+        if (begin >= end)
+        {
+            return false;
+        }
+        std::string_view text(field.data() + begin, end - begin);
+        int base = 10;
+        if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+        {
+            text.remove_prefix(2);
+            base = 16;
+        }
+        if (text.empty())
+        {
+            return false;
+        }
+        for (const char c : text)
+        {
+            const bool digit = (c >= '0' && c <= '9') ||
+                               (base == 16 && ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')));
+            if (!digit)
+            {
+                return false;
+            }
+        }
+        uint32_t value = 0;
+        const auto result = std::from_chars(text.data(), text.data() + text.size(), value, base);
+        if (result.ec != std::errc() || result.ptr != text.data() + text.size())
+        {
+            return false;
+        }
+        out = value;
+        return true;
+    }
+
+    // Gate D — rabbitizer R5900 validity: a word decodes iff its
+    // R5900 unique id is not the R5900 INVALID id. This is
+    // rabbitizer-strict, not architecturally permissive: words with
+    // nonzero unused fields (e.g. SLLV with sa != 0) are INVALID
+    // here. Real compiler output zeroes unused fields, so genuine
+    // code passes; data words that happen to share an opcode with
+    // real instructions still pass (an address word decodes as SD,
+    // for example) — the check is a plausibility filter, not a
+    // proof of code.
+    bool R5900WordDecodes(uint32_t address, uint32_t word)
+    {
+        RabbitizerInstruction inst;
+        RabbitizerInstructionR5900_init(&inst, word, address);
+        RabbitizerInstructionR5900_processUniqueId(&inst);
+        const bool valid = inst.uniqueId != RABBITIZER_INSTR_ID_r5900_INVALID;
+        RabbitizerInstructionR5900_destroy(&inst);
+        return valid;
+    }
+
+    // Gate D — header recognition: the exporter writes
+    // "Name,Start,End,Size"; the older merge test writes the same
+    // words lowercase. Both are headers. The comparison is
+    // case-insensitive and field-exact, so no valid data row can
+    // ever match: a data row's second and third fields are numbers,
+    // never the words "start"/"end".
+    bool IsGhidraHeaderLine(const std::string &line)
+    {
+        static const char *expected[4] = {"name", "start", "end", "size"};
+        std::stringstream ss(line);
+        std::string field;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (!std::getline(ss, field, ','))
+            {
+                return false;
+            }
+            size_t begin = 0;
+            size_t end = field.size();
+            while (begin < end && (field[begin] == ' ' || field[begin] == '\t' || field[begin] == '\r'))
+            {
+                ++begin;
+            }
+            while (end > begin && (field[end - 1] == ' ' || field[end - 1] == '\t' || field[end - 1] == '\r'))
+            {
+                --end;
+            }
+            const std::string_view trimmed(field.data() + begin, end - begin);
+            const std::string_view want(expected[i]);
+            if (trimmed.size() != want.size())
+            {
+                return false;
+            }
+            for (size_t j = 0; j < want.size(); ++j)
+            {
+                const char a = trimmed[j];
+                const char lowered = (a >= 'A' && a <= 'Z') ? static_cast<char>(a - 'A' + 'a') : a;
+                if (lowered != want[j])
+                {
+                    return false;
+                }
+            }
+        }
+        // A fifth field disqualifies the line as a header; it will
+        // be parsed as (malformed) data instead.
+        if (std::getline(ss, field, ','))
+        {
+            return false;
+        }
+        return true;
     }
 
     bool HasReachableReturnByControlFlow(const ps2recomp::Section &section,
@@ -1852,7 +1976,14 @@ namespace
             }
             if (opcode == OPCODE_SLTIU)
             {
-                setReg(rt, known[rs] ? std::optional<uint32_t>((*known[rs] < imm16) ? 1u : 0u)
+                // MIPS/R5900 SLTIU sign-extends the immediate FIRST, then
+                // compares unsigned. Comparing against the zero-extended
+                // field (imm16) is wrong exactly for negative immediates
+                // (e.g. sltiu $t0, $s0, -1 with $s0 = 0x10000 must yield 1,
+                // since 0x10000 < 0xFFFFFFFF, not 0). Mirror the SLTI arm:
+                // compare against the already-computed sign-extended simm,
+                // reinterpreted as unsigned.
+                setReg(rt, known[rs] ? std::optional<uint32_t>((*known[rs] < static_cast<uint32_t>(simm)) ? 1u : 0u)
                                      : std::nullopt);
                 continue;
             }
@@ -3224,13 +3355,16 @@ namespace ps2recomp
 
     bool ElfParser::loadGhidraFunctionMap(const std::string &mapPath)
     {
+        // Gate D — statistics are reset on every call so a failed
+        // load never reports a previous load's counts.
+        m_lastGhidraMapStats = GhidraMapLoadStats{};
+        m_hasLoadedGhidraMap = false;
+        m_ghidraMapStarts.clear();
+
         if (mapPath.empty())
         {
             return false;
         }
-
-        m_hasLoadedGhidraMap = false;
-        m_ghidraMapStarts.clear();
 
         std::ifstream file(mapPath);
         if (!file.is_open())
@@ -3242,68 +3376,309 @@ namespace ps2recomp
             return false;
         }
 
-        std::string line;
-        if (!std::getline(file, line))
-        {
-            return false;
-        }
+        // Gate D — validation bounds. A real Ghidra export for a PS2
+        // title holds tens of thousands of functions at most; the
+        // row cap is generous headroom, not a target. The per-line
+        // cap bounds a single hostile line. Both keep a corrupt file
+        // from turning the load into an unbounded read.
+        constexpr int kMaxGhidraMapRows = 262144;
+        constexpr size_t kMaxGhidraMapLine = 4096;
 
-        int count = 0;
-        int skippedNonExecutable = 0;
-        int skippedInvalidRange = 0;
+        // New-slice bookkeeping: map rows are appended to
+        // m_extraFunctions, which may already hold config extras;
+        // the overlap and delay-slot passes below run on the new
+        // slice only, never on pre-existing extras.
+        const size_t mapBegin = m_extraFunctions.size();
         std::unordered_set<uint32_t> mapStarts;
+
+        std::string line;
+        bool firstLine = true;
+        int dataRows = 0;
+        bool rowLimitExceeded = false;
         while (std::getline(file, line))
         {
+            if (!line.empty() && line.back() == '\r')
+            {
+                line.pop_back(); // CRLF files: strip the carriage return
+            }
+
+            if (firstLine)
+            {
+                firstLine = false;
+                if (IsGhidraHeaderLine(line))
+                {
+                    m_lastGhidraMapStats.headerSeen = true;
+                    continue;
+                }
+                // Gate D gap 6 — the Phase 19 loader discarded the
+                // first line unconditionally as the assumed header,
+                // so a headerless file silently lost its first row.
+                // A first line that is not the known header is a
+                // data row; warn once so the two cases are
+                // distinguishable.
+                if (m_reporter)
+                {
+                    m_reporter->warning("ghidra-map", "First line of Ghidra function map is not the expected 'Name,Start,End,Size' header; treating it as a data row: " + mapPath);
+                }
+            }
+
             if (line.empty())
                 continue;
 
-            std::stringstream ss(line);
-            std::string name, startStr, endStr, sizeStr;
+            // Gate D gap 8 — row cap: stop reading, keep what was
+            // accepted so far, and warn below. Rows past the cap
+            // are never examined, so a trailing valid row cannot
+            // sneak in.
+            if (dataRows >= kMaxGhidraMapRows)
+            {
+                rowLimitExceeded = true;
+                break;
+            }
+            ++dataRows;
 
+            // Gate D gap 8 — line cap: an over-long line cannot be
+            // a real row (names are short, addresses ~10 chars).
+            if (line.size() > kMaxGhidraMapLine)
+            {
+                ++m_lastGhidraMapStats.skippedMalformed;
+                continue;
+            }
+
+            std::stringstream ss(line);
+            std::string name, startStr, endStr, sizeStr, extra;
+
+            // Gate D gap 5 — malformed rows are counted, not
+            // silently skipped: a truncated file must be
+            // distinguishable from a clean one. A trailing comma
+            // leaves `extra` unread (failed getline) and is
+            // tolerated; non-empty extra content is not.
             if (!std::getline(ss, name, ',') ||
                 !std::getline(ss, startStr, ',') ||
                 !std::getline(ss, endStr, ',') ||
-                !std::getline(ss, sizeStr, ','))
+                !std::getline(ss, sizeStr, ',') ||
+                std::getline(ss, extra, ','))
             {
+                ++m_lastGhidraMapStats.skippedMalformed;
                 continue;
             }
 
-            try
+            // Gate D gap 7 — explicit number parsing: the exporter
+            // writes 0x-prefixed hex, bare fields are decimal.
+            // Base-0 parsing is forbidden here because a leading
+            // zero would silently mean octal ("010" -> 8). A field
+            // that is not a clean number in either form is
+            // malformed, not silently skipped.
+            uint32_t start = 0;
+            uint32_t requestedEnd = 0;
+            if (!ParseGhidraNumber(startStr, start) || !ParseGhidraNumber(endStr, requestedEnd))
             {
-                uint32_t start = std::stoul(startStr, nullptr, 0);
-                uint32_t end = std::stoul(endStr, nullptr, 0);
-
-                const Section *section = FindFunctionSectionByAddress(m_sections, start);
-                if (!section)
-                {
-                    ++skippedNonExecutable;
-                    continue;
-                }
-
-                end = ClampFunctionEndToSection(section, start, end);
-                if (end <= start)
-                {
-                    ++skippedInvalidRange;
-                    continue;
-                }
-
-                Function func{};
-                func.name = name;
-                func.start = start;
-                func.end = end;
-                func.isRecompiled = false;
-                func.isStub = false;
-                func.isSkipped = false;
-
-                m_extraFunctions.push_back(std::move(func));
-                mapStarts.insert(start);
-                count++;
-            }
-            catch (...)
-            {
+                ++m_lastGhidraMapStats.skippedMalformed;
                 continue;
             }
+            // Size is read but ignored by design (Phase 19: body
+            // address count, not byte size). It is not validated:
+            // a bad Size must not reject an otherwise valid row.
+            (void)sizeStr;
+
+            const Section *section = FindFunctionSectionByAddress(m_sections, start);
+            if (!section)
+            {
+                ++m_lastGhidraMapStats.skippedNonExecutable;
+                continue;
+            }
+
+            // Phase 19 — the loader is the validation boundary for
+            // external oracle input: a misaligned start can never be
+            // a MIPS function entry (all instructions are 4-aligned),
+            // so it is skipped like the other invalid rows instead
+            // of becoming a function. Previously no alignment check
+            // existed anywhere in the loader or addOrMerge path.
+            if ((start & 0x3u) != 0)
+            {
+                ++m_lastGhidraMapStats.skippedMisaligned;
+                continue;
+            }
+
+            // Gate D gap 1 (pre-clamp) — the shared clamp repairs
+            // end <= start to start+4, which would fabricate a
+            // one-instruction function from an inverted map row.
+            // Map rows are external input: an inverted or empty
+            // range is rejected, not repaired.
+            if (requestedEnd <= start)
+            {
+                ++m_lastGhidraMapStats.skippedInvalidRange;
+                continue;
+            }
+
+            uint32_t end = ClampFunctionEndToSection(section, start, requestedEnd);
+            if (end <= start)
+            {
+                ++m_lastGhidraMapStats.skippedInvalidRange;
+                continue;
+            }
+
+            // Gate D gap 1 (post-clamp) — a function end must land
+            // on an instruction boundary. Clamping to a section end
+            // can only produce an unaligned end for a pathological
+            // section; that row is rejected rather than promoted
+            // with a mid-instruction end.
+            if ((end & 0x3u) != 0)
+            {
+                ++m_lastGhidraMapStats.skippedUnalignedEnd;
+                continue;
+            }
+
+            // Gate D gap 3 — full-span decode: every word in
+            // [start, end) must decode under rabbitizer R5900.
+            // Unreadable words (no section data) fail the same way:
+            // a row over bytes the loader cannot read cannot be
+            // validated. Honest limit: an address-like data word
+            // decodes as a real instruction (e.g. SD), so this is a
+            // plausibility filter, not a proof of code.
+            bool decodes = true;
+            for (uint32_t address = start; address < end; address += 4)
+            {
+                uint32_t word = 0;
+                const uint32_t offset = address - section->address;
+                if (!ReadSectionWord(*section, offset, word) || !R5900WordDecodes(address, word))
+                {
+                    decodes = false;
+                    break;
+                }
+            }
+            if (!decodes)
+            {
+                ++m_lastGhidraMapStats.skippedUndecodable;
+                continue;
+            }
+
+            Function func{};
+            func.name = name;
+            func.start = start;
+            func.end = end;
+            func.isRecompiled = false;
+            func.isStub = false;
+            func.isSkipped = false;
+
+            m_extraFunctions.push_back(std::move(func));
+            mapStarts.insert(start);
         }
+
+        // Gate D gap 2 — overlap sweep over the NEW slice only.
+        // Sorted with the same ordering the merge uses below
+        // (start, named-over-auto, larger end, name); first-wins
+        // keeps the earliest-starting row and rejects any later row
+        // starting before the kept row's end. Adjacency (a start
+        // exactly at the kept end) is not overlap. The rule is
+        // name-blind: it also rejects in-body label rows, which is
+        // why the Phase 19 label fixture was redesigned in Gate D.
+        {
+            auto mapRowLess = [](const Function &a, const Function &b) {
+                if (a.start != b.start)
+                {
+                    return a.start < b.start;
+                }
+                const bool aAuto = IsAutoGeneratedName(a.name);
+                const bool bAuto = IsAutoGeneratedName(b.name);
+                if (aAuto != bAuto)
+                {
+                    return !aAuto;
+                }
+                if (a.end != b.end)
+                {
+                    return a.end > b.end;
+                }
+                return a.name < b.name;
+            };
+            auto sliceBegin = m_extraFunctions.begin() + static_cast<std::ptrdiff_t>(mapBegin);
+            auto sliceEnd = m_extraFunctions.end();
+            std::sort(sliceBegin, sliceEnd, mapRowLess);
+            uint32_t keptEnd = 0;
+            bool haveKept = false;
+            auto writeIt = sliceBegin;
+            for (auto readIt = sliceBegin; readIt != sliceEnd; ++readIt)
+            {
+                const uint32_t rowStart = readIt->start;
+                const uint32_t rowEnd = readIt->end;
+                if (haveKept && rowStart < keptEnd)
+                {
+                    ++m_lastGhidraMapStats.skippedOverlapping;
+                    continue;
+                }
+                if (writeIt != readIt)
+                {
+                    *writeIt = std::move(*readIt);
+                }
+                ++writeIt;
+                keptEnd = rowEnd;
+                haveKept = true;
+            }
+            m_extraFunctions.erase(writeIt, sliceEnd);
+        }
+
+        // Gate D gap 4 — delay-slot starts. A row whose
+        // same-section predecessor word decodes (via the project
+        // decoder) as an instruction with a delay slot starts
+        // inside that branch's execution and is rejected. Real
+        // function boundaries follow the previous function's delay
+        // slot (a nop), never sit in it; the Gate D oracle tile
+        // layout models this. No membership exemption is needed:
+        // the check reads the predecessor word, not row claims.
+        {
+            R5900Decoder decoder;
+            auto sliceBegin = m_extraFunctions.begin() + static_cast<std::ptrdiff_t>(mapBegin);
+            auto sliceEnd = m_extraFunctions.end();
+            auto writeIt = sliceBegin;
+            for (auto readIt = sliceBegin; readIt != sliceEnd; ++readIt)
+            {
+                bool delaySlot = false;
+                const Section *section = FindFunctionSectionByAddress(m_sections, readIt->start);
+                if (section != nullptr && section->data != nullptr && readIt->start > section->address)
+                {
+                    uint32_t predecessor = 0;
+                    const uint32_t offset = readIt->start - 4 - section->address;
+                    if (ReadSectionWord(*section, offset, predecessor))
+                    {
+                        const Instruction inst = decoder.decodeInstruction(readIt->start - 4, predecessor, false);
+                        delaySlot = inst.hasDelaySlot;
+                    }
+                }
+                if (delaySlot)
+                {
+                    ++m_lastGhidraMapStats.skippedDelaySlot;
+                    continue;
+                }
+                if (writeIt != readIt)
+                {
+                    *writeIt = std::move(*readIt);
+                }
+                ++writeIt;
+            }
+            m_extraFunctions.erase(writeIt, sliceEnd);
+        }
+
+        // Rebuild the map-start set from the rows that survived all
+        // Gate D passes; rejected rows must not claim coverage for
+        // the map-set erasure rule below.
+        mapStarts.clear();
+        for (auto it = m_extraFunctions.begin() + static_cast<std::ptrdiff_t>(mapBegin);
+             it != m_extraFunctions.end(); ++it)
+        {
+            mapStarts.insert(it->start);
+        }
+        const int count = static_cast<int>(m_extraFunctions.size() - mapBegin);
+        m_lastGhidraMapStats.loaded = count;
+        m_lastGhidraMapStats.rowLimitExceeded = rowLimitExceeded;
+
+        // Gate D — every skip bucket warns, whether or not any row
+        // loaded: a file whose rows are all rejected must not look
+        // like a clean empty file.
+        auto warnIf = [&](int skipCount, const std::string &message) {
+            if (skipCount > 0 && m_reporter)
+            {
+                m_reporter->warning("ghidra-map", message);
+            }
+        };
 
         if (count > 0)
         {
@@ -3313,20 +3688,22 @@ namespace ps2recomp
             {
                 m_reporter->info("ghidra-map", "Loaded " + std::to_string(count) + " functions from Ghidra map");
             }
-            if (skippedNonExecutable > 0)
-            {
-                if (m_reporter)
-                {
-                    m_reporter->warning("ghidra-map", "Ignored " + std::to_string(skippedNonExecutable) + " Ghidra function(s) outside executable sections.");
-                }
-            }
-            if (skippedInvalidRange > 0)
-            {
-                if (m_reporter)
-                {
-                    m_reporter->warning("ghidra-map", "Ignored " + std::to_string(skippedInvalidRange) + " Ghidra function(s) with invalid ranges after section clamping.");
-                }
-            }
+        }
+        warnIf(m_lastGhidraMapStats.skippedNonExecutable, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedNonExecutable) + " Ghidra function(s) outside executable sections.");
+        warnIf(m_lastGhidraMapStats.skippedInvalidRange, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedInvalidRange) + " Ghidra function(s) with invalid ranges.");
+        warnIf(m_lastGhidraMapStats.skippedMisaligned, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedMisaligned) + " Ghidra function(s) with misaligned start addresses.");
+        warnIf(m_lastGhidraMapStats.skippedUnalignedEnd, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedUnalignedEnd) + " Ghidra function(s) with unaligned end addresses.");
+        warnIf(m_lastGhidraMapStats.skippedOverlapping, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedOverlapping) + " Ghidra function(s) overlapping an earlier accepted row.");
+        warnIf(m_lastGhidraMapStats.skippedUndecodable, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedUndecodable) + " Ghidra function(s) containing words that do not decode as R5900 instructions.");
+        warnIf(m_lastGhidraMapStats.skippedDelaySlot, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedDelaySlot) + " Ghidra function(s) starting in a branch delay slot.");
+        warnIf(m_lastGhidraMapStats.skippedMalformed, "Ignored " + std::to_string(m_lastGhidraMapStats.skippedMalformed) + " malformed Ghidra map row(s) that could not be parsed.");
+        if (rowLimitExceeded && m_reporter)
+        {
+            m_reporter->warning("ghidra-map", "Stopped reading Ghidra function map at the 262144-row limit; remaining rows were ignored.");
+        }
+
+        if (count > 0)
+        {
 
             m_extraFunctions.erase(
                 std::remove_if(m_extraFunctions.begin(), m_extraFunctions.end(),
@@ -3375,11 +3752,45 @@ namespace ps2recomp
             return true;
         }
 
-        if (skippedNonExecutable > 0 || skippedInvalidRange > 0)
+        if (count == 0)
         {
-            if (m_reporter)
+            const auto &stats = m_lastGhidraMapStats;
+            const bool anySkip = stats.skippedNonExecutable > 0 || stats.skippedInvalidRange > 0 ||
+                                 stats.skippedMisaligned > 0 || stats.skippedUnalignedEnd > 0 ||
+                                 stats.skippedOverlapping > 0 || stats.skippedUndecodable > 0 ||
+                                 stats.skippedDelaySlot > 0 || stats.skippedMalformed > 0 || rowLimitExceeded;
+            if (anySkip && m_reporter)
             {
-                m_reporter->warning("ghidra-map", "Loaded 0 functions from Ghidra map after filtering (" + std::to_string(skippedNonExecutable) + " non-executable, " + std::to_string(skippedInvalidRange) + " invalid range).");
+                std::string detail;
+                auto appendPart = [&](int skipCount, const char *label) {
+                    if (skipCount > 0)
+                    {
+                        if (!detail.empty())
+                        {
+                            detail += ", ";
+                        }
+                        detail += std::to_string(skipCount);
+                        detail += " ";
+                        detail += label;
+                    }
+                };
+                appendPart(stats.skippedNonExecutable, "non-executable");
+                appendPart(stats.skippedInvalidRange, "invalid range");
+                appendPart(stats.skippedMisaligned, "misaligned");
+                appendPart(stats.skippedUnalignedEnd, "unaligned end");
+                appendPart(stats.skippedOverlapping, "overlapping");
+                appendPart(stats.skippedUndecodable, "undecodable");
+                appendPart(stats.skippedDelaySlot, "delay-slot start");
+                appendPart(stats.skippedMalformed, "malformed");
+                if (rowLimitExceeded)
+                {
+                    if (!detail.empty())
+                    {
+                        detail += ", ";
+                    }
+                    detail += "row limit exceeded";
+                }
+                m_reporter->warning("ghidra-map", "Loaded 0 functions from Ghidra map after filtering (" + detail + ").");
             }
         }
 

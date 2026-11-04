@@ -48,10 +48,12 @@ at reads, rather than claiming that an event between reads reached the guest.
 Example:
 
 ```powershell
-$env:ZMBOR_PAD_SCRIPT = 'D:\Project\Testing\work\input\menu.txt'
-& work\scripts\crash_pipeline.ps1 -SkipRecompile -SkipBuild -RunSeconds 180 -Tag input_trial
+$env:ZMBOR_PAD_SCRIPT = 'C:\path\to\pad-script.txt'
+# Launch the native PS2 program you built with Zmbor (path depends on your build).
+& .\build\ps2xRuntime\ps2x_game.exe
 Remove-Item Env:ZMBOR_PAD_SCRIPT
 ```
 
 The example row timing illustrates the format; it does not establish that any
-specific game reaches a menu at frame 600.
+specific game reaches a menu at frame 600. No Crash Twinsanity checkout or
+workstation-specific pipeline script is needed for PAD playback.

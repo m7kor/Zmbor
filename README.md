@@ -423,6 +423,7 @@ and [implementation decisions](docs/engineering/PS2_IMPLEMENTATION_DECISIONS.md)
 | [Status inventory](docs/status/README.md) / [data](docs/status/components.json) | Evidence classification for all 227 declared components |
 | [Hardware comparison guide](docs/hwtest/README.md) / [TESTING.md](TESTING.md) | EE and IOP reference programs, test commands and provenance |
 | [Prosanity integration notes](docs/engineering/PROSANITY_INTEGRATION.md) | Source SHA, code import method and scope limitations |
+| [Post-merge RPC audit](docs/engineering/PROSANITY_POSTMERGE_REVIEW.md) | Reviewed EE/IOP memory issue, regression scope and remaining gates; code fix remains in PR #16 |
 | [Crash Twinsanity continuation](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md) | Historical independent game-specific evidence, **not** Zmbor core acceptance |
 | [Ghidra exporter](ps2xRecomp/tools/ghidra/ExportPS2Functions.java) | Generated function maps for stripped PS2 binaries |
 | [Architecture and acceptance](docs/architecture/) | Contracts, E2E gates, fuzzing, benchmarks and research |

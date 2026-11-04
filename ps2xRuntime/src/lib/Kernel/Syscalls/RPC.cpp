@@ -702,6 +702,81 @@ namespace ps2_syscalls
         finishCall(nullptr, *ctx);
     }
 
+    bool findEeRpcServerForIop(uint8_t *rdram, PS2Runtime *runtime, uint32_t sid, uint32_t &serverAddress,
+                               uint32_t &bufferAddress)
+    {
+        serverAddress = 0u;
+        bufferAddress = 0u;
+        uint32_t sd = 0u;
+        {
+            std::lock_guard<std::mutex> lock(g_rpc_mutex);
+            const auto it = g_rpc_servers.find(sid);
+            if (it == g_rpc_servers.end())
+                return false;
+            sd = it->second.sd_ptr;
+        }
+        const auto *server = sd ? reinterpret_cast<const t_SifRpcServerData *>(getConstMemPtr(rdram, sd)) : nullptr;
+        if (!server || server->func == 0u || !runtime || !runtime->hasFunction(server->func))
+            return false;
+        serverAddress = sd;
+        bufferAddress = server->buf;
+        return true;
+    }
+
+    bool queueEeRpcServerCallForIop(uint8_t *rdram, PS2Runtime *runtime, uint32_t serverAddress, uint32_t function,
+                                    std::vector<uint8_t> send, uint32_t receiveSize,
+                                    std::function<void(const std::vector<uint8_t> &)> onComplete)
+    {
+        auto *server = serverAddress ? reinterpret_cast<t_SifRpcServerData *>(getMemPtr(rdram, serverAddress)) : nullptr;
+        if (!runtime || !server || server->func == 0u || !runtime->hasFunction(server->func))
+            return false;
+        const uint32_t buffer = server->buf;
+        if (!send.empty())
+        {
+            if (buffer == 0u || !getMemPtr(rdram, buffer) ||
+                !getMemPtr(rdram, buffer + static_cast<uint32_t>(send.size()) - 1u))
+                return false;
+            std::memcpy(getMemPtr(rdram, buffer), send.data(), send.size());
+        }
+        server->rpc_number = static_cast<int>(function);
+        server->size = static_cast<int>(send.size());
+
+        GuestInvocation invocation{};
+        invocation.kind = GuestInvocationKind::RpcCallback;
+        invocation.context = runtime->cpu();
+        invocation.context.pc = server->func;
+        SET_GPR_U32(&invocation.context, 4, function);
+        SET_GPR_U32(&invocation.context, 5, buffer);
+        SET_GPR_U32(&invocation.context, 6, static_cast<uint32_t>(send.size()));
+        SET_GPR_U32(&invocation.context, 7, 0u);
+        SET_GPR_U32(&invocation.context, 29, 0u); // the scheduler gives queued invocations their own stack
+        SET_GPR_U32(&invocation.context, 31, 0u);
+        invocation.onComplete = [rdram, receiveSize, done = std::move(onComplete)](const R5900Context &completed, R5900Context &)
+        {
+            // ps2sdk sifrpc: the server function returns the address of the reply data; rsize bytes are sent back.
+            std::vector<uint8_t> reply;
+            const uint32_t replyAddress = getRegU32(&completed, 2);
+            if (replyAddress != 0u && receiveSize != 0u)
+            {
+                reply.resize(receiveSize, 0u);
+                for (uint32_t i = 0; i < receiveSize; ++i)
+                {
+                    const uint8_t *byte = getConstMemPtr(rdram, replyAddress + i);
+                    if (!byte)
+                    {
+                        reply.resize(i);
+                        break;
+                    }
+                    reply[i] = *byte;
+                }
+            }
+            if (done)
+                done(reply);
+        };
+        runtime->eeScheduler().queueInvocation(std::move(invocation));
+        return true;
+    }
+
     void SifRegisterRpc(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         uint32_t sdPtr = getRegU32(ctx, 4);

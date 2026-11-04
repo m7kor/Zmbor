@@ -1345,6 +1345,26 @@ namespace ps2x::iop::detail
         }
     }
 
+    int IopKernel::currentThreadId() const noexcept
+    {
+        return m_currentThread != nullptr ? m_currentThread->id : 0;
+    }
+
+    bool IopKernel::wakeupThreadFromHost(int id)
+    {
+        IopThread *thread = id == 0 ? nullptr : findThread(id);
+        if (thread == nullptr || thread->state == IopThreadState::Dormant)
+            return false;
+        if (thread->state == IopThreadState::Waiting && thread->waitType == IopWaitType::Sleep)
+        {
+            thread->cpu.gpr[2] = static_cast<uint32_t>(KE_OK);
+            makeReady(*thread, nullptr);
+        }
+        else
+            ++thread->wakeupCount;
+        return true;
+    }
+
     void IopKernel::sleepCurrent(IopCpuState &cpu)
     {
         if (!isCurrentCpu(cpu))

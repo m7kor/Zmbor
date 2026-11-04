@@ -24,6 +24,7 @@ namespace ps2_stubs
     void sceMpegDispWidth(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void sceMpegGetDecodeMode(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void sceMpegGetPicture(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
+    void sceMpegGetPictureAbort(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void sceMpegGetPictureRAW8(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void sceMpegGetPictureRAW8xy(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);
     void sceMpegInit(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime);

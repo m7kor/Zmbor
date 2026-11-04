@@ -223,6 +223,20 @@ bool PS2Ipu::pushInput(const Qword &qword)
     return true;
 }
 
+bool PS2Ipu::canConsumeInputForHle() const noexcept
+{
+    return !m_busy && m_bitPointer == 0u && m_output.empty() && m_outputPending.empty();
+}
+
+bool PS2Ipu::popInputForHle(Qword &qword)
+{
+    if (!canConsumeInputForHle() || m_input.empty())
+        return false;
+    qword = m_input.front();
+    m_input.pop_front();
+    return true;
+}
+
 bool PS2Ipu::popOutput(Qword &qword)
 {
     if (m_output.empty())

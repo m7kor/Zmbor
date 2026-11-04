@@ -5,6 +5,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <string>
+#include <map>
 
 namespace ps2x::iop
 {
@@ -54,6 +58,10 @@ namespace ps2x::iop::detail
 
         [[nodiscard]] bool hasServer(uint32_t sid) const noexcept;
         [[nodiscard]] size_t serverCount() const noexcept { return m_servers.size(); }
+        // Bring-up diagnostics: registered servers and EE->IOP calls per (sid, function).
+        [[nodiscard]] std::vector<std::string> debugLines() const;
+        // Runs IOP end_function callbacks of IOP->EE calls (set by the emulator, which owns the executor).
+        void setExecutor(IopGuestExecutor *executor) noexcept { m_executor = executor; }
 
     private:
         struct RpcServer
@@ -72,6 +80,20 @@ namespace ps2x::iop::detail
         IopMemory &m_memory;
         IopKernel &m_kernel;
         std::unordered_map<uint32_t, RpcServer> m_servers;
+        struct RpcCallCounter
+        {
+            uint64_t served = 0;
+            uint64_t noServer = 0;
+        };
+        std::map<uint64_t, RpcCallCounter> m_callCounts;
+        std::map<uint64_t, uint64_t> m_iopClientCalls; // (ordinal << 32 | sid) -> calls
+        // IOP-as-client calls to EE servers in flight (client descriptor addresses) and the sid each client bound.
+        std::unordered_set<uint32_t> m_pendingClients;
+        std::unordered_map<uint32_t, uint32_t> m_clientSids;
+        uint64_t m_iopClientCompletions = 0;
+        IopGuestExecutor *m_executor = nullptr;
+        static constexpr uint32_t kClientDataSize = 0x28u;
+        static constexpr uint32_t kRpcModeNowait = 0x1u;
         uint32_t m_nextDmaId = 1u;
         bool m_sifInitialized = false;
     };

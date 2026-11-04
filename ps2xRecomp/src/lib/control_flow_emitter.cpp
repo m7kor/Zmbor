@@ -307,6 +307,7 @@ namespace ps2recomp
         {
             m_ss << indent << "    ctx->pc = getRegU32(ctx, 31);\n";
         }
+        m_ss << fmt::format("{}    PS2X_HLE_TRACE(\"{}\", 0x{:X}u);\n", indent, handlerName, m_branchInst.address);
         m_ss << indent << "    " << (isSyscall ? "ps2_syscalls::" : "ps2_stubs::")
              << handlerName << "(rdram, ctx, runtime);\n";
         m_ss << indent << "}\n";

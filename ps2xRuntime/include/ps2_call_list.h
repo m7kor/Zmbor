@@ -308,6 +308,7 @@
     X(sceCdReadClock)                         \
     X(sceCdReadIOPm)                          \
     X(sceCdSearchFile)                        \
+    X(sceCdLayerSearchFile)                   \
     X(sceCdSeek)                              \
     X(sceCdStInit)                            \
     X(sceCdStPause)                           \
@@ -454,6 +455,7 @@
     X(sceMpegDispWidth)                       \
     X(sceMpegGetDecodeMode)                   \
     X(sceMpegGetPicture)                      \
+    X(sceMpegGetPictureAbort)                 \
     X(sceMpegGetPictureRAW8)                  \
     X(sceMpegGetPictureRAW8xy)                \
     X(sceMpegInit)                            \

@@ -26,6 +26,7 @@
 
 #include "ps2_log.h"
 #include "runtime/ps2_address.h"
+#include "runtime/zmbor_trace.h"
 #include "runtime/gs/ps2_gif_arbiter.h"
 #include "runtime/ps2_memory.h"
 #include "runtime/gs/gs_frontend.h"
@@ -437,6 +438,27 @@ public:
     void requestStop();
     bool isStopRequested() const;
 
+    // Why the guest run ended. The first non-normal reason recorded wins (it is the earliest failure; anything
+    // after it is a consequence). processExitCode() maps it to the host exit status so a failed guest is never
+    // reported as success. Harness timeouts are decided outside the process and are not represented here.
+    enum class GuestTermination : uint32_t
+    {
+        None = 0,                  // run() has not ended, or ended with no recorded reason (all threads dormant)
+        GuestExit = 1,             // guest Exit syscall / exit() stub
+        UserClose = 2,             // host window closed by the user
+        UnresolvedControlFlow = 3, // a guest transfer reached an address with no recompiled function
+        GuestFatal = 4,            // guest-visible fatal condition (unhandled guest exception)
+        Unsupported = 5,           // the guest needed an operation the runtime does not implement
+        HostFailure = 6,           // host-side exception or runtime failure
+        HarnessTimeout = 124,      // ZMBOR_RUN_SECONDS elapsed: a test-harness limit, not a guest result
+    };
+    void noteGuestTermination(GuestTermination reason, const std::string &detail);
+    GuestTermination guestTermination() const;
+    std::string guestTerminationDetail() const;
+    static const char *describeGuestTermination(GuestTermination reason);
+    // 0 for None/GuestExit/UserClose; for a failure the enum value (3..6); 124 for HarnessTimeout.
+    int processExitCode() const;
+
     EeScheduler &eeScheduler();
     const EeScheduler &eeScheduler() const;
     void postEeEvent(EeEvent event);
@@ -583,6 +605,9 @@ private:
 
     std::atomic<uint32_t> m_missingFunctionPolicy{static_cast<uint32_t>(MissingFunctionPolicy::ContinueToTarget)};
     std::atomic<bool> m_missingFunctionReported{false};
+    mutable std::mutex m_terminationMutex;
+    GuestTermination m_termination = GuestTermination::None;
+    std::string m_terminationDetail;
     std::atomic<bool> m_stopRequested{false};
     DebugUiCallback m_debugUiInitCallback = nullptr;
     DebugUiCallback m_debugUiDrawCallback = nullptr;

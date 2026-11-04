@@ -28,6 +28,7 @@ namespace ps2_stubs
     {
         if (runtime)
         {
+            runtime->noteGuestTermination(PS2Runtime::GuestTermination::GuestExit, "exit()");
             runtime->requestStop();
         }
         setReturnS32(ctx, 0);

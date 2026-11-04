@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <string_view>
@@ -72,6 +73,40 @@ namespace
         bool hasGuestFunction(uint32_t) const override { return false; }
         bool invokeGuestFunction(uint64_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t *) override { return false; }
         void log(LogLevel, std::string_view message) override { logs.emplace_back(message); }
+
+        // EE side of IOP-as-client RPC: one EE server (eeServerSid) whose reply is the first send word + function.
+        bool findEeRpcServer(uint32_t sid, uint32_t &serverAddress, uint32_t &bufferAddress) override
+        {
+            lastBoundSid = sid;
+            serverAddress = (eeServerSid != 0u && sid == eeServerSid) ? 0x00E01000u : 0u;
+            bufferAddress = serverAddress != 0u ? 0x00E02000u : 0u;
+            return serverAddress != 0u;
+        }
+        bool callEeRpc(uint32_t serverAddress, uint32_t function, std::vector<uint8_t> send, uint32_t receiveSize,
+                       std::function<void(const std::vector<uint8_t> &)> onComplete) override
+        {
+            ++eeCalls;
+            lastServer = serverAddress;
+            lastFunction = function;
+            uint32_t word = 0u;
+            std::memcpy(&word, send.data(), std::min<size_t>(send.size(), sizeof(word)));
+            word += function;
+            std::vector<uint8_t> reply(receiveSize, 0u);
+            std::memcpy(reply.data(), &word, std::min<size_t>(reply.size(), sizeof(word)));
+            if (deferEeReply)
+                pendingEeReply = [onComplete, reply]() { onComplete(reply); };
+            else
+                onComplete(reply);
+            return true;
+        }
+
+        uint32_t eeServerSid = 0u;
+        bool deferEeReply = false;
+        std::function<void()> pendingEeReply;
+        uint32_t lastBoundSid = 0u;
+        uint32_t lastServer = 0u;
+        uint32_t lastFunction = 0u;
+        int eeCalls = 0;
 
         std::vector<uint8_t> guest;
         std::vector<std::string> logs;
@@ -258,6 +293,99 @@ namespace
         std::memcpy(host.guest.data() + address + codeOffset, code, sizeof(code));
         std::memcpy(host.guest.data() + address + codeOffset + importTableOffset,
                     importTable, sizeof(importTable));
+    }
+
+
+    // IRX whose start code is an IOP client of an EE RPC server, as Crash Twinsanity's STREAM.IRX is of the EE sid
+    // 0x12344321: sceSifBindRpc(cd = 0x10200, 0x12344321, 0), then a blocking sceSifCallRpc(cd, 7, 0, send = 0x10400
+    // holding 0xCAFEF00D, 4, recv = 0x10480, 4, 0, 0); the start result is the received word.
+    void writeIopClientIrx(TestHost &host, uint32_t address)
+    {
+        constexpr uint32_t codeOffset = 0x100u;
+        constexpr uint32_t loadAddress = 0x00010000u;
+        constexpr uint32_t importTableOffset = 0xA0u;
+        constexpr uint32_t bindStub = loadAddress + importTableOffset + 20u;
+        constexpr uint32_t callStub = bindStub + 8u;
+
+        ElfHeader header{};
+        header.ident[0] = 0x7Fu;
+        header.ident[1] = 'E';
+        header.ident[2] = 'L';
+        header.ident[3] = 'F';
+        header.ident[4] = 1u;
+        header.ident[5] = 1u;
+        header.ident[6] = 1u;
+        header.type = 2u;
+        header.machine = 8u;
+        header.version = 1u;
+        header.entry = loadAddress;
+        header.phoff = sizeof(ElfHeader);
+        header.ehsize = sizeof(ElfHeader);
+        header.phentsize = sizeof(ProgramHeader);
+        header.phnum = 1u;
+
+        const uint32_t code[] = {
+            0x27BDFFD0u, // addiu sp, sp, -0x30
+            0xAFBF002Cu, // sw    ra, 0x2c(sp)
+            0x3C08CAFEu, // lui   t0, 0xcafe
+            0x3508F00Du, // ori   t0, t0, 0xf00d
+            0x3C090001u, // lui   t1, 1
+            0xAD280400u, // sw    t0, 0x400(t1)   send word
+            0x3C040001u, // lui   a0, 1
+            0x34840200u, // ori   a0, a0, 0x200   cd
+            0x3C051234u, // lui   a1, 0x1234
+            0x34A54321u, // ori   a1, a1, 0x4321  sid
+            0x00003021u, // addu  a2, zero, zero
+            0x0C000000u | ((bindStub >> 2u) & 0x03FFFFFFu), // jal sceSifBindRpc
+            0x00000000u, // nop
+            0x3C040001u, // lui   a0, 1
+            0x34840200u, // ori   a0, a0, 0x200   cd
+            0x24050007u, // addiu a1, zero, 7     fno
+            0x00003021u, // addu  a2, zero, zero  blocking
+            0x3C070001u, // lui   a3, 1
+            0x34E70400u, // ori   a3, a3, 0x400   send
+            0x24080004u, // addiu t0, zero, 4
+            0xAFA80010u, // sw    t0, 0x10(sp)    ssize
+            0x3C080001u, // lui   t0, 1
+            0x35080480u, // ori   t0, t0, 0x480
+            0xAFA80014u, // sw    t0, 0x14(sp)    recv
+            0x24080004u, // addiu t0, zero, 4
+            0xAFA80018u, // sw    t0, 0x18(sp)    rsize
+            0xAFA0001Cu, // sw    zero, 0x1c(sp)  end_function
+            0x0C000000u | ((callStub >> 2u) & 0x03FFFFFFu), // jal sceSifCallRpc
+            0xAFA00020u, // sw    zero, 0x20(sp)  end_param (delay slot)
+            0x3C090001u, // lui   t1, 1
+            0x8D220480u, // lw    v0, 0x480(t1)   received word
+            0x8FBF002Cu, // lw    ra, 0x2c(sp)
+            0x27BD0030u, // addiu sp, sp, 0x30
+            0x03E00008u, // jr    ra
+            0x00000000u, // nop
+        };
+        static_assert(sizeof(code) <= importTableOffset);
+        const uint32_t importTable[] = {
+            0x41E00000u, 0x00000000u, 0x00000101u,
+            0x63666973u, // "sifc"
+            0x0000646Du, // "md"
+            0x03E00008u, 0x2400000Fu, // sceSifBindRpc (15)
+            0x03E00008u, 0x24000010u, // sceSifCallRpc (16)
+            0x00000000u, 0x00000000u,
+        };
+
+        ProgramHeader program{};
+        program.type = 1u;
+        program.offset = codeOffset;
+        program.vaddr = loadAddress;
+        program.paddr = loadAddress;
+        program.filesz = importTableOffset + sizeof(importTable);
+        program.memsz = 0x500u;
+        program.flags = 7u;
+        program.align = 4u;
+
+        std::fill(host.guest.begin() + address, host.guest.end(), 0u);
+        std::memcpy(host.guest.data() + address, &header, sizeof(header));
+        std::memcpy(host.guest.data() + address + sizeof(header), &program, sizeof(program));
+        std::memcpy(host.guest.data() + address + codeOffset, code, sizeof(code));
+        std::memcpy(host.guest.data() + address + codeOffset + importTableOffset, importTable, sizeof(importTable));
     }
 
     // withSymbols: relocations name a .text section symbol whose value (0x20) is not zero, as in ps2sdk-built IRXs;
@@ -1176,6 +1304,52 @@ int main()
         { return message.find("unhandled import cdvdman:7") != std::string::npos; });
     if (!expect(!emittedUnhandledSeek,
                 "sceCdSeek still emitted an unhandled IOP import")) return 1;
+
+    // IOP as the client of an EE RPC server (sifcmd 15/16): bind fills cd.server, a blocking call carries the
+    // send data to the EE server and its reply back. These ordinals used to return 0 without binding.
+    {
+        TestHost eeHost(0x20000u);
+        eeHost.eeServerSid = 0x12344321u;
+        IopSubsystem clientIop(eeHost);
+        writeIopClientIrx(eeHost, 0x100u);
+        const ModuleLoadResult client = clientIop.loadModuleBuffer(0x100u);
+        uint32_t boundServer = 0u;
+        (void)clientIop.readMemory(0x00010224u, &boundServer, sizeof(boundServer));
+        if (!expect(eeHost.lastBoundSid == 0x12344321u, "IOP sceSifBindRpc did not ask the EE for its sid")) return 1;
+        if (!expect(boundServer == 0x00E01000u, "IOP sceSifBindRpc did not fill cd.server")) return 1;
+        if (!expect(eeHost.eeCalls == 1 && eeHost.lastFunction == 7u && eeHost.lastServer == 0x00E01000u,
+                    "IOP sceSifCallRpc did not reach the EE server with its function number")) return 1;
+        if (!expect(client.handled && client.startResult == static_cast<int32_t>(0xCAFEF00Du + 7u),
+                    "IOP sceSifCallRpc did not return the EE server reply")) return 1;
+    }
+    {
+        // Deferred EE reply: the blocking call must sleep the IOP thread, then the reply wakes it.
+        TestHost eeHost(0x20000u);
+        eeHost.eeServerSid = 0x12344321u;
+        eeHost.deferEeReply = true;
+        IopSubsystem clientIop(eeHost);
+        writeIopClientIrx(eeHost, 0x100u);
+        (void)clientIop.loadModuleBuffer(0x100u);
+        uint32_t received = 0u;
+        (void)clientIop.readMemory(0x00010480u, &received, sizeof(received));
+        if (!expect(eeHost.eeCalls == 1 && received == 0u && eeHost.pendingEeReply,
+                    "Blocking IOP sceSifCallRpc did not wait for the EE reply")) return 1;
+        eeHost.pendingEeReply();
+        clientIop.runEeCycles(1u << 20);
+        (void)clientIop.readMemory(0x00010480u, &received, sizeof(received));
+        if (!expect(received == 0xCAFEF00Du + 7u, "Deferred EE reply was not written to the IOP receive buffer")) return 1;
+    }
+    {
+        // No EE server registered yet: cd.server stays 0 (the SDK's retry signal) and no call reaches the EE.
+        TestHost eeHost(0x20000u);
+        IopSubsystem clientIop(eeHost);
+        writeIopClientIrx(eeHost, 0x100u);
+        (void)clientIop.loadModuleBuffer(0x100u);
+        uint32_t boundServer = 1u;
+        (void)clientIop.readMemory(0x00010224u, &boundServer, sizeof(boundServer));
+        if (!expect(boundServer == 0u && eeHost.eeCalls == 0,
+                    "Bind to an unregistered EE server must leave cd.server at 0")) return 1;
+    }
 
     std::cout << "ps2xIOP emulator smoke tests passed\n";
     return 0;

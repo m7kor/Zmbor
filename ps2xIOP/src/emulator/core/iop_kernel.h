@@ -98,6 +98,11 @@ namespace ps2x::iop::detail
 
         [[nodiscard]] size_t threadCount() const noexcept { return m_threads.size(); }
         [[nodiscard]] bool hasCurrentThread() const noexcept { return m_currentThread != nullptr; }
+        // Id of the running thread, or 0 when none (host-side services that block it and wake it later).
+        [[nodiscard]] int currentThreadId() const noexcept;
+        // WakeupThread from outside guest code (no caller CPU): a sleeping thread becomes ready, otherwise its
+        // wakeup count increases, as the WakeupThread import does. Returns false for an unknown or dormant thread.
+        bool wakeupThreadFromHost(int id);
 
     private:
         struct WaitQueue

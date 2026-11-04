@@ -1,4 +1,5 @@
 #include "runtime/ps2_memory.h"
+#include "runtime/zmbor_trace.h"
 #include "ps2x/iop/sif0_fifo.h"
 #include "runtime/ps2_address.h"
 #include "runtime/gs/gs_frontend.h"
@@ -1421,6 +1422,20 @@ bool PS2Memory::writeIORegister(uint32_t address, uint32_t value)
 
             const uint32_t channelBase = address & 0xFFFFFF00;
             m_dmaStartCount.fetch_add(1, std::memory_order_relaxed);
+            if (zmbor_trace::enabled(zmbor_trace::kGs))
+            {
+                const auto reg = [&](uint32_t offset)
+                {
+                    const auto it = m_ioRegisters.find(channelBase + offset);
+                    return it == m_ioRegisters.end() ? 0u : static_cast<uint32_t>(it->second);
+                };
+                char key[48];
+                std::snprintf(key, sizeof(key), "dma_start ch=0x%08x mod=%u", channelBase, (value >> 2) & 3u);
+                char detail[96];
+                std::snprintf(detail, sizeof(detail), "chcr=0x%x madr=0x%x qwc=0x%x tadr=0x%x", value, reg(0x10),
+                              reg(0x20), reg(0x30));
+                zmbor_trace::record(zmbor_trace::kGs, key, 0u, detail);
+            }
 
             if (tryProcessScratchpadDma(channelBase, value))
             {
@@ -2385,6 +2400,27 @@ bool PS2Memory::isDrainChannelHeld(uint32_t channelBase) const
     return (m_mfifoDrainStalled && channelBase == mfifoDrainChannel()) ||
            (m_stallHeldChannel != 0u && channelBase == m_stallHeldChannel) ||
            (m_toIpuActive && channelBase == 0x1000B400u) || (m_fromIpuActive && channelBase == 0x1000B000u);
+}
+
+size_t PS2Memory::drainIpuInputForHle(size_t maxQwords, std::vector<uint8_t> &output)
+{
+    if (maxQwords == 0u || !m_ipu.canConsumeInputForHle())
+        return 0u;
+    const size_t available = m_ipu.inputQwords() + m_toIpuPending.size();
+    const size_t count = std::min(maxQwords, available);
+    if (count > (output.max_size() - output.size()) / 16u)
+        throw std::length_error("HLE IPU input exceeds destination capacity");
+    // Allocate before consuming anything, so an allocation failure cannot lose authoritative FIFO bytes.
+    output.reserve(output.size() + count * 16u);
+    size_t drained = 0u;
+    PS2Ipu::Qword qword{};
+    while (drained < count && m_ipu.popInputForHle(qword))
+    {
+        output.insert(output.end(), qword.begin(), qword.end());
+        ++drained;
+        serviceIpu();
+    }
+    return drained;
 }
 
 // toIPU moves qwords into the IPU input FIFO while it has room (8 qwords) and the IPU consumes them as its command

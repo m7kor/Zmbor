@@ -69,6 +69,11 @@ public:
     [[nodiscard]] std::vector<PS2VfsDescriptorInfo> descriptors() const;
 
 private:
+    [[nodiscard]] int32_t openImpl(std::string_view path, uint32_t flags, const PS2VfsMounts &mounts, const PS2RomDevice &rom);
+
+public:
+
+private:
     struct OpenDescriptor
     {
         std::unique_ptr<IPS2OpenFile> file;

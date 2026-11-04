@@ -9,7 +9,9 @@ option(PS2X_ENABLE_RUNNER_UNITY_BUILD "Build ps2EntryRunner with CMake unity bui
 set(PS2X_RUNNER_UNITY_BUILD_BATCH_SIZE 32 CACHE STRING "Unity build batch size for ps2EntryRunner")
 option(PS2X_ENABLE_RUNNER_PCH "Precompile the heavy runtime headers for ps2EntryRunner" ON)
 option(PS2X_ENABLE_RUNTIME_LOGS "Enable PS2 runtime logs" ON)
-option(PS2X_ENABLE_AGRESSIVE_LOGS "Enable very verbose/agressive PS2 runtime logs" ON)
+# Function entry/exit tracing flushes a file on every guest call. Keep this
+# diagnostic opt-in; enabling it can dominate a native game's execution time.
+option(PS2X_ENABLE_AGRESSIVE_LOGS "Enable very verbose/agressive PS2 runtime logs" OFF)
 option(PS2X_ENABLE_IOP_RPC_TRACE "Log unhandled IOP/SIF RPC trace suggestions" ON)
 option(PS2X_STRICT_RETURN_DIAGNOSTICS "Route generated JR $ra returns through runtime branch diagnostics" OFF)
 option(PS2X_SHOW_WINDOWS_CONSOLE "Show a console window for ps2EntryRunner on Windows release builds" ON)
@@ -243,6 +245,15 @@ elseif(WIN32)
     set(FFMPEG_PREBUILT_TAG "n7.1-241205")
     set(FFMPEG_PREBUILT_URL
         "https://github.com/System233/ffmpeg-msvc-prebuilt/releases/download/${FFMPEG_PREBUILT_TAG}/ffmpeg-${FFMPEG_PREBUILT_TAG}-lgpl-amd64-shared.zip")
+    # Integrity pin (computed 2026-11-04; the GitHub asset carries no digest). The archive is FFmpeg 7.1
+    # (libavcodec 61.19), x86-64, "LGPL version 2.1 or later" per avutil_license(), configured without
+    # --enable-gpl/--enable-nonfree. PS2X_FFMPEG_ARCHIVE points at an already downloaded copy (offline builds);
+    # the hash is checked either way.
+    set(FFMPEG_PREBUILT_SHA256 "B985887DBCA8C0A9A4C47F9D2BAC7EC3AB994335B1B7FE7000BDB1DCD772AC68")
+    set(PS2X_FFMPEG_ARCHIVE "" CACHE FILEPATH "Local copy of the pinned FFmpeg prebuilt archive (optional)")
+    if(PS2X_FFMPEG_ARCHIVE)
+        set(FFMPEG_PREBUILT_URL "${PS2X_FFMPEG_ARCHIVE}")
+    endif()
 
     set(FFMPEG_PREFIX_DIR "${CMAKE_BINARY_DIR}/ThirdParty/ffmpeg-prefix")
     set(FFMPEG_SOURCE_DIR "${FFMPEG_PREFIX_DIR}/src/ffmpeg_external")
@@ -252,6 +263,7 @@ elseif(WIN32)
 
     ExternalProject_Add(ffmpeg_external
         URL "${FFMPEG_PREBUILT_URL}"
+        URL_HASH "SHA256=${FFMPEG_PREBUILT_SHA256}"
         DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         PREFIX "${FFMPEG_PREFIX_DIR}"
         CONFIGURE_COMMAND ""
@@ -361,6 +373,8 @@ endfunction()
 
 add_library(ps2_runtime STATIC
     src/lib/game_overrides.cpp
+    src/lib/zmbor_trace.cpp
+    src/lib/zmbor_trace_hle.cpp
     src/lib/gs/ps2_gif_arbiter.cpp
     src/lib/ps2_audio.cpp
     src/lib/ps2_audio_vag.cpp
@@ -371,6 +385,7 @@ add_library(ps2_runtime STATIC
     src/lib/ps2_memory.cpp
     src/lib/ps2_ipu.cpp
     src/lib/ps2_pad.cpp
+    src/lib/pad_playback.cpp
     src/lib/ps2_rom_device.cpp
     src/lib/ps2_vfs.cpp
     src/lib/ps2_runtime.cpp
@@ -648,6 +663,44 @@ endif()
 
 if(PS2X_IS_ANDROID)
     target_sources(ps2EntryRunner PRIVATE src/lib/ps2_android_runtime.cpp)
+endif()
+
+# Out-of-tree recompiled program. -DPS2X_GAME_GENERATED_DIR=<ps2_recomp output directory> builds ps2x_game from that
+# directory, so user-supplied (possibly copyrighted) generated sources never have to be copied into src/runner or
+# include/. Same runtime, main.cpp and link options as ps2EntryRunner; nothing game-specific is compiled in.
+set(PS2X_GAME_GENERATED_DIR "" CACHE PATH "ps2_recomp output directory to build as the ps2x_game executable")
+option(PS2X_GAME_OPTIMIZE "Optimize the recompiled sources of ps2x_game (much slower to build)" OFF)
+set(PS2X_GAME_UNITY_BATCH_SIZE 64 CACHE STRING "Unity build batch size for ps2x_game")
+if(PS2X_GAME_GENERATED_DIR AND NOT PS2X_IS_ANDROID AND NOT PS2X_IS_VITA)
+    file(GLOB PS2X_GAME_SOURCES CONFIGURE_DEPENDS "${PS2X_GAME_GENERATED_DIR}/*.cpp")
+    if(NOT PS2X_GAME_SOURCES OR NOT EXISTS "${PS2X_GAME_GENERATED_DIR}/ps2_recompiled_functions.h")
+        message(FATAL_ERROR "PS2X_GAME_GENERATED_DIR=${PS2X_GAME_GENERATED_DIR} holds no ps2_recomp output")
+    endif()
+    add_executable(ps2x_game "${ROOT_MAIN_CPP}" ${PS2X_GAME_SOURCES})
+    # BEFORE: include/ may hold stale (git-ignored) generated headers from an in-tree runner build.
+    target_include_directories(ps2x_game BEFORE PRIVATE "${PS2X_GAME_GENERATED_DIR}")
+    target_link_libraries(ps2x_game PRIVATE ps2_runtime)
+    set_target_properties(ps2x_game PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE "${PS2X_GAME_UNITY_BATCH_SIZE}")
+    set_source_files_properties("${ROOT_MAIN_CPP}" PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE SKIP_PRECOMPILE_HEADERS TRUE)
+    target_precompile_headers(ps2x_game PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/ps2_runtime_macros.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/ps2_runtime.h"
+        "${PS2X_GAME_GENERATED_DIR}/ps2_recompiled_functions.h"
+        "${PS2X_GAME_GENERATED_DIR}/ps2_recompiled_stubs.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/ps2_syscalls.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/ps2_stubs.h")
+    if(NOT PS2X_GAME_OPTIMIZE)
+        # Target-wide, not per source: per-source COMPILE_OPTIONS take files out of the unity batches and make
+        # them disagree with the precompiled header (C4653), which compiled every function as its own TU.
+        target_compile_options(ps2x_game PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/Od,-O0>")
+    endif()
+    if(MSVC)
+        target_compile_options(ps2x_game PRIVATE /bigobj /FS)
+        # Same reasons as the hardware-test executables: unoptimized recompiled frames are large, and the
+        # WinAPI/raylib CloseWindow clash needs /FORCE:MULTIPLE.
+        target_link_options(ps2x_game PRIVATE "/STACK:67108864" "/FORCE:MULTIPLE")
+    endif()
+    ps2x_stage_ffmpeg_runtime_dlls(ps2x_game)
 endif()
 
 install(TARGETS ps2_runtime ps2EntryRunner

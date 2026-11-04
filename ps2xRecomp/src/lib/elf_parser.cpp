@@ -1,3 +1,18 @@
+#define NOMINMAX
+
+// Platform headers come before rabbitizer.h: rabbitizer's common/Utils.h defines CONST as [[gnu::const]] (and
+// PURE), and <windows.h> uses CONST in winnt.h/winscard.h prototypes, which then fail with C2733/C2373 on the
+// Windows 10.0.26100 SDK (CI windows-msvc-x86_64 on main 0ec3f4e).
+#include <fcntl.h>
+
+#if defined(_WIN32)
+#include <io.h>
+#include <direct.h>
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #include "ps2recomp/elf_parser.h"
 #include "ps2recomp/instructions.h"
 #include "ps2recomp/r5900_decoder.h"
@@ -9,17 +24,6 @@
 #include <optional>
 #include <stdexcept>
 #include <unordered_set>
-#define NOMINMAX
-
-#include <fcntl.h>
-
-#if defined(_WIN32)
-#include <io.h>
-#include <direct.h>
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 #include "libdwarf_private.h"
 #include <libdwarf.h>
 #include <dwarf.h>
@@ -1537,6 +1541,90 @@ namespace
         return name == ".ctors" || name == ".dtors" || name == ".init_array" || name == ".fini_array";
     }
 
+    // A straight-line leaf method: the address starts right after a function boundary (`jr $ra`, its delay slot,
+    // then at most kMaxPaddingWords non-branch filler words) and runs without any branch, jump, call, SYSCALL or BREAK to its own
+    // `jr $ra` within kMaxBodyWords. This is the shape of retail accessor methods (field loads/stores, then return)
+    // whose `jr $ra` lies just beyond LooksLikeCallableEntry's eight-word leaf window: Crash Twinsanity
+    // (SLUS_209.09) vtables at 0x2f4d4c/0x302864 point at 0x25a4e0, 0x25a510, 0x25a540 and 0x25a570, each with
+    // `jr $ra` at word 9, and a JALR to 0x25a4e0 found no recompiled entry. Neither half is evidence on its own
+    // (a post-return prologue alone stays a hint, an isolated pointer stays data); the caller additionally
+    // requires a clustered neighbor pointer.
+    bool IsStraightLineLeafMethod(const std::vector<ps2recomp::Section> &sections, uint32_t address)
+    {
+        constexpr uint32_t kMaxPaddingWords = 3;
+        constexpr uint32_t kMaxBodyWords = 32;
+        const ps2recomp::Section *section = FindCodeSectionByAddress(sections, address);
+        if (!section || !section->data || (address % MIPS_INSTRUCTION_SIZE) != 0)
+        {
+            return false;
+        }
+        const auto isReturn = [](uint32_t raw)
+        { return OPCODE(raw) == OPCODE_SPECIAL && FUNCTION(raw) == SPECIAL_JR && RS(raw) == GPR_RA; };
+
+        // Backward: `jr $ra`, its delay slot, then 0..kMaxPaddingWords filler words. Filler is usually zero `nop`
+        // padding, but compilers also leave unreachable non-branch words there (Crash Twinsanity 0x25ae7c..0x25ae84:
+        // `nop; addiu sp,sp,0x30; nop` between a return and the vtable accessor 0x25ae88). A filler word must not be
+        // a control transfer. The delay slot may itself be a `nop`, so every filler count is tried.
+        const uint32_t offset = address - section->address;
+        uint32_t raw = 0;
+        bool afterReturn = false;
+        for (uint32_t padding = 0; padding <= kMaxPaddingWords && !afterReturn; ++padding)
+        {
+            const uint32_t returnBack = (padding + 2u) * MIPS_INSTRUCTION_SIZE;
+            if (offset < returnBack)
+            {
+                break;
+            }
+            if (padding > 0)
+            {
+                if (!ReadSectionWord(*section, offset - padding * MIPS_INSTRUCTION_SIZE, raw) || IsControlTransfer(raw))
+                {
+                    break; // filler words are contiguous non-branch words directly before the address
+                }
+                // A prologue (frame allocation or $ra save) before the address means the address is inside that
+                // function, not after a boundary.
+                const uint32_t op = OPCODE(raw);
+                const bool allocatesFrame = (op == OPCODE_ADDIU || op == OPCODE_DADDIU) && RS(raw) == GPR_SP &&
+                                            RT(raw) == GPR_SP && (IMMEDIATE(raw) & MIPS_IMMEDIATE_SIGN_BIT) != 0;
+                const bool savesRa = (op == OPCODE_SW || op == OPCODE_SD || op == OPCODE_SQ) && RS(raw) == GPR_SP &&
+                                     RT(raw) == GPR_RA;
+                if (allocatesFrame || savesRa)
+                {
+                    break;
+                }
+            }
+            afterReturn = ReadSectionWord(*section, offset - returnBack, raw) && isReturn(raw);
+        }
+        if (!afterReturn)
+        {
+            return false;
+        }
+
+        // Forward: straight-line body ending in its own `jr $ra`.
+        const uint32_t start = address - section->address;
+        for (uint32_t i = 0; i < kMaxBodyWords; ++i)
+        {
+            if (!ReadSectionWord(*section, start + i * MIPS_INSTRUCTION_SIZE, raw))
+            {
+                return false;
+            }
+            if (isReturn(raw))
+            {
+                return i > 0; // a bare `jr $ra` is handled by the leaf-thunk rules, not here
+            }
+            const uint32_t opcode = OPCODE(raw);
+            const bool copBranch = (opcode == OPCODE_COP0 || opcode == OPCODE_COP1 || opcode == OPCODE_COP2) &&
+                                   RS(raw) == 0x08u;
+            const bool trap = opcode == OPCODE_SPECIAL &&
+                              (FUNCTION(raw) == SPECIAL_SYSCALL || FUNCTION(raw) == SPECIAL_BREAK);
+            if (IsControlTransfer(raw) || copBranch || trap)
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
     void ScanDataFunctionPointerTables(const std::vector<ps2recomp::Section> &sections, std::unordered_set<uint32_t> &starts)
     {
         struct PointerCandidate
@@ -1544,6 +1632,7 @@ namespace
             uint32_t sourceOffset;
             uint32_t target;
             bool hasConservativeShape;
+            bool isLeafMethod;
         };
 
         constexpr uint32_t kClusterDistanceBytes = 32;
@@ -1563,7 +1652,9 @@ namespace
                 uint32_t target = 0;
                 if (ReadSectionWord(section, offset, target) && (target % MIPS_INSTRUCTION_SIZE) == 0 && FindCodeSectionByAddress(sections, target))
                 {
-                    candidates.push_back({offset, target, LooksLikeCallableEntry(sections, target, true)});
+                    const bool conservative = LooksLikeCallableEntry(sections, target, true);
+                    candidates.push_back({offset, target, conservative,
+                                          !conservative && IsStraightLineLeafMethod(sections, target)});
                 }
             }
 
@@ -1684,6 +1775,37 @@ namespace
                 if (hasConservativeAnchor && LooksLikeCallableEntry(sections, candidates[index].target, true, true))
                 {
                     starts.insert(candidates[index].target);
+                    continue;
+                }
+
+                // A straight-line leaf method clustered with another table entry that is itself a conservative
+                // entry or another leaf method (a vtable of accessors). See IsStraightLineLeafMethod.
+                if (candidates[index].isLeafMethod)
+                {
+                    // candidates are in sourceOffset order: only the window around index can be in range.
+                    const auto anchors = [&](size_t neighbor)
+                    {
+                        return candidates[neighbor].target != candidates[index].target &&
+                               (candidates[neighbor].hasConservativeShape || candidates[neighbor].isLeafMethod);
+                    };
+                    bool anchored = false;
+                    for (size_t neighbor = index; neighbor > 0 && !anchored;)
+                    {
+                        --neighbor;
+                        if (candidates[index].sourceOffset - candidates[neighbor].sourceOffset > kClusterDistanceBytes)
+                            break;
+                        anchored = anchors(neighbor);
+                    }
+                    for (size_t neighbor = index + 1; neighbor < candidates.size() && !anchored; ++neighbor)
+                    {
+                        if (candidates[neighbor].sourceOffset - candidates[index].sourceOffset > kClusterDistanceBytes)
+                            break;
+                        anchored = anchors(neighbor);
+                    }
+                    if (anchored)
+                    {
+                        starts.insert(candidates[index].target);
+                    }
                 }
             }
         }

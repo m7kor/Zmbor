@@ -542,6 +542,22 @@ namespace ps2_stubs
         sceCdRead(rdram, ctx, runtime);
     }
 
+    // sceCdLayerSearchFile(sceCdlFILE *fp, const char *name, int layer): the dual-layer DVD form of sceCdSearchFile.
+    // Without a handler the game's own libcdvd code ran and bound the IOP cdvdfsv search-file RPC (sid 0x80000597),
+    // which no IOP service provides, so it retried forever (Crash Twinsanity, when starting its first movie). The
+    // host disc is one filesystem: layer 0 is a normal search; a layer-1 search reports "not found" (0), as a
+    // single-layer disc does, instead of answering from the wrong layer.
+    void sceCdLayerSearchFile(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        if (getRegU32(ctx, 6) != 0u)
+        {
+            g_lastCdError = -1;
+            setReturnS32(ctx, 0);
+            return;
+        }
+        sceCdSearchFile(rdram, ctx, runtime);
+    }
+
     void sceCdSearchFile(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         uint32_t fileAddr = getRegU32(ctx, 4);
@@ -571,7 +587,16 @@ namespace ps2_stubs
                 preview << std::hex;
                 for (uint32_t i = 0; i < 16; ++i)
                 {
-                    const uint8_t byte = *getConstMemPtr(rdram, pathAddr + i);
+                    const uint64_t previewAddr = static_cast<uint64_t>(pathAddr) + i;
+                    const uint8_t *ptr = previewAddr <= 0xFFFFFFFFull
+                                             ? getConstMemPtr(rdram, static_cast<uint32_t>(previewAddr))
+                                             : nullptr;
+                    if (!ptr)
+                    {
+                        preview << (i == 0 ? "" : " ") << "<unmapped>";
+                        break;
+                    }
+                    const uint8_t byte = *ptr;
                     preview << (i == 0 ? "" : " ") << static_cast<uint32_t>(byte);
                 }
                 std::cerr << "[sceCdSearchFile] empty path at 0x" << std::hex << pathAddr

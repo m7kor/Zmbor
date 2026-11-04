@@ -2,6 +2,7 @@
 #define PS2_LOG_H
 
 #include <algorithm>
+#include <cstddef>
 #include <deque>
 #include <filesystem>
 #include <fstream>

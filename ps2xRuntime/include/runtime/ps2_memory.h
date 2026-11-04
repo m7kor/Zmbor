@@ -10,7 +10,9 @@
 #include <atomic>
 #include <iostream>
 #include <mutex>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 
 // Phase 15: a TLB miss is a distinct failure, not a generic address error.
 // translateAddress() throws this (derived from std::runtime_error, so
@@ -21,8 +23,19 @@ struct Ps2TlbMissError : std::runtime_error
 {
     uint32_t vaddr;
     explicit Ps2TlbMissError(uint32_t v)
-        : std::runtime_error("TLB miss for address: 0x" + std::to_string(v)), vaddr(v)
+        : std::runtime_error(messageFor(v)), vaddr(v)
     {
+    }
+
+private:
+    // Gate B (S7): the message previously rendered the address in decimal
+    // after a "0x" prefix ("0x532676224"). Render it in hex; the address
+    // value and the exception behavior are unchanged.
+    static std::string messageFor(uint32_t v)
+    {
+        std::ostringstream oss;
+        oss << "TLB miss for address: 0x" << std::hex << v;
+        return oss.str();
     }
 };
 

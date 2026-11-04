@@ -150,7 +150,7 @@ void GS::reset()
     m_colclamp = 0u;
     m_texa = {0u, false, 0u};
     m_texclut = {0u, 0u, 0u};
-    m_hasLastLoadClut = false;
+    m_loadClutHistory.clear();
     m_bitbltbuf = {};
     m_trxpos = {};
     m_trxreg = {};
@@ -1694,15 +1694,26 @@ void GS::setRasterBackend(std::unique_ptr<GSRasterBackend> backend)
     m_backend = std::move(backend);
     m_backend->Initialize(m_localMemoryStorage, m_localMemorySize);
 
-    // Stage 0 swap contract: VRAM bytes were transferred above. Re-issue the
-    // last delivered CLUT load so the new backend does not render textured
-    // draws with an empty CLUT. The texture-page cache needs no transfer: it
-    // is a VRAM mirror refilled on demand from the transferred bytes.
+    // Stage 0 swap contract (Gate E): VRAM bytes were transferred above.
+    // Replay the full ordered LoadClut history into the fresh backend so
+    // its cumulative, CLD-conditional palette state matches the old
+    // backend's. The old last-load-only re-issue could not do this: a
+    // trailing no-op, a conditional load against a reset CBP slot, or an
+    // earlier palette slice would all be lost (Gate A S4). Replay
+    // delivers through the backend's own LoadClut, so no backend
+    // internals are copied, and it reads current VRAM, like the old
+    // re-issue did. The texture-page cache needs no transfer: it is a
+    // VRAM mirror refilled on demand from the transferred bytes.
     // Transfer state is NOT preserved — swaps require transfer-idle state
-    // (see the GSRasterBackend contract); issueLoadClutUnlocked also skips
-    // delivery when the new backend is a raw backend.
-    if (m_hasLastLoadClut)
-        issueLoadClutUnlocked(m_lastLoadClutTex0, m_lastLoadClutTexclut);
+    // (see the GSRasterBackend contract). Replay is skipped when the new
+    // backend is a raw backend, and it must NOT go through
+    // issueLoadClutUnlocked: that would re-record the history into
+    // itself on every swap.
+    if (!rawGifMode())
+    {
+        for (const GSLoadClutRecord &record : m_loadClutHistory)
+            m_backend->LoadClut(record.tex0, record.texclut);
+    }
 }
 
 bool GS::rawGifMode() const
@@ -1714,9 +1725,7 @@ void GS::issueLoadClutUnlocked(const GSTex0Reg &tex0, const GSTexClutReg &texclu
 {
     if (rawGifMode())
         return;
-    m_lastLoadClutTex0 = tex0;
-    m_lastLoadClutTexclut = texclut;
-    m_hasLastLoadClut = true;
+    m_loadClutHistory.push_back(GSLoadClutRecord{tex0, texclut});
     if (m_backend)
         m_backend->LoadClut(tex0, texclut);
 }

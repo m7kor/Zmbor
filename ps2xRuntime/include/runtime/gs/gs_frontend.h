@@ -233,11 +233,22 @@ private:
     GSTexaReg m_texa{0u, false, 0u};
     GSTexClutReg m_texclut{0u, 0u, 0u};
 
-    // Last CLUT load actually delivered to a backend (Stage 0 swap contract).
-    // Cleared by reset(); never recorded while raw mode suppresses delivery.
-    GSTex0Reg m_lastLoadClutTex0{};
-    GSTexClutReg m_lastLoadClutTexclut{0u, 0u, 0u};
-    bool m_hasLastLoadClut = false;
+    // Ordered history of every CLUT load delivered to a backend since the
+    // last reset (Gate E: Stage 0 swap contract). A swap replays this
+    // history in order into the fresh backend; the old last-load-only
+    // record could not restore cumulative, CLD-conditional palette state
+    // (Gate A S4), so history replaces it outright (history.back() is the
+    // last load). One small record per TEX0/TEX2 write, so history grows
+    // within a reset epoch; reset() clears it. Never recorded while raw
+    // mode suppresses delivery. Guarded by m_stateMutex. Replay reads
+    // current VRAM (same semantics as the old last-load re-issue) and
+    // never copies backend internals.
+    struct GSLoadClutRecord
+    {
+        GSTex0Reg tex0{};
+        GSTexClutReg texclut{0u, 0u, 0u};
+    };
+    std::vector<GSLoadClutRecord> m_loadClutHistory;
 
     GSBitBltBuf m_bitbltbuf{};
     GSTrxPos m_trxpos{};

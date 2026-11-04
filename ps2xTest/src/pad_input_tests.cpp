@@ -2,10 +2,16 @@
 #include "ps2_stubs.h"
 #include "ps2_syscalls.h"
 #include "Stubs/Pad.h"
+#include "runtime/pad_playback.h"
 
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <sstream>
+#include <fstream>
+#include <filesystem>
+#include <cstdlib>
+#include <chrono>
 
 
 namespace
@@ -68,6 +74,131 @@ void register_pad_input_tests()
 {
     MiniTest::Case("PadInput", [](TestCase &tc)
                    {
+        tc.Run("scripted frames preserve holds releases analog and independent ports", [](TestCase &t)
+        {
+            PadPlayback playback;
+            std::istringstream script("# complete states\ntimeline frames\n"
+                                      "10 0 0 0x4008 0 255 16 238\n"
+                                      "10 1 0 0x80 128 128 128 128\n"
+                                      "12 0 0 0 128 128 128 128\n");
+            std::string error;
+            t.IsTrue(playback.load(script, error), error);
+            t.Equals(playback.sample(0, 0, 9, 90000).buttons, uint16_t{0xFFFF}, "before first frame is neutral regardless of wall time");
+            const auto pressed = playback.sample(0, 0, 10, 0);
+            t.Equals(pressed.buttons, uint16_t{0xBFF7}, "start and cross become active-low at boundary");
+            t.Equals(pressed.lx, uint8_t{0}, "left stick low endpoint");
+            t.Equals(pressed.ly, uint8_t{255}, "left stick high endpoint");
+            t.Equals(pressed.rx, uint8_t{16}, "right stick X");
+            t.Equals(pressed.ry, uint8_t{238}, "right stick Y");
+            t.Equals(playback.sample(0, 0, 11, 0).buttons, pressed.buttons, "hold survives repeated and later polls");
+            t.Equals(playback.sample(1, 0, 12, 0).buttons, uint16_t{0xFF7F}, "second port independent");
+            t.Equals(playback.sample(0, 0, 12, 0).buttons, uint16_t{0xFFFF}, "release at exact frame");
+            t.Equals(playback.sample(0, 0, 12, 0).lx, uint8_t{128}, "release state recenters stick");
+            t.Equals(playback.sample(0, 1, 10, 0).buttons, uint16_t{0xFFFF}, "unsupported slot stays neutral");
+            t.Equals(playback.sample(0, 0, 10, 0).buttons, pressed.buttons, "replaying earlier frame repeats identical state");
+        });
+
+        tc.Run("scripted milliseconds use time and last simultaneous event", [](TestCase &t)
+        {
+            PadPlayback playback;
+            std::istringstream script("timeline milliseconds\n5 0 0 8 128 128 128 128\n5 0 0 1 128 128 128 128\n8 0 0 0 128 128 128 128\n");
+            std::string error;
+            t.IsTrue(playback.load(script, error), error);
+            t.IsFalse(playback.usesFrames(), "milliseconds timeline selected");
+            t.Equals(playback.sample(0, 0, 999, 4).buttons, uint16_t{0xFFFF}, "frames do not advance timed script");
+            t.Equals(playback.sample(0, 0, 0, 5).buttons, uint16_t{0xFFFE}, "last same-tick event wins");
+            t.Equals(playback.sample(0, 0, 0, 8).buttons, uint16_t{0xFFFF}, "timed release");
+        });
+
+        tc.Run("script parser rejects malformed input without partial playback", [](TestCase &t)
+        {
+            const char *invalid[] = {
+                "", "timeline polls\n", "timeline frames extra\n",
+                "timeline frames\n-1 0 0 8 128 128 128 128\n",
+                "timeline frames\n0 2 0 8 128 128 128 128\n",
+                "timeline frames\n0 0 1 8 128 128 128 128\n",
+                "timeline frames\n0 0 0 65536 128 128 128 128\n",
+                "timeline frames\n0 0 0 8 256 128 128 128\n",
+                "timeline frames\n0 0 0 8 128 128 128\n",
+                "timeline frames\n0 0 0 8 128 128 128 128 extra\n",
+                "timeline frames\n9 0 0 8 128 128 128 128\n8 0 0 0 128 128 128 128\n"
+            };
+            for (const auto *text : invalid)
+            {
+                PadPlayback playback;
+                std::istringstream valid("timeline frames\n0 0 0 8 128 128 128 128\n");
+                std::string error;
+                t.IsTrue(playback.load(valid, error), "seed sequence loads");
+                std::istringstream script(text);
+                t.IsFalse(playback.load(script, error), "malformed script rejected");
+                t.IsFalse(error.empty(), "parse error explains failure");
+                t.Equals(playback.sample(0, 0, 100, 100).buttons, uint16_t{0xFFFF}, "failed load clears previous/partial sequence");
+            }
+        });
+
+        tc.Run("scePadRead consumes script and preserves explicit override precedence", [](TestCase &t)
+        {
+            struct ScriptEnvironment
+            {
+                std::string previous;
+                bool hadPrevious = false;
+                std::filesystem::path path = std::filesystem::temp_directory_path() /
+                    ("zmbor-pad-playback-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".txt");
+                ScriptEnvironment()
+                {
+                    const char *old = std::getenv("ZMBOR_PAD_SCRIPT");
+                    hadPrevious = old != nullptr;
+                    if (old) previous = old;
+                    std::ofstream(path) << "timeline frames\n0 0 0 0x4008 0 255 16 238\n";
+#ifdef _WIN32
+                    _putenv_s("ZMBOR_PAD_SCRIPT", path.string().c_str());
+#else
+                    setenv("ZMBOR_PAD_SCRIPT", path.string().c_str(), 1);
+#endif
+                }
+                ~ScriptEnvironment()
+                {
+#ifdef _WIN32
+                    _putenv_s("ZMBOR_PAD_SCRIPT", hadPrevious ? previous.c_str() : "");
+#else
+                    if (hadPrevious) setenv("ZMBOR_PAD_SCRIPT", previous.c_str(), 1);
+                    else unsetenv("ZMBOR_PAD_SCRIPT");
+#endif
+                    std::error_code error;
+                    std::filesystem::remove(path, error);
+                }
+            };
+            std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0);
+            R5900Context ctx;
+            {
+                ScriptEnvironment environment;
+                ps2_stubs::clearPadOverrideState();
+                ps2_stubs::scePadInit(rdram.data(), &ctx, nullptr);
+                openPadPort(ctx, rdram);
+                runPadRead(ctx, rdram);
+                t.Equals(readButtons(rdram), uint16_t{0xBFF7}, "script reaches guest pad bytes");
+                t.Equals(rdram[kPadDataAddr + 4], uint8_t{16}, "script right X reaches guest");
+                t.Equals(rdram[kPadDataAddr + 6], uint8_t{0}, "script left X reaches guest");
+                ps2_stubs::setPadOverrideState(0xFFFE, 128, 128, 128, 128);
+                runPadRead(ctx, rdram);
+                t.Equals(readButtons(rdram), uint16_t{0xFFFE}, "explicit override retains precedence");
+                ps2_stubs::clearPadOverrideState();
+                runPadRead(ctx, rdram);
+                t.Equals(readButtons(rdram), uint16_t{0xBFF7}, "clearing override resumes scripted timeline");
+#ifdef _WIN32
+                _putenv_s("ZMBOR_PAD_SCRIPT", "");
+#else
+                unsetenv("ZMBOR_PAD_SCRIPT");
+#endif
+                ps2_stubs::scePadInit(rdram.data(), &ctx, nullptr);
+                openPadPort(ctx, rdram);
+                runPadRead(ctx, rdram);
+                t.IsFalse(ps2_stubs::getPadDebugSnapshot().ports[0][0].lastUsedOverride,
+                          "reinitializing without script restores normal input path");
+            }
+            ps2_stubs::scePadInit(rdram.data(), &ctx, nullptr);
+        });
+
         tc.Run("scePadRead uses override state", [](TestCase &t)
                {
             std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0);

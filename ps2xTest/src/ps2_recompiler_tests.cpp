@@ -774,6 +774,88 @@ static bool writeMinimalMipsElfWithDelaySlotPastFunctionEnd(const std::filesyste
     return writer.save(elfPath.string());
 }
 
+// A stripped ELF whose .rodata holds a vtable of straight-line accessor methods whose `jr $ra` sits at word 9,
+// one past LooksLikeCallableEntry's eight-word leaf window (the Crash Twinsanity SLUS_209.09 shape: 0x25a4e0,
+// 0x25a510, ... reached only through vtable slots and JALR).
+static bool writeMinimalMipsElfWithLeafMethodVtable(const std::filesystem::path &elfPath)
+{
+    ELFIO::elfio writer;
+    writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
+    writer.set_os_abi(ELFIO::ELFOSABI_NONE);
+    writer.set_type(ELFIO::ET_EXEC);
+    writer.set_machine(ELFIO::EM_MIPS);
+    writer.set_entry(0x00100000u);
+
+    ELFIO::section *text = writer.sections.add(".text");
+    text->set_type(ELFIO::SHT_PROGBITS);
+    text->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR);
+    text->set_addr_align(4);
+    text->set_address(0x00100000u);
+
+    std::array<uint32_t, 96> w{};
+    w[0] = 0x03E00008u; // entry 0x00100000: jr ra
+    w[1] = 0x00000000u; // nop
+    // Accessor body: nine straight-line loads/stores, then jr ra + a delay-slot store.
+    const auto accessor = [&w](size_t at)
+    {
+        w[at + 0] = 0x8C820040u; // lw v0,0x40(a0)
+        w[at + 1] = 0xC4810058u; // lwc1 f1,0x58(a0)
+        w[at + 2] = 0xC482005Cu; // lwc1 f2,0x5c(a0)
+        w[at + 3] = 0xC4830078u; // lwc1 f3,0x78(a0)
+        w[at + 4] = 0xC480007Cu; // lwc1 f0,0x7c(a0)
+        w[at + 5] = 0xAC820038u; // sw v0,0x38(a0)
+        w[at + 6] = 0xE480006Cu; // swc1 f0,0x6c(a0)
+        w[at + 7] = 0xE4810048u; // swc1 f1,0x48(a0)
+        w[at + 8] = 0xE482004Cu; // swc1 f2,0x4c(a0)
+        w[at + 9] = 0x03E00008u; // jr ra (word 9)
+        w[at + 10] = 0xE4830068u; // swc1 f3,0x68(a0) (delay slot)
+    };
+    accessor(2);  // method A at 0x00100008 (right after the entry's jr ra + nop)
+    accessor(14); // method B at 0x00100038 (after A's return and one zero padding word at 0x00100034)
+    // Non-leaf function at 0x00100068 (word 26) with a straight run inside it.
+    w[26] = 0x27BDFFF0u; // addiu sp,sp,-0x10
+    w[27] = 0xFFBF0000u; // sd ra,0(sp)
+    for (size_t i = 28; i < 40; ++i)
+        w[i] = 0x24420001u; // addiu v0,v0,1
+    w[40] = 0xDFBF0000u; // ld ra,0(sp)
+    w[41] = 0x03E00008u; // jr ra
+    w[42] = 0x27BD0010u; // addiu sp,sp,0x10 (delay slot)
+    accessor(43); // accessor C at 0x001000AC, referenced only by an isolated pointer
+    accessor(56); // accessor D at 0x001000E0, after C's return (two padding words); its only table neighbor
+                  // points into the non-leaf body
+    // Accessor E at 0x00100120 follows a return whose filler is not all zero: `jr ra; addiu sp,sp,0x20` then
+    // `nop; addiu sp,sp,0x30; nop` (an unreachable non-branch word), the Crash Twinsanity 0x25ae88 shape.
+    w[67] = 0x03E00008u; // jr ra
+    w[68] = 0x27BD0020u; // addiu sp,sp,0x20 (delay slot)
+    w[69] = 0x00000000u; // nop
+    w[70] = 0x27BD0030u; // addiu sp,sp,0x30 (unreachable filler)
+    w[71] = 0x00000000u; // nop
+    accessor(72);        // E at 0x00100120
+    text->set_data(reinterpret_cast<const char *>(w.data()), static_cast<ELFIO::Elf_Word>(w.size() * 4));
+
+    ELFIO::section *rodata = writer.sections.add(".rodata");
+    rodata->set_type(ELFIO::SHT_PROGBITS);
+    rodata->set_flags(ELFIO::SHF_ALLOC);
+    rodata->set_addr_align(4);
+    rodata->set_address(0x00200000u);
+    std::array<uint32_t, 48> table{};
+    table[1] = 0x00100008u;  // vtable: A
+    table[3] = 0x00100038u;  //         B (8 bytes later)
+    table[5] = 0x00100120u;  //         E (after non-zero filler)
+    table[16] = 0x001000ACu; // C alone: an isolated pointer stays data
+    table[30] = 0x00100070u; // into the non-leaf body (not after a return), clustered with D
+    table[32] = 0x001000E0u; // D
+    rodata->set_data(reinterpret_cast<const char *>(table.data()), static_cast<ELFIO::Elf_Word>(table.size() * 4));
+
+    ELFIO::segment *seg = writer.segments.add();
+    seg->set_type(ELFIO::PT_LOAD);
+    seg->set_flags(ELFIO::PF_R | ELFIO::PF_X);
+    seg->set_align(0x1000);
+    seg->add_section_index(text->get_index(), text->get_addr_align());
+    seg->add_section_index(rodata->get_index(), rodata->get_addr_align());
+    return writer.save(elfPath.string());
+}
+
 static bool writeMinimalMipsElfWithAddressTakenCallbacks(const std::filesystem::path &elfPath,
                                                          bool includePartialDwarf = false)
 {
@@ -4018,6 +4100,38 @@ void register_ps2_recompiler_tests()
             t.IsFalse(hasStart(0x00100300u),
                       "an isolated data pointer or non-callback code materialization must not become a function");
 
+            std::error_code removeError;
+            std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("elf parser discovers vtable accessor methods beyond the eight-word leaf window", [](TestCase &t) {
+            const auto uniqueSuffix = std::to_string(
+                static_cast<unsigned long long>(std::chrono::steady_clock::now().time_since_epoch().count()));
+            const std::filesystem::path elfPath =
+                std::filesystem::temp_directory_path() / ("ps2recomp-leaf-vtable-" + uniqueSuffix + ".elf");
+            const bool writeOk = writeMinimalMipsElfWithLeafMethodVtable(elfPath);
+            t.IsTrue(writeOk, "temporary stripped ELF should be generated");
+            if (!writeOk)
+                return;
+            ElfParser parser(elfPath.string());
+            const bool parseOk = parser.parse();
+            t.IsTrue(parseOk, "generated ELF should parse");
+            if (parseOk)
+            {
+                const auto functions = parser.extractFunctions();
+                auto hasStart = [&functions](uint32_t start)
+                {
+                    return std::any_of(functions.begin(), functions.end(),
+                                       [start](const Function &f) { return f.start == start; });
+                };
+                t.IsTrue(hasStart(0x00100008u), "first accessor of a vtable (jr ra at word 9) must be a function");
+                t.IsTrue(hasStart(0x00100038u), "accessor after zero padding must be a function");
+                t.IsTrue(hasStart(0x00100120u), "accessor after a return and non-branch filler must be a function");
+                t.IsFalse(hasStart(0x001000E0u),
+                          "an accessor whose only neighbor points into a function body has no anchor");
+                t.IsFalse(hasStart(0x001000ACu), "an isolated pointer to a leaf accessor must stay data");
+                t.IsFalse(hasStart(0x00100070u), "a clustered pointer into a function body must not split it");
+            }
             std::error_code removeError;
             std::filesystem::remove(elfPath, removeError);
         });

@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <vector>
 
 #include <cstdint>
 #include <memory>
@@ -35,6 +37,8 @@ namespace ps2x::iop::detail
 
         [[nodiscard]] bool dispatchImport(uint16_t ordinal, IopCpuState &cpu);
         [[nodiscard]] std::optional<CompletionCallback> takeCompletionCallback() noexcept;
+        // Bring-up diagnostics: first sceCdSearchFile/sceCdRead requests and read totals.
+        [[nodiscard]] std::vector<std::string> debugCounters() const;
 
     private:
         class Impl;

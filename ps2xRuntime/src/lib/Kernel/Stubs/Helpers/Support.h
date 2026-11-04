@@ -309,9 +309,11 @@ namespace
             const std::string leaf = toLowerAscii(entry.path().filename().string());
             g_cdLeafIndex.emplace(leaf, entry.path());
 
-            std::error_code relEc;
-            const std::filesystem::path relative = std::filesystem::relative(entry.path(), root, relEc);
-            if (!relEc)
+            // Iterator paths already share this root. Canonicalizing them with
+            // filesystem::relative needlessly queries ancestors and can fail
+            // under restricted filesystem permissions even for readable files.
+            const std::filesystem::path relative = entry.path().lexically_relative(root);
+            if (!relative.empty())
             {
                 const std::string looseKey = cdLoosePathKeyFromRelative(relative);
                 if (!looseKey.empty())
@@ -432,7 +434,21 @@ namespace
         return true;
     }
 
-    bool readCdSectors(uint32_t lbn, uint32_t sectors, uint8_t *dst, size_t byteCount)
+    bool readCdSectorsUntraced(uint32_t lbn, uint32_t sectors, uint8_t *dst, size_t byteCount);
+
+    // Every EE-side disc sector read goes through here; ZMBOR_TRACE_IO audits it (LBN, size, result).
+    inline bool readCdSectors(uint32_t lbn, uint32_t sectors, uint8_t *dst, size_t byteCount)
+    {
+        const bool ok = readCdSectorsUntraced(lbn, sectors, dst, byteCount);
+        if (zmbor_trace::enabled(zmbor_trace::kIo))
+        {
+            zmbor_trace::ioEvent("cd_read_sectors", "cdrom:lbn", static_cast<int64_t>(lbn),
+                                 static_cast<int64_t>(byteCount), ok ? static_cast<int64_t>(byteCount) : -1, 0u);
+        }
+        return ok;
+    }
+
+    inline bool readCdSectorsUntraced(uint32_t lbn, uint32_t sectors, uint8_t *dst, size_t byteCount)
     {
         for (const auto &[key, entry] : g_cdFilesByKey)
         {
@@ -520,6 +536,19 @@ namespace
     bool writeCdSearchResult(uint8_t *rdram, uint32_t fileAddr, const std::string &ps2Path, const CdFileEntry &entry)
     {
         // sceCdlFILE layout: u32 lsn, u32 size, char name[16], u8 date[8]
+        // A valid first byte does not guarantee a contiguous 32-byte host span.
+        // Check the whole result before writing, including aliases and scratchpad.
+        uint32_t offset = 0;
+        bool scratch = false;
+        if (!ps2ResolveGuestPointer(fileAddr, offset, scratch))
+        {
+            return false;
+        }
+        const uint32_t capacity = scratch ? PS2_SCRATCHPAD_SIZE : PS2_RAM_SIZE;
+        if (offset > capacity || capacity - offset < 32u)
+        {
+            return false;
+        }
         uint8_t *fileStruct = getMemPtr(rdram, fileAddr);
         if (!fileStruct)
         {

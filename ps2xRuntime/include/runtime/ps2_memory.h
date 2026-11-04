@@ -639,6 +639,9 @@ public:
     // IPU (registers 0x10002000-0x10002030, IPU_in_FIFO 0x10007010, toIPU = DMA channel 4).
     PS2Ipu &ipu() noexcept { return m_ipu; }
     bool takePendingIpuInterrupt() noexcept { return m_pendingIpuInterrupt.exchange(false, std::memory_order_acq_rel); }
+    // Opt-in library-level decoder input: append at most maxQwords whole FIFO qwords, refilling from held toIPU
+    // DMA through its normal service path. Returns qwords appended. Unsafe hardware state or zero bound is a no-op.
+    size_t drainIpuInputForHle(size_t maxQwords, std::vector<uint8_t> &output);
 
 private:
     // Feeds a held toIPU transfer into the input FIFO as space frees, runs the IPU, and completes the channel when its

@@ -1296,8 +1296,23 @@ namespace ps2recomp
                     stub << "#ifdef _DEBUG\n";
                     stub << "    PS_LOG_ENTRY(\"" << generatedName << "\");\n";
                     stub << "#endif\n";
-                    stub << "    ctx->pc = getRegU32(ctx, 31);\n"
-                         << "    ";
+                    stub << "    ctx->pc = getRegU32(ctx, 31);\n";
+                    {
+                        // Bounded opt-in HLE trace (runtime/zmbor_trace.h); one atomic load when disabled. Named
+                        // after the bound handler when there is one (the guest function is usually sub_XXXXXXXX).
+                        std::string traceName = function.name;
+                        const auto bindingIt = m_stubHandlerBindingsByStart.find(function.start);
+                        if (!function.isSkipped && bindingIt != m_stubHandlerBindingsByStart.end() &&
+                            !bindingIt->second.empty())
+                        {
+                            traceName = bindingIt->second;
+                        }
+                        std::ostringstream address;
+                        address << "0x" << std::hex << std::uppercase << function.start << "u";
+                        stub << "    PS2X_HLE_TRACE(\"" << escapeCStringLiteral(traceName) << "\", "
+                             << address.str() << ");\n";
+                    }
+                    stub << "    ";
 
                     if (function.isSkipped)
                     {

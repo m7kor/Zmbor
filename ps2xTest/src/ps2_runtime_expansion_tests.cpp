@@ -242,6 +242,165 @@ namespace
         ctx->pc = 0u;
     }
 
+
+    constexpr uint32_t kNodataMain = 0x0012A000u, kNodataDone = 0x0012A010u;
+    constexpr uint32_t kNodataCallback = 0x0012A020u, kNodataReturn = 0x0012A030u;
+    constexpr uint32_t kNodataStream = 0x0012A040u, kNodataMpeg = 0x0012B000u;
+    constexpr uint32_t kNodataCancel = 0x0012A050u;
+    constexpr uint32_t kNodataPss = 0x0012C000u, kNodataRing = 0x0012D000u;
+    constexpr uint32_t kNodataImage = 0x00130000u;
+    constexpr uint8_t kNodataPacket[] = {
+        0, 0, 1, 0xE0, 0, 11, 0x80, 0, 0, // PES header
+        0, 0, 1, 0xB3, 0x14, 0, 0xF0, 0x13 // synthetic sequence-header payload
+    };
+#if PS2X_TEST_HAS_FFMPEG
+    // Self-generated test content, not game data. Three red 16x16 intra frames:
+    // ffmpeg -f lavfi -i color=c=red:s=16x16:r=25:d=0.12 -c:v mpeg2video -bf 0 -g 1 -f mpeg2video out.m2v
+    constexpr uint8_t kNodataRedMpeg[] = {
+        0,0,1,0xB3,1,0,0x10,0x13,0xFF,0xFF,0xE0,0x18,0,0,1,0xB5,0x14,0x8A,0,1,0,0,0,0,1,0xB8,0,8,0,0x40,
+        0,0,1,0,0,0x0F,0xFF,0xF8,0,0,1,0xB5,0x8F,0xFF,0xF3,0x41,0x80,0,0,1,1,0x13,0xF2,0x14,0xA5,0x2F,0x99,0xBF,0x70,0x80,
+        0,0,1,0xB3,1,0,0x10,0x13,0xFF,0xFF,0xE0,0x18,0,0,1,0xB5,0x14,0x8A,0,1,0,0,0,0,1,0xB8,0,8,0,0xC0,
+        0,0,1,0,0,0x0F,0xFF,0xF8,0,0,1,0xB5,0x8F,0xFF,0xF3,0x41,0x80,0,0,1,1,0x13,0xF2,0x14,0xA5,0x2F,0x99,0xBF,0x70,0x80,
+        0,0,1,0xB3,1,0,0x10,0x13,0xFF,0xFF,0xE0,0x18,0,0,1,0xB5,0x14,0x8A,0,1,0,0,0,0,1,0xB8,0,8,1,0x40,
+        0,0,1,0,0,0x0F,0xFF,0xF8,0,0,1,0xB5,0x8F,0xFF,0xF3,0x41,0x80,0,0,1,1,0x13,0xF2,0x14,0xA5,0x2F,0x99,0xBF,0x70,0x80
+    };
+#endif
+    std::atomic<uint32_t> gNodataMode{0}, gNodataCalls{0}, gNodataChecks{0};
+    std::atomic<uint32_t> gNodataStreamCalls{0}, gNodataStreamSp{0};
+    std::atomic<bool> gNodataStackStable{true};
+    std::atomic<int32_t> gNodataResult{-999};
+    uint64_t gNodataFirstTick=0, gNodataLastTick=0;
+
+    void testNodataMain(uint8_t *ram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        setRegU32(*ctx, 4, kNodataMpeg);
+        setRegU32(*ctx, 5, kNodataImage);
+        ctx->pc = kNodataDone;
+        ps2_stubs::sceMpegGetPicture(ram, ctx, runtime);
+    }
+    void testNodataDone(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        gNodataResult.store(static_cast<int32_t>(::getRegU32(ctx, 2)));
+        ctx->pc=0;
+        runtime->requestStop();
+    }
+    void testNodataCallback(uint8_t *ram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        const uint32_t call=gNodataCalls.fetch_add(1);
+        if (::getRegU32(ctx, 4)==kNodataMpeg && ::getRegU32(ctx, 6)==0x12345678u &&
+            Ps2FastRead32(ram, ::getRegU32(ctx, 5))==1u)
+            gNodataChecks.fetch_or(1u);
+        const auto tick=runtime->eeScheduler().currentVSyncTick();
+        if (call==0) gNodataFirstTick=tick;
+        gNodataLastTick=tick;
+        if (gNodataMode.load()==2u || gNodataMode.load()==9u)
+        {
+            setRegU32(*ctx, 2, 0xFFFFFFFFu);
+            ctx->pc=0;
+            return;
+        }
+        if (gNodataMode.load()==6u)
+        {
+            // A guest producer can tear down its instance. Its saved HLE
+            // completion must not resurrect it or retry the deleted producer.
+            ps2_stubs::sceMpegDelete(ram,ctx,runtime);
+            setRegU32(*ctx,2,0u);
+            ctx->pc=0;
+            return;
+        }
+        if (gNodataMode.load()==10u)
+        {
+            // The library's EOF/error producer aborts the outstanding picture
+            // request but can itself return success. GetPicture must notice
+            // the explicit abort instead of asking that producer to read again.
+            ps2_stubs::enqueueMpegDecodedFrameForTesting(kNodataMpeg);
+            ps2_stubs::sceMpegGetPictureAbort(ram,ctx,runtime);
+            if (getRegS32(*ctx,2)==1) gNodataChecks.fetch_or(8u);
+            setRegU32(*ctx,2,1u);
+            ctx->pc=0;
+            return;
+        }
+#if PS2X_TEST_HAS_FFMPEG
+        if (gNodataMode.load()==7u)
+        {
+            auto &memory=runtime->memory();
+            std::memset(memory.getRDRAM()+kNodataRing,0,192u);
+            std::memcpy(memory.getRDRAM()+kNodataRing,kNodataRedMpeg,sizeof(kNodataRedMpeg));
+            memory.writeIORegister(0x1000B410u,kNodataRing);
+            memory.writeIORegister(0x1000B420u,12u);
+            memory.writeIORegister(0x1000B400u,0x101u);
+            setRegU32(*ctx,2,1u);
+            ctx->pc=0;
+            return;
+        }
+#endif
+        if (gNodataMode.load()==5u)
+        {
+            // Exercise the actual DMA/FIFO boundary, not a direct call to the
+            // drain API. A synthetic frame isolates delivery from codec data.
+            auto &memory=runtime->memory();
+            std::memset(memory.getRDRAM()+kNodataRing,0,8192u);
+            memory.writeIORegister(0x1000B410u,kNodataRing);
+            memory.writeIORegister(0x1000B420u,512u);
+            memory.writeIORegister(0x1000B400u,0x101u);
+            ps2_stubs::enqueueMpegDecodedFrameForTesting(kNodataMpeg);
+            setRegU32(*ctx,2,1u);
+            ctx->pc=0;
+            return;
+        }
+        if ((gNodataMode.load()==1u || gNodataMode.load()==4u) && call==0u)
+        {
+            setRegU32(*ctx, 2, 0u);
+            ctx->pc=0;
+            return;
+        }
+        // Use the active guest context, like a generated nested JAL. Demux
+        // must run its stream callback before this input callback resumes.
+        setRegU32(*ctx, 4, kNodataMpeg);
+        setRegU32(*ctx, 5, kNodataPss);
+        const uint32_t packetBytes=sizeof(kNodataPacket)*(gNodataMode.load()==3u?100u:1u);
+        setRegU32(*ctx, 6, packetBytes);
+        setRegU32(*ctx, 7, kNodataPss);
+        setRegU32(*ctx, 8, packetBytes);
+        ctx->pc=kNodataReturn;
+        ps2_stubs::sceMpegDemuxPssRing(ram, ctx, runtime);
+    }
+    void testNodataReturn(uint8_t *ram, R5900Context *ctx, PS2Runtime *)
+    {
+        if (::getRegU32(ctx, 2)==sizeof(kNodataPacket)*(gNodataMode.load()==3u?100u:1u) &&
+            std::memcmp(ram+kNodataRing, kNodataPacket+9, 8)==0)
+            gNodataChecks.fetch_or(4u);
+        setRegU32(*ctx, 2, 1u);
+        ctx->pc=0;
+    }
+    void testNodataCancel(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        runtime->eeScheduler().releaseWait(1,false);
+        ctx->pc=0;
+    }
+    void testNodataStream(uint8_t *ram, R5900Context *ctx, PS2Runtime *)
+    {
+        const uint32_t sp=::getRegU32(ctx, 29);
+        if (gNodataStreamCalls.fetch_add(1)==0)
+            gNodataStreamSp.store(sp);
+        else if (gNodataStreamSp.load()!=sp)
+            gNodataStackStable.store(false);
+        const uint32_t cb=::getRegU32(ctx, 5);
+        const uint32_t data=Ps2FastRead32(ram, cb+8u), size=Ps2FastRead32(ram, cb+12u);
+        if (::getRegU32(ctx, 4)==kNodataMpeg && ::getRegU32(ctx, 6)==0x87654321u &&
+            Ps2FastRead32(ram, cb)==0 && size==8u &&
+            data>=kNodataPss && (data-kNodataPss)%sizeof(kNodataPacket)==9u)
+        {
+            std::memcpy(ram+kNodataRing, ram+data, size);
+            gNodataChecks.fetch_or(2u);
+        }
+        // Inject a known 16x16 decoded fixture to test scheduling and image
+        // delivery independently of whether this build includes FFmpeg.
+        ps2_stubs::enqueueMpegDecodedFrameForTesting(kNodataMpeg);
+        setRegU32(*ctx, 2, 0u); // must not overwrite Demux's consumed byte count
+        ctx->pc=0;
+    }
+
     void testMpegWaitMain(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
     {
         gMpegWaitStage.store(1u, std::memory_order_release);
@@ -1111,7 +1270,166 @@ void register_ps2_runtime_expansion_tests()
                       "ContinueToTarget should remain a non-stopping debug policy");
         });
 
-        tc.Run("MPEG init and callback stubs return success instead of TODO errors", [](TestCase &t)
+
+        tc.Run("MPEG nodata pumps nested demux callbacks and delivers a decoded fixture", [](TestCase &t)
+        {
+            for (uint32_t mode=0; mode<11; ++mode)
+            {
+#if !PS2X_TEST_HAS_FFMPEG
+                if (mode==7u) continue; // Codec-dependent path is explicitly absent in FFmpeg-OFF builds.
+#endif
+                PS2Runtime runtime;
+                t.IsTrue(runtime.memory().initialize(), "DMA test memory must initialize");
+                uint8_t *ram = runtime.memory().getRDRAM();
+                if (!ram) continue;
+                ps2_stubs::resetMpegStubState();
+                std::memcpy(ram+kNodataPss,kNodataPacket,sizeof(kNodataPacket));
+                if (mode==3u)
+                    for (uint32_t i=1;i<100u;++i)
+                        std::memcpy(ram+kNodataPss+i*sizeof(kNodataPacket),kNodataPacket,sizeof(kNodataPacket));
+                gNodataMode.store(mode); gNodataCalls.store(0); gNodataChecks.store(0);
+                gNodataStreamCalls.store(0); gNodataStreamSp.store(0); gNodataStackStable.store(true);
+                gNodataResult.store(-999);
+                runtime.registerFunction(kNodataMain,testNodataMain);
+                runtime.registerFunction(kNodataDone,testNodataDone);
+                runtime.registerFunction(kNodataCallback,testNodataCallback);
+                runtime.registerFunction(kNodataReturn,testNodataReturn);
+                runtime.registerFunction(kNodataStream,testNodataStream);
+                runtime.registerFunction(kNodataCancel,testNodataCancel);
+                R5900Context add{};
+                if (mode==9u)
+                {
+                    // Rejected bulk input must not mark the decoder as having
+                    // consumed data before its DMA owner is registered.
+                    using InputFn = void (*)(uint8_t *, R5900Context *, PS2Runtime *);
+                    const InputFn functions[] = {ps2_stubs::sceMpegAddBs,ps2_stubs::sceMpegDemuxPss,ps2_stubs::sceMpegDemuxPssRing};
+                    const std::pair<uint32_t,uint32_t> invalid[] = {
+                        {PS2_SCRATCHPAD_BASE+PS2_SCRATCHPAD_SIZE-8u,16u},
+                        {PS2_RAM_SIZE-8u,16u},{0xA0000000u+PS2_RAM_SIZE-8u,16u},
+                        {PS2_SCRATCHPAD_BASE,PS2_RAM_SIZE},{kNodataPss,0xFFFFFFFFu},
+                        {kNodataPss,0x80000000u},{0xFFFFFFF8u,16u},{0x60000000u,16u}
+                    };
+                    for (const auto function:functions)
+                        for (const auto &range:invalid)
+                        {
+                            add={}; setRegU32(add,4,kNodataMpeg); setRegU32(add,5,range.first); setRegU32(add,6,range.second);
+                            setRegU32(add,8,0xFFFFFFFFu); // valid unbounded-wrapper sentinel, not an input length
+                            function(ram,&add,&runtime);
+                            t.Equals(getRegS32(add,2),-1,"cross-region and oversized spans must reject atomically");
+                        }
+                }
+                if (mode==8u)
+                {
+                    setRegU32(add,4,kNodataMpeg); setRegU32(add,5,kNodataPss); setRegU32(add,6,sizeof(kNodataPacket));
+                    ps2_stubs::sceMpegAddBs(ram,&add,&runtime);
+                }
+                setRegU32(add,4,kNodataMpeg); setRegU32(add,5,1u);
+                setRegU32(add,6,kNodataCallback); setRegU32(add,7,0x12345678u);
+                ps2_stubs::sceMpegAddCallback(ram,&add,&runtime);
+                setRegU32(add,4,kNodataMpeg); setRegU32(add,5,0u); setRegU32(add,6,0u);
+                setRegU32(add,7,kNodataStream); setRegU32(add,8,0x87654321u);
+                ps2_stubs::sceMpegAddStrCallback(ram,&add,&runtime);
+                R5900Context main{}; main.pc=kNodataMain;
+                runtime.eeScheduler().reset(ram,main);
+                if (mode==4u)
+                {
+                    const int cancelId=runtime.eeScheduler().createThread(EeThreadCreateParams{
+                        0u,kNodataCancel,0u,0u,0u,10,0u});
+                    t.IsTrue(cancelId>1,"cancellation producer thread must exist");
+                    runtime.eeScheduler().startThread(cancelId,0u,main,false);
+                }
+                std::jthread watchdog([&](std::stop_token stop)
+                {
+                    for (int i=0;i<250 && !stop.stop_requested();++i)
+                        std::this_thread::sleep_for(std::chrono::milliseconds(4));
+                    if (!stop.stop_requested()) runtime.requestStop();
+                });
+                runtime.eeScheduler().run();
+                watchdog.request_stop();
+                t.Equals(gNodataCalls.load(),mode==8u?0u:(mode==1u?2u:1u),"input producer must run with bounded retries");
+                t.Equals(gNodataResult.load(),mode==4u?-418:((mode==2u || mode==6u || mode==8u || mode==9u || mode==10u)?-1:0),"GetPicture must resume the original continuation");
+                if (mode==5u)
+                {
+                    t.Equals(runtime.memory().ipu().inputQwords(),size_t{0},"HLE decode must consume the actual FIFO bytes");
+                    t.Equals(runtime.memory().readIORegister(0x1000B400u)&0x100u,0u,"consuming the transfer must allow DMA4 completion");
+                    t.Equals(runtime.memory().readIORegister(0x1000B410u),kNodataRing+8192u,"DMA must advance by all consumed bytes");
+                    t.IsTrue((runtime.memory().readIORegister(0x1000E010u)&(1u<<4))!=0u,"ordinary DMA completion must set CIS4");
+                    t.Equals(static_cast<uint32_t>(ram[kNodataImage]),0x80u,"DMA producer must resume GetPicture delivery");
+                }
+                else if (mode==7u)
+                {
+                    t.Equals(Ps2FastRead32(ram,kNodataMpeg),16u,"FFmpeg DMA input must decode the real 16-pixel width");
+                    t.Equals(Ps2FastRead32(ram,kNodataMpeg+4u),16u,"FFmpeg DMA input must decode the real 16-pixel height");
+                    t.IsTrue(ram[kNodataImage]>240u && ram[kNodataImage+1u]<12u && ram[kNodataImage+2u]<12u,
+                             "FFmpeg must deliver red pixels from the self-generated MPEG fixture, without frame injection");
+                    t.Equals(static_cast<uint32_t>(ram[kNodataImage+3u]),128u,"decoded pixels use PS2 alpha encoding");
+                    t.Equals(runtime.memory().readIORegister(0x1000B400u)&0x100u,0u,"real decoder consumption must complete DMA4");
+                }
+                else if (mode==10u)
+                {
+                    t.Equals(gNodataChecks.load(),9u,"Abort returns one while preserving the callback ABI");
+                    t.Equals(static_cast<uint32_t>(ram[kNodataImage]),0u,"abort must not present an already queued frame");
+                    R5900Context retry{};
+                    setRegU32(retry,4,kNodataMpeg); setRegU32(retry,5,kNodataImage);
+                    ps2_stubs::sceMpegGetPicture(ram,&retry,&runtime);
+                    t.Equals(getRegS32(retry,2),-1,"abort stays associated with this instance until Reset/Create");
+                    ps2_stubs::sceMpegReset(ram,&retry,&runtime);
+                    ps2_stubs::enqueueMpegDecodedFrameForTesting(kNodataMpeg);
+                    setRegU32(retry,4,kNodataMpeg); setRegU32(retry,5,kNodataImage);
+                    ps2_stubs::sceMpegGetPicture(ram,&retry,&runtime);
+                    t.Equals(getRegS32(retry,2),0,"Reset clears the aborted picture request state");
+                    t.Equals(static_cast<uint32_t>(ram[kNodataImage]),128u,"a reset instance can deliver frames again");
+                }
+                else if (mode!=2u && mode!=4u && mode!=6u && mode!=8u && mode!=9u)
+                {
+                    t.Equals(gNodataChecks.load(),7u,"nested callback ABI, payload copy and return ordering must hold");
+                    t.Equals(gNodataStreamCalls.load(),mode==3u?100u:1u,"every stream callback in the batch must complete");
+                    t.IsTrue(gNodataStackStable.load(),"sibling callbacks must reuse one invocation stack");
+                    t.Equals(Ps2FastRead32(ram,kNodataMpeg),16u,"GetPicture must publish fixture width");
+                    t.Equals(Ps2FastRead32(ram,kNodataMpeg+4u),16u,"GetPicture must publish fixture height");
+                    t.Equals(static_cast<uint32_t>(ram[kNodataImage]),0x80u,"decoded fixture must reach guest image memory");
+                    if (mode==1u) t.IsTrue(gNodataLastTick>gNodataFirstTick,"a dry input callback retries after VSync");
+                }
+            }
+        });
+
+        tc.Run("MPEG bulk input accepts bounded RAM and scratchpad aliases and validates ring extents", [](TestCase &t)
+        {
+            PS2Runtime runtime;
+            t.IsTrue(runtime.memory().initialize(),"bulk input memory must initialize");
+            uint8_t *ram=runtime.memory().getRDRAM();
+            if (!ram) return;
+            ps2_stubs::resetMpegStubState();
+            const uint32_t aliases[] = {0u,0x20000000u,0x80000000u,0xA0000000u};
+            R5900Context ctx{};
+            for (const uint32_t alias:aliases)
+            {
+                setRegU32(ctx,4,kNodataMpeg); setRegU32(ctx,5,alias+PS2_RAM_SIZE-8u); setRegU32(ctx,6,8u);
+                ps2_stubs::sceMpegDemuxPss(ram,&ctx,&runtime);
+                t.Equals(getRegS32(ctx,2),8,"an exact-fit RAM alias span must be consumed");
+            }
+            for (const uint32_t base:{PS2_SCRATCHPAD_BASE,PS2_SCRATCHPAD_BASE|0x80000000u})
+            {
+                setRegU32(ctx,4,kNodataMpeg); setRegU32(ctx,5,base+PS2_SCRATCHPAD_SIZE-8u); setRegU32(ctx,6,8u);
+                ps2_stubs::sceMpegDemuxPss(ram,&ctx,&runtime);
+                t.Equals(getRegS32(ctx,2),8,"an exact-fit scratchpad alias span must be consumed");
+            }
+            setRegU32(ctx,4,kNodataMpeg); setRegU32(ctx,5,PS2_SCRATCHPAD_BASE+PS2_SCRATCHPAD_SIZE-8u);
+            setRegU32(ctx,6,16u); setRegU32(ctx,7,PS2_SCRATCHPAD_BASE+PS2_SCRATCHPAD_SIZE-16u); setRegU32(ctx,8,16u);
+            ps2_stubs::sceMpegDemuxPssRing(ram,&ctx,&runtime);
+            t.Equals(getRegS32(ctx,2),16,"a valid scratchpad ring may wrap within its mapped storage");
+            setRegU32(ctx,6,17u);
+            ps2_stubs::sceMpegDemuxPssRing(ram,&ctx,&runtime);
+            t.Equals(getRegS32(ctx,2),-1,"available input cannot exceed one ring's capacity");
+            setRegU32(ctx,6,8u); setRegU32(ctx,8,32u);
+            ps2_stubs::sceMpegDemuxPssRing(ram,&ctx,&runtime);
+            t.Equals(getRegS32(ctx,2),-1,"ring extent crossing the scratchpad boundary must reject before copying");
+            setRegU32(ctx,5,kNodataPss); setRegU32(ctx,6,8u); setRegU32(ctx,7,0u); setRegU32(ctx,8,0xFFFFFFFFu);
+            ps2_stubs::sceMpegDemuxPssRing(ram,&ctx,&runtime);
+            t.Equals(getRegS32(ctx,2),8,"the SDK's -1 ring size wrapper retains contiguous-span behavior");
+        });
+
+        tc.Run("MPEG callback replacement returns the previous function and Create resets registrations", [](TestCase &t)
         {
             std::vector<uint8_t> rdram(PS2_RAM_SIZE, 0u);
             ps2_stubs::resetMpegStubState();
@@ -1127,28 +1445,59 @@ void register_ps2_runtime_expansion_tests()
             setRegU32(addCtx0, 6, 0x00124000u);
             setRegU32(addCtx0, 7, 0u);
             ps2_stubs::sceMpegAddCallback(rdram.data(), &addCtx0, nullptr);
-            t.Equals(getRegS32(addCtx0, 2), 1,
-                     "first sceMpegAddCallback should hand back a non-error callback handle");
+            // Original libmpeg AddCallback loads the previous function at
+            // inner+0xC+12*type before replacing it (Crash ELF 0x2B7D48..78).
+            // The API returns a function pointer, not an allocation handle.
+            t.Equals(getRegS32(addCtx0, 2), 0,
+                     "a previously empty callback slot should return null");
+            setRegU32(addCtx0, 6, 0x00124008u);
+            ps2_stubs::sceMpegAddCallback(rdram.data(), &addCtx0, nullptr);
+            t.Equals(::getRegU32(&addCtx0, 2), 0x00124000u,
+                     "replacement must return the previous callback function");
 
             R5900Context addCtx1{};
             setRegU32(addCtx1, 4, 0x00123000u);
-            setRegU32(addCtx1, 5, 2u);
+            setRegU32(addCtx1, 5, 0u);
             setRegU32(addCtx1, 6, 0x00124010u);
             setRegU32(addCtx1, 7, 0u);
             ps2_stubs::sceMpegAddCallback(rdram.data(), &addCtx1, nullptr);
-            t.Equals(getRegS32(addCtx1, 2), 2,
-                     "subsequent sceMpegAddCallback calls should keep succeeding");
+            t.Equals(getRegS32(addCtx1, 2), 0,
+                     "an independent callback type must have its own slot");
+
+            R5900Context stream{};
+            setRegU32(stream,4,0x00123000u); setRegU32(stream,5,0u); setRegU32(stream,6,0u);
+            setRegU32(stream,7,0x00124030u); setRegU32(stream,8,0u);
+            ps2_stubs::sceMpegAddStrCallback(rdram.data(),&stream,nullptr);
+            t.Equals(::getRegU32(&stream,2),0u,"a new stream callback should return null");
+            setRegU32(stream,7,0x00124040u);
+            ps2_stubs::sceMpegAddStrCallback(rdram.data(),&stream,nullptr);
+            t.Equals(::getRegU32(&stream,2),0x00124030u,"same stream key must replace and return its previous function");
+
+            R5900Context create{};
+            setRegU32(create,4,0x00123000u); setRegU32(create,5,0x00130000u); setRegU32(create,6,0u);
+            ps2_stubs::sceMpegCreate(rdram.data(),&create,nullptr);
+            t.Equals(::getRegU32(&create,2),0u,"a too-small work buffer must fail");
+            setRegU32(addCtx0,6,0x00124000u);
+            ps2_stubs::sceMpegAddCallback(rdram.data(),&addCtx0,nullptr);
+            t.Equals(::getRegU32(&addCtx0,2),0x00124008u,"failed Create must preserve registrations");
+            setRegU32(create,6,0x2800u);
+            ps2_stubs::sceMpegCreate(rdram.data(),&create,nullptr);
+            t.IsTrue(::getRegU32(&create,2)!=0u,"valid Create must succeed");
+            ps2_stubs::sceMpegAddCallback(rdram.data(),&addCtx0,nullptr);
+            t.Equals(::getRegU32(&addCtx0,2),0u,"successful Create must reset generic callbacks");
+            ps2_stubs::sceMpegAddStrCallback(rdram.data(),&stream,nullptr);
+            t.Equals(::getRegU32(&stream,2),0u,"successful Create must reset stream callbacks");
 
             R5900Context reinitCtx{};
             ps2_stubs::sceMpegInit(rdram.data(), &reinitCtx, nullptr);
 
             R5900Context addAfterReinit{};
             setRegU32(addAfterReinit, 4, 0x00123000u);
-            setRegU32(addAfterReinit, 5, 3u);
+            setRegU32(addAfterReinit, 5, 1u);
             setRegU32(addAfterReinit, 6, 0x00124020u);
             setRegU32(addAfterReinit, 7, 0u);
             ps2_stubs::sceMpegAddCallback(rdram.data(), &addAfterReinit, nullptr);
-            t.Equals(getRegS32(addAfterReinit, 2), 1,
+            t.Equals(getRegS32(addAfterReinit, 2), 0,
                      "sceMpegInit should reset MPEG callback bookkeeping between runs");
         });
 
@@ -1344,8 +1693,8 @@ void register_ps2_runtime_expansion_tests()
             ps2_stubs::sceMpegDemuxPssRing(rdram.data(), &afterCreateDemuxCtx, &runtime);
             runtime.eeScheduler().run();
 
-            t.Equals(gMpegStreamCallbackCount.load(std::memory_order_acquire), 1u,
-                     "new MPEG create should allow callbacks for the next stream");
+            t.Equals(gMpegStreamCallbackCount.load(std::memory_order_acquire), 0u,
+                     "new MPEG create must not retain the preceding stream's callbacks");
 
             runtime.requestStop();
         });

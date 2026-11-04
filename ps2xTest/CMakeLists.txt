@@ -76,6 +76,7 @@ get_filename_component(PS2X_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 # time, so it needs the build-time host compiler path as well as the repo
 # root. Both are compile definitions only; nothing is executed at build time.
 target_compile_definitions(ps2_test_lib PRIVATE
+    PS2X_TEST_HAS_FFMPEG=$<BOOL:${PS2X_ENABLE_FFMPEG}>
     "PS2X_REPO_ROOT=\"${PS2X_REPO_ROOT}\""
     "PS2X_HOST_CXX=\"${CMAKE_CXX_COMPILER}\""
 )

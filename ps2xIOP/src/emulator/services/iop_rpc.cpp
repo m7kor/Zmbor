@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "iop_rpc.h"
 
 #include "../core/iop_cpu.h"
@@ -21,6 +22,8 @@ namespace ps2x::iop::detail
     void IopRpcBridge::reset()
     {
         m_servers.clear();
+        m_pendingClients.clear();
+        m_clientSids.clear();
         m_nextDmaId = 1u;
         m_sifInitialized = false;
     }
@@ -168,10 +171,104 @@ namespace ps2x::iop::detail
         case 9:
         case 10:
         case 11:
-        case 14: // InitRpc
-        case 15:
-        case 16:
+        case 14: // sceSifInitRpc
             setV0(0);
+            return true;
+        // IOP as the client of an EE RPC server (ps2sdk sifcmd exports: 15 sceSifBindRpc, 16 sceSifCallRpc,
+        // 18 sceSifCheckStatRpc). SceSifClientData: hdr{pkt_addr, rpc_id, sema_id, mode} 0x00..0x0F, command 0x10,
+        // buf 0x14, cbuf 0x18, end_function 0x1C, end_param 0x20, server 0x24. These used to return 0 without
+        // binding, so an IRX polling `cd.server` (Crash Twinsanity STREAM.IRX, sid 0x12344321) spun forever.
+        case 15: // sceSifBindRpc(cd, sid, mode)
+        {
+            const uint32_t client = cpu.gpr[4];
+            const uint32_t sid = cpu.gpr[5];
+            ++m_iopClientCalls[(15ull << 32) | sid];
+            if (client == 0u || !m_memory.ownsRamRange(client, kClientDataSize))
+            {
+                setV0(static_cast<uint32_t>(-1));
+                return true;
+            }
+            uint32_t server = 0u;
+            uint32_t buffer = 0u;
+            // An unregistered EE server leaves cd->server at 0: the SDK's documented "retry the bind" signal.
+            (void)m_host.findEeRpcServer(sid, server, buffer);
+            m_memory.write32(client + 0x0Cu, cpu.gpr[6]); // hdr.mode
+            m_memory.write32(client + 0x10u, 0u);
+            m_memory.write32(client + 0x14u, buffer);
+            m_memory.write32(client + 0x18u, 0u);
+            m_memory.write32(client + 0x24u, server);
+            if (server != 0u)
+                m_clientSids[client] = sid;
+            setV0(0);
+            return true;
+        }
+        case 16: // sceSifCallRpc(cd, fno, mode, send, ssize, recv, rsize, end_func, end_param)
+        {
+            const uint32_t client = cpu.gpr[4];
+            const uint32_t function = cpu.gpr[5];
+            const uint32_t mode = cpu.gpr[6];
+            const uint32_t send = cpu.gpr[7];
+            const uint32_t stackPointer = cpu.gpr[29];
+            const uint32_t sendSize = m_memory.read32(stackPointer + 16u);
+            const uint32_t receive = m_memory.read32(stackPointer + 20u);
+            const uint32_t receiveSize = m_memory.read32(stackPointer + 24u);
+            const uint32_t endFunction = m_memory.read32(stackPointer + 28u);
+            const uint32_t endParameter = m_memory.read32(stackPointer + 32u);
+            const uint32_t server = client != 0u && m_memory.ownsRamRange(client, kClientDataSize)
+                                        ? m_memory.read32(client + 0x24u)
+                                        : 0u;
+            {
+                const auto sid = m_clientSids.find(client);
+                ++m_iopClientCalls[(16ull << 32) | (sid != m_clientSids.end() ? sid->second : 0u)];
+            }
+            if (server == 0u || m_pendingClients.count(client) != 0u ||
+                (sendSize != 0u && !m_memory.ownsRamRange(send, sendSize)) ||
+                (receiveSize != 0u && !m_memory.ownsRamRange(receive, receiveSize)))
+            {
+                // Unbound client, a call while the previous one is still running, or a bad buffer.
+                setV0(static_cast<uint32_t>(-1));
+                return true;
+            }
+            std::vector<uint8_t> payload(sendSize);
+            if (sendSize != 0u && !m_memory.readRam(send, payload.data(), payload.size()))
+            {
+                setV0(static_cast<uint32_t>(-1));
+                return true;
+            }
+            m_memory.write32(client + 0x10u, function);
+            m_memory.write32(client + 0x1Cu, endFunction);
+            m_memory.write32(client + 0x20u, endParameter);
+            const bool blocking = (mode & kRpcModeNowait) == 0u;
+            const int waiter = blocking ? m_kernel.currentThreadId() : 0;
+            const uint32_t gp = cpu.gpr[28];
+            m_pendingClients.insert(client);
+            const bool queued = m_host.callEeRpc(
+                server, function, std::move(payload), receiveSize,
+                [this, client, receive, receiveSize, endFunction, endParameter, waiter, gp](const std::vector<uint8_t> &reply)
+                {
+                    if (receive != 0u && receiveSize != 0u && !reply.empty())
+                        (void)m_memory.writeRam(receive, reply.data(), std::min<size_t>(reply.size(), receiveSize));
+                    m_pendingClients.erase(client);
+                    ++m_iopClientCompletions;
+                    if (endFunction != 0u && m_executor != nullptr)
+                        (void)m_executor->executeGuestFunction(endFunction, endParameter, 0u, 0u, 0u, gp);
+                    if (waiter != 0)
+                        (void)m_kernel.wakeupThreadFromHost(waiter);
+                });
+            if (!queued)
+            {
+                m_pendingClients.erase(client);
+                setV0(static_cast<uint32_t>(-1));
+                return true;
+            }
+            setV0(0);
+            // Blocking mode returns once the EE server has answered: sleep until the completion wakes this thread.
+            if (blocking && waiter != 0 && m_pendingClients.count(client) != 0u)
+                m_kernel.sleepCurrent(cpu);
+            return true;
+        }
+        case 18: // sceSifCheckStatRpc(cd): 1 while a call on this client is in flight
+            setV0(m_pendingClients.count(cpu.gpr[4]) != 0u ? 1u : 0u);
             return true;
         case 12: // sceSifSendCmd
         case 13: // isceSifSendCmd
@@ -251,9 +348,6 @@ namespace ps2x::iop::detail
             setV0(server.serverData);
             return true;
         }
-        case 18:
-            setV0(0);
-            return true;
         case 19: // SetRpcQueue
             setV0(cpu.gpr[4]);
             return true;
@@ -298,7 +392,13 @@ namespace ps2x::iop::detail
     {
         RpcResult result{};
         const auto serverIt = m_servers.find(request.sid);
-        if (serverIt == m_servers.end() || serverIt->second.function == 0u)
+        const bool served = serverIt != m_servers.end() && serverIt->second.function != 0u;
+        {
+            const uint64_t key = (static_cast<uint64_t>(request.sid) << 32) | request.function;
+            RpcCallCounter &counter = m_callCounts[key];
+            ++(served ? counter.served : counter.noServer);
+        }
+        if (!served)
             return result;
 
         RpcServer &server = serverIt->second;
@@ -360,6 +460,37 @@ namespace ps2x::iop::detail
             else
                 ++server;
         }
+    }
+
+    std::vector<std::string> IopRpcBridge::debugLines() const
+    {
+        std::vector<std::string> lines;
+        char line[160];
+        for (const auto &[sid, server] : m_servers)
+        {
+            std::snprintf(line, sizeof(line), "rpc_server sid=0x%x func=0x%x buf=0x%x", sid, server.function,
+                          server.buffer);
+            lines.emplace_back(line);
+        }
+        for (const auto &[key, count] : m_iopClientCalls)
+        {
+            std::snprintf(line, sizeof(line), "iop_client %s sid=0x%x calls=%llu",
+                          (key >> 32) == 15u ? "sceSifBindRpc" : "sceSifCallRpc", static_cast<uint32_t>(key),
+                          static_cast<unsigned long long>(count));
+            lines.emplace_back(line);
+        }
+        std::snprintf(line, sizeof(line), "iop_client completions=%llu pending=%zu",
+                      static_cast<unsigned long long>(m_iopClientCompletions), m_pendingClients.size());
+        lines.emplace_back(line);
+        for (const auto &[key, counter] : m_callCounts)
+        {
+            std::snprintf(line, sizeof(line), "rpc_call sid=0x%x fn=%u served=%llu no_server=%llu",
+                          static_cast<uint32_t>(key >> 32), static_cast<uint32_t>(key),
+                          static_cast<unsigned long long>(counter.served),
+                          static_cast<unsigned long long>(counter.noServer));
+            lines.emplace_back(line);
+        }
+        return lines;
     }
 
     bool IopRpcBridge::hasServer(uint32_t sid) const noexcept

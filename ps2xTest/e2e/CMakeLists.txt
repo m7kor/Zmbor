@@ -35,7 +35,7 @@ function(ps2x_add_e2e_program name)
         COMMAND $<TARGET_FILE:ps2_recomp> "${work}/${name}.toml"
         DEPENDS "${PS2X_E2E_SCRIPT_DIR}/e2e_programs.py" "${PS2X_E2E_SCRIPT_DIR}/mips_elf.py"
                 "${CMAKE_SOURCE_DIR}/tools/semantics/vu_fmac_model.py" ps2_recomp
-        BYPRODUCTS "${work}/${name}.frame.json"
+        BYPRODUCTS "${work}/${name}.frame.json" "${work}/${name}.exitcode"
         COMMENT "e2e: assembling and recompiling ${name}"
         VERBATIM)
 
@@ -77,6 +77,7 @@ ps2x_add_e2e_program(gs_sprite FRAME)
 ps2x_add_e2e_program(branchdelay)
 ps2x_add_e2e_program(vu_macro)
 ps2x_add_e2e_program(stripped)
+ps2x_add_e2e_program(missing_target)
 
 # Hardware result tests: ELFs recompiled by tools/hwtest/hwtest.py prepare (for example ps2autotests, whose
 # .expected files were printed by a real PS2). Configure with -DPS2X_HWTEST_GENERATED=<prepared dir>.

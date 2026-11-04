@@ -1,5 +1,16 @@
 # Zmbor
 
+Zmbor is an experimental PlayStation 2 static recompiler and native runtime. This branch integrates the
+[Prosanity engineering continuation](https://github.com/m7kor/prosanity/commit/798d80701a977cc0dcecef373d39d145a84f9525)
+while preserving Zmbor's core mission, GPL-3.0 licensing, PS2Recomp upstream attribution and build-compatible
+module names. See [integration notes](docs/engineering/PROSANITY_INTEGRATION.md).
+
+**Current checkpoint (4 November 2026):** native Crash Twinsanity startup and both introductory videos have been
+observed; **interactive gameplay is not verified**. The latest unit suite passes 697/697, and IOP hardware-output
+comparisons match 23/23 programs (1306/1306 lines). See the [engineering continuation report](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
+for exact configurations, regression limits, measured early-boot performance, and unresolved issues.
+Game files, BIOS, generated commercial-game code, private diagnostics, and screenshots are not included.
+
 <p align="center"><strong>PlayStation 2 static recompilation • hardware-aware native runtime • evidence-first engineering</strong></p>
 
 <p align="center">

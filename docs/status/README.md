@@ -383,22 +383,22 @@ Out-of-scope entries (NOT_APPLICABLE) are proposed by this inventory and need th
 
 ### K. Game compatibility
 
-Stages of tools/compat. Evidence exists only for the 55 ps2autotests programs and 4 synthetic e2e programs; no commercial game and no homebrew game has been run, so every game-level stage is UNKNOWN.
+Stages of tools/compat (different numbering from the Crash bring-up stages). Historical hardware measurements remain unchanged. Crash Twinsanity now executes natively and renders startup content; see docs/engineering/CRASH_TWINSANITY_CONTINUATION.md. Interactive gameplay, audio, scenes and saves remain unverified; no hardware status is upgraded by this game run.
 
 | id | component | status | implemented | missing / blocker | evidence | target |
 |---|---|---|---|---|---|---|
-| `c.elf` | ELF loading (stage 0) | `VERIFIED_PARTIAL` | 55/55 test programs | No game ELF | hw: `cpu_ee_alu` 787/787 |  |
-| `c.native` | Native executable generation (stages 1-2) | `VERIFIED_PARTIAL` | 55/55 test programs | No game ELF | hw: `cpu_ee_alu` 787/787 |  |
-| `c.init` | Initialisation (stage 3) | `VERIFIED_PARTIAL` | 55/55 test programs produce output | No game | hw: `cpu_ee_alu` 787/787 |  |
+| `c.elf` | ELF loading (stage 0) | `VERIFIED_PARTIAL` | 55/55 test programs | Crash Twinsanity ELF exercised; broader commercial-game compatibility unverified | hw: `cpu_ee_alu` 787/787 |  |
+| `c.native` | Native executable generation (stages 1-2) | `VERIFIED_PARTIAL` | 55/55 test programs | Crash Twinsanity native executable built; broader commercial-game compatibility unverified | hw: `cpu_ee_alu` 787/787 |  |
+| `c.init` | Initialisation (stage 3) | `VERIFIED_PARTIAL` | 55/55 test programs produce output | Crash Twinsanity initializes; broader game coverage unverified | hw: `cpu_ee_alu` 787/787 |  |
 | `c.checkpoint` | Stable checkpoint (stage 4) | `VERIFIED_PARTIAL` | 55/55 test programs reach their end marker | Test programs, not games | hw: `cpu_ee_alu` 787/787 |  |
-| `c.mainloop` | Main loop execution | `UNKNOWN` |  | No game run | — |  |
-| `c.render` | Rendering | `UNKNOWN` |  | Only a synthetic e2e frame is checked | — |  |
-| `c.input` | Controller input (stage 5) | `UNKNOWN` |  | No scripted input runs | — |  |
-| `c.sound` | Sound | `UNKNOWN` |  | No game run | — |  |
-| `c.scenes` | Scene transitions (stage 6) | `UNKNOWN` |  | No game run | — |  |
-| `c.save` | Save and load (stage 8) | `UNKNOWN` |  | No game run | — |  |
-| `c.extended` | Extended execution (stage 7) | `UNKNOWN` |  | No game run | — |  |
-| `c.complete` | Full completion (stage 9) | `UNKNOWN` |  | No game run | — |  |
+| `c.mainloop` | Main loop execution | `UNKNOWN` |  | Crash startup executes; interactive game main loop unverified | — |  |
+| `c.render` | Rendering | `UNKNOWN` |  | Synthetic e2e frame checked and Crash startup visually inspected; gameplay rendering and hardware accuracy unverified | — |  |
+| `c.input` | Controller input (stage 5) | `UNKNOWN` |  | Scripted EE HLE playback tested; interactive response in Crash and low-level SIO2 playback unverified | — |  |
+| `c.sound` | Sound | `UNKNOWN` |  | Crash startup runs; audible output unverified | — |  |
+| `c.scenes` | Scene transitions (stage 6) | `UNKNOWN` |  | Crash startup runs; interactive scene transitions unverified | — |  |
+| `c.save` | Save and load (stage 8) | `UNKNOWN` |  | Crash startup probes memory card; saving and loading unverified | — |  |
+| `c.extended` | Extended execution (stage 7) | `UNKNOWN` |  | Bounded Crash startup runs; extended interactive execution unverified | — |  |
+| `c.complete` | Full completion (stage 9) | `UNKNOWN` |  | Crash startup runs; game completion unverified | — |  |
 
 ## Source and test references
 

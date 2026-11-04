@@ -62,6 +62,10 @@ public:
 
     [[nodiscard]] bool canAcceptInput() const noexcept { return m_input.size() < kFifoQwords; }
     bool pushInput(const Qword &qword);
+    // Explicit HLE decoder boundary, never used by ordinary register/FIFO access. A library-level decoder may
+    // replace a hardware decode only at a whole-qword boundary with no running command or undrained output.
+    [[nodiscard]] bool canConsumeInputForHle() const noexcept;
+    bool popInputForHle(Qword &qword);
     [[nodiscard]] size_t inputQwords() const noexcept { return m_input.size(); }
     [[nodiscard]] size_t outputQwords() const noexcept { return m_output.size(); }
     bool popOutput(Qword &qword);

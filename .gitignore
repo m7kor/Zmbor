@@ -27,3 +27,9 @@ build-*/
 
 # Python bytecode caches
 __pycache__/
+
+# Private, user-supplied game data and derived artifacts (never commit)
+/games/
+/work/
+*.iso
+*.ISO

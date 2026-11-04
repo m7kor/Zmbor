@@ -18,6 +18,7 @@ extern "C"
 
 #include <deque>
 #include <memory>
+#include <optional>
 
 #include "Syscalls/Helpers/State.h"
 
@@ -92,7 +93,16 @@ namespace ps2_stubs
                 size_t totalPacketsSent = 0u;
                 size_t framesBefore = frames.size();
 
-                const uint8_t *cursor = data;
+                // av_parser_parse2 requires AV_INPUT_BUFFER_PADDING_SIZE
+                // readable zero bytes beyond the input (libavcodec/avcodec.h).
+                // Guest memory and demux vector subspans do not provide that
+                // contract, so own a padded copy for the duration of parsing.
+                std::vector<uint8_t> padded;
+                if (size > padded.max_size() - AV_INPUT_BUFFER_PADDING_SIZE)
+                    return false;
+                padded.resize(size + AV_INPUT_BUFFER_PADDING_SIZE, 0u);
+                std::memcpy(padded.data(), data, size);
+                const uint8_t *cursor = padded.data();
                 size_t remaining = size;
                 int64_t parserPts = pts90k >= 0 ? pts90k : AV_NOPTS_VALUE;
                 int64_t parserDts = dts90k >= 0 ? dts90k : AV_NOPTS_VALUE;
@@ -474,7 +484,7 @@ namespace ps2_stubs
             uint32_t streamId = 0u;
             uint32_t func = 0u;
             uint32_t data = 0u;
-            uint32_t handle = 0u;
+            uint32_t gp = 0u;
             bool stream = false;
         };
 
@@ -486,12 +496,17 @@ namespace ps2_stubs
 
         struct MpegPlaybackState
         {
+            uint64_t instance = 0u;
             uint32_t picturesServed = 0u;
             uint32_t width = 320u;
             uint32_t height = 240u;
             uint32_t decodeMode = 0u;
             uint32_t imageBufferAddr = 0u;
             bool sawInput = false;
+            bool dmaInput = false;
+            bool inputOwnerConflict = false;
+            bool pictureAborted = false;
+            bool demuxEnded = false;
             bool sawSequenceEnd = false;
             bool streamEnded = false;
             bool decoderFailed = false;
@@ -798,12 +813,18 @@ namespace ps2_stubs
 
         MpegPlaybackState &getPlaybackState(uint32_t mpegAddr)
         {
-            return g_mpeg_stub_state.playbackByMpeg[mpegAddr];
+            static uint64_t nextInstance = 0;
+            auto &playback = g_mpeg_stub_state.playbackByMpeg[mpegAddr];
+            if (!playback.instance) playback.instance = ++nextInstance;
+            return playback;
         }
 
         MpegPlaybackState makeFreshPlaybackState()
         {
             MpegPlaybackState playback{};
+            // Never reuse a token, including across Init/Delete/Create.
+            static uint64_t nextInstance = 1ull << 32u;
+            playback.instance = ++nextInstance;
             playback.cdStreamGeneration = g_mpeg_stub_state.cdStreamGeneration;
             return playback;
         }
@@ -1181,7 +1202,7 @@ namespace ps2_stubs
 
             while (true)
             {
-                if (playback.streamEnded)
+                if (playback.streamEnded || playback.demuxEnded)
                 {
                     erasePssPrefix(playback, buffer.size());
                     return;
@@ -1216,7 +1237,8 @@ namespace ps2_stubs
 
                 if (streamId == kMpegProgramEnd)
                 {
-                    playback.streamEnded = true;
+                    playback.demuxEnded = true;
+                    if (!playback.dmaInput) playback.streamEnded = true;
                     playback.cdStreamGeneration = g_mpeg_stub_state.cdStreamGeneration;
                     flushDecoderIfEnded(playback);
                     erasePssPrefix(playback, buffer.size());
@@ -1331,7 +1353,7 @@ namespace ps2_stubs
                                 pes.pts90k,
                                 pes.dts90k);
                         }
-                        feedElementaryStream(
+                        if (!playback.dmaInput) feedElementaryStream(
                             playback,
                             buffer.data() + payloadStart,
                             packetEnd - payloadStart,
@@ -1372,7 +1394,8 @@ namespace ps2_stubs
         {
             std::vector<MpegStreamCallbackEvent> ignoredCallbacks;
             processPssBuffer(mpegAddr, playback, ignoredCallbacks, true);
-            playback.streamEnded = true;
+            playback.demuxEnded = true;
+            if (!playback.dmaInput) playback.streamEnded = true;
             playback.cdStreamGeneration = g_mpeg_stub_state.cdStreamGeneration;
             flushDecoderIfEnded(playback);
         }
@@ -1469,6 +1492,57 @@ namespace ps2_stubs
             processPssBuffer(mpegAddr, playback, callbackEvents);
         }
 
+        bool validMpegGuestSpan(const uint8_t *rdram, uint32_t address, size_t size)
+        {
+            if (size == 0u) return true;
+            uint32_t offset = 0u;
+            bool scratch = false;
+            if (!rdram || !ps2ResolveGuestPointer(address, offset, scratch)) return false;
+            if (!scratch)
+            {
+                // The general pointer helper intentionally mirrors addresses;
+                // a bulk HLE read must instead stay within a real RAM alias.
+                const uint32_t segment = address & 0xE0000000u;
+                const uint32_t physical = address & 0x1FFFFFFFu;
+                if ((segment != 0u && segment != 0x20000000u && segment != 0x80000000u && segment != 0xA0000000u) ||
+                    physical >= PS2_RAM_SIZE) return false;
+            }
+            const size_t capacity = scratch ? PS2_SCRATCHPAD_SIZE : PS2_RAM_SIZE;
+            return offset <= capacity && size <= capacity - offset &&
+                   static_cast<uint64_t>(address) + size <= 0x100000000ull &&
+                   getConstMemPtr(rdram, address) != nullptr;
+        }
+
+        bool validMpegRingSpan(const uint8_t *rdram, uint32_t dataAddr, uint32_t byteCount,
+                              uint32_t ringBaseAddr, uint32_t ringSize)
+        {
+            if (byteCount == 0u) return true;
+            // The SDK's non-ring wrapper supplies a ring size of -1. It still
+            // requires one contiguous mapped input span; -1 is not a byte count.
+            if (!ringBaseAddr || !ringSize || ringSize == 0xFFFFFFFFu)
+                return validMpegGuestSpan(rdram, dataAddr, byteCount);
+            if (byteCount > ringSize || !validMpegGuestSpan(rdram, ringBaseAddr, ringSize)) return false;
+            uint32_t base = 0u, data = 0u;
+            bool baseScratch = false, dataScratch = false;
+            if (!ps2ResolveGuestPointer(ringBaseAddr, base, baseScratch) ||
+                !ps2ResolveGuestPointer(dataAddr, data, dataScratch) || baseScratch != dataScratch ||
+                data < base || data - base >= ringSize) return false;
+            const uint32_t first = std::min(byteCount, ringSize - (data - base));
+            return validMpegGuestSpan(rdram, dataAddr, first) &&
+                   validMpegGuestSpan(rdram, ringBaseAddr, byteCount - first);
+        }
+
+        void logInvalidMpegInput(const char *operation, R5900Context *ctx, uint32_t data, uint32_t count,
+                                 uint32_t ring = 0u, uint32_t ringSize = 0u)
+        {
+            static uint32_t logged = 0u;
+            if (logged++ >= 32u) return;
+            std::cerr << "[MPEG:invalid-input] op=" << operation << " pc=0x" << std::hex << ctx->pc
+                      << " ra=0x" << getRegU32(ctx, 31) << " mpeg=0x" << getRegU32(ctx, 4)
+                      << " data=0x" << data << " count=0x" << count << " ring=0x" << ring
+                      << " ringSize=0x" << ringSize << std::dec << std::endl;
+        }
+
         size_t appendGuestBytes(uint32_t mpegAddr,
                                 MpegPlaybackState &playback,
                                 const uint8_t *rdram,
@@ -1476,33 +1550,9 @@ namespace ps2_stubs
                                 size_t size,
                                 std::vector<MpegStreamCallbackEvent> &callbackEvents)
         {
-            size_t copied = 0u;
-            while (copied < size)
-            {
-                const uint32_t curAddr = addr + static_cast<uint32_t>(copied);
-                const uint32_t offset = curAddr & PS2_RAM_MASK;
-                size_t chunk = std::min<size_t>(size - copied, PS2_RAM_SIZE - offset);
-                if (chunk == 0u)
-                {
-                    break;
-                }
-
-                const uint8_t *src = getConstMemPtr(rdram, curAddr);
-                if (!src)
-                {
-                    break;
-                }
-
-                appendPssBytes(
-                    mpegAddr,
-                    playback,
-                    src,
-                    chunk,
-                    curAddr,
-                    callbackEvents);
-                copied += chunk;
-            }
-            return copied;
+            if (!validMpegGuestSpan(rdram, addr, size)) return 0u;
+            appendPssBytes(mpegAddr, playback, getConstMemPtr(rdram, addr), size, addr, callbackEvents);
+            return size;
         }
 
         size_t appendGuestRingBytes(uint32_t mpegAddr,
@@ -1518,10 +1568,11 @@ namespace ps2_stubs
             {
                 return 0u;
             }
+            if (!validMpegRingSpan(rdram, dataAddr, byteCount, ringBaseAddr, ringSize)) return 0u;
 
             const uint32_t base = ringBaseAddr & PS2_RAM_MASK;
             const uint32_t data = dataAddr & PS2_RAM_MASK;
-            if (ringBaseAddr != 0u && ringSize != 0u && ringSize <= PS2_RAM_SIZE)
+            if (ringBaseAddr != 0u && ringSize != 0u && ringSize != 0xFFFFFFFFu)
             {
                 const uint32_t ringOffset = (data - base) & PS2_RAM_MASK;
                 if (ringOffset < ringSize)
@@ -1579,7 +1630,7 @@ namespace ps2_stubs
             return true;
         }
 
-        void dispatchGuestStreamCallback(uint8_t *rdram,
+        std::optional<GuestInvocation> makeGuestStreamCallback(uint8_t *rdram,
                                          R5900Context *callerCtx,
                                          PS2Runtime *runtime,
                                          const MpegStreamCallbackEvent &event,
@@ -1587,18 +1638,18 @@ namespace ps2_stubs
         {
             if (!rdram || !callerCtx || !runtime || callback.func == 0u || !runtime->hasFunction(callback.func))
             {
-                return;
+                return std::nullopt;
             }
 
             const uint32_t cbDataAddr = runtime->runtimeMalloc(kMpegCallbackDataSize, 16u);
             if (cbDataAddr == 0u)
             {
-                return;
+                return std::nullopt;
             }
             if (!writeMpegCallbackData(rdram, cbDataAddr, event))
             {
                 runtime->runtimeFree(cbDataAddr);
-                return;
+                return std::nullopt;
             }
 
             R5900Context callbackCtx = *callerCtx;
@@ -1606,6 +1657,7 @@ namespace ps2_stubs
             SET_GPR_U32(&callbackCtx, 5, cbDataAddr);
             SET_GPR_U32(&callbackCtx, 6, callback.data);
             SET_GPR_U32(&callbackCtx, 7, 0u);
+            SET_GPR_U32(&callbackCtx, 28, callback.gp);
             SET_GPR_U32(&callbackCtx, 29, 0u);
             SET_GPR_U32(&callbackCtx, 31, 0u);
             callbackCtx.pc = callback.func;
@@ -1617,7 +1669,26 @@ namespace ps2_stubs
             {
                 runtime->runtimeFree(cbDataAddr);
             };
-            runtime->eeScheduler().queueInvocation(std::move(invocation));
+            return invocation;
+        }
+
+        void invokeStreamCallbackChain(PS2Runtime *runtime,
+                                       std::shared_ptr<std::vector<GuestInvocation>> invocations,
+                                       size_t index)
+        {
+            GuestInvocation invocation = std::move((*invocations)[index]);
+            auto complete = std::move(invocation.onComplete);
+            invocation.onComplete = [runtime, invocations, index, complete = std::move(complete)](
+                                        const R5900Context &completed, R5900Context &parent)
+            {
+                if (complete)
+                    complete(completed, parent);
+                // The completed invocation has already been popped. Start the
+                // next sibling at the same nesting depth and reuse its stack.
+                if (index + 1u < invocations->size())
+                    invokeStreamCallbackChain(runtime, invocations, index + 1u);
+            };
+            runtime->eeScheduler().invokeCurrent(std::move(invocation));
         }
 
         void dispatchStreamCallbacks(uint8_t *rdram,
@@ -1630,13 +1701,27 @@ namespace ps2_stubs
                 return;
             }
 
+            std::vector<GuestInvocation> invocations;
             for (const MpegStreamCallbackEvent &event : events)
             {
                 for (const MpegRegisteredCallback &callback : event.callbacks)
                 {
-                    dispatchGuestStreamCallback(rdram, ctx, runtime, event, callback);
+                    if (auto invocation = makeGuestStreamCallback(rdram, ctx, runtime, event, callback))
+                        invocations.push_back(std::move(*invocation));
                 }
             }
+            if (invocations.empty())
+                return;
+            // Demux callbacks may fill a ring that the enclosing input callback
+            // waits on. Run them before returning to that guest call, even when
+            // it is already an HLE invocation. External test/setup calls retain
+            // deferred dispatch because they have no live guest continuation.
+            auto &scheduler = runtime->eeScheduler();
+            if (scheduler.currentContext() == ctx)
+                invokeStreamCallbackChain(runtime,
+                    std::make_shared<std::vector<GuestInvocation>>(std::move(invocations)), 0u);
+            for (auto &invocation : invocations)
+                scheduler.queueInvocation(std::move(invocation));
         }
 
         void dispatchStreamCallbacksUnlocked(uint8_t *rdram,
@@ -1878,6 +1963,12 @@ namespace ps2_stubs
         const uint32_t mpegAddr = getRegU32(ctx, 4);
         const uint32_t dataAddr = getRegU32(ctx, 5);
         const uint32_t byteCount = getRegU32(ctx, 6);
+        if (!validMpegGuestSpan(rdram, dataAddr, byteCount))
+        {
+            logInvalidMpegInput("AddBs", ctx, dataAddr, byteCount);
+            setReturnS32(ctx, -1);
+            return;
+        }
 
         size_t copied = 0u;
         bool wakePictureWaiter = false;
@@ -1885,18 +1976,10 @@ namespace ps2_stubs
             std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
             MpegPlaybackState &playback = getPlaybackState(mpegAddr);
             const size_t framesBefore = playback.decodedFrames.size();
-            while (copied < byteCount)
+            if (byteCount != 0u)
             {
-                const uint32_t curAddr = dataAddr + static_cast<uint32_t>(copied);
-                const uint32_t offset = curAddr & PS2_RAM_MASK;
-                const size_t chunk = std::min<size_t>(static_cast<size_t>(byteCount) - copied, PS2_RAM_SIZE - offset);
-                const uint8_t *src = getConstMemPtr(rdram, curAddr);
-                if (!src || chunk == 0u)
-                {
-                    break;
-                }
-                feedElementaryStream(playback, src, chunk);
-                copied += chunk;
+                feedElementaryStream(playback, getConstMemPtr(rdram, dataAddr), byteCount);
+                copied = byteCount;
             }
             wakePictureWaiter = playback.decodedFrames.size() != framesBefore || playback.streamEnded || playback.decoderFailed;
         }
@@ -1922,11 +2005,35 @@ namespace ps2_stubs
         g_mpeg_stub_state.initialized = true;
         (void)getPlaybackState(mpegAddr);
 
-        const uint32_t handle = g_mpeg_stub_state.nextCallbackHandle++;
-        g_mpeg_stub_state.callbacksByMpeg[mpegAddr].push_back(
-            MpegRegisteredCallback{callbackType, 0u, callbackFunc, callbackData, handle, false});
+        if (callbackType == 1u && callbackFunc != 0u)
+        {
+            auto &playback = getPlaybackState(mpegAddr);
+            // Establish ownership before the producer demuxes anything. Once
+            // DMA owns the ES, unregistering a callback must not decode its
+            // already-demuxed bytes again. A late switch cannot reconcile
+            // previously decoded bytes with an unconsumed guest ring safely.
+            if (!playback.dmaInput && playback.sawInput)
+            {
+                playback.inputOwnerConflict = true;
+                std::cerr << "[MPEG] nodata registered after direct decoder input; input ownership transition unsupported\n";
+            }
+            playback.dmaInput = true;
+        }
 
-        setReturnU32(ctx, handle);
+        auto &callbacks = g_mpeg_stub_state.callbacksByMpeg[mpegAddr];
+        for (auto &callback : callbacks)
+            if (!callback.stream && callback.type == callbackType)
+            {
+                const uint32_t previous = callback.func;
+                callback.func = callbackFunc;
+                callback.data = callbackData;
+                callback.gp = getRegU32(ctx, 28);
+                setReturnU32(ctx, previous);
+                return;
+            }
+        callbacks.push_back(MpegRegisteredCallback{
+            callbackType, 0u, callbackFunc, callbackData, getRegU32(ctx, 28), false});
+        setReturnU32(ctx, 0u);
     }
 
     void sceMpegAddStrCallback(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -1941,9 +2048,19 @@ namespace ps2_stubs
         std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
         g_mpeg_stub_state.initialized = true;
         (void)getPlaybackState(mpegAddr);
-        const uint32_t handle = g_mpeg_stub_state.nextCallbackHandle++;
-        g_mpeg_stub_state.callbacksByMpeg[mpegAddr].push_back(
-            MpegRegisteredCallback{streamType, streamId, callbackFunc, callbackData, handle, true});
+        auto &callbacks = g_mpeg_stub_state.callbacksByMpeg[mpegAddr];
+        for (auto &callback : callbacks)
+            if (callback.stream && callback.type == streamType && callback.streamId == streamId)
+            {
+                const uint32_t previous = callback.func;
+                callback.func = callbackFunc;
+                callback.data = callbackData;
+                callback.gp = getRegU32(ctx, 28);
+                setReturnU32(ctx, previous);
+                return;
+            }
+        callbacks.push_back(MpegRegisteredCallback{
+            streamType, streamId, callbackFunc, callbackData, getRegU32(ctx, 28), true});
         setReturnU32(ctx, 0u);
     }
 
@@ -1998,22 +2115,9 @@ namespace ps2_stubs
             return;
         }
 
-        {
-            std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
-            getPlaybackState(param_1) = makeFreshPlaybackState();
-        }
-
         const uint32_t puVar4 = uVar3 + 0x108u;
         const uint32_t innerSize = static_cast<uint32_t>(iVar2_signed) - 0x118u;
-
-        mpegGuestWrite32(rdram, param_1 + 0x40, uVar3);
-
         const uint32_t a1_init = uVar3 + 0x118u;
-        mpegGuestWrite32(rdram, puVar4 + 0x0, a1_init);
-        mpegGuestWrite32(rdram, puVar4 + 0x4, innerSize);
-        mpegGuestWrite32(rdram, puVar4 + 0x8, a1_init);
-        mpegGuestWrite32(rdram, puVar4 + 0xC, a1_init);
-
         const uint32_t allocResult = runtime ? runtime->runtimeMalloc(0x600, 8u) : (uVar3 + 0x200u);
         if (allocResult == 0u)
         {
@@ -2021,6 +2125,18 @@ namespace ps2_stubs
             setReturnU32(ctx, 0u);
             return;
         }
+        {
+            std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
+            getPlaybackState(param_1) = makeFreshPlaybackState();
+            // Create initializes a new library work area and callback table;
+            // registration must not accumulate across a header-probe recreate.
+            g_mpeg_stub_state.callbacksByMpeg.erase(param_1);
+        }
+        mpegGuestWrite32(rdram, param_1 + 0x40, uVar3);
+        mpegGuestWrite32(rdram, puVar4 + 0x0, a1_init);
+        mpegGuestWrite32(rdram, puVar4 + 0x4, innerSize);
+        mpegGuestWrite32(rdram, puVar4 + 0x8, a1_init);
+        mpegGuestWrite32(rdram, puVar4 + 0xC, a1_init);
         mpegGuestWrite32(rdram, uVar3 + 0x44, allocResult);
 
         // param_1[0..2] = 0; param_1[4..0xe] = 0xffffffff/0 as per decompilation
@@ -2087,6 +2203,12 @@ namespace ps2_stubs
         const uint32_t mpegAddr = getRegU32(ctx, 4);
         const uint32_t dataAddr = getRegU32(ctx, 5);
         const uint32_t byteCount = getRegU32(ctx, 6);
+        if (!validMpegGuestSpan(rdram, dataAddr, byteCount))
+        {
+            logInvalidMpegInput("DemuxPss", ctx, dataAddr, byteCount);
+            setReturnS32(ctx, -1);
+            return;
+        }
 
         std::vector<MpegStreamCallbackEvent> callbackEvents;
         std::vector<uint32_t> completedMpegIds;
@@ -2147,8 +2269,9 @@ namespace ps2_stubs
             });
         }
 
-        dispatchStreamCallbacksUnlocked(rdram, ctx, runtime, callbackEvents);
+        // Save the result before a synchronous callback transfers control.
         setReturnS32(ctx, static_cast<int32_t>(consumed));
+        dispatchStreamCallbacksUnlocked(rdram, ctx, runtime, callbackEvents);
     }
 
     void sceMpegDemuxPssRing(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -2170,6 +2293,12 @@ namespace ps2_stubs
         const uint32_t availableBytes = getRegU32(ctx, 6);
         const uint32_t ringBaseAddr = getRegU32(ctx, 7);
         const uint32_t ringSize = readAbiArg4(rdram, ctx);
+        if (!validMpegRingSpan(rdram, dataAddr, availableBytes, ringBaseAddr, ringSize))
+        {
+            logInvalidMpegInput("DemuxPssRing", ctx, dataAddr, availableBytes, ringBaseAddr, ringSize);
+            setReturnS32(ctx, -1);
+            return;
+        }
 
         std::vector<MpegStreamCallbackEvent> callbackEvents;
         std::vector<uint32_t> completedMpegIds;
@@ -2241,8 +2370,9 @@ namespace ps2_stubs
             });
         }
 
-        dispatchStreamCallbacksUnlocked(rdram, ctx, runtime, callbackEvents);
+        // Save the result before a synchronous callback transfers control.
         setReturnS32(ctx, static_cast<int32_t>(consumed));
+        dispatchStreamCallbacksUnlocked(rdram, ctx, runtime, callbackEvents);
     }
 
     void sceMpegDispCenterOffX(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
@@ -2286,7 +2416,7 @@ namespace ps2_stubs
         setReturnU32(ctx, getPlaybackState(mpegAddr).decodeMode);
     }
 
-    void sceMpegGetPicture(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    static void getMpegPicture(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime, bool allowRefill)
     {
         const uint32_t mpegAddr = getRegU32(ctx, 4);
         const uint32_t imageAddr = getRegU32(ctx, 5);
@@ -2298,11 +2428,138 @@ namespace ps2_stubs
         {
             std::unique_lock<std::mutex> lock(g_mpeg_stub_mutex);
             MpegPlaybackState &playback = getPlaybackState(mpegAddr);
+            if (playback.pictureAborted)
+            {
+                setReturnS32(ctx, -1);
+                return;
+            }
+            if (playback.inputOwnerConflict)
+            {
+                setReturnS32(ctx, -1);
+                return;
+            }
+            if (playback.dmaInput && runtime)
+            {
+                // The guest producer feeds the real IPU FIFO via DMA4. Consume
+                // those authoritative bytes, allowing the ordinary DMA engine
+                // to refill and complete naturally; never acknowledge raw RAM
+                // reads as DMA consumption or decode the demux payload twice.
+                std::vector<uint8_t> input;
+                runtime->memory().drainIpuInputForHle(4096u, input);
+                if (!input.empty()) feedElementaryStream(playback, input.data(), input.size());
+            }
             if (playback.decodedFrames.empty() &&
-                !g_mpeg_stub_state.currentCdStreamEofSeen &&
+                (playback.dmaInput || !g_mpeg_stub_state.currentCdStreamEofSeen) &&
                 !playback.streamEnded &&
                 !playback.decoderFailed)
             {
+                // sceMpegCbNodata (1) is the guest's input producer. Waiting
+                // without calling it deadlocks single-threaded MPEG players.
+                std::optional<MpegRegisteredCallback> nodata;
+                if (runtime && runtime->eeScheduler().currentContext() == ctx)
+                {
+                    const auto callbacks = g_mpeg_stub_state.callbacksByMpeg.find(mpegAddr);
+                    if (callbacks != g_mpeg_stub_state.callbacksByMpeg.end())
+                        for (const auto &callback : callbacks->second)
+                            if (!callback.stream && callback.type == 1u && callback.func != 0u &&
+                                runtime->hasFunction(callback.func))
+                            {
+                                nodata = callback;
+                                break;
+                            }
+                }
+                if (nodata)
+                {
+                    playback.dmaInput = true;
+                    const uint64_t instance = playback.instance;
+                    lock.unlock();
+                    auto &scheduler = runtime->eeScheduler();
+                    if (!allowRefill)
+                    {
+                        // A callback that produces no complete frame gets one
+                        // retry per guest VSync, without a host busy loop.
+                        scheduler.waitVSync(scheduler.currentVSyncTick(), -1,
+                            [rdram, runtime, mpegAddr, instance](R5900Context &parent)
+                            {
+                                if (static_cast<int32_t>(getRegU32(&parent, 2)) < 0)
+                                    return;
+                                {
+                                    std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
+                                    const auto found = g_mpeg_stub_state.playbackByMpeg.find(mpegAddr);
+                                    if (found == g_mpeg_stub_state.playbackByMpeg.end() || found->second.instance != instance)
+                                    { setReturnS32(&parent, -1); return; }
+                                }
+                                sceMpegGetPicture(rdram, &parent, runtime);
+                            });
+                    }
+                    constexpr uint64_t kNodataTagBase = 0x4D50454700000000ull;
+                    const uint64_t tag = kNodataTagBase | mpegAddr;
+                    if (scheduler.hasInvocation(GuestInvocationKind::HleCall, tag))
+                    {
+                        setReturnS32(ctx, -1);
+                        return;
+                    }
+                    MpegStreamCallbackEvent event{};
+                    event.mpegAddr = mpegAddr;
+                    event.streamType = 1u;
+                    const uint32_t cbDataAddr = runtime->runtimeMalloc(kMpegCallbackDataSize, 16u);
+                    if (cbDataAddr == 0u || !writeMpegCallbackData(rdram, cbDataAddr, event))
+                    {
+                        if (cbDataAddr != 0u) runtime->runtimeFree(cbDataAddr);
+                        setReturnS32(ctx, -1);
+                        return;
+                    }
+                    GuestInvocation invocation{};
+                    invocation.kind = GuestInvocationKind::HleCall;
+                    invocation.tag = tag;
+                    invocation.context = *ctx;
+                    invocation.context.pc = nodata->func;
+                    SET_GPR_U32(&invocation.context, 4, mpegAddr);
+                    SET_GPR_U32(&invocation.context, 5, cbDataAddr);
+                    SET_GPR_U32(&invocation.context, 6, nodata->data);
+                    SET_GPR_U32(&invocation.context, 7, 0u);
+                    SET_GPR_U32(&invocation.context, 28, nodata->gp);
+                    SET_GPR_U32(&invocation.context, 29, 0u);
+                    SET_GPR_U32(&invocation.context, 31, 0u);
+                    invocation.onComplete = [rdram, runtime, cbDataAddr, mpegAddr, instance](const R5900Context &completed,
+                                                                       R5900Context &parent)
+                    {
+                        runtime->runtimeFree(cbDataAddr);
+                        {
+                            std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
+                            const auto found = g_mpeg_stub_state.playbackByMpeg.find(mpegAddr);
+                            if (found == g_mpeg_stub_state.playbackByMpeg.end() || found->second.instance != instance)
+                            { setReturnS32(&parent, -1); return; }
+                            auto &state = found->second;
+                            if (state.pictureAborted)
+                            {
+                                setReturnS32(&parent, -1);
+                                return;
+                            }
+                            std::vector<uint8_t> input;
+                            runtime->memory().drainIpuInputForHle(4096u, input);
+                            if (!input.empty()) feedElementaryStream(state, input.data(), input.size());
+                            // Producer EOF alone is too early: the guest can
+                            // still have ES bytes in its ring. A dry producer
+                            // plus an empty DMA/FIFO is the decoder drain point.
+                            if (getRegU32(&completed, 2) == 0u && input.empty() &&
+                                (state.demuxEnded || g_mpeg_stub_state.currentCdStreamEofSeen) &&
+                                runtime->memory().ipu().inputQwords() == 0u &&
+                                !(runtime->memory().read32(0x1000B400u) & 0x100u))
+                            {
+                                state.streamEnded = true;
+                                flushDecoderIfEnded(state);
+                            }
+                        }
+                        if (static_cast<int32_t>(getRegU32(&completed, 2)) < 0)
+                        {
+                            setReturnS32(&parent, -1);
+                            return;
+                        }
+                        getMpegPicture(rdram, &parent, runtime, false);
+                    };
+                    scheduler.invokeCurrent(std::move(invocation));
+                }
                 if (g_mpeg_stub_state.getPictureWaitTraceCount < 32u)
                 {
                     PS2_IF_AGRESSIVE_LOGS({
@@ -2422,6 +2679,28 @@ namespace ps2_stubs
         }
 
         setReturnS32(ctx, 0);
+    }
+
+    void sceMpegGetPicture(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        getMpegPicture(rdram, ctx, runtime, true);
+    }
+
+    void sceMpegGetPictureAbort(uint8_t *, R5900Context *ctx, PS2Runtime *runtime)
+    {
+        const uint32_t mpegAddr = getRegU32(ctx, 4);
+        {
+            std::lock_guard<std::mutex> lock(g_mpeg_stub_mutex);
+            // Abort is per instance and remains set until Reset/Create. The
+            // library GetPicture entry does not clear the abort flag. Retain
+            // queued output and DMA state; cancellation does not consume data.
+            // Verified against the original library's entry/mid-decode checks
+            // and Reset clear; local evidence: sol_mpeg_abort_{inner,reset}_disasm.log.
+            getPlaybackState(mpegAddr).pictureAborted = true;
+        }
+        if (runtime)
+            runtime->eeScheduler().completeExternalWait(kMpegPictureWaitType, mpegAddr, -1);
+        setReturnS32(ctx, 1);
     }
 
     void sceMpegGetPictureRAW8(uint8_t *rdram, R5900Context *ctx, PS2Runtime *runtime)

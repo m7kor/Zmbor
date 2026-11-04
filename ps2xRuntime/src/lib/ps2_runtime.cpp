@@ -456,10 +456,39 @@ static void UploadFrame(Texture2D &tex, PS2Runtime *rt, uint32_t &outWidth, uint
     // PS2X_DUMP_FRAME=<file.ppm> writes each newly presented guest frame (RGB, as presented) for automated
     // graphics tests and debugging; the file always holds the latest one.
     static const char *s_dumpFramePath = std::getenv("PS2X_DUMP_FRAME");
-    if (s_dumpFramePath && s_dumpFramePath[0] != '\0' && width != 0u && height != 0u &&
+    // ZMBOR_FRAME_SERIES=<dir> additionally keeps a time series: one frame_<ms>.ppm every ZMBOR_FRAME_SERIES_MS
+    // host milliseconds (default 2000), at most 300 files, to follow screen progression across a run.
+    static const char *s_seriesDir = std::getenv("ZMBOR_FRAME_SERIES");
+    static const uint64_t s_seriesPeriodMs = []()
+    {
+        const char *v = std::getenv("ZMBOR_FRAME_SERIES_MS");
+        const long long parsed = v ? std::strtoll(v, nullptr, 10) : 0;
+        return static_cast<uint64_t>(parsed > 0 ? parsed : 2000);
+    }();
+    static const auto s_seriesStart = std::chrono::steady_clock::now();
+    static uint64_t s_seriesNextMs = 0;
+    static uint32_t s_seriesCount = 0;
+    std::string seriesPath;
+    if (s_seriesDir && s_seriesDir[0] != '\0' && s_seriesCount < 300u)
+    {
+        const uint64_t nowMs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                         std::chrono::steady_clock::now() - s_seriesStart)
+                                                         .count());
+        if (nowMs >= s_seriesNextMs)
+        {
+            char name[64];
+            std::snprintf(name, sizeof(name), "/frame_%07llu.ppm", static_cast<unsigned long long>(nowMs));
+            seriesPath = std::string(s_seriesDir) + name;
+            s_seriesNextMs = nowMs + s_seriesPeriodMs;
+            ++s_seriesCount;
+        }
+    }
+    for (const char *dumpPath : {s_dumpFramePath, seriesPath.empty() ? nullptr : seriesPath.c_str()})
+    {
+    if (dumpPath && dumpPath[0] != '\0' && width != 0u && height != 0u &&
         s_scratch.size() >= static_cast<size_t>(width) * height * 4u)
     {
-        if (FILE *ppm = std::fopen(s_dumpFramePath, "wb"))
+        if (FILE *ppm = std::fopen(dumpPath, "wb"))
         {
             std::fprintf(ppm, "P6\n%u %u\n255\n", width, height);
             std::vector<uint8_t> row(static_cast<size_t>(width) * 3u);
@@ -476,6 +505,7 @@ static void UploadFrame(Texture2D &tex, PS2Runtime *rt, uint32_t &outWidth, uint
             }
             std::fclose(ppm);
         }
+    }
     }
 
     std::fill(s_uploadBuffer.begin(), s_uploadBuffer.end(), 0u);
@@ -1423,6 +1453,14 @@ void PS2Runtime::reportMissingFunction(uint8_t *rdram,
         }
     }
 
+    // Every policy records the failure: even SkipCallDebug only continues past code that does not exist, so the
+    // run can no longer be reported as successful.
+    {
+        std::ostringstream detail;
+        detail << describeGuestBranchKind(kind) << " source=0x" << std::hex << sourcePc << " target=0x" << targetPc;
+        noteGuestTermination(GuestTermination::UnresolvedControlFlow, detail.str());
+    }
+
     if (firstReport && policy == MissingFunctionPolicy::BreakOnce)
     {
 #if defined(_MSC_VER)
@@ -1599,6 +1637,16 @@ void PS2Runtime::handleSyscall(uint8_t *rdram, R5900Context *ctx, uint32_t encod
     const uint32_t syscallId = (encodedSyscallId != 0u)
                                    ? encodedSyscallId
                                    : getRegU32(ctx, 3); // $v1 / $3 is the EE kernel syscall number
+
+    if (zmbor_trace::enabled(zmbor_trace::kSyscall))
+    {
+        char key[32];
+        std::snprintf(key, sizeof(key), "syscall:0x%x", syscallId & 0xFFFFu);
+        char detail[96];
+        std::snprintf(detail, sizeof(detail), "a0=0x%x a1=0x%x a2=0x%x ra=0x%x", getRegU32(ctx, 4),
+                      getRegU32(ctx, 5), getRegU32(ctx, 6), getRegU32(ctx, 31));
+        zmbor_trace::record(zmbor_trace::kSyscall, key, ctx->pc, detail);
+    }
 
     if (ps2_syscalls::dispatchNumericSyscall(syscallId, rdram, ctx, this))
     {
@@ -2599,6 +2647,63 @@ bool PS2Runtime::isStopRequested() const
     return m_stopRequested.load(std::memory_order_relaxed);
 }
 
+void PS2Runtime::noteGuestTermination(GuestTermination reason, const std::string &detail)
+{
+    std::lock_guard<std::mutex> lock(m_terminationMutex);
+    const auto isFailure = [](GuestTermination r)
+    {
+        return r == GuestTermination::UnresolvedControlFlow || r == GuestTermination::GuestFatal ||
+               r == GuestTermination::Unsupported || r == GuestTermination::HostFailure;
+    };
+    // First failure wins; a failure replaces a normal reason; a normal reason never replaces anything.
+    if (m_termination == GuestTermination::None || (isFailure(reason) && !isFailure(m_termination)))
+    {
+        m_termination = reason;
+        m_terminationDetail = detail;
+    }
+}
+
+PS2Runtime::GuestTermination PS2Runtime::guestTermination() const
+{
+    std::lock_guard<std::mutex> lock(m_terminationMutex);
+    return m_termination;
+}
+
+std::string PS2Runtime::guestTerminationDetail() const
+{
+    std::lock_guard<std::mutex> lock(m_terminationMutex);
+    return m_terminationDetail;
+}
+
+const char *PS2Runtime::describeGuestTermination(GuestTermination reason)
+{
+    switch (reason)
+    {
+    case GuestTermination::None: return "none";
+    case GuestTermination::GuestExit: return "guest_exit";
+    case GuestTermination::UserClose: return "user_close";
+    case GuestTermination::UnresolvedControlFlow: return "unresolved_control_flow";
+    case GuestTermination::GuestFatal: return "guest_fatal";
+    case GuestTermination::Unsupported: return "unsupported_operation";
+    case GuestTermination::HostFailure: return "host_failure";
+    case GuestTermination::HarnessTimeout: return "harness_timeout";
+    }
+    return "unknown";
+}
+
+int PS2Runtime::processExitCode() const
+{
+    switch (guestTermination())
+    {
+    case GuestTermination::None:
+    case GuestTermination::GuestExit:
+    case GuestTermination::UserClose:
+        return 0;
+    default:
+        return static_cast<int>(guestTermination());
+    }
+}
+
 EeScheduler &PS2Runtime::eeScheduler()
 {
     return *m_eeScheduler;
@@ -2746,6 +2851,7 @@ void PS2Runtime::HandleIntegerOverflow(R5900Context *ctx)
 
 void PS2Runtime::run()
 {
+    zmbor_trace::initFromEnvironment();
     m_stopRequested.store(false, std::memory_order_relaxed);
     ps2_stubs::resetSifState();
     resetIop();
@@ -2783,16 +2889,33 @@ void PS2Runtime::run()
         catch (const std::exception &e)
         {
             std::cerr << "Error during program execution: " << e.what() << std::endl;
+            noteGuestTermination(GuestTermination::HostFailure, std::string("exception: ") + e.what());
         }
         catch (...)
         {
             std::cerr << "Error during program execution: unknown exception" << std::endl;
+            noteGuestTermination(GuestTermination::HostFailure, "unknown exception");
         }
         gameThreadFinished.store(true, std::memory_order_release); });
 
     uint64_t tick = 0;
+    // ZMBOR_RUN_SECONDS=N: stop after N host seconds through the normal shutdown path (so exit status and the
+    // trace summary are produced), recorded as HarnessTimeout rather than as a guest outcome.
+    double runSeconds = 0.0;
+    if (const char *limit = std::getenv("ZMBOR_RUN_SECONDS"))
+    {
+        runSeconds = std::strtod(limit, nullptr);
+    }
+    const auto runStart = std::chrono::steady_clock::now();
     while (!isStopRequested() && !gameThreadFinished.load(std::memory_order_acquire))
     {
+        if (runSeconds > 0.0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - runStart).count() >= runSeconds)
+        {
+            noteGuestTermination(GuestTermination::HarnessTimeout, "ZMBOR_RUN_SECONDS elapsed");
+            requestStop();
+            break;
+        }
         PS2_IF_AGRESSIVE_LOGS({
             tick++;
             if ((tick % 120) == 0)
@@ -2864,6 +2987,7 @@ void PS2Runtime::run()
         if (WindowShouldClose())
         {
             RUNTIME_LOG("[run] window close requested, breaking out of loop");
+            noteGuestTermination(GuestTermination::UserClose, "window closed");
             requestStop();
             break;
         }
@@ -2884,4 +3008,35 @@ void PS2Runtime::run()
     CloseWindow();
 
     RUNTIME_LOG("[run] exiting loop");
+    std::cerr << "[zmbor:termination] reason=" << describeGuestTermination(guestTermination())
+              << " exit=" << processExitCode() << " detail=" << guestTerminationDetail() << std::endl;
+    {
+        const GSRegisters &gs = m_memory.gs();
+        std::ostringstream header;
+        header << "termination=" << describeGuestTermination(guestTermination()) << " exit=" << processExitCode()
+               << " detail=" << guestTerminationDetail() << "\n"
+               << std::hex << "gs pmode=0x" << gs.pmode << " smode2=0x" << gs.smode2 << " dispfb1=0x" << gs.dispfb1
+               << " display1=0x" << gs.display1 << " dispfb2=0x" << gs.dispfb2 << " display2=0x" << gs.display2
+               << " bgcolor=0x" << gs.bgcolor << std::dec << "\n"
+               << "counters dma_starts=" << m_memory.dmaStartCount() << " gif_copies=" << m_memory.gifCopyCount()
+               << " gs_writes=" << m_memory.gsWriteCount() << " vif_writes=" << m_memory.vifWriteCount()
+               << " vsync_ticks=" << m_memory.gs().vsyncTick.load() << "\n";
+        const auto &ipu = m_memory.ipu();
+        header << std::hex << "ipu ctrl=0x" << ipu.readControl() << " bp=0x" << ipu.readBitPointer()
+               << " cmd=0x" << ipu.readCommand() << std::dec
+               << " input_qwords=" << ipu.inputQwords() << " output_qwords=" << ipu.outputQwords()
+               << " busy=" << ipu.busy() << " unimplemented_command=" << ipu.unimplementedCommand() << "\n";
+        if (m_iopSubsystem && zmbor_trace::g_enabled.load() != 0u)
+        {
+            const auto iop = m_iopSubsystem->debugSnapshot();
+            header << "iop cycles=" << iop.emulatorCycles << " instructions=" << iop.emulatorInstructions
+                   << " modules=" << iop.emulatorLoadedModules << " threads=" << iop.emulatorThreads
+                   << " rpc_servers=" << iop.emulatorRpcServers << "\n";
+            for (const auto &line : iop.emulatorCounters)
+                header << "iop " << line << "\n";
+            for (const auto &line : iop.diagnostics)
+                header << "iop diag " << line << "\n";
+        }
+        zmbor_trace::writeSummary(header.str());
+    }
 }

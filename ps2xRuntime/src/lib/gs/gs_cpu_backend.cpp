@@ -1,4 +1,5 @@
 #include "runtime/gs/gs_cpu_backend.h"
+#include "runtime/zmbor_trace.h"
 #include "runtime/gs/ps2_gs_common.h"
 #include "runtime/gs/ps2_gs_psmct16.h"
 #include "runtime/gs/ps2_gs_psmct32.h"
@@ -725,6 +726,23 @@ void GSCpuBackend::DrawPrimitive(const GSPrimitiveBatch &batch)
 {
     const GSDrawState &state = batch.state;
     const auto &ctx = state.context;
+    if (zmbor_trace::enabled(zmbor_trace::kGs))
+    {
+        // One counter per (render target, texture source, primitive type): which buffers the guest draws into.
+        char key[160];
+        std::snprintf(key, sizeof(key), "gs_draw fbp=%u fbw=%u psm=0x%x fbmsk=0x%x type=%u tme=%u tbp=%u tpsm=0x%x abe=%u",
+                      static_cast<unsigned>(ctx.frame.fbp), static_cast<unsigned>(ctx.frame.fbw),
+                      static_cast<unsigned>(ctx.frame.psm), static_cast<unsigned>(ctx.frame.fbmsk),
+                      static_cast<unsigned>(state.prim.type), static_cast<unsigned>(state.prim.tme),
+                      state.prim.tme ? static_cast<unsigned>(ctx.tex0.tbp0) : 0u,
+                      state.prim.tme ? static_cast<unsigned>(ctx.tex0.psm) : 0u, static_cast<unsigned>(state.prim.abe));
+        char detail[160];
+        std::snprintf(detail, sizeof(detail), "test=0x%llx alpha=0x%llx scissor=(%u,%u)-(%u,%u)",
+                      static_cast<unsigned long long>(ctx.test), static_cast<unsigned long long>(ctx.alpha),
+                      static_cast<unsigned>(ctx.scissor.x0), static_cast<unsigned>(ctx.scissor.y0),
+                      static_cast<unsigned>(ctx.scissor.x1), static_cast<unsigned>(ctx.scissor.y1));
+        zmbor_trace::record(zmbor_trace::kGs, key, 0u, detail);
+    }
     PS2_IF_AGRESSIVE_LOGS({
         const uint32_t primitiveIndex = s_debugPrimitiveCount.fetch_add(1u, std::memory_order_relaxed);
         if (primitiveIndex < 64u)
@@ -1635,6 +1653,19 @@ void GSCpuBackend::DrawLine(const GSPrimitiveBatch &batch)
 
 void GSCpuBackend::BeginTransfer(const GSTransferCommand &command)
 {
+    if (zmbor_trace::enabled(zmbor_trace::kGs))
+    {
+        char key[128];
+        std::snprintf(key, sizeof(key), "gs_transfer dir=%u dbp=%u dbw=%u dpsm=0x%x sbp=%u",
+                      static_cast<unsigned>(command.direction), static_cast<unsigned>(command.bitbltbuf.dbp),
+                      static_cast<unsigned>(command.bitbltbuf.dbw), static_cast<unsigned>(command.bitbltbuf.dpsm),
+                      static_cast<unsigned>(command.bitbltbuf.sbp));
+        char detail[96];
+        std::snprintf(detail, sizeof(detail), "rect=%ux%u at (%u,%u)", static_cast<unsigned>(command.trxreg.rrw),
+                      static_cast<unsigned>(command.trxreg.rrh), static_cast<unsigned>(command.trxpos.dsax),
+                      static_cast<unsigned>(command.trxpos.dsay));
+        zmbor_trace::record(zmbor_trace::kGs, key, 0u, detail);
+    }
     std::lock_guard<std::mutex> lock(m_mutex);
     m_transfer = command;
     m_transferState.x = command.trxpos.dsax;

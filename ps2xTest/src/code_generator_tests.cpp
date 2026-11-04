@@ -599,18 +599,33 @@ int main()
         // ps2_runtime.h pulls in IOP types (ps2xIOP/include) and the
         // kernel stub headers (ps2xRuntime/src/lib/Kernel) via
         // ps2_stubs.h; both roots are needed for a standalone compile.
-        const std::string compileCmd = "\"" + compiler + "\" -std=c++20 -msse4.1 -I\"" +
-                                       std::string(PS2X_REPO_ROOT) + "/ps2xRuntime/include\" -I\"" +
-                                       std::string(PS2X_REPO_ROOT) + "/ps2xIOP/include\" -I\"" +
-                                       std::string(PS2X_REPO_ROOT) + "/ps2xRuntime/src/lib/Kernel\" -I\"" +
-                                       dir.string() + "\" \"" + (dir / "harness.cpp").string() +
-                                       "\" -o \"" + (dir / "harness").string() + "\"";
+        const std::string root = PS2X_REPO_ROOT;
+        const std::string includes[] = {root + "/ps2xRuntime/include", root + "/ps2xIOP/include",
+                                        root + "/ps2xRuntime/src/lib/Kernel", dir.string()};
+#if defined(_MSC_VER) && !defined(__clang__)
+        // The test binary and the harness use the same compiler (PS2X_HOST_CXX); cl.exe takes its own option
+        // syntax (SSE4.1 intrinsics need no flag on x64 MSVC). cmd.exe strips the outer quotes of the
+        // std::system string, so the whole command is wrapped once more.
+        std::string compileCmd = "\"\"" + compiler + "\" /nologo /std:c++20 /EHsc";
+        for (const std::string &inc : includes)
+            compileCmd += " /I\"" + inc + "\"";
+        compileCmd += " \"" + (dir / "harness.cpp").string() + "\" /Fo\"" + (dir / "harness.obj").string() +
+                      "\" /Fe\"" + (dir / "harness.exe").string() + "\" > \"" + (dir / "compile.txt").string() +
+                      "\"\"";
+#else
+        std::string compileCmd = "\"" + compiler + "\" -std=c++20 -msse4.1";
+        for (const std::string &inc : includes)
+            compileCmd += " -I\"" + inc + "\"";
+        compileCmd += " \"" + (dir / "harness.cpp").string() + "\" -o \"" + (dir / "harness").string() + "\"";
+#endif
         const int compileResult = std::system(compileCmd.c_str());
         t.IsTrue(compileResult == 0, "generated-code harness must compile: " + compileCmd);
         if (compileResult != 0)
             return;
-        const std::string runCmd = "\"" + (dir / "harness").string() + "\" > \"" +
-                                   (dir / "output.txt").string() + "\"";
+        std::string runCmd = "\"" + (dir / "harness").string() + "\" > \"" + (dir / "output.txt").string() + "\"";
+#if defined(_WIN32)
+        runCmd = "\"" + runCmd + "\"";
+#endif
         const int runResult = std::system(runCmd.c_str());
         t.IsTrue(runResult == 0, "generated-code harness must run");
         std::ifstream output(dir / "output.txt");

@@ -1,19 +1,13 @@
-# Prosanity
+# Zmbor
 
-Prosanity publishes the ongoing **Zmbor** engineering continuation as an experimental PlayStation 2 static
-recompiler and native runtime. It retains Zmbor and [PS2Recomp](https://github.com/ran-j/PS2Recomp) history,
-attribution, and GPL-3.0 licensing. Existing module and executable names are retained for build compatibility.
+**Prosanity integration (4 November 2026).** This repository incorporates the runtime and recompiler engineering developed in [Prosanity](https://github.com/m7kor/prosanity), a direct continuation of Zmbor built on the [PS2Recomp](https://github.com/ran-j/PS2Recomp) foundations. Existing module and executable names remain unchanged for build compatibility.
 
-**Current checkpoint (4 November 2026):** native Crash Twinsanity startup and both introductory videos have been
-observed; **interactive gameplay is not verified**. The latest unit suite passes 697/697, and IOP hardware-output
-comparisons match 23/23 programs (1306/1306 lines). See the [engineering continuation report](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md)
-for exact configurations, regression limits, measured early-boot performance, and unresolved issues.
-Game files, BIOS, generated commercial-game code, private diagnostics, and screenshots are not included.
+**Latest game-development checkpoint (reported by the Prosanity source branch):** native Crash Twinsanity startup and both introductory videos were observed, but **interactive gameplay has not been verified**. The source reports 697/697 unit tests and IOP hardware-output comparisons for 23/23 programs (1306/1306 lines). These are source-branch results, not independently reproduced game-compatibility or physical-hardware validation on this integration branch. See [engineering continuation](docs/engineering/CRASH_TWINSANITY_CONTINUATION.md) for evidence, limitations, and reproducible steps. Commercial game files, BIOS, generated commercial-game code, diagnostics, and screenshots are not included.
 
 <p align="center"><strong>PlayStation 2 static recompilation • hardware-aware native runtime • evidence-first engineering</strong></p>
 
 <p align="center">
-  <a href="https://github.com/m7kor/prosanity/actions/workflows/build.yml"><img src="https://github.com/m7kor/prosanity/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/m7kor/Zmbor/actions/workflows/build.yml"><img src="https://github.com/m7kor/Zmbor/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="GPL-3.0"></a>
   <img src="https://img.shields.io/badge/language-C%2B%2B20-00599C?logo=cplusplus" alt="C++20">
   <img src="https://img.shields.io/badge/platform-PS2%20%2B%20native%20host-6f42c1" alt="PS2 recompilation">

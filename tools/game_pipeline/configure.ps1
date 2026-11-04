@@ -1,9 +1,0 @@
-param([string]$Dir = 'build', [string[]]$Extra = @())
-. D:\Project\Testing\work\scripts\env.ps1
-$D = 'D:/Project/Testing/work/deps'
-$args2 = @('-S','.','-B',$Dir,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DPS2X_BUILD_STUDIO=OFF','-DPS2X_ENABLE_FFMPEG=OFF',
- '-DPS2X_IOP_BUILD_TESTS=ON','-DPS2X_ENABLE_SCCACHE=OFF',
- "-DFETCHCONTENT_SOURCE_DIR_ELFIO=$D/elfio","-DFETCHCONTENT_SOURCE_DIR_TOML11=$D/toml11","-DFETCHCONTENT_SOURCE_DIR_FMT=$D/fmt",
- "-DFETCHCONTENT_SOURCE_DIR_LIBDWARF=$D/libdwarf","-DFETCHCONTENT_SOURCE_DIR_RABBITIZER=$D/rabbitizer","-DFETCHCONTENT_SOURCE_DIR_RAYLIB=$D/raylib",
- "-DFETCHCONTENT_SOURCE_DIR_IMGUI=$D/imgui","-DFETCHCONTENT_SOURCE_DIR_RLIMGUI=$D/rlimgui","-DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$D/json") + $Extra
-& cmake @args2

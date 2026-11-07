@@ -1,3 +1,6 @@
+#include "runtime/zmbor_trace.h"
+#include "runtime/ps2_byte_fingerprint.h"
+
 namespace
 {
     std::string readGuestCStringBounded(const uint8_t *rdram, uint32_t guestAddr, size_t maxBytes)
@@ -271,6 +274,7 @@ namespace
                                 uint8_t *rdram,
                                 PS2Runtime *runtime,
                                 const std::string &sectionName,
+                                uint32_t guestPc,
                                 GuestExecData &execDataOut,
                                 std::string &errorOut)
     {
@@ -280,15 +284,17 @@ namespace
             return false;
         }
 
-        std::ifstream file(hostPath, std::ios::binary);
+        std::ifstream file(hostPath, std::ios::binary | std::ios::ate);
         if (!file)
         {
             errorOut = "failed to open ELF";
             return false;
         }
 
+        const std::streamoff fileSize = file.tellg();
         Elf32Header header{};
-        if (!readFileBlockAt(file, 0, &header, sizeof(header)))
+        if (fileSize < static_cast<std::streamoff>(sizeof(header)) ||
+            !readFileBlockAt(file, 0, &header, sizeof(header)))
         {
             errorOut = "failed to read ELF header";
             return false;
@@ -299,8 +305,21 @@ namespace
             errorOut = "not a MIPS executable ELF";
             return false;
         }
+        if (header.elfClass != 1u || header.endianness != 1u)
+        {
+            errorOut = "unsupported ELF format (expected 32-bit little-endian)";
+            return false;
+        }
 
-        bool loadedAny = false;
+        const uint64_t programTableEnd = static_cast<uint64_t>(header.phoff) +
+            static_cast<uint64_t>(header.phnum) * header.phentsize;
+        if (header.phnum != 0u &&
+            (header.phentsize < sizeof(Elf32ProgramHeader) || programTableEnd > static_cast<uint64_t>(fileSize)))
+        {
+            errorOut = "ELF program-header table is out of range";
+            return false;
+        }
+
         const bool loadAll = sectionName.empty() || toLowerAscii(sectionName) == "all";
         static uint32_t secFilterLogCount = 0;
         if (!loadAll && secFilterLogCount < 8u)
@@ -310,8 +329,15 @@ namespace
             ++secFilterLogCount;
         }
 
-        // As PS2Runtime::loadELF: refuse an ELF with an RDRAM segment in the runtime-owned EE kernel area (runtime
-        // arena and fixed HLE pools) before writing any segment.
+        struct LoadSegment
+        {
+            Elf32ProgramHeader header;
+            uint8_t *destination;
+        };
+        std::vector<LoadSegment> segments;
+        segments.reserve(header.phnum);
+
+        // Resolve and validate the complete load plan before changing guest memory.
         for (uint32_t i = 0; i < header.phnum; ++i)
         {
             Elf32ProgramHeader ph{};
@@ -321,32 +347,7 @@ namespace
                 errorOut = "failed to read ELF program headers";
                 return false;
             }
-            if (ph.type != kElfPtLoad || ph.memsz == 0u ||
-                (ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < (PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE)))
-            {
-                continue;
-            }
-            const uint32_t physAddr = runtime ? runtime->memory().translateAddress(ph.vaddr) : (ph.vaddr & PS2_RAM_MASK);
-            const std::string overlap =
-                PS2Runtime::describeRuntimeReservedOverlap(physAddr, static_cast<uint64_t>(physAddr) + ph.memsz);
-            if (!overlap.empty())
-            {
-                errorOut = "ELF segment overlaps the runtime's reserved EE kernel area (" + overlap + ")";
-                return false;
-            }
-        }
-
-        for (uint32_t i = 0; i < header.phnum; ++i)
-        {
-            Elf32ProgramHeader ph{};
-            const uint64_t phOffset = static_cast<uint64_t>(header.phoff) + static_cast<uint64_t>(i) * header.phentsize;
-            if (!readFileBlockAt(file, phOffset, &ph, sizeof(ph)))
-            {
-                errorOut = "failed to read ELF program headers";
-                return false;
-            }
-
-            if (ph.type != kElfPtLoad || ph.memsz == 0u)
+            if (ph.type != kElfPtLoad)
             {
                 continue;
             }
@@ -355,62 +356,90 @@ namespace
                 errorOut = "ELF segment filesz > memsz";
                 return false;
             }
-
-            const uint64_t memSize64 = static_cast<uint64_t>(ph.memsz);
-            if (runtime && ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < (PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE))
+            if (ph.memsz == 0u)
             {
-                const uint32_t scratchOffset = runtime->memory().translateAddress(ph.vaddr);
-                if (static_cast<uint64_t>(scratchOffset) + memSize64 > PS2_SCRATCHPAD_SIZE)
+                continue;
+            }
+            if (ph.filesz != 0u && static_cast<uint64_t>(ph.offset) + ph.filesz > static_cast<uint64_t>(fileSize))
+            {
+                errorOut = "ELF segment exceeds file bounds";
+                return false;
+            }
+
+            if (runtime && ps2IsScratchpadAddress(ph.vaddr))
+            {
+                const uint32_t scratchOffset = ps2ScratchpadOffset(ph.vaddr);
+                if (static_cast<uint64_t>(scratchOffset) + ph.memsz > PS2_SCRATCHPAD_SIZE)
                 {
                     errorOut = "ELF scratchpad segment out of range";
                     return false;
                 }
 
-                uint8_t *dest = runtime->memory().getScratchpad() + scratchOffset;
-                if (ph.filesz > 0u)
+                uint8_t *scratch = runtime->memory().getScratchpad();
+                if (!scratch)
                 {
-                    if (!readFileBlockAt(file, ph.offset, dest, ph.filesz))
-                    {
-                        errorOut = "failed to read ELF segment payload";
-                        return false;
-                    }
-                }
-                if (ph.memsz > ph.filesz)
-                {
-                    std::memset(dest + ph.filesz, 0, ph.memsz - ph.filesz);
-                }
-            }
-            else
-            {
-                const uint32_t physAddr = runtime ? runtime->memory().translateAddress(ph.vaddr) : (ph.vaddr & PS2_RAM_MASK);
-                if (static_cast<uint64_t>(physAddr) + memSize64 > PS2_RAM_SIZE)
-                {
-                    errorOut = "ELF RDRAM segment out of range";
+                    errorOut = "ELF scratchpad segment has no memory backing";
                     return false;
                 }
-
-                uint8_t *dest = rdram + physAddr;
-                if (ph.filesz > 0u)
-                {
-                    if (!readFileBlockAt(file, ph.offset, dest, ph.filesz))
-                    {
-                        errorOut = "failed to read ELF segment payload";
-                        return false;
-                    }
-                }
-                if (ph.memsz > ph.filesz)
-                {
-                    std::memset(dest + ph.filesz, 0, ph.memsz - ph.filesz);
-                }
+                segments.push_back({ph, scratch + scratchOffset});
+                continue;
             }
 
-            loadedAny = true;
+            uint32_t physAddr;
+            try
+            {
+                physAddr = runtime ? runtime->memory().translateAddress(ph.vaddr) : (ph.vaddr & PS2_RAM_MASK);
+            }
+            catch (const Ps2TlbMissError &e)
+            {
+                errorOut = e.what();
+                return false;
+            }
+            const uint64_t end = static_cast<uint64_t>(physAddr) + ph.memsz;
+            if (end > PS2_RAM_SIZE)
+            {
+                errorOut = "ELF RDRAM segment out of range";
+                return false;
+            }
+            const std::string overlap = PS2Runtime::describeRuntimeReservedOverlap(physAddr, end);
+            if (!overlap.empty())
+            {
+                errorOut = "ELF segment overlaps the runtime's reserved EE kernel area (" + overlap + ")";
+                return false;
+            }
+            segments.push_back({ph, rdram + physAddr});
         }
 
-        if (!loadedAny)
+        if (segments.empty())
         {
             errorOut = "ELF has no loadable segments";
             return false;
+        }
+
+        const bool traceLoads = zmbor_trace::enabled(zmbor_trace::kLoad);
+        for (const auto &[ph, destination] : segments)
+        {
+            if (ph.filesz != 0u && !readFileBlockAt(file, ph.offset, destination, ph.filesz))
+            {
+                errorOut = "failed to read ELF segment payload";
+                return false;
+            }
+            if (ph.memsz > ph.filesz)
+            {
+                std::memset(destination + ph.filesz, 0, ph.memsz - ph.filesz);
+            }
+            if (traceLoads)
+            {
+                const bool scratch = runtime && ps2IsScratchpadAddress(ph.vaddr);
+                const auto *base = scratch ? runtime->memory().getScratchpad() : rdram;
+                const auto offset = static_cast<uint32_t>(destination - base);
+                char detail[128];
+                std::snprintf(detail, sizeof(detail),
+                              "vaddr=0x%08x region=%s offset=0x%08x filesz=%u memsz=%u fnv1a64=%016llx",
+                              ph.vaddr, scratch ? "scratchpad" : "rdram", offset, ph.filesz, ph.memsz,
+                              static_cast<unsigned long long>(ps2ByteFingerprint(destination, ph.memsz)));
+                zmbor_trace::record(zmbor_trace::kLoad, "elf:sif-segment", guestPc, detail);
+            }
         }
 
         execDataOut.epc = header.entry;
@@ -453,7 +482,7 @@ namespace
 
         GuestExecData execData{};
         std::string loadError;
-        if (!loadElfIntoGuestMemory(hostPath, rdram, runtime, sectionName, execData, loadError))
+        if (!loadElfIntoGuestMemory(hostPath, rdram, runtime, sectionName, ctx->pc, execData, loadError))
         {
             static uint32_t logCount = 0;
             if (logCount < 16u)

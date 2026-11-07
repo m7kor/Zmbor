@@ -19,6 +19,8 @@
 #include "rabbitizer.h"
 #include "ps2recomp/recompiler_reporter.h"
 #include "ps2recomp/types.h"
+#include "runtime/ps2_address.h"
+#include "runtime/ps2_byte_fingerprint.h"
 #include <charconv>
 #include <iostream>
 #include <optional>
@@ -31,6 +33,8 @@
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <iterator>
+#include <map>
 
 namespace
 {
@@ -40,6 +44,156 @@ namespace
                name.rfind("FUN_", 0) == 0 ||
                name.rfind("LAB_", 0) == 0 ||
                name.rfind("DAT_", 0) == 0;
+    }
+
+    struct FileBackedLoadSpan
+    {
+        uint64_t begin;
+        uint64_t end;
+        const char *bytes;
+    };
+
+    uint32_t LoadComparisonAddress(uint32_t virtualAddress, uint64_t memorySize)
+    {
+        if (ps2IsScratchpadAddress(virtualAddress))
+        {
+            const uint32_t offset = ps2ScratchpadOffset(virtualAddress);
+            return offset + memorySize <= PS2_SCRATCHPAD_SIZE ? PS2_SCRATCHPAD_BASE + offset : virtualAddress;
+        }
+
+        uint32_t physical = virtualAddress;
+        if (Ps2IsUncachedRamMirrorAddress(virtualAddress))
+            physical &= PS2_RAM_MASK;
+        else if (Ps2IsKseg01Address(virtualAddress))
+            physical = Ps2DirectMappedPhysicalAddress(virtualAddress);
+
+        // The loader translates the base once and copies linearly within RDRAM.
+        return physical + memorySize <= PS2_RAM_SIZE ? physical : virtualAddress;
+    }
+
+    struct LoadedExtent
+    {
+        uint64_t end;
+        const char *bytes; // A null payload represents zero-fill.
+    };
+
+    using LoadedByteMap = std::map<uint64_t, LoadedExtent>;
+
+    void OverlayLoadExtent(LoadedByteMap &image, uint64_t begin, uint64_t end, const char *bytes)
+    {
+        auto first = image.lower_bound(begin);
+        if (first != image.begin() && std::prev(first)->second.end > begin)
+            --first;
+        auto past = image.lower_bound(end);
+        if (first != past)
+        {
+            // Preserve only the edges of older writes that lie outside this write.
+            const auto last = std::prev(past);
+            if (last->second.end > end)
+            {
+                const char *tail = last->second.bytes ? last->second.bytes + (end - last->first) : nullptr;
+                past = image.emplace_hint(past, end, LoadedExtent{last->second.end, tail});
+            }
+            if (first->first < begin)
+            {
+                first->second.end = begin;
+                ++first;
+            }
+            image.erase(first, past);
+        }
+        image.emplace(begin, LoadedExtent{end, bytes});
+    }
+
+    // A missing result means a byte mismatch. Otherwise return the number of
+    // bytes verified against the initial image, including its zero-fill.
+    struct LoadCoverage
+    {
+        uint64_t verified = 0;
+        std::vector<std::pair<uint64_t, uint64_t>> gaps;
+    };
+
+    std::optional<LoadCoverage> MeasureLoadCoverage(const ps2recomp::Section &section, const LoadedByteMap &image)
+    {
+        const uint64_t begin = LoadComparisonAddress(section.address, section.size);
+        const uint64_t end = begin + section.size;
+        auto first = image.lower_bound(begin);
+        if (first != image.begin() && std::prev(first)->second.end > begin)
+            --first;
+
+        LoadCoverage coverage;
+        uint64_t cursor = begin;
+        for (auto it = first; it != image.end() && it->first < end; ++it)
+        {
+            const uint64_t overlap = std::max(begin, it->first);
+            const auto count = static_cast<size_t>(std::min(end, it->second.end) - overlap);
+            const auto *data = section.data + (overlap - begin);
+            if (it->second.bytes)
+            {
+                if (std::memcmp(data, it->second.bytes + (overlap - it->first), count) != 0)
+                    return std::nullopt;
+            }
+            else if (std::any_of(data, data + count, [](uint8_t byte) { return byte != 0; }))
+            {
+                return std::nullopt;
+            }
+            if (cursor < overlap)
+                coverage.gaps.emplace_back(cursor, overlap);
+            cursor = overlap + count;
+            coverage.verified += count;
+        }
+        if (cursor < end)
+            coverage.gaps.emplace_back(cursor, end);
+        return coverage;
+    }
+
+    std::optional<uint64_t> FindConflictingLoadOverlap(
+        std::vector<FileBackedLoadSpan> &spans,
+        std::vector<std::pair<uint64_t, uint64_t>> &zeroFillSpans)
+    {
+        std::sort(spans.begin(), spans.end(), [](const auto &a, const auto &b) { return a.begin < b.begin; });
+
+        // Keep disjoint pieces of the bytes already checked. In address order,
+        // a new span can extend the union only at its end.
+        std::vector<FileBackedLoadSpan> checked;
+        checked.reserve(spans.size());
+        for (const auto &span : spans)
+        {
+            const auto first = std::partition_point(checked.begin(), checked.end(),
+                [&](const auto &piece) { return piece.end <= span.begin; });
+            for (auto it = first; it != checked.end() && it->begin < span.end; ++it)
+            {
+                const auto begin = std::max(span.begin, it->begin);
+                const auto end = std::min(span.end, it->end);
+                if (std::memcmp(span.bytes + (begin - span.begin), it->bytes + (begin - it->begin),
+                                static_cast<size_t>(end - begin)) != 0)
+                    return begin;
+            }
+
+            const auto uncovered = checked.empty() ? span.begin : std::max(span.begin, checked.back().end);
+            if (uncovered < span.end)
+                checked.push_back({uncovered, span.end, span.bytes + (uncovered - span.begin)});
+        }
+
+        std::sort(zeroFillSpans.begin(), zeroFillSpans.end());
+        uint64_t checkedZeroEnd = 0;
+        for (const auto &[start, end] : zeroFillSpans)
+        {
+            // Check each zero-filled address at most once, even for nested tails.
+            const auto begin = std::max(start, checkedZeroEnd);
+            if (begin >= end)
+                continue;
+            checkedZeroEnd = end;
+            const auto first = std::partition_point(checked.begin(), checked.end(),
+                [&](const auto &piece) { return piece.end <= begin; });
+            for (auto it = first; it != checked.end() && it->begin < end; ++it)
+            {
+                const auto *bytes = it->bytes + (std::max(begin, it->begin) - it->begin);
+                const auto *limit = it->bytes + (std::min(end, it->end) - it->begin);
+                if (std::any_of(bytes, limit, [](char byte) { return byte != 0; }))
+                    return std::max(begin, it->begin);
+            }
+        }
+        return std::nullopt;
     }
 
     void AppendLoadSegmentsAsSections(const ELFIO::elfio &elf, std::vector<ps2recomp::Section> &sections)
@@ -3957,7 +4111,128 @@ namespace ps2recomp
             return false;
         }
 
+        // ELFIO converts metadata fields, but section payloads retain their file byte order.
+        if (m_elf->get_encoding() != ELFIO::ELFDATA2LSB)
+        {
+            if (m_reporter)
+            {
+                m_reporter->error("elf", "Expected a little-endian PS2 ELF file");
+            }
+            return false;
+        }
+
+        // Without section headers these segments become the parser's byte sources.
+        const bool usesSegmentFallback = m_elf->sections.size() == 0;
+        const bool usesSectionImageCheck = !usesSegmentFallback && m_elf->get_type() == ELFIO::ET_EXEC;
+        LoadedByteMap loadImage;
+        std::vector<FileBackedLoadSpan> loadSpans;
+        std::vector<std::pair<uint64_t, uint64_t>> zeroFillSpans;
+        for (ELFIO::Elf_Half i = 0; i < m_elf->segments.size(); ++i)
+        {
+            const auto *segment = m_elf->segments[i];
+            if (!segment || segment->get_type() != ELFIO::PT_LOAD)
+                continue;
+
+            const auto fileSize = segment->get_file_size();
+            const auto memorySize = segment->get_memory_size();
+            if (fileSize > memorySize)
+            {
+                if (m_reporter)
+                {
+                    m_reporter->error("elf", "ELF segment " + std::to_string(i) + " has filesz > memsz.");
+                }
+                return false;
+            }
+            // ELFIO can retain a segment header without loading its declared payload.
+            const auto *data = fileSize == 0 ? nullptr : segment->get_data();
+            if (fileSize != 0 && !data)
+            {
+                if (m_reporter)
+                {
+                    m_reporter->error("elf", "ELF segment " + std::to_string(i) + " has no file payload.");
+                }
+                return false;
+            }
+            if (!usesSegmentFallback && !usesSectionImageCheck)
+                continue;
+
+            const uint64_t begin = LoadComparisonAddress(static_cast<uint32_t>(segment->get_virtual_address()),
+                                                        memorySize);
+            if (usesSegmentFallback)
+            {
+                if (fileSize != 0)
+                    loadSpans.push_back({begin, begin + fileSize, data});
+                if (memorySize > fileSize)
+                    zeroFillSpans.emplace_back(begin + fileSize, begin + memorySize);
+            }
+            else
+            {
+                if (fileSize != 0)
+                    OverlayLoadExtent(loadImage, begin, begin + fileSize, data);
+                if (memorySize > fileSize)
+                    OverlayLoadExtent(loadImage, begin + fileSize, begin + memorySize, nullptr);
+            }
+        }
+        if (const auto conflict = FindConflictingLoadOverlap(loadSpans, zeroFillSpans))
+        {
+            if (m_reporter)
+            {
+                std::ostringstream message;
+                message << "Conflicting bytes in overlapping PT_LOAD segments near load address 0x"
+                        << std::hex << *conflict << '.';
+                m_reporter->error("elf", message.str());
+            }
+            return false;
+        }
+
         loadSections();
+        if (usesSectionImageCheck)
+        {
+            for (const auto &section : m_sections)
+            {
+                if ((!section.isCode && !section.isData) || section.size == 0 || section.isBSS)
+                    continue;
+                const auto coverage = section.data ? MeasureLoadCoverage(section, loadImage) : std::nullopt;
+                if (!coverage)
+                {
+                    if (m_reporter)
+                    {
+                        const char *kind = section.isCode ? "EE code section " : "Allocated data section ";
+                        const char *reason = section.data ? " differs from its PT_LOAD image." : " has no file payload.";
+                        m_reporter->error("elf", kind + section.name + reason);
+                    }
+                    return false;
+                }
+                if (!coverage->gaps.empty())
+                {
+                    std::ostringstream message;
+                    message << (section.isCode ? "EE code section " : "Allocated data section ")
+                            << (section.name.empty() ? "<unnamed>" : section.name)
+                            << " at 0x" << std::hex << section.address << std::dec << " has "
+                            << coverage->verified << " of " << section.size
+                            << " bytes covered by initial PT_LOAD; remaining bytes are unverified. gaps=";
+                    const uint64_t base = LoadComparisonAddress(section.address, section.size);
+                    const uint64_t end = base + section.size;
+                    const bool scratch = base >= PS2_SCRATCHPAD_BASE &&
+                                         end <= static_cast<uint64_t>(PS2_SCRATCHPAD_BASE) + PS2_SCRATCHPAD_SIZE;
+                    const char *region = scratch ? "scratchpad" : end <= PS2_RAM_SIZE ? "rdram" : "virtual";
+                    const uint64_t regionBase = scratch ? PS2_SCRATCHPAD_BASE : 0u;
+                    const char *separator = "";
+                    for (const auto &[start, limit] : coverage->gaps)
+                    {
+                        message << separator << region << ":0x" << std::hex << start - regionBase
+                                << "-0x" << limit - regionBase << '@'
+                                << ps2ByteFingerprint(section.data + (start - base), static_cast<size_t>(limit - start))
+                                << "+0x" << static_cast<uint64_t>(section.offset) + (start - base);
+                        separator = ",";
+                    }
+                    if (m_reporter)
+                        m_reporter->warning("elf-coverage", message.str());
+                    else
+                        std::cerr << "Warning: " << message.str() << '\n';
+                }
+            }
+        }
         loadSymbols();
         loadRelocations();
         loadDebugFunctions();

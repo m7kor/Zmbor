@@ -6,6 +6,7 @@
 //   ZMBOR_TRACE_SYSCALL=1  numeric EE syscalls (handleSyscall): counts per syscall number
 //   ZMBOR_TRACE_IO=1       guest file operations (open/read/seek/close): per-file audit, no file contents
 //   ZMBOR_TRACE_GS=1       GS privileged-register and draw counters, display state at exit
+//   ZMBOR_TRACE_LOAD=1     guest ELF segment writes through SifLoadElf
 //   ZMBOR_TRACE_ALL=1      all of the above
 //   ZMBOR_TRACE_EVENTS=N   keep the first N detailed events per key (default 4) in the ordered event log
 //   ZMBOR_SUMMARY_FILE=f   write the end-of-run summary to f (otherwise stderr when any trace is on)
@@ -26,6 +27,7 @@ namespace zmbor_trace
         kSyscall = 1u << 1,
         kIo = 1u << 2,
         kGs = 1u << 3,
+        kLoad = 1u << 4,
     };
 
     extern std::atomic<uint32_t> g_enabled;

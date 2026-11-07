@@ -20,7 +20,7 @@ function(ps2x_link_like_runtime target)
 endfunction()
 
 function(ps2x_add_e2e_program name)
-    cmake_parse_arguments(E2E "FRAME" "" "" ${ARGN})
+    cmake_parse_arguments(E2E "FRAME;LOAD_TRACE" "" "" ${ARGN})
     set(work "${CMAKE_CURRENT_BINARY_DIR}/${name}")
     set(gen "${work}/${name}_generated")
     set(generated
@@ -28,9 +28,13 @@ function(ps2x_add_e2e_program name)
         "${gen}/register_functions.cpp"
         "${gen}/ps2_recompiled_functions.h"
         "${gen}/ps2_recompiled_stubs.h")
+    set(extra_outputs "")
+    if(E2E_LOAD_TRACE)
+        list(APPEND extra_outputs "${work}/sif_overlay.elf")
+    endif()
 
     add_custom_command(
-        OUTPUT ${generated} "${work}/${name}.elf" "${work}/${name}.expected"
+        OUTPUT ${generated} "${work}/${name}.elf" "${work}/${name}.expected" ${extra_outputs}
         COMMAND "${Python3_EXECUTABLE}" -I "${PS2X_E2E_SCRIPT_DIR}/e2e_programs.py" ${name} "${work}"
         COMMAND $<TARGET_FILE:ps2_recomp> "${work}/${name}.toml"
         DEPENDS "${PS2X_E2E_SCRIPT_DIR}/e2e_programs.py" "${PS2X_E2E_SCRIPT_DIR}/mips_elf.py"
@@ -62,13 +66,19 @@ function(ps2x_add_e2e_program name)
             -DPYTHON=${Python3_EXECUTABLE}
             -DCHECK_FRAME=${PS2X_E2E_SCRIPT_DIR}/check_frame.py)
     endif()
-    add_test(NAME e2e_${name}
-        COMMAND "${CMAKE_COMMAND}"
-            -DRUNNER=$<TARGET_FILE:ps2x_e2e_${name}>
-            -DELF=${work}/${name}.elf
-            -DEXPECTED_FILE=${work}/${name}.expected
-            ${frame_args}
-            -P "${PS2X_E2E_SCRIPT_DIR}/run_e2e.cmake")
+    if(E2E_LOAD_TRACE)
+        add_test(NAME e2e_${name}
+            COMMAND "${Python3_EXECUTABLE}" -I "${PS2X_E2E_SCRIPT_DIR}/check_sif_load.py"
+                $<TARGET_FILE:ps2x_e2e_${name}> $<TARGET_FILE:ps2_analyzer> "${work}")
+    else()
+        add_test(NAME e2e_${name}
+            COMMAND "${CMAKE_COMMAND}"
+                -DRUNNER=$<TARGET_FILE:ps2x_e2e_${name}>
+                -DELF=${work}/${name}.elf
+                -DEXPECTED_FILE=${work}/${name}.expected
+                ${frame_args}
+                -P "${PS2X_E2E_SCRIPT_DIR}/run_e2e.cmake")
+    endif()
     set_tests_properties(e2e_${name} PROPERTIES TIMEOUT 90 LABELS e2e)
 endfunction()
 
@@ -78,6 +88,9 @@ ps2x_add_e2e_program(branchdelay)
 ps2x_add_e2e_program(vu_macro)
 ps2x_add_e2e_program(stripped)
 ps2x_add_e2e_program(missing_target)
+if(TARGET ps2_analyzer)
+    ps2x_add_e2e_program(sif_load LOAD_TRACE)
+endif()
 
 # Hardware result tests: ELFs recompiled by tools/hwtest/hwtest.py prepare (for example ps2autotests, whose
 # .expected files were printed by a real PS2). Configure with -DPS2X_HWTEST_GENERATED=<prepared dir>.

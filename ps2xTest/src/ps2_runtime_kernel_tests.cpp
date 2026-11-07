@@ -2,13 +2,16 @@
 #include <filesystem>
 #include "MiniTest.h"
 #include "ps2_runtime.h"
+#include "ps2recomp/elf_parser.h"
 #include "ps2_runtime_macros.h"
 #include "ps2_syscalls.h"
 #include "ps2_stubs.h"
 #include "runtime/ee_scheduler.h"
+#include "runtime/zmbor_trace.h"
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <sstream>
@@ -1177,8 +1180,253 @@ void register_ps2_runtime_kernel_tests()
             std::filesystem::remove_all(dir, ec);
         });
 
+        tc.Run("invalid PT_LOAD size is refused before copying any segment", [](TestCase &t)
+        {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-load-size-" + suffix + ".elf");
+            constexpr uint32_t first = 0x00100000u;
+            constexpr uint32_t second = 0x00180000u;
+            constexpr uint32_t fileSize = 8u;
+            for (const uint32_t memorySize : {4u, 0u})
+            {
+                writeTestElf(path, {{first, fileSize}, {second, fileSize}}, 0x5Au);
+                std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
+                file.seekp(52 + 32 + 20); // ELF32 header, first program header, then p_memsz of the second.
+                file.write(reinterpret_cast<const char *>(&memorySize), sizeof(memorySize));
+                file.close();
+                t.IsTrue(static_cast<bool>(file), "write the malformed fixture");
+                if (!file)
+                    break;
+
+                PS2Runtime runtime;
+                const bool initialized = runtime.memory().initialize();
+                t.IsTrue(initialized, "initialize guest memory");
+                if (!initialized)
+                    break;
+                t.IsFalse(runtime.loadELF(path.string()), "reject a segment with filesz > memsz");
+                const uint8_t *rdram = runtime.memory().getRDRAM();
+                t.IsTrue(rdram[first] == 0u && rdram[second] == 0u, "guest RAM stays untouched");
+            }
+            std::error_code error;
+            std::filesystem::remove(path, error);
+        });
+
+        tc.Run("invalid PT_LOAD leaves guest RAM and entry PC intact", [](TestCase &t)
+        {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-truncated-load-" + suffix + ".elf");
+            constexpr uint32_t first = 0x00100000u;
+            constexpr uint32_t second = 0x00180000u;
+            constexpr uint32_t previousPc = 0x00200000u;
+            writeTestElf(path, {{first, 8u}, {second, 8u}}, 0x5Au);
+            std::error_code error;
+            const auto size = std::filesystem::file_size(path, error);
+            if (!error && size > 0)
+                std::filesystem::resize_file(path, size - 1, error);
+            t.IsTrue(!error && size > 0, "truncate the final byte of the second segment");
+            if (!error && size > 0)
+            {
+                PS2Runtime runtime;
+                const bool initialized = runtime.memory().initialize();
+                t.IsTrue(initialized, "initialize guest memory");
+                if (initialized)
+                {
+                    runtime.cpu().pc = previousPc;
+                    const auto previousElfPath = PS2Runtime::getIoPaths().elfPath;
+                    t.IsFalse(runtime.loadELF(path.string()), "reject a truncated load segment");
+                    t.Equals(runtime.cpu().pc, previousPc, "preserve the prior entry PC");
+                    const uint8_t *rdram = runtime.memory().getRDRAM();
+                    t.IsTrue(rdram[first] == 0u && rdram[second] == 0u, "guest RAM stays untouched");
+                    for (const uint32_t invalid : {PS2_RAM_SIZE - 4u, 0xC0200000u})
+                    {
+                        writeTestElf(path, {{first, 8u}, {invalid, 8u}}, 0x5Au);
+                        t.IsFalse(runtime.loadELF(path.string()), "reject an invalid second destination");
+                        t.Equals(runtime.cpu().pc, previousPc, "preserve PC after destination validation");
+                        t.Equals(rdram[first], uint8_t{0}, "leave the first segment untouched");
+                    }
+                    writeTestElf(path, {}, 0x5Au);
+                    t.IsFalse(runtime.loadELF(path.string()), "reject an ELF without loadable segments");
+                    t.Equals(runtime.cpu().pc, previousPc, "preserve PC for an empty load plan");
+                    t.IsTrue(PS2Runtime::getIoPaths().elfPath == previousElfPath,
+                             "failed loads preserve the previous ELF path");
+                }
+            }
+            std::filesystem::remove(path, error);
+        });
+
+        tc.Run("sectionless ELF analysis requires agreeing bytes in overlapping PT_LOAD segments", [](TestCase &t)
+        {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-load-overlap-" + suffix + ".elf");
+            constexpr uint32_t base = 0x00100000u;
+            constexpr uint32_t overlap = base + 4u;
+            constexpr uint32_t addiu = 0x24020007u;
+            struct Case
+            {
+                const char *name;
+                uint32_t secondAddress;
+                uint32_t firstWord;
+                uint32_t secondWord;
+                bool zeroFill;
+                bool scratchpad = false;
+            };
+            const Case cases[] = {
+                {"matching file bytes", overlap, 0u, 0u, false},
+                {"conflicting file bytes", overlap, 0u, addiu, false},
+                {"matching zero-fill", overlap, 0u, 0u, true},
+                {"conflicting zero-fill", overlap, addiu, 0u, true},
+                {"matching KSEG0 alias", 0x80000000u + overlap, addiu, addiu, false},
+                {"conflicting KSEG1 alias", 0xA0000000u + overlap, 0u, addiu, false},
+                {"conflicting uncached mirror zero-fill", 0x20000000u + overlap, addiu, 0u, true},
+                {"matching scratchpad alias", (PS2_SCRATCHPAD_BASE | 0x80000000u) + 4u, addiu, addiu, false, true},
+                {"conflicting scratchpad alias", (PS2_SCRATCHPAD_BASE | 0x80000000u) + 4u, 0u, addiu, false, true},
+            };
+            for (const auto &c : cases)
+            {
+                const uint32_t firstAddress = c.scratchpad ? PS2_SCRATCHPAD_BASE : base;
+                writeTestElf(path, {{firstAddress, 8u}, {c.secondAddress, 4u}}, 0u);
+                std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
+                constexpr auto payload = 52 + 2 * 32;
+                file.seekp(payload + 4); // Last word of the first segment.
+                file.write(reinterpret_cast<const char *>(&c.firstWord), sizeof(c.firstWord));
+                file.seekp(payload + 8); // First word of the second segment.
+                file.write(reinterpret_cast<const char *>(&c.secondWord), sizeof(c.secondWord));
+                if (c.zeroFill)
+                {
+                    constexpr uint32_t noFileBytes = 0;
+                    file.seekp(52 + 32 + 16); // p_filesz of the second segment.
+                    file.write(reinterpret_cast<const char *>(&noFileBytes), sizeof(noFileBytes));
+                }
+                file.close();
+                t.IsTrue(static_cast<bool>(file), "write the overlapping fixture");
+                if (!file)
+                    break;
+
+                PS2Runtime runtime;
+                const bool initialized = runtime.memory().initialize();
+                t.IsTrue(initialized, "initialize guest memory");
+                if (!initialized)
+                    break;
+                t.IsTrue(runtime.loadELF(path.string()), "the loader applies program headers in order");
+                const auto loadedWord = c.scratchpad ? readGuestU32(runtime.memory().getScratchpad(), 4u)
+                                                     : readGuestU32(runtime.memory().getRDRAM(), overlap);
+                t.Equals(loadedWord, c.secondWord, std::string(c.name) + ": second segment supplies the guest word");
+
+                ps2recomp::ElfParser parser(path.string());
+                const bool parsed = parser.parse();
+                t.Equals(parsed, c.firstWord == c.secondWord, std::string(c.name) + ": parser acceptance");
+                if (parsed)
+                    t.Equals(parser.readWord(firstAddress + 4u), loadedWord, "analysis agrees with guest memory");
+            }
+            std::error_code error;
+            std::filesystem::remove(path, error);
+        });
+
+        tc.Run("section-backed EE code agrees with the final PT_LOAD image", [](TestCase &t)
+        {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-section-image-" + suffix + ".elf");
+            constexpr uint32_t base = 0x00100000u;
+            constexpr uint32_t overlap = base + 4u;
+            constexpr uint32_t payload = 52u + 2u * 32u;
+            constexpr uint32_t sectionTable = payload + 12u;
+            constexpr uint32_t addiu = 0x24020007u;
+            struct Case
+            {
+                uint32_t firstWord;
+                uint32_t finalWord;
+                bool zeroFill;
+                bool useFinalPayload;
+                bool accepts;
+            };
+            const Case cases[] = {
+                {0u, addiu, false, false, false},
+                {0u, addiu, false, true, true},
+                {addiu, 0u, true, false, false},
+                {0u, 0u, true, false, true},
+            };
+            for (const auto &c : cases)
+            {
+                writeTestElf(path, {{base, 8u}, {overlap, 4u}}, 0u);
+                std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
+                auto put = [&](std::streamoff offset, const auto &value)
+                {
+                    file.seekp(offset);
+                    file.write(reinterpret_cast<const char *>(&value), sizeof(value));
+                };
+                put(32, sectionTable); // e_shoff
+                put(48, uint16_t{2}); // e_shnum, including the null section
+                put(payload + 4u, c.firstWord);
+                put(payload + 8u, c.finalWord);
+                if (c.zeroFill)
+                    put(52 + 32 + 16, uint32_t{0}); // Second segment's p_filesz.
+                const std::array<uint32_t, 10> nullSection{};
+                const std::array<uint32_t, 10> codeSection{
+                    0, ELFIO::SHT_PROGBITS, ELFIO::SHF_ALLOC | ELFIO::SHF_EXECINSTR,
+                    overlap, payload + (c.useFinalPayload ? 8u : 4u), 4, 0, 0, 4, 0};
+                put(sectionTable, nullSection);
+                put(sectionTable + sizeof(nullSection), codeSection);
+                file.close();
+                t.IsTrue(static_cast<bool>(file), "write the section-backed fixture");
+                if (!file)
+                    break;
+
+                PS2Runtime runtime;
+                const bool initialized = runtime.memory().initialize();
+                t.IsTrue(initialized, "initialize guest memory");
+                if (!initialized)
+                    break;
+                t.IsTrue(runtime.loadELF(path.string()), "load the fixture's program headers");
+                const auto loaded = readGuestU32(runtime.memory().getRDRAM(), overlap);
+                t.Equals(loaded, c.finalWord, "verify the final guest word");
+                ps2recomp::ElfParser parser(path.string());
+                const bool parsed = parser.parse();
+                t.Equals(parsed, c.accepts, "admit code only when the section agrees with the loaded bytes");
+                if (parsed)
+                    t.Equals(parser.readWord(overlap), loaded, "compare section bytes with the runtime image");
+            }
+            std::error_code error;
+            std::filesystem::remove(path, error);
+        });
+
+        tc.Run("desktop ELF loader maps both scratchpad addresses and checks bounds before copying", [](TestCase &t)
+        {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-scratchpad-load-" + suffix + ".elf");
+            constexpr uint32_t entry = 0x00100000u;
+            constexpr uint32_t offset = PS2_SCRATCHPAD_SIZE - 4u;
+            for (const uint32_t base : {PS2_SCRATCHPAD_BASE, PS2_SCRATCHPAD_BASE | 0x80000000u})
+            {
+                for (const uint32_t size : {4u, 8u})
+                {
+                    writeTestElf(path, {{entry, 4u}, {base + offset, size}}, 0x5Au);
+                    PS2Runtime runtime;
+                    const bool initialized = runtime.memory().initialize();
+                    t.IsTrue(initialized, "initialize guest memory");
+                    if (!initialized)
+                        break;
+                    auto *rdram = runtime.memory().getRDRAM();
+                    auto *scratch = runtime.memory().getScratchpad();
+                    std::memset(rdram + offset, 0xA5, 8u);
+                    std::memset(scratch + offset, 0xA5, 4u);
+                    runtime.cpu().pc = 0x00200000u;
+
+                    const bool fits = size == 4u;
+                    const std::string name = base == PS2_SCRATCHPAD_BASE ? "base" : "alias";
+                    t.Equals(runtime.loadELF(path.string()), fits, name + ": scratchpad bounds");
+                    t.Equals(readGuestU32(scratch, offset), fits ? 0x5A5A5A5Au : 0xA5A5A5A5u,
+                             name + ": scratchpad contents");
+                    t.Equals(readGuestU32(rdram, offset), 0xA5A5A5A5u, name + ": low RDRAM is preserved");
+                    t.Equals(readGuestU32(rdram, entry), fits ? 0x5A5A5A5Au : 0u, name + ": earlier segment");
+                    t.Equals(runtime.cpu().pc, fits ? entry : 0x00200000u, name + ": entry PC");
+                }
+            }
+            std::error_code error;
+            std::filesystem::remove(path, error);
+        });
+
 #if defined(_WIN32)
-        tc.Run("SifLoadElf refuses an ELF overlapping the reserved area and the guest sees -1", [](TestCase &t)
+        tc.Run("SifLoadElf checks reserved RDRAM and scratchpad alias bounds", [](TestCase &t)
         {
             // ELFs loaded by the guest at run time go through the same check (Syscalls/Helpers/Loader.h). An
             // absolute Windows path is a native-host path for the PS2 path parser.
@@ -1203,8 +1451,113 @@ void register_ps2_runtime_kernel_tests()
             t.Equals(static_cast<uint32_t>(env.rdram[0x00060000u]), 0u, "not even the reserved pool");
             t.IsTrue(load(good) >= 0, "the same ELF without the conflicting segment loads");
             t.Equals(static_cast<uint32_t>(env.rdram[0x00200000u]), 0x5Au, "and its segment is written");
+
+            const bool initialized = env.runtime.memory().initialize();
+            t.IsTrue(initialized, "initialize scratchpad for the SIF loader");
+            if (initialized)
+            {
+                constexpr uint32_t offset = PS2_SCRATCHPAD_SIZE - 4u;
+                constexpr uint32_t alias = (PS2_SCRATCHPAD_BASE | 0x80000000u) + offset;
+                const auto mirror = dir / "scratchpad-alias.elf";
+                writeTestElf(mirror, {{0x00210000u, 4u}, {alias, 8u}}, 0x5Au);
+                t.IsTrue(load(mirror) < 0, "the guest gets an error for an oversized scratchpad segment");
+                t.Equals(readGuestU32(env.rdram.data(), 0x00210000u), 0u, "the earlier segment stays untouched");
+
+                writeTestElf(mirror, {{alias, 4u}}, 0x5Au);
+                const auto previousTrace = zmbor_trace::g_enabled.fetch_or(zmbor_trace::kLoad);
+                const auto result = load(mirror);
+                zmbor_trace::g_enabled.store(previousTrace);
+                t.IsTrue(result >= 0, "the scratchpad alias ending at the boundary loads");
+                t.Equals(readGuestU32(env.runtime.memory().getScratchpad(), offset), 0x5A5A5A5Au,
+                         "the SIF loader writes to scratchpad");
+                t.Equals(readGuestU32(env.rdram.data(), offset), 0u, "the SIF loader preserves low RDRAM");
+                t.IsTrue(zmbor_trace::summary("").find(
+                             "vaddr=0xf0003ffc region=scratchpad offset=0x00003ffc filesz=4 memsz=4") != std::string::npos,
+                         "trace preserves the alias and records the actual scratchpad destination");
+            }
             std::error_code ec;
             std::filesystem::remove_all(dir, ec);
+        });
+
+        tc.Run("SifLoadElf rejects invalid load segments before copying any payload", [](TestCase &t)
+        {
+            TestEnv env;
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-sif-segments-" + suffix + ".elf");
+            const std::string guestPath = path.generic_string();
+            constexpr uint32_t pathAddress = 0x00300000u;
+            std::memcpy(env.rdram.data() + pathAddress, guestPath.c_str(), guestPath.size() + 1u);
+
+            constexpr uint32_t first = 0x00200000u;
+            constexpr uint32_t second = 0x00210000u;
+            struct Case
+            {
+                const char *name;
+                uint32_t secondAddress;
+                uint32_t memorySize;
+                bool truncated;
+                bool loads;
+                uint16_t programHeaderSize = 32u;
+                uint8_t elfClass = 1u;
+                uint8_t endianness = 1u;
+            };
+            const Case cases[] = {
+                {"truncated payload", second, 8u, true, false},
+                {"undersized program header", second, 8u, false, false, 31u},
+                {"inconsistent ELF class", second, 8u, false, false, 32u, 2u},
+                {"inconsistent ELF byte order", second, 8u, false, false, 32u, 1u, 2u},
+                {"filesz exceeds memsz", second, 4u, false, false},
+                {"nonempty file with zero memsz", second, 0u, false, false},
+                {"RDRAM extent crosses its end", PS2_RAM_SIZE - 4u, 8u, false, false},
+                {"unmapped TLB destination", 0xC0210000u, 8u, false, false},
+                {"valid image", second, 12u, false, true},
+            };
+            constexpr uint32_t caller = 0x00456780u;
+            env.ctx.pc = caller;
+            std::error_code error;
+            for (const auto &c : cases)
+            {
+                writeTestElf(path, {{first, 8u}, {c.secondAddress, 8u}}, 0x5Au);
+                std::fstream file(path, std::ios::binary | std::ios::in | std::ios::out);
+                file.seekp(4); // EI_CLASS and EI_DATA.
+                file.put(static_cast<char>(c.elfClass));
+                file.put(static_cast<char>(c.endianness));
+                file.seekp(52 + 32 + 20); // p_memsz of the second program header.
+                file.write(reinterpret_cast<const char *>(&c.memorySize), sizeof(c.memorySize));
+                file.seekp(42); // e_phentsize of the ELF32 header.
+                file.write(reinterpret_cast<const char *>(&c.programHeaderSize), sizeof(c.programHeaderSize));
+                file.close();
+                if (c.truncated)
+                    std::filesystem::resize_file(path, 52u + 2u * 32u + 16u - 1u, error);
+                t.IsTrue(static_cast<bool>(file) && !error, "prepare the SIF fixture");
+                if (!file || error)
+                    break;
+
+                std::memset(env.rdram.data() + first, 0xA5, 8u);
+                const auto secondCheckAddress = c.secondAddress & PS2_RAM_MASK;
+                const auto secondCheckSize = std::min(8u, PS2_RAM_SIZE - secondCheckAddress);
+                std::memset(env.rdram.data() + secondCheckAddress, 0xA5, secondCheckSize);
+                setRegU32(env.ctx, 4, pathAddress);
+                setRegU32(env.ctx, 5, 0u);
+                const auto previousTrace = zmbor_trace::g_enabled.fetch_or(zmbor_trace::kLoad);
+                ps2_syscalls::sceSifLoadElf(env.rdram.data(), &env.ctx, &env.runtime);
+                zmbor_trace::g_enabled.store(previousTrace);
+                t.Equals(getRegS32(env.ctx, 2) >= 0, c.loads, std::string(c.name) + ": guest result");
+                const uint32_t expected = c.loads ? 0x5A5A5A5Au : 0xA5A5A5A5u;
+                t.Equals(readGuestU32(env.rdram.data(), first), expected, std::string(c.name) + ": first segment");
+                t.Equals(readGuestU32(env.rdram.data(), secondCheckAddress), expected, std::string(c.name) + ": second segment");
+                const auto trace = zmbor_trace::summary("");
+                t.Equals(trace.find("pc=0x00456780 elf:sif-segment") != std::string::npos, c.loads,
+                         std::string(c.name) + ": only copied segments produce trace events");
+                if (c.loads)
+                {
+                    t.IsTrue(trace.find("vaddr=0x00200000 region=rdram offset=0x00200000 filesz=8 memsz=8") != std::string::npos,
+                             "trace records the first segment");
+                    t.IsTrue(trace.find("vaddr=0x00210000 region=rdram offset=0x00210000 filesz=8 memsz=12") != std::string::npos,
+                             "trace distinguishes payload and zero-fill");
+                }
+            }
+            std::filesystem::remove(path, error);
         });
 #endif
 

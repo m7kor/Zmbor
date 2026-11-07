@@ -41,10 +41,10 @@ jobs:
       - name: Floating-point build guard and probe lab self-test
         run: |
           ctest --test-dir build/ps2xTest -L fpenv --output-on-failure
-          ctest --test-dir build/ps2xTest -R "hwprobes_lab_selftest|compat_matrix_selftest" --output-on-failure
+          ctest --test-dir build/ps2xTest -R "hwprobes_lab_selftest|compat_matrix_selftest|elf_byte_order" --output-on-failure
 
       - name: End-to-end (generated ELF -> ps2_recomp -> runtime)
-        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite)$" --output-on-failure
+        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite|sif_load)$" --output-on-failure
 
       # Gate F: every public header must compile standalone (Gate B S1/S2
       # regression mechanism). Runs after configure, which populates
@@ -129,7 +129,7 @@ jobs:
         env:
           ASAN_OPTIONS: halt_on_error=1:detect_leaks=0
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite)$" --output-on-failure
+        run: xvfb-run -a ctest --test-dir build/ps2xTest -R "^(e2e_(basic|branchdelay|vu_macro|stripped|gs_sprite|sif_load)|elf_byte_order)$" --output-on-failure
 
       # Gate F: public header self-containment check (Gate B S1/S2
       # regression mechanism); see the linux-gcc-clang job for the
@@ -215,7 +215,7 @@ jobs:
         shell: cmd
         run: |
           ctest --test-dir build\ps2xTest -C Release -L fpenv --output-on-failure || exit /b 1
-          ctest --test-dir build\ps2xTest -C Release -R "hwprobes_lab_selftest|compat_matrix_selftest" --output-on-failure
+          ctest --test-dir build\ps2xTest -C Release -R "hwprobes_lab_selftest|compat_matrix_selftest|elf_byte_order" --output-on-failure
 
       # No end-to-end step here: the hosted Windows runner has no OpenGL driver (WGL), and the runtime opens a window
       # even when hidden. The e2e programs run on the Linux jobs (xvfb + Mesa) and in the local Windows gate.

@@ -97,6 +97,7 @@ namespace zmbor_trace
             if (all || envOn("ZMBOR_TRACE_SYSCALL")) mask |= kSyscall;
             if (all || envOn("ZMBOR_TRACE_IO")) mask |= kIo;
             if (all || envOn("ZMBOR_TRACE_GS")) mask |= kGs;
+            if (all || envOn("ZMBOR_TRACE_LOAD")) mask |= kLoad;
             if (const char *n = std::getenv("ZMBOR_TRACE_EVENTS"))
                 g_eventsPerKey = static_cast<uint32_t>(std::max(0L, std::strtol(n, nullptr, 10)));
             g_enabled.store(mask, std::memory_order_relaxed); });

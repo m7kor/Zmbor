@@ -844,8 +844,6 @@ bool PS2Runtime::initialize(const char *title)
 
 bool PS2Runtime::loadELF(const std::string &elfPath)
 {
-    configureIoPathsFromElf(elfPath);
-
     std::ifstream file(elfPath, std::ios::binary);
     if (!file)
     {
@@ -902,63 +900,20 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         return false;
     }
 
-    // Validate every loadable segment against the runtime-owned EE kernel area (runtime arena and fixed HLE pools,
-    // 0x00020000-0x00080000) before anything is written: the runtime keeps live state there, so an ELF placed in it
-    // would be overwritten (or overwrite that state). It is kernel memory on a real PS2 as well. The ELF is refused.
+    struct LoadSegment
+    {
+        ProgramHeader header;
+        uint16_t index;
+        uint32_t physAddr;
+        uint8_t *destination;
+        bool scratch;
+    };
+    std::vector<LoadSegment> segments;
+    segments.reserve(header.phnum);
     for (uint16_t i = 0; i < header.phnum; i++)
     {
         const uint64_t phOffset =
             static_cast<uint64_t>(header.phoff) + static_cast<uint64_t>(i) * static_cast<uint64_t>(header.phentsize);
-        ProgramHeader ph{};
-        if (phOffset + sizeof(ProgramHeader) > static_cast<uint64_t>(fileSize))
-            break; // reported by the loading loop
-        file.seekg(static_cast<std::streamoff>(phOffset), std::ios::beg);
-        if (!file.read(reinterpret_cast<char *>(&ph), sizeof(ph)))
-            break;
-        if (ph.type != PT_LOAD || ph.memsz == 0u ||
-            (ph.vaddr >= PS2_SCRATCHPAD_BASE && ph.vaddr < PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE))
-            continue;
-        uint32_t physAddr = 0u;
-        try
-        {
-            physAddr = m_memory.translateAddress(ph.vaddr);
-        }
-        catch (const std::exception &)
-        {
-            continue; // reported by the loading loop
-        }
-        const uint64_t physEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
-        const std::string overlap = describeRuntimeReservedOverlap(physAddr, physEnd);
-        if (!overlap.empty())
-        {
-            std::cerr << "ELF segment " << i << " (vaddr 0x" << std::hex << ph.vaddr << ", RDRAM 0x" << physAddr
-                      << "-0x" << physEnd << std::dec << ") overlaps the runtime's reserved EE kernel area ("
-                      << overlap << "); the ELF is not loaded." << std::endl;
-            return false;
-        }
-    }
-    file.clear();
-
-    m_cpuContext.pc = header.entry;
-    m_debugPc.store(m_cpuContext.pc, std::memory_order_relaxed);
-
-    uint32_t maxLoadedRdramEnd = kGuestHeapDefaultBase;
-    uint32_t minLoadedRdramStart = PS2_RAM_SIZE;
-    uint32_t moduleBase = std::numeric_limits<uint32_t>::max();
-    uint32_t moduleEnd = 0u;
-    bool loadedAnySegment = false;
-
-    for (uint16_t i = 0; i < header.phnum; i++)
-    {
-        const uint64_t phOffset =
-            static_cast<uint64_t>(header.phoff) +
-            static_cast<uint64_t>(i) * static_cast<uint64_t>(header.phentsize);
-        if (phOffset + sizeof(ProgramHeader) > static_cast<uint64_t>(fileSize))
-        {
-            std::cerr << "ELF program header " << i << " is out of range." << std::endl;
-            return false;
-        }
-
         ProgramHeader ph{};
         file.seekg(static_cast<std::streamoff>(phOffset), std::ios::beg);
         if (!file.read(reinterpret_cast<char *>(&ph), sizeof(ph)))
@@ -966,29 +921,22 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
             std::cerr << "Failed to read ELF program header " << i << std::endl;
             return false;
         }
-
-        if (ph.type != PT_LOAD || ph.memsz == 0u)
-        {
+        if (ph.type != PT_LOAD)
             continue;
-        }
-
         if (ph.filesz > ph.memsz)
         {
             std::cerr << "ELF segment " << i << " has filesz > memsz." << std::endl;
             return false;
         }
-
+        if (ph.memsz == 0u)
+            continue;
         const uint64_t segmentFileEnd = static_cast<uint64_t>(ph.offset) + static_cast<uint64_t>(ph.filesz);
         if (segmentFileEnd > static_cast<uint64_t>(fileSize))
         {
             std::cerr << "ELF segment " << i << " exceeds file bounds." << std::endl;
             return false;
         }
-
-        const bool scratch =
-            ph.vaddr >= PS2_SCRATCHPAD_BASE &&
-            ph.vaddr < (PS2_SCRATCHPAD_BASE + PS2_SCRATCHPAD_SIZE);
-
+        const bool scratch = ps2IsScratchpadAddress(ph.vaddr);
         uint32_t physAddr = 0u;
         try
         {
@@ -1001,26 +949,42 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
                       << std::dec << ": " << e.what() << std::endl;
             return false;
         }
-        const uint64_t regionSize = scratch ? static_cast<uint64_t>(PS2_SCRATCHPAD_SIZE)
-                                            : static_cast<uint64_t>(PS2_RAM_SIZE);
-        const uint64_t segmentMemEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
-        if (segmentMemEnd > regionSize)
+        const uint64_t physEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
+        if (physEnd > (scratch ? PS2_SCRATCHPAD_SIZE : PS2_RAM_SIZE))
         {
             std::cerr << "ELF segment " << i << " exceeds "
-                      << (scratch ? "scratchpad" : "RDRAM")
-                      << " bounds (vaddr=0x" << std::hex << ph.vaddr
-                      << " memsz=0x" << ph.memsz << std::dec << ")." << std::endl;
+                      << (scratch ? "scratchpad" : "RDRAM") << " bounds." << std::endl;
             return false;
         }
-
         uint8_t *destBase = scratch ? m_memory.getScratchpad() : m_memory.getRDRAM();
         if (!destBase)
         {
             std::cerr << "ELF segment " << i << " has no destination memory backing." << std::endl;
             return false;
         }
+        const std::string overlap = scratch ? std::string{} : describeRuntimeReservedOverlap(physAddr, physEnd);
+        if (!overlap.empty())
+        {
+            std::cerr << "ELF segment " << i << " (vaddr 0x" << std::hex << ph.vaddr << ", RDRAM 0x" << physAddr
+                      << "-0x" << physEnd << std::dec << ") overlaps the runtime's reserved EE kernel area ("
+                      << overlap << "); the ELF is not loaded." << std::endl;
+            return false;
+        }
+        segments.push_back({ph, i, physAddr, destBase + physAddr, scratch});
+    }
+    if (segments.empty())
+    {
+        std::cerr << "ELF contains no loadable PT_LOAD segments." << std::endl;
+        return false;
+    }
 
-        uint8_t *dest = destBase + physAddr;
+    uint32_t maxLoadedRdramEnd = kGuestHeapDefaultBase;
+    uint32_t minLoadedRdramStart = PS2_RAM_SIZE;
+    uint32_t moduleBase = std::numeric_limits<uint32_t>::max();
+    uint32_t moduleEnd = 0u;
+    for (const auto &[ph, i, physAddr, dest, scratch] : segments)
+    {
+        const uint64_t segmentMemEnd = static_cast<uint64_t>(physAddr) + static_cast<uint64_t>(ph.memsz);
         if (ph.filesz > 0u)
         {
             file.seekg(static_cast<std::streamoff>(ph.offset), std::ios::beg);
@@ -1057,7 +1021,6 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
             }
         }
 
-        loadedAnySegment = true;
         moduleBase = std::min(moduleBase, ph.vaddr);
         const uint64_t segmentVirtualEnd = static_cast<uint64_t>(ph.vaddr) + static_cast<uint64_t>(ph.memsz);
         const uint32_t clampedVirtualEnd =
@@ -1067,11 +1030,9 @@ bool PS2Runtime::loadELF(const std::string &elfPath)
         moduleEnd = std::max(moduleEnd, clampedVirtualEnd);
     }
 
-    if (!loadedAnySegment)
-    {
-        std::cerr << "ELF contains no loadable PT_LOAD segments." << std::endl;
-        return false;
-    }
+    configureIoPathsFromElf(elfPath);
+    m_cpuContext.pc = header.entry;
+    m_debugPc.store(m_cpuContext.pc, std::memory_order_relaxed);
 
     if (maxLoadedRdramEnd > PS2_RAM_SIZE)
     {

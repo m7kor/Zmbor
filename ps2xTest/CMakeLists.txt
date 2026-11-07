@@ -12,6 +12,11 @@ if(BUILD_TESTING)
     # The community research database (research/) must keep provenance and never claim unearned statuses.
     find_package(Python3 COMPONENTS Interpreter QUIET)
     if(Python3_Interpreter_FOUND)
+        if(TARGET ps2_analyzer AND TARGET ps2_recomp)
+            add_test(NAME elf_byte_order
+                     COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/e2e/elf_byte_order.py
+                             $<TARGET_FILE:ps2_analyzer> $<TARGET_FILE:ps2_recomp>)
+        endif()
         add_test(NAME research_database_valid
                  COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_SOURCE_DIR}/tools/research/validate_research.py)
         # Probe manifests and observation scoring (synthetic data only; no hardware is involved).

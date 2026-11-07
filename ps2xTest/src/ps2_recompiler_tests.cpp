@@ -10,6 +10,7 @@
 #include "ps2recomp/r5900_decoder.h"
 #include "ps2recomp/types.h"
 #include "ps2_runtime_calls.h"
+#include "ps2_runtime.h"
 #include <elfio/elfio.hpp>
 #include <algorithm>
 #include <array>
@@ -17,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <set>
 #include <tuple>
 #include <unordered_map>
@@ -69,6 +71,14 @@ static Function makeFunction(const std::string &name, uint32_t start, uint32_t e
     return fn;
 }
 
+static void addTestLoadSection(ELFIO::segment *segment, ELFIO::section *section)
+{
+    // ELFIO retains the segment's explicit base when laying out its sections.
+    if (segment->get_sections_num() == 0)
+        segment->set_virtual_address(section->get_address());
+    segment->add_section_index(section->get_index(), section->get_addr_align());
+}
+
 static bool writeMinimalMipsElfWithCodeAndDataFunctionSymbols(const std::filesystem::path &elfPath)
 {
     ELFIO::elfio writer;
@@ -117,13 +127,13 @@ static bool writeMinimalMipsElfWithCodeAndDataFunctionSymbols(const std::filesys
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+    addTestLoadSection(dataSegment, data);
 
     return writer.save(elfPath.string());
 }
@@ -198,7 +208,7 @@ static bool writeMinimalMipsElfWithJalFallbackTarget(const std::filesystem::path
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -324,13 +334,13 @@ static bool writePhase12DiscoveryElf(const std::filesystem::path &elfPath, bool 
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+    addTestLoadSection(dataSegment, data);
 
     return writer.save(elfPath.string());
 }
@@ -442,7 +452,7 @@ static bool writePhase14JalrElf(const std::filesystem::path &elfPath, bool cutFi
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -493,7 +503,8 @@ static const std::array<uint32_t, 26> kPhase14DataTextWords = {
     0x00000000u, // nop
 };
 
-static bool writePhase14DataElf(const std::filesystem::path &elfPath, bool zeroDataPointer)
+static bool writePhase14DataElf(const std::filesystem::path &elfPath, bool zeroDataPointer,
+                                std::optional<uint32_t> overlayPointer = std::nullopt)
 {
     ELFIO::elfio writer;
     writer.create(ELFIO::ELFCLASS32, ELFIO::ELFDATA2LSB);
@@ -535,13 +546,28 @@ static bool writePhase14DataElf(const std::filesystem::path &elfPath, bool zeroD
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+    addTestLoadSection(dataSegment, data);
+
+    if (overlayPointer)
+    {
+        auto *overlay = writer.sections.add(".data.overlay");
+        overlay->set_type(ELFIO::SHT_PROGBITS);
+        overlay->set_flags(ELFIO::SHF_ALLOC | ELFIO::SHF_WRITE);
+        overlay->set_addr_align(4);
+        overlay->set_address(data->get_address());
+        overlay->set_data(reinterpret_cast<const char *>(&*overlayPointer), sizeof(*overlayPointer));
+        auto *segment = writer.segments.add();
+        segment->set_type(ELFIO::PT_LOAD);
+        segment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
+        segment->set_align(4);
+        addTestLoadSection(segment, overlay);
+    }
 
     return writer.save(elfPath.string());
 }
@@ -594,13 +620,13 @@ static bool writeMinimalMipsElfWithVuMicroprogramSection(const std::filesystem::
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *vuSegment = writer.segments.add();
     vuSegment->set_type(ELFIO::PT_LOAD);
     vuSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     vuSegment->set_align(0x1000);
-    vuSegment->add_section_index(vuText->get_index(), vuText->get_addr_align());
+    addTestLoadSection(vuSegment, vuText);
 
     return writer.save(elfPath.string());
 }
@@ -655,7 +681,7 @@ static bool writeMinimalMipsElfWithUnmappedEntryHint(const std::filesystem::path
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -714,7 +740,7 @@ static bool writeMinimalMipsElfWithStandaloneEntryBlock(const std::filesystem::p
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -769,7 +795,7 @@ static bool writeMinimalMipsElfWithDelaySlotPastFunctionEnd(const std::filesyste
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -851,8 +877,8 @@ static bool writeMinimalMipsElfWithLeafMethodVtable(const std::filesystem::path 
     seg->set_type(ELFIO::PT_LOAD);
     seg->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     seg->set_align(0x1000);
-    seg->add_section_index(text->get_index(), text->get_addr_align());
-    seg->add_section_index(rodata->get_index(), rodata->get_addr_align());
+    addTestLoadSection(seg, text);
+    addTestLoadSection(seg, rodata);
     return writer.save(elfPath.string());
 }
 
@@ -1239,14 +1265,14 @@ static bool writeMinimalMipsElfWithAddressTakenCallbacks(const std::filesystem::
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(rodata->get_index(), rodata->get_addr_align());
-    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+    addTestLoadSection(dataSegment, rodata);
+    addTestLoadSection(dataSegment, data);
 
     return writer.save(elfPath.string());
 }
@@ -1304,13 +1330,13 @@ static bool writeMinimalMipsElfWithInitializer(const std::filesystem::path &elfP
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R | ELFIO::PF_W);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(ctors->get_index(), ctors->get_addr_align());
+    addTestLoadSection(dataSegment, ctors);
 
     return writer.save(elfPath.string());
 }
@@ -1415,13 +1441,13 @@ static bool writeGhidraOracleElf(const std::filesystem::path &elfPath)
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     ELFIO::segment *dataSegment = writer.segments.add();
     dataSegment->set_type(ELFIO::PT_LOAD);
     dataSegment->set_flags(ELFIO::PF_R);
     dataSegment->set_align(0x1000);
-    dataSegment->add_section_index(data->get_index(), data->get_addr_align());
+    addTestLoadSection(dataSegment, data);
 
     return writer.save(elfPath.string());
 }
@@ -1821,7 +1847,7 @@ static bool writeGateDUndecodableElf(const std::filesystem::path &elfPath)
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -1904,7 +1930,7 @@ static bool writeGateDDelaySlotElf(const std::filesystem::path &elfPath)
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -2066,7 +2092,7 @@ static bool writeGateDOctalElf(const std::filesystem::path &elfPath)
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -2409,7 +2435,7 @@ static bool writeGateCSltiuElf(const std::filesystem::path &elfPath, GateCSltiuV
     textSegment->set_type(ELFIO::PT_LOAD);
     textSegment->set_flags(ELFIO::PF_R | ELFIO::PF_X);
     textSegment->set_align(0x1000);
-    textSegment->add_section_index(text->get_index(), text->get_addr_align());
+    addTestLoadSection(textSegment, text);
 
     return writer.save(elfPath.string());
 }
@@ -3019,7 +3045,7 @@ void register_ps2_recompiler_tests()
                      "one configured jump table should be loaded");
             if (!config.jumpTables.empty())
             {
-                const JumpTable &table = config.jumpTables.front();
+                const ps2recomp::JumpTable &table = config.jumpTables.front();
                 t.Equals(table.address, 0x200000u, "table address should parse from hex string");
                 t.Equals(table.baseRegister, 9u, "base register should parse");
                 t.Equals(table.entries.size(), static_cast<size_t>(2),
@@ -3979,6 +4005,42 @@ void register_ps2_recompiler_tests()
 
             std::error_code removeError;
             std::filesystem::remove(elfPath, removeError);
+        });
+
+        tc.Run("section-backed discovery rejects a pointer overwritten by PT_LOAD", [](TestCase &t) {
+            const auto suffix = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+            const auto path = std::filesystem::temp_directory_path() / ("zmbor-pointer-image-" + suffix + ".elf");
+            constexpr uint32_t target = 0x00100040u;
+            for (const uint32_t finalPointer : {target, 0u})
+            {
+                const bool written = writePhase14DataElf(path, false, finalPointer);
+                t.IsTrue(written, "write the data-pointer fixture");
+                if (!written)
+                    break;
+
+                PS2Runtime runtime;
+                const bool initialized = runtime.memory().initialize();
+                t.IsTrue(initialized, "initialize guest memory");
+                if (!initialized)
+                    break;
+                t.IsTrue(runtime.loadELF(path.string()), "load the fixture's program headers");
+                uint32_t loadedPointer = 0;
+                std::memcpy(&loadedPointer, runtime.memory().getRDRAM() + 0x00100200u, sizeof(loadedPointer));
+                t.Equals(loadedPointer, finalPointer, "the final segment supplies the runtime pointer");
+
+                ElfParser parser(path.string());
+                const bool parsed = parser.parse();
+                t.Equals(parsed, finalPointer == target, "admit only data that agrees with the loaded pointer");
+                if (parsed)
+                {
+                    const auto discovery = parser.discoverFromEntryPoint();
+                    const bool discovered = std::any_of(discovery.functions.begin(), discovery.functions.end(),
+                        [=](const Function &fn) { return fn.start == target; });
+                    t.Equals(discovered, loadedPointer == target, "discover the target only if the loaded pointer names it");
+                }
+            }
+            std::error_code error;
+            std::filesystem::remove(path, error);
         });
 
         tc.Run("Phase 14 data-pointer deletion removes the function and its callee", [](TestCase &t) {

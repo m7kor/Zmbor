@@ -5,6 +5,7 @@ Usage: e2e_programs.py <program> <out_dir>
 Writes <out_dir>/<program>.elf and <out_dir>/<program>.toml; the runner prints the expected line on stdout.
 """
 import pathlib
+import struct
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -664,12 +665,73 @@ def program_missing_target():
 
 
 EXPECTED['missing_target'] = 'E2E before missing target'
+
+
+def program_sif_load():
+    a = Assembler()
+    a.function('_start')
+    a.la('t0', 'overlay_data')
+    a.li('t1', 0x7FFFFFFF)
+    a.i('sw', 't1', 't0', 0)
+    a.i('sw', 't1', 't0', 4)
+    a.la('a0', 'overlay_path')
+    a.li('a1', 0)
+    a.jump('jal', 'sceSifLoadElf')
+    a.nop()
+    a.branch('bne', 'v0', 'zero', 'failed')
+    a.nop()
+    a.la('t0', 'overlay_data')
+    a.i('lw', 't1', 't0', 0)
+    a.li('t2', 0x12345678)
+    a.branch('bne', 't1', 't2', 'failed')
+    a.nop()
+    a.i('lw', 't1', 't0', 4)
+    a.branch('bne', 't1', 'zero', 'failed')
+    a.nop()
+    a.la('a0', 'success')
+    a.jump('jal', 'puts')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.li('a0', 0)
+    a.label('failed')
+    a.la('a0', 'failure')
+    a.jump('jal', 'puts')
+    a.nop()
+    a.jump('jal', 'exit')
+    a.li('a0', 1)
+
+    for name in ('sceSifLoadElf', 'puts', 'exit'):
+        a.function(name)
+        a.r('jr', rs='ra')
+        a.nop()
+    a.data_block('overlay_path', b'host:sif_overlay.elf\0', align=4)
+    a.data_block('success', b'E2E SIF loaded payload and zeroed tail\0', align=4)
+    a.data_block('failure', b'E2E SIF payload check failed\0', align=4)
+    a.data_block('overlay_data', struct.pack('<II', 0x12345678, 0), align=4)
+    return a, ['sceSifLoadElf', 'puts', 'exit']
+
+
+EXPECTED['sif_load'] = 'E2E SIF loaded payload and zeroed tail'
+
+
+def write_sif_overlay(out_dir, asm, image):
+    # Leave the final two data words in the section table and file but outside the initial PT_LOAD.
+    file_size, memory_size = struct.unpack_from('<II', image, 52 + 16)
+    struct.pack_into('<II', image, 52 + 16, file_size - 8, memory_size - 8)
+    # Load through a KSEG1 alias to exercise correlation in physical RDRAM coordinates.
+    alias = 0xA0000000 | asm.addr('overlay_data')
+    header = (b'\x7fELF' + bytes([1, 1, 1]) + bytes(9)
+              + struct.pack('<HHIIIIIHHHHHH', 2, 8, 1, alias, 52, 0, 0, 52, 32, 1, 40, 0, 0))
+    segment = struct.pack('<8I', 1, 84, alias, alias, 4, 8, 6, 1)
+    (out_dir / 'sif_overlay.elf').write_bytes(header + segment + struct.pack('<I', 0x12345678))
+
 # Host exit code each program must end with (default 0). 3 = unresolved guest control flow
 # (PS2Runtime::GuestTermination::UnresolvedControlFlow).
 EXPECTED_EXIT = {'missing_target': 3}
 
 PROGRAMS = {'basic': program_basic, 'gs_sprite': program_gs_sprite, 'branchdelay': program_branchdelay,
-            'vu_macro': program_vu_macro, 'stripped': program_stripped, 'missing_target': program_missing_target}
+            'vu_macro': program_vu_macro, 'stripped': program_stripped, 'missing_target': program_missing_target,
+            'sif_load': program_sif_load}
 
 # Programs whose ELF must be emitted stripped (no symbol table).
 STRIPPED_PROGRAMS = {'stripped'}
@@ -680,7 +742,10 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     asm, stubs = PROGRAMS[name]()
     elf_path = out_dir / f'{name}.elf'
-    elf_path.write_bytes(asm.elf(strip=(name in STRIPPED_PROGRAMS)))
+    image = bytearray(asm.elf(strip=(name in STRIPPED_PROGRAMS)))
+    if name == 'sif_load':
+        write_sif_overlay(out_dir, asm, image)
+    elf_path.write_bytes(image)
     gen_dir = out_dir / f'{name}_generated'
     stub_list = ', '.join(f'"{s}"' for s in stubs)
     (out_dir / f'{name}.toml').write_text(

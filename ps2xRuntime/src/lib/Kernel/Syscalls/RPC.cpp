@@ -715,7 +715,7 @@ namespace ps2_syscalls
                 return false;
             sd = it->second.sd_ptr;
         }
-        const auto *server = sd ? reinterpret_cast<const t_SifRpcServerData *>(getConstMemPtr(rdram, sd)) : nullptr;
+        const auto *server = sd ? getEeGuestStruct<t_SifRpcServerData>(rdram, sd) : nullptr;
         if (!server || server->func == 0u || !runtime || !runtime->hasFunction(server->func))
             return false;
         serverAddress = sd;
@@ -727,16 +727,22 @@ namespace ps2_syscalls
                                     std::vector<uint8_t> send, uint32_t receiveSize,
                                     std::function<void(const std::vector<uint8_t> &)> onComplete)
     {
-        auto *server = serverAddress ? reinterpret_cast<t_SifRpcServerData *>(getMemPtr(rdram, serverAddress)) : nullptr;
+        auto *server = serverAddress ? getEeGuestStruct<t_SifRpcServerData>(rdram, serverAddress) : nullptr;
         if (!runtime || !server || server->func == 0u || !runtime->hasFunction(server->func))
             return false;
         const uint32_t buffer = server->buf;
         if (!send.empty())
         {
-            if (buffer == 0u || !getMemPtr(rdram, buffer) ||
-                !getMemPtr(rdram, buffer + static_cast<uint32_t>(send.size()) - 1u))
+            // First/last pointer checks alone do not prove a contiguous EE RAM span:
+            // memcpy would overrun RDRAM if the buffer crossed a mirrored RAM boundary.
+            uint32_t offset = 0u;
+            bool scratch = false;
+            if (buffer == 0u || !resolveEeGuestRange(buffer, send.size(), offset, scratch))
                 return false;
-            std::memcpy(getMemPtr(rdram, buffer), send.data(), send.size());
+            uint8_t *destination = getMemPtr(rdram, buffer);
+            if (!destination)
+                return false;
+            std::memcpy(destination, send.data(), send.size());
         }
         server->rpc_number = static_cast<int>(function);
         server->size = static_cast<int>(send.size());
@@ -758,16 +764,16 @@ namespace ps2_syscalls
             const uint32_t replyAddress = getRegU32(&completed, 2);
             if (replyAddress != 0u && receiveSize != 0u)
             {
-                reply.resize(receiveSize, 0u);
-                for (uint32_t i = 0; i < receiveSize; ++i)
+                uint32_t offset = 0u;
+                bool scratch = false;
+                if (resolveEeGuestRange(replyAddress, 1u, offset, scratch))
                 {
-                    const uint8_t *byte = getConstMemPtr(rdram, replyAddress + i);
-                    if (!byte)
-                    {
-                        reply.resize(i);
-                        break;
-                    }
-                    reply[i] = *byte;
+                    // Preserve partial replies on invalid ranges, but never wrap
+                    // an EE guest address into a new RAM alias while copying.
+                    const size_t remaining = (scratch ? PS2_SCRATCHPAD_SIZE : PS2_RAM_SIZE) - offset;
+                    const size_t readable = std::min<size_t>(receiveSize, remaining);
+                    if (const uint8_t *source = getConstMemPtr(rdram, replyAddress))
+                        reply.assign(source, source + readable);
                 }
             }
             if (done)

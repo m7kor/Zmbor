@@ -2,11 +2,13 @@
 #include "ps2_runtime.h"
 #include "ps2_runtime_macros.h"
 #include "ps2_iop_transport.h"
+#include "Syscalls/RPC.h"
 #include "ps2_syscalls.h"
 #include "ps2_stubs.h"
 #include "runtime/ee_scheduler.h"
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -186,12 +188,51 @@ namespace
         std::memcpy(&value, rdram + addr, sizeof(value));
         return value;
     }
+    void noOpEeRpcServer(uint8_t *, R5900Context *, PS2Runtime *) {}
 }
 
 void register_ps2_sif_rpc_tests()
 {
     MiniTest::Case("PS2SifRpc", [](TestCase &tc)
     {
+        tc.Run("IOP-to-EE RPC checks the complete EE RAM destination", [](TestCase &t)
+        {
+            TestEnv env;
+            // Padded host allocation makes the original overrun measurable in a
+            // regression test without first corrupting another host allocation.
+            env.rdram.resize(PS2_RAM_SIZE + 64u, 0xA5u);
+            env.runtime.eeScheduler().reset(env.rdram.data(), env.ctx);
+            constexpr uint32_t kServer = 0x00021000u;
+            constexpr uint32_t kFunction = 0x00023000u;
+            t.IsTrue(env.runtime.registerFunction(kFunction, &noOpEeRpcServer),
+                     "register test EE server function");
+            SifRpcServerData server{};
+            server.func = kFunction;
+            server.buf = PS2_RAM_SIZE - 4u; // eight-byte payload overflows by four
+            writeGuestStruct(env.rdram.data(), kServer, server);
+            const std::vector<uint8_t> payload{1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u};
+            const auto call = [&]()
+            {
+                return queueEeRpcServerCallForIop(env.rdram.data(), &env.runtime,
+                                                   kServer, 7u, payload, 0u, {});
+            };
+            t.IsTrue(!call(), "cross-boundary send must fail");
+            t.IsTrue(std::all_of(env.rdram.begin() + PS2_RAM_SIZE, env.rdram.end(),
+                                 [](uint8_t v) { return v == 0xA5u; }),
+                     "failed send cannot write outside host RDRAM");
+
+            server.buf = 0xA0000000u | (PS2_RAM_SIZE - 4u);
+            writeGuestStruct(env.rdram.data(), kServer, server);
+            t.IsTrue(!call(), "KSEG1 alias cannot bypass the span check");
+
+            server.buf = 0x00024000u;
+            writeGuestStruct(env.rdram.data(), kServer, server);
+            t.IsTrue(call(), "valid EE RPC buffer remains supported");
+            t.IsTrue(std::memcmp(env.rdram.data() + server.buf,
+                                  payload.data(), payload.size()) == 0,
+                     "valid RPC payload reaches the guest server");
+        });
+
         tc.Run("SifInitRpc does not reset the running IOP", [](TestCase &t)
         {
             TestEnv env;

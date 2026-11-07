@@ -1,6 +1,5 @@
 #pragma once
-// Bounded, opt-in runtime diagnostics for bringing up commercial programs (docs/engineering/
-// CRASH_TWINSANITY_BLACK_SCREEN.md). Off by default; every hook is one relaxed atomic load when disabled.
+// Bounded, opt-in runtime diagnostics for bringing up commercial programs (see docs/engineering/PROSANITY_INTEGRATION.md). Off by default; every hook is one relaxed atomic load when disabled.
 //
 //   ZMBOR_TRACE_HLE=1      every HLE stub/syscall-wrapper call: counts, first/last caller, args, results
 //   ZMBOR_TRACE_SYSCALL=1  numeric EE syscalls (handleSyscall): counts per syscall number
